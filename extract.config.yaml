@@ -47,5 +47,5 @@ postProcess:
     to: pnpm-workspace.yaml
 
 git:
-  remote: git@github.com:syrokomskyi/werkstatt.git
+  remote: git@github.com:syrokomskyi/werkstatt-engine.git
   autoPush: true
