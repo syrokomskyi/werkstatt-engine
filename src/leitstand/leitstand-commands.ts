@@ -861,13 +861,13 @@ export async function runLeitstandDevDeploy(
     nextSteps: deployResult.failingPhase
       ? [
           {
-            action: `Fix the failing phase (${deployResult.failingPhase}), then re-run: pnpm exec werkstatt run leitstand.dev-deploy --release ${releaseId}`,
+            action: `Fix the failing phase (${deployResult.failingPhase}), then re-run: pnpm exec werkstatt run leitstand.dev-deploy --site ${systemId} --release ${releaseId}`,
             kind: "required",
           },
         ]
       : [
           {
-            action: `Propagate to alt: pnpm exec werkstatt run leitstand.propagate --release ${releaseId}`,
+            action: `Propagate to alt: pnpm exec werkstatt run leitstand.propagate --site ${systemId} --release ${releaseId}`,
             kind: "optional",
           },
         ],
@@ -1035,13 +1035,13 @@ export async function runLeitstandPropagate(
     nextSteps: deployResult.failingPhase
       ? [
           {
-            action: `Fix the failing phase (${deployResult.failingPhase}), then re-run: pnpm exec werkstatt run leitstand.propagate --release ${releaseId}`,
+            action: `Fix the failing phase (${deployResult.failingPhase}), then re-run: pnpm exec werkstatt run leitstand.propagate --site ${systemId} --release ${releaseId}`,
             kind: "required",
           },
         ]
       : [
           {
-            action: `Certify the alt gate: pnpm exec werkstatt run leitstand.certify --release ${releaseId} --gate alt`,
+            action: `Certify the alt gate: pnpm exec werkstatt run leitstand.certify --site ${systemId} --release ${releaseId} --gate alt`,
             kind: "optional",
           },
           {
@@ -2476,7 +2476,12 @@ export async function runLeitstandVerify(
   if (hasIssues) {
     const issues: string[] = [];
     if (!allReachable) issues.push(`${reachableCount}/${total} reachable`);
-    if (reachableChannels.length > 0 && !allSameHash) issues.push("hash drift");
+    if (reachableChannels.length > 0 && !allSameHash) {
+      const hashDetails = Object.entries(hashesByChannel)
+        .map(([ch, h]) => `${ch}=${h ?? "unreachable"}`)
+        .join(", ");
+      issues.push(`hash drift (${hashDetails})`);
+    }
     if (localMismatch) issues.push("local mismatch");
     summary = `[leitstand.verify] ${systemId}: ${issues.join(", ")}`;
   } else {

@@ -437,7 +437,17 @@ export async function commitAndPushBordbuch(
   }
 
   try {
+    try {
+      gitExec(systemDir, "stash push -m bordbuch-pull-rebase");
+    } catch {
+      // No changes to stash — proceed with pull
+    }
     gitExec(systemDir, `pull --rebase origin ${branch}`);
+    try {
+      gitExec(systemDir, "stash pop");
+    } catch {
+      // Stash pop may fail if rebase introduced conflicts — non-fatal, stash remains for manual recovery
+    }
     gitExec(systemDir, `push origin ${branch}`);
     return { commitSha, pushed: true, error: null };
   } catch (err) {
