@@ -1,6 +1,6 @@
 {
   "name": "@warpgogol/werkstatt-engine",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": false,
   "type": "module",
   "engines": {
@@ -339,7 +339,11 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": ["src", "bin", "os"],
+  "files": [
+    "src",
+    "bin",
+    "os"
+  ],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
@@ -349,36 +353,36 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.27",
-    "@ai-sdk/openai": "^4.0.27",
+    "@ai-sdk/anthropic": "^4.0.41",
+    "@ai-sdk/openai": "^4.0.46",
     "@astrojs/compiler": "^4.0.0",
-    "@astrojs/markdown-remark": "^7.0.0",
-    "@aws-sdk/client-s3": "^3.1101.0",
-    "@libp2p/identify": "^4.1.12",
-    "@libp2p/kad-dht": "^16.4.2",
-    "@libp2p/peer-id": "^6.0.14",
-    "@libp2p/ping": "^3.1.11",
-    "@libp2p/tcp": "^11.0.26",
+    "@astrojs/markdown-remark": "^7.2.4",
+    "@aws-sdk/client-s3": "^3.1116.0",
+    "@libp2p/identify": "^4.1.13",
+    "@libp2p/kad-dht": "^16.4.4",
+    "@libp2p/peer-id": "^6.0.15",
+    "@libp2p/ping": "^3.1.12",
+    "@libp2p/tcp": "^11.0.27",
     "@multiformats/multiaddr": "^13.0.3",
     "@noble/ed25519": "^3.1.0",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/picomatch": "^4.0.3",
-    "@typescript-eslint/typescript-estree": "^8.65.0",
-    "@warpgogol/forge": "^2.9.1",
-    "@warpgogol/werkstatt-shared": "^0.8.6",
-    "ai": "^7.0.47",
+    "@typescript-eslint/typescript-estree": "^8.67.0",
+    "@warpgogol/forge": "workspace:*",
+    "@warpgogol/werkstatt-shared": "workspace:*",
+    "ai": "^7.0.77",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "asn1js": "^3.0.10",
-    "astro": "^7.2.0",
+    "astro": "^7.2.4",
     "dotenv": "^17.4.2",
     "jsonc-parser": "^3.3.1",
-    "libp2p": "^3.3.8",
+    "libp2p": "^3.3.9",
     "p-limit": "^7.3.1",
     "pdf-lib": "^1.17.1",
     "picomatch": "^4.0.5",
-    "pkijs": "^3.3.3",
-    "postcss": "^8.5.25",
+    "pkijs": "^3.4.0",
+    "postcss": "^8.5.26",
     "remark-frontmatter": "^5.0.0",
     "remark-mdx": "^3.1.1",
     "remark-parse": "^11.0.0",
@@ -387,7 +391,7 @@
     "tar": "^7.5.22",
     "tsx": "^4.23.12",
     "unified": "^11.0.5",
-    "uuid": "^14.0.1",
+    "uuid": "^14.0.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
@@ -401,13 +405,13 @@
     "lighthouse": "13.4.1"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "@types/semver": "^7.7.0",
-    "eslint": "^10.8.0",
+    "@types/node": "^26.2.0",
+    "@types/semver": "^7.8.0",
+    "eslint": "^10.9.0",
     "fast-check": "^4.9.0",
     "sharp": "^0.35.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "8.65.0",
-    "vitest": "^4.1.10"
+    "typescript-eslint": "8.68.0",
+    "vitest": "^4.1.11"
   }
 }
