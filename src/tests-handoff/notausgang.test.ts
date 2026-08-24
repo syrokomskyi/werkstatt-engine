@@ -415,7 +415,7 @@ test("validate fails on secret detected outside safe locations", async () => {
 
   await writeFile(
     join(workspaceRoot, "notausgang-export", "site", "src", "content", "secret.md"),
-    "API_KEY=sk_live_abcdefghijklmnopqrstuvwxyz123456\n",
+    "API_KEY=sk_live_TESTPLACEHOLDERXXXXXXXXXX\n",
     "utf8",
   );
 
