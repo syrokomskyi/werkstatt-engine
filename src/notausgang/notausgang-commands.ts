@@ -27,7 +27,10 @@ import {
 import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
 import { fingerprintTree, fingerprintFile } from "@warpgogol/werkstatt-engine/fingerprint/semantic";
 import { byteHashFile } from "@warpgogol/werkstatt-engine/fingerprint";
-import { notausgangManifestSchema, type NotausgangManifest } from "@warpgogol/werkstatt-engine/schemas";
+import {
+  notausgangManifestSchema,
+  type NotausgangManifest,
+} from "@warpgogol/werkstatt-engine/schemas";
 import { generateOperationId } from "../werkstatt/index.ts";
 import { atomicMoveDir, atomicWriteFile } from "../werkstatt/atomic.ts";
 import { readSystemConfig, resolveCacheClonePath } from "../sternsystem/registry-io.ts";
@@ -56,6 +59,7 @@ const RUNTIME_FILE_PATTERNS = [
 ];
 
 const SECRET_PATTERNS = [
+  /TESTSECRET_[a-zA-Z0-9]{20,}/,
   /sk_live_[a-zA-Z0-9]{20,}/,
   /sk_test_[a-zA-Z0-9]{20,}/,
   /eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/,

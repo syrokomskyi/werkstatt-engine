@@ -72,6 +72,7 @@ function flagBool(input: KernelCommandInput, key: string): boolean {
 const CREDENTIAL_PATTERNS: RegExp[] = [
   /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[A-Za-z0-9]{20,}["']?/i,
   /(?:aws_secret_access_key|private_key|client_secret)\s*[:=]\s*["']?[^\s"']{8,}["']?/i,
+  /TESTSECRET_[a-zA-Z0-9]{20,}/,
   /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----/,
   /eyJ[A-Za-z0-9_-]{10,}\.\.[A-Za-z0-9_-]{10,}/,
   /AKIA[0-9A-Z]{16}/,

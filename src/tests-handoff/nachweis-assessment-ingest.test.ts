@@ -573,7 +573,7 @@ describe("RFC-0873: nachweis.assessment.ingest", () => {
     const bundlePath = join(bundleDir, "bundle.json");
     await writeFile(
       bundlePath,
-      JSON.stringify(bundle, null, 2) + '\n"api_key": "AKIAIOSFODNN7EXAMPLE"',
+      JSON.stringify(bundle, null, 2) + '\n"api_key": "TESTSECRET_abcdefghijklmnopqrst"',
       "utf8",
     );
     await writeArtifactFiles(bundleDir, {
