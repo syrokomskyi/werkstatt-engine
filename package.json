@@ -1,6 +1,6 @@
 {
   "name": "@warpgogol/werkstatt-engine",
-  "version": "1.7.0",
+  "version": "1.9.0",
   "private": false,
   "type": "module",
   "engines": {
@@ -339,11 +339,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os"
-  ],
+  "files": ["src", "bin", "os"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
@@ -407,7 +403,6 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/semver": "^7.7.0",
-    "@types/uuid": "^11.0.0",
     "eslint": "^10.8.0",
     "fast-check": "^4.9.0",
     "sharp": "^0.35.3",
