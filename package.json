@@ -1,6 +1,6 @@
 {
   "name": "@warpgogol/werkstatt-engine",
-  "version": "1.4.16",
+  "version": "1.4.17",
   "private": false,
   "type": "module",
   "engines": {
@@ -339,7 +339,12 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": ["src", "bin", "os", "dist"],
+  "files": [
+    "src",
+    "bin",
+    "os",
+    "dist"
+  ],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
