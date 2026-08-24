@@ -2,8 +2,8 @@
 # Extracts packages/werkstatt from the werkstatt monorepo into a standalone private repo.
 # RFC-0773: Engine publication pipeline via repo-extract to private npm.
 
-projectDir: packages/werkstatt
-destName: werkstatt
+projectDir: packages/werkstatt-engine
+destName: werkstatt-engine
 standalone: true
 versionBump: patch
 
@@ -43,7 +43,7 @@ postProcess:
   - action: delete
     path: pnpm-lock.yaml
   - action: copy
-    from: packages/werkstatt/pnpm-workspace.override.yaml
+    from: packages/werkstatt-engine/pnpm-workspace.override.yaml
     to: pnpm-workspace.yaml
 
 git:
