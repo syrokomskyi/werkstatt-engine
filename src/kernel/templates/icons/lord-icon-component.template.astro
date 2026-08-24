@@ -1,0 +1,28 @@
+---
+/* 
+<MODULE_CONTRACT> 
+<purpose>Facilitates the rendering of Lord icons by composing the base icon component with specific properties.</purpose> 
+ 
+ 
+<non-goals> 
+<item>Do not handle icon data fetching or transformation logic.</item> 
+<item>Do not manage global state or context for icon usage.</item> 
+<item>Do not implement styling or layout concerns outside of the icon rendering.</item> 
+</non-goals> 
+</MODULE_CONTRACT> 
+ 
+<CHANGE_SUMMARY> 
+<item>Backfill Compass scaffolding to clarify the architectural role and responsibilities of the icon component.</item> 
+</CHANGE_SUMMARY> 
+*/
+
+
+import LordIconBase from "../../../../lord-icon-base.astro";
+import src from "{{RELATIVE_JSON_PATH}}?url";
+
+type Props = Omit<import("../../../../lord-icon-base.astro").Props, "src">;
+
+const { ...props } = Astro.props;
+---
+
+<LordIconBase {...props} src={src} />

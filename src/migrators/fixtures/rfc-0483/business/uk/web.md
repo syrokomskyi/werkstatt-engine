@@ -1,0 +1,4 @@
+---
+domains:
+  primary: "warpgogol.com"
+---

@@ -1,0 +1,22 @@
+{
+  "schema": "werkstatt/canonical-json-v1-provenance@1",
+  "createdAt": "2026-08-15",
+  "nodeVersion": "v24.0.0",
+  "sources": [
+    {
+      "name": "RFC 8785 Appendix B",
+      "url": "https://www.rfc-editor.org/rfc/rfc8785.html#name-examples",
+      "retrievedAt": "2026-08-14",
+      "sourceSha256": "f838dae5004a1ecfae084cf223b03195a1fa69785b3ab74d28401ffb108fbe27",
+      "license": "IETF Trust Provisions (BSD-3)",
+      "note": "RFC 8785 is an IETF Informational document. Examples are reproduced under the IETF Trust Provisions."
+    }
+  ],
+  "vectorSets": [
+    {
+      "name": "rfc8785-appendix-b",
+      "source": "RFC 8785 Appendix B",
+      "description": "Accepted and rejected vectors from RFC 8785 Appendix B with Werkstatt profile restrictions applied"
+    }
+  ]
+}

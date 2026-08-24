@@ -1,0 +1,745 @@
+{
+  "name": "@warpgogol/werkstatt-engine",
+  "version": "1.4.10",
+  "private": false,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "description": "Werkstatt engine — stack-agnostic lifecycle platform (RFC-0769/0772).",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/syrokomskyi/werkstatt.git"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "werkstatt": "./bin/werkstatt.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./os/werkstatt-autonomy-module": {
+      "types": "./os/werkstatt-autonomy.module.ts",
+      "default": "./os/werkstatt-autonomy.module.ts"
+    },
+    "./os/werkstatt-shared-validate-module": {
+      "types": "./os/werkstatt-shared-validate.module.ts",
+      "default": "./os/werkstatt-shared-validate.module.ts"
+    },
+    "./os/werkstatt-commands-validate-module": {
+      "types": "./os/werkstatt-commands-validate.module.ts",
+      "default": "./os/werkstatt-commands-validate.module.ts"
+    },
+    "./package.json": "./package.json",
+    "./kernel": {
+      "types": "./src/kernel/index.ts",
+      "default": "./src/kernel/index.ts"
+    },
+    "./kernel/icons": {
+      "types": "./src/kernel/icons/icons.module.ts",
+      "default": "./src/kernel/icons/icons.module.ts"
+    },
+    "./kernel/adr": {
+      "types": "./src/kernel/adr/index.ts",
+      "default": "./src/kernel/adr/index.ts"
+    },
+    "./kernel/change-impact": {
+      "types": "./src/kernel/change-impact.ts",
+      "default": "./src/kernel/change-impact.ts"
+    },
+    "./kernel/change-impact-module": {
+      "types": "./src/kernel/change-impact.module.ts",
+      "default": "./src/kernel/change-impact.module.ts"
+    },
+    "./kernel/cli": {
+      "types": "./src/kernel/cli/index.ts",
+      "default": "./src/kernel/cli/index.ts"
+    },
+    "./kernel/commit-message": {
+      "types": "./src/kernel/commit-message.module.ts",
+      "default": "./src/kernel/commit-message.module.ts"
+    },
+    "./kernel/command-manifest": {
+      "types": "./src/kernel/command-manifest.ts",
+      "default": "./src/kernel/command-manifest.ts"
+    },
+    "./kernel/command-manifest-module": {
+      "types": "./src/kernel/command-manifest.module.ts",
+      "default": "./src/kernel/command-manifest.module.ts"
+    },
+    "./kernel/cache-module": {
+      "types": "./src/kernel/cache/cache-module.ts",
+      "default": "./src/kernel/cache/cache-module.ts"
+    },
+    "./kernel/discovery": {
+      "types": "./src/kernel/discovery.ts",
+      "default": "./src/kernel/discovery.ts"
+    },
+    "./kernel/generated-marker": {
+      "types": "./src/kernel/generated-marker.ts",
+      "default": "./src/kernel/generated-marker.ts"
+    },
+    "./kernel/gitmesh-module": {
+      "types": "./src/kernel/gitmesh/gitmesh-module.ts",
+      "default": "./src/kernel/gitmesh/gitmesh-module.ts"
+    },
+    "./kernel/swim-module": {
+      "types": "./src/kernel/swim/swim-module.ts",
+      "default": "./src/kernel/swim/swim-module.ts"
+    },
+    "./kernel/lagebild": {
+      "types": "./src/kernel/lagebild/index.ts",
+      "default": "./src/kernel/lagebild/index.ts"
+    },
+    "./kernel/lagebild-module": {
+      "types": "./src/kernel/lagebild/lagebild.module.ts",
+      "default": "./src/kernel/lagebild/lagebild.module.ts"
+    },
+    "./kernel/pipeline-budget": {
+      "types": "./src/kernel/pipeline-budget.module.ts",
+      "default": "./src/kernel/pipeline-budget.module.ts"
+    },
+    "./kernel/pipeline-budgets": {
+      "types": "./src/kernel/pipeline-budgets.ts",
+      "default": "./src/kernel/pipeline-budgets.ts"
+    },
+    "./kernel/semantic": {
+      "types": "./src/kernel/semantic/semantic.module.ts",
+      "default": "./src/kernel/semantic/semantic.module.ts"
+    },
+    "./kernel/runtime": {
+      "types": "./src/kernel/runtime.ts",
+      "default": "./src/kernel/runtime.ts"
+    },
+    "./kernel/types": {
+      "types": "./src/kernel/types.ts",
+      "default": "./src/kernel/types.ts"
+    },
+    "./kernel/workspace-discovery": {
+      "types": "./src/kernel/workspace-discovery.ts",
+      "default": "./src/kernel/workspace-discovery.ts"
+    },
+    "./kernel/workspace-io": {
+      "types": "./src/kernel/workspace-io.ts",
+      "default": "./src/kernel/workspace-io.ts"
+    },
+    "./kernel/workflow": {
+      "types": "./src/kernel/workflow/index.ts",
+      "default": "./src/kernel/workflow/index.ts"
+    },
+    "./kernel/dht": {
+      "types": "./src/kernel/dht/types.ts",
+      "default": "./src/kernel/dht/types.ts"
+    },
+    "./kernel/dht-module": {
+      "types": "./src/kernel/dht/dht-module.ts",
+      "default": "./src/kernel/dht/dht-module.ts"
+    },
+    "./mission": {
+      "types": "./src/mission/index.ts",
+      "default": "./src/mission/index.ts"
+    },
+    "./sternsystem": {
+      "types": "./src/sternsystem/index.ts",
+      "default": "./src/sternsystem/index.ts"
+    },
+    "./bordbuch": {
+      "types": "./src/bordbuch/index.ts",
+      "default": "./src/bordbuch/index.ts"
+    },
+    "./artifact-store": {
+      "types": "./src/artifact-store/index.ts",
+      "default": "./src/artifact-store/index.ts"
+    },
+    "./behavior-snapshot": {
+      "types": "./src/behavior-snapshot/index.ts",
+      "default": "./src/behavior-snapshot/index.ts"
+    },
+    "./release": {
+      "types": "./src/release/index.ts",
+      "default": "./src/release/index.ts"
+    },
+    "./leitstand": {
+      "types": "./src/leitstand/index.ts",
+      "default": "./src/leitstand/index.ts"
+    },
+    "./leitstand/adapters/cloudflare-workers": {
+      "types": "./src/leitstand/adapters/cloudflare-workers.ts",
+      "default": "./src/leitstand/adapters/cloudflare-workers.ts"
+    },
+    "./notausgang": {
+      "types": "./src/notausgang/index.ts",
+      "default": "./src/notausgang/index.ts"
+    },
+    "./evidence": {
+      "types": "./src/evidence/index.ts",
+      "default": "./src/evidence/index.ts"
+    },
+    "./handoff": {
+      "types": "./src/handoff/index.ts",
+      "default": "./src/handoff/index.ts"
+    },
+    "./handoff-module": {
+      "types": "./src/handoff/handoff.module.ts",
+      "default": "./src/handoff/handoff.module.ts"
+    },
+    "./mission-module": {
+      "types": "./src/mission/mission.module.ts",
+      "default": "./src/mission/mission.module.ts"
+    },
+    "./sternsystem-module": {
+      "types": "./src/sternsystem/sternsystem.module.ts",
+      "default": "./src/sternsystem/sternsystem.module.ts"
+    },
+    "./bordbuch-module": {
+      "types": "./src/bordbuch/bordbuch.module.ts",
+      "default": "./src/bordbuch/bordbuch.module.ts"
+    },
+    "./artifact-store-module": {
+      "types": "./src/artifact-store/artifact-store.module.ts",
+      "default": "./src/artifact-store/artifact-store.module.ts"
+    },
+    "./behavior-snapshot-module": {
+      "types": "./src/behavior-snapshot/behavior-snapshot.module.ts",
+      "default": "./src/behavior-snapshot/behavior-snapshot.module.ts"
+    },
+    "./release-module": {
+      "types": "./src/release/release.module.ts",
+      "default": "./src/release/release.module.ts"
+    },
+    "./leitstand-module": {
+      "types": "./src/leitstand/leitstand.module.ts",
+      "default": "./src/leitstand/leitstand.module.ts"
+    },
+    "./subdomain-module": {
+      "types": "./src/subdomain/subdomain.module.ts",
+      "default": "./src/subdomain/subdomain.module.ts"
+    },
+    "./customdomain-module": {
+      "types": "./src/customdomain/customdomain.module.ts",
+      "default": "./src/customdomain/customdomain.module.ts"
+    },
+    "./dns-module": {
+      "types": "./src/dns/dns.module.ts",
+      "default": "./src/dns/dns.module.ts"
+    },
+    "./notausgang-module": {
+      "types": "./src/notausgang/notausgang.module.ts",
+      "default": "./src/notausgang/notausgang.module.ts"
+    },
+    "./deploy-module": {
+      "types": "./src/deploy/deploy.module.ts",
+      "default": "./src/deploy/deploy.module.ts"
+    },
+    "./platform-module": {
+      "types": "./src/handoff/platform-module.ts",
+      "default": "./src/handoff/platform-module.ts"
+    },
+    "./identity-module": {
+      "types": "./src/handoff/identity-module.ts",
+      "default": "./src/handoff/identity-module.ts"
+    },
+    "./evidence-module": {
+      "types": "./src/evidence/evidence-module.ts",
+      "default": "./src/evidence/evidence-module.ts"
+    },
+    "./nachweis-module": {
+      "types": "./src/nachweis/nachweis.module.ts",
+      "default": "./src/nachweis/nachweis.module.ts"
+    },
+    "./signing": {
+      "types": "./src/signing/index.ts",
+      "default": "./src/signing/index.ts"
+    },
+    "./signing-module": {
+      "types": "./src/signing/signing.module.ts",
+      "default": "./src/signing/signing.module.ts"
+    },
+    "./integrity": {
+      "types": "./src/integrity/index.ts",
+      "default": "./src/integrity/index.ts"
+    },
+    "./observability": {
+      "types": "./src/observability/index.ts",
+      "default": "./src/observability/index.ts"
+    },
+    "./observability/module": {
+      "types": "./src/observability/module.ts",
+      "default": "./src/observability/module.ts"
+    },
+    "./fingerprint": {
+      "types": "./src/fingerprint/index.ts",
+      "default": "./src/fingerprint/index.ts"
+    },
+    "./fingerprint/semantic": {
+      "types": "./src/fingerprint/semantic.ts",
+      "default": "./src/fingerprint/semantic.ts"
+    },
+    "./agent-gate": {
+      "types": "./src/agent-gate/index.ts",
+      "default": "./src/agent-gate/index.ts"
+    },
+    "./agent-gate/astro": {
+      "types": "./src/agent-gate/astro.ts",
+      "default": "./src/agent-gate/astro.ts"
+    },
+    "./changelog": {
+      "types": "./src/changelog/index.ts",
+      "default": "./src/changelog/index.ts"
+    },
+    "./schemas": {
+      "types": "./src/schemas/index.ts",
+      "default": "./src/schemas/index.ts"
+    },
+    "./component": {
+      "types": "./src/component/index.ts",
+      "default": "./src/component/index.ts"
+    },
+    "./testing/smoke": {
+      "types": "./src/testing/smoke/index.ts",
+      "default": "./src/testing/smoke/index.ts"
+    },
+    "./testing/integration": {
+      "types": "./src/testing/integration/index.ts",
+      "default": "./src/testing/integration/index.ts"
+    },
+    "./testing/e2e": {
+      "types": "./src/testing/e2e/index.ts",
+      "default": "./src/testing/e2e/index.ts"
+    },
+    "./component-runtime/reflection": {
+      "types": "./src/component-runtime/reflection.ts",
+      "default": "./src/component-runtime/reflection.ts"
+    },
+    "./component-runtime/conformance": {
+      "types": "./src/component-runtime/conformance.ts",
+      "default": "./src/component-runtime/conformance.ts"
+    },
+    "./component-runtime/testing": {
+      "types": "./src/component-runtime/testing/harness.ts",
+      "default": "./src/component-runtime/testing/harness.ts"
+    },
+    "./isolation/contracts": {
+      "types": "./src/isolation/contracts.ts",
+      "default": "./src/isolation/contracts.ts"
+    },
+    "./isolation/schemas": {
+      "types": "./src/isolation/schemas.ts",
+      "default": "./src/isolation/schemas.ts"
+    },
+    "./isolation/conformance": {
+      "types": "./src/isolation/conformance.ts",
+      "default": "./src/isolation/conformance.ts"
+    },
+    "./certification": {
+      "types": "./src/certification/index.ts",
+      "default": "./src/certification/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "bin",
+    "os",
+    "dist"
+  ],
+  "scripts": {
+    "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
+    "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
+    "build": "pnpm exec tsc -p tsconfig.build.json",
+    "build:check": "pnpm exec tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "pnpm exec tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.27",
+    "@ai-sdk/openai": "^4.0.27",
+    "@astrojs/compiler": "^4.0.0",
+    "@astrojs/markdown-remark": "^7.0.0",
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "@libp2p/identify": "^4.1.12",
+    "@libp2p/kad-dht": "^16.4.2",
+    "@libp2p/peer-id": "^6.0.14",
+    "@libp2p/ping": "^3.1.11",
+    "@libp2p/tcp": "^11.0.26",
+    "@multiformats/multiaddr": "^13.0.3",
+    "@noble/ed25519": "^3.1.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/picomatch": "^4.0.3",
+    "@typescript-eslint/typescript-estree": "^8.65.0",
+    "@warpgogol/forge": "^2.9.1",
+    "@warpgogol/werkstatt-shared": "*",
+    "ai": "^7.0.47",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "asn1js": "^3.0.10",
+    "astro": "^7.2.0",
+    "dotenv": "^17.4.2",
+    "jsonc-parser": "^3.3.1",
+    "libp2p": "^3.3.8",
+    "p-limit": "^7.3.1",
+    "pdf-lib": "^1.17.1",
+    "picomatch": "^4.0.5",
+    "pkijs": "^3.3.3",
+    "postcss": "^8.5.25",
+    "remark-frontmatter": "^5.0.0",
+    "remark-mdx": "^3.1.1",
+    "remark-parse": "^11.0.0",
+    "semver": "^7.8.5",
+    "simple-git": "^3.36.0",
+    "tar": "^7.5.22",
+    "tsx": "^4.23.12",
+    "unified": "^11.0.5",
+    "uuid": "^14.0.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/src/index.js",
+    "types": "./dist/src/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./os/werkstatt-autonomy-module": {
+        "types": "./dist/os/werkstatt-autonomy.module.d.ts",
+        "default": "./dist/os/werkstatt-autonomy.module.js"
+      },
+      "./os/werkstatt-shared-validate-module": {
+        "types": "./dist/os/werkstatt-shared-validate.module.d.ts",
+        "default": "./dist/os/werkstatt-shared-validate.module.js"
+      },
+      "./os/werkstatt-commands-validate-module": {
+        "types": "./dist/os/werkstatt-commands-validate.module.d.ts",
+        "default": "./dist/os/werkstatt-commands-validate.module.js"
+      },
+      "./package.json": "./package.json",
+      "./kernel": {
+        "types": "./dist/src/kernel/index.d.ts",
+        "default": "./dist/src/kernel/index.js"
+      },
+      "./kernel/icons": {
+        "types": "./dist/src/kernel/icons/icons.module.d.ts",
+        "default": "./dist/src/kernel/icons/icons.module.js"
+      },
+      "./kernel/adr": {
+        "types": "./dist/src/kernel/adr/index.d.ts",
+        "default": "./dist/src/kernel/adr/index.js"
+      },
+      "./kernel/change-impact": {
+        "types": "./dist/src/kernel/change-impact.d.ts",
+        "default": "./dist/src/kernel/change-impact.js"
+      },
+      "./kernel/change-impact-module": {
+        "types": "./dist/src/kernel/change-impact.module.d.ts",
+        "default": "./dist/src/kernel/change-impact.module.js"
+      },
+      "./kernel/cli": {
+        "types": "./dist/src/kernel/cli/index.d.ts",
+        "default": "./dist/src/kernel/cli/index.js"
+      },
+      "./kernel/commit-message": {
+        "types": "./dist/src/kernel/commit-message.module.d.ts",
+        "default": "./dist/src/kernel/commit-message.module.js"
+      },
+      "./kernel/command-manifest": {
+        "types": "./dist/src/kernel/command-manifest.d.ts",
+        "default": "./dist/src/kernel/command-manifest.js"
+      },
+      "./kernel/command-manifest-module": {
+        "types": "./dist/src/kernel/command-manifest.module.d.ts",
+        "default": "./dist/src/kernel/command-manifest.module.js"
+      },
+      "./kernel/cache-module": {
+        "types": "./dist/src/kernel/cache/cache-module.d.ts",
+        "default": "./dist/src/kernel/cache/cache-module.js"
+      },
+      "./kernel/discovery": {
+        "types": "./dist/src/kernel/discovery.d.ts",
+        "default": "./dist/src/kernel/discovery.js"
+      },
+      "./kernel/generated-marker": {
+        "types": "./dist/src/kernel/generated-marker.d.ts",
+        "default": "./dist/src/kernel/generated-marker.js"
+      },
+      "./kernel/gitmesh-module": {
+        "types": "./dist/src/kernel/gitmesh/gitmesh-module.d.ts",
+        "default": "./dist/src/kernel/gitmesh/gitmesh-module.js"
+      },
+      "./kernel/swim-module": {
+        "types": "./dist/src/kernel/swim/swim-module.d.ts",
+        "default": "./dist/src/kernel/swim/swim-module.js"
+      },
+      "./kernel/lagebild": {
+        "types": "./dist/src/kernel/lagebild/index.d.ts",
+        "default": "./dist/src/kernel/lagebild/index.js"
+      },
+      "./kernel/lagebild-module": {
+        "types": "./dist/src/kernel/lagebild/lagebild.module.d.ts",
+        "default": "./dist/src/kernel/lagebild/lagebild.module.js"
+      },
+      "./kernel/pipeline-budget": {
+        "types": "./dist/src/kernel/pipeline-budget.module.d.ts",
+        "default": "./dist/src/kernel/pipeline-budget.module.js"
+      },
+      "./kernel/pipeline-budgets": {
+        "types": "./dist/src/kernel/pipeline-budgets.d.ts",
+        "default": "./dist/src/kernel/pipeline-budgets.js"
+      },
+      "./kernel/semantic": {
+        "types": "./dist/src/kernel/semantic/semantic.module.d.ts",
+        "default": "./dist/src/kernel/semantic/semantic.module.js"
+      },
+      "./kernel/runtime": {
+        "types": "./dist/src/kernel/runtime.d.ts",
+        "default": "./dist/src/kernel/runtime.js"
+      },
+      "./kernel/types": {
+        "types": "./dist/src/kernel/types.d.ts",
+        "default": "./dist/src/kernel/types.js"
+      },
+      "./kernel/workspace-discovery": {
+        "types": "./dist/src/kernel/workspace-discovery.d.ts",
+        "default": "./dist/src/kernel/workspace-discovery.js"
+      },
+      "./kernel/workspace-io": {
+        "types": "./dist/src/kernel/workspace-io.d.ts",
+        "default": "./dist/src/kernel/workspace-io.js"
+      },
+      "./kernel/workflow": {
+        "types": "./dist/src/kernel/workflow/index.d.ts",
+        "default": "./dist/src/kernel/workflow/index.js"
+      },
+      "./kernel/dht": {
+        "types": "./dist/src/kernel/dht/types.d.ts",
+        "default": "./dist/src/kernel/dht/types.js"
+      },
+      "./kernel/dht-module": {
+        "types": "./dist/src/kernel/dht/dht-module.d.ts",
+        "default": "./dist/src/kernel/dht/dht-module.js"
+      },
+      "./mission": {
+        "types": "./dist/src/mission/index.d.ts",
+        "default": "./dist/src/mission/index.js"
+      },
+      "./sternsystem": {
+        "types": "./dist/src/sternsystem/index.d.ts",
+        "default": "./dist/src/sternsystem/index.js"
+      },
+      "./bordbuch": {
+        "types": "./dist/src/bordbuch/index.d.ts",
+        "default": "./dist/src/bordbuch/index.js"
+      },
+      "./artifact-store": {
+        "types": "./dist/src/artifact-store/index.d.ts",
+        "default": "./dist/src/artifact-store/index.js"
+      },
+      "./behavior-snapshot": {
+        "types": "./dist/src/behavior-snapshot/index.d.ts",
+        "default": "./dist/src/behavior-snapshot/index.js"
+      },
+      "./release": {
+        "types": "./dist/src/release/index.d.ts",
+        "default": "./dist/src/release/index.js"
+      },
+      "./leitstand": {
+        "types": "./dist/src/leitstand/index.d.ts",
+        "default": "./dist/src/leitstand/index.js"
+      },
+      "./leitstand/adapters/cloudflare-workers": {
+        "types": "./dist/src/leitstand/adapters/cloudflare-workers.d.ts",
+        "default": "./dist/src/leitstand/adapters/cloudflare-workers.js"
+      },
+      "./notausgang": {
+        "types": "./dist/src/notausgang/index.d.ts",
+        "default": "./dist/src/notausgang/index.js"
+      },
+      "./evidence": {
+        "types": "./dist/src/evidence/index.d.ts",
+        "default": "./dist/src/evidence/index.js"
+      },
+      "./handoff": {
+        "types": "./dist/src/handoff/index.d.ts",
+        "default": "./dist/src/handoff/index.js"
+      },
+      "./handoff-module": {
+        "types": "./dist/src/handoff/handoff.module.d.ts",
+        "default": "./dist/src/handoff/handoff.module.js"
+      },
+      "./mission-module": {
+        "types": "./dist/src/mission/mission.module.d.ts",
+        "default": "./dist/src/mission/mission.module.js"
+      },
+      "./sternsystem-module": {
+        "types": "./dist/src/sternsystem/sternsystem.module.d.ts",
+        "default": "./dist/src/sternsystem/sternsystem.module.js"
+      },
+      "./bordbuch-module": {
+        "types": "./dist/src/bordbuch/bordbuch.module.d.ts",
+        "default": "./dist/src/bordbuch/bordbuch.module.js"
+      },
+      "./artifact-store-module": {
+        "types": "./dist/src/artifact-store/artifact-store.module.d.ts",
+        "default": "./dist/src/artifact-store/artifact-store.module.js"
+      },
+      "./behavior-snapshot-module": {
+        "types": "./dist/src/behavior-snapshot/behavior-snapshot.module.d.ts",
+        "default": "./dist/src/behavior-snapshot/behavior-snapshot.module.js"
+      },
+      "./release-module": {
+        "types": "./dist/src/release/release.module.d.ts",
+        "default": "./dist/src/release/release.module.js"
+      },
+      "./leitstand-module": {
+        "types": "./dist/src/leitstand/leitstand.module.d.ts",
+        "default": "./dist/src/leitstand/leitstand.module.js"
+      },
+      "./subdomain-module": {
+        "types": "./dist/src/subdomain/subdomain.module.d.ts",
+        "default": "./dist/src/subdomain/subdomain.module.js"
+      },
+      "./customdomain-module": {
+        "types": "./dist/src/customdomain/customdomain.module.d.ts",
+        "default": "./dist/src/customdomain/customdomain.module.js"
+      },
+      "./dns-module": {
+        "types": "./dist/src/dns/dns.module.d.ts",
+        "default": "./dist/src/dns/dns.module.js"
+      },
+      "./notausgang-module": {
+        "types": "./dist/src/notausgang/notausgang.module.d.ts",
+        "default": "./dist/src/notausgang/notausgang.module.js"
+      },
+      "./deploy-module": {
+        "types": "./dist/src/deploy/deploy.module.d.ts",
+        "default": "./dist/src/deploy/deploy.module.js"
+      },
+      "./platform-module": {
+        "types": "./dist/src/handoff/platform-module.d.ts",
+        "default": "./dist/src/handoff/platform-module.js"
+      },
+      "./identity-module": {
+        "types": "./dist/src/handoff/identity-module.d.ts",
+        "default": "./dist/src/handoff/identity-module.js"
+      },
+      "./evidence-module": {
+        "types": "./dist/src/evidence/evidence-module.d.ts",
+        "default": "./dist/src/evidence/evidence-module.js"
+      },
+      "./nachweis-module": {
+        "types": "./dist/src/nachweis/nachweis.module.d.ts",
+        "default": "./dist/src/nachweis/nachweis.module.js"
+      },
+      "./signing": {
+        "types": "./dist/src/signing/index.d.ts",
+        "default": "./dist/src/signing/index.js"
+      },
+      "./signing-module": {
+        "types": "./dist/src/signing/signing.module.d.ts",
+        "default": "./dist/src/signing/signing.module.js"
+      },
+      "./integrity": {
+        "types": "./dist/src/integrity/index.d.ts",
+        "default": "./dist/src/integrity/index.js"
+      },
+      "./observability": {
+        "types": "./dist/src/observability/index.d.ts",
+        "default": "./dist/src/observability/index.js"
+      },
+      "./observability/module": {
+        "types": "./dist/src/observability/module.d.ts",
+        "default": "./dist/src/observability/module.js"
+      },
+      "./fingerprint": {
+        "types": "./dist/src/fingerprint/index.d.ts",
+        "default": "./dist/src/fingerprint/index.js"
+      },
+      "./fingerprint/semantic": {
+        "types": "./dist/src/fingerprint/semantic.d.ts",
+        "default": "./dist/src/fingerprint/semantic.js"
+      },
+      "./agent-gate": {
+        "types": "./dist/src/agent-gate/index.d.ts",
+        "default": "./dist/src/agent-gate/index.js"
+      },
+      "./agent-gate/astro": {
+        "types": "./dist/src/agent-gate/astro.d.ts",
+        "default": "./dist/src/agent-gate/astro.js"
+      },
+      "./changelog": {
+        "types": "./dist/src/changelog/index.d.ts",
+        "default": "./dist/src/changelog/index.js"
+      },
+      "./schemas": {
+        "types": "./dist/src/schemas/index.d.ts",
+        "default": "./dist/src/schemas/index.js"
+      },
+      "./component": {
+        "types": "./dist/src/component/index.d.ts",
+        "default": "./dist/src/component/index.js"
+      },
+      "./testing/smoke": {
+        "types": "./dist/src/testing/smoke/index.d.ts",
+        "default": "./dist/src/testing/smoke/index.js"
+      },
+      "./testing/integration": {
+        "types": "./dist/src/testing/integration/index.d.ts",
+        "default": "./dist/src/testing/integration/index.js"
+      },
+      "./testing/e2e": {
+        "types": "./dist/src/testing/e2e/index.d.ts",
+        "default": "./dist/src/testing/e2e/index.js"
+      },
+      "./component-runtime/reflection": {
+        "types": "./dist/src/component-runtime/reflection.d.ts",
+        "default": "./dist/src/component-runtime/reflection.js"
+      },
+      "./component-runtime/conformance": {
+        "types": "./dist/src/component-runtime/conformance.d.ts",
+        "default": "./dist/src/component-runtime/conformance.js"
+      },
+      "./component-runtime/testing": {
+        "types": "./dist/src/component-runtime/testing/harness.d.ts",
+        "default": "./dist/src/component-runtime/testing/harness.js"
+      },
+      "./isolation/contracts": {
+        "types": "./dist/src/isolation/contracts.d.ts",
+        "default": "./dist/src/isolation/contracts.js"
+      },
+      "./isolation/schemas": {
+        "types": "./dist/src/isolation/schemas.d.ts",
+        "default": "./dist/src/isolation/schemas.js"
+      },
+      "./isolation/conformance": {
+        "types": "./dist/src/isolation/conformance.d.ts",
+        "default": "./dist/src/isolation/conformance.js"
+      },
+      "./certification": {
+        "types": "./dist/src/certification/index.d.ts",
+        "default": "./dist/src/certification/index.js"
+      }
+    }
+  },
+  "optionalDependencies": {
+    "@syrokomskyi/axiom-factory-app": "link:../../../pipelines/apps/axiom/factory",
+    "@syrokomskyi/axiom-study": "link:../../../pipelines/packages/axiom/axiom-study",
+    "better-sqlite3": "^13.0.3",
+    "lighthouse": "13.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/semver": "^7.7.0",
+    "@types/uuid": "^11.0.0",
+    "eslint": "^10.8.0",
+    "fast-check": "^4.9.0",
+    "sharp": "^0.35.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "^4.1.10"
+  }
+}

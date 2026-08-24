@@ -1,0 +1,98 @@
+{
+  "schema": "werkstatt/canonical-json-v1-vectors@1",
+  "description": "RFC 8785 Appendix B vectors with Werkstatt profile restrictions. Rejected vectors are official JCS values that the stricter Werkstatt profile rejects (negative zero, unsafe integers).",
+  "accepted": [
+    {
+      "id": "B.1-empty",
+      "input": {},
+      "expected": "{}"
+    },
+    {
+      "id": "B.2-simple",
+      "input": { "a": 1, "b": 2 },
+      "expected": "{\"a\":1,\"b\":2}"
+    },
+    {
+      "id": "B.3-key-order",
+      "input": { "b": 1, "a": 2 },
+      "expected": "{\"a\":2,\"b\":1}"
+    },
+    {
+      "id": "B.4-unicode-keys",
+      "input": { "α": "alpha", "Z": "zee" },
+      "expected": "{\"Z\":\"zee\",\"α\":\"alpha\"}"
+    },
+    {
+      "id": "B.5-special-chars",
+      "input": { "a\\b": "backslash", "a\"b": "quote" },
+      "expected": "{\"a\\\"b\":\"quote\",\"a\\\\b\":\"backslash\"}"
+    },
+    {
+      "id": "B.6-numbers",
+      "input": { "int": 42, "float": 3.5, "zero": 0 },
+      "expected": "{\"float\":3.5,\"int\":42,\"zero\":0}"
+    },
+    {
+      "id": "B.7-nested",
+      "input": { "outer": { "inner": { "deep": true } } },
+      "expected": "{\"outer\":{\"inner\":{\"deep\":true}}}"
+    },
+    {
+      "id": "B.8-array",
+      "input": { "arr": [1, 2, 3] },
+      "expected": "{\"arr\":[1,2,3]}"
+    },
+    {
+      "id": "B.9-null-bool",
+      "input": { "n": null, "t": true, "f": false },
+      "expected": "{\"f\":false,\"n\":null,\"t\":true}"
+    },
+    {
+      "id": "B.10-control-chars",
+      "input": { "tab": "\t", "newline": "\n", "cr": "\r" },
+      "expected": "{\"cr\":\"\\r\",\"newline\":\"\\n\",\"tab\":\"\\t\"}"
+    },
+    {
+      "id": "B.11-empty-array",
+      "input": { "empty": [] },
+      "expected": "{\"empty\":[]}"
+    },
+    {
+      "id": "B.12-mixed-types",
+      "input": { "str": "hello", "num": 42, "arr": [true, null, "x"], "obj": { "y": 1 } },
+      "expected": "{\"arr\":[true,null,\"x\"],\"num\":42,\"obj\":{\"y\":1},\"str\":\"hello\"}"
+    },
+    {
+      "id": "B.13-unicode-escape",
+      "input": { "esc": "\u0001" },
+      "expected": "{\"esc\":\"\\u0001\"}"
+    },
+    {
+      "id": "B.14-number-precision",
+      "input": { "v": 1.5 },
+      "expected": "{\"v\":1.5}"
+    },
+    {
+      "id": "B.15-large-integer",
+      "input": { "v": 9007199254740991 },
+      "expected": "{\"v\":9007199254740991}"
+    }
+  ],
+  "rejected": [
+    {
+      "id": "R.01-negative-zero",
+      "input": { "v": -0 },
+      "reason": "Werkstatt profile rejects negative zero"
+    },
+    {
+      "id": "R.02-unsafe-integer",
+      "input": { "v": 9007199254740992 },
+      "reason": "Werkstatt profile rejects unsafe integers (Number.isSafeInteger is false)"
+    },
+    {
+      "id": "R.03-unsafe-integer-negative",
+      "input": { "v": -9007199254740992 },
+      "reason": "Werkstatt profile rejects unsafe negative integers"
+    }
+  ]
+}

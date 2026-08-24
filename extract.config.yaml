@@ -1,0 +1,51 @@
+# extract.config.yaml — repo-extract standalone package export for @warpgogol/werkstatt-engine
+# Extracts packages/werkstatt from the werkstatt monorepo into a standalone private repo.
+# RFC-0773: Engine publication pipeline via repo-extract to private npm.
+
+projectDir: packages/werkstatt
+destName: werkstatt
+standalone: true
+versionBump: patch
+
+workspacePrefixes:
+  - "@warpgogol/"
+stripScopes:
+  - "@warpgogol/"
+preservePackages:
+  - "@warpgogol/werkstatt-engine"
+  - "@warpgogol/werkstatt-shared"
+  - "@warpgogol/forge"
+stubPackages:
+  - "@warpgogol/werkstatt-site"
+packageManager: "pnpm"
+
+ci:
+  provider: github-actions
+  publish: true
+  nodeVersion: 24
+
+ignoreDirs:
+  - .turbo
+  - .agents
+  - node_modules
+  - tmp-*
+
+excludePathSegments:
+  - .npmrc
+  - src/tests
+  - src/kernel/tests/rfc-acceptance.test.ts
+  - src/kernel/tests/rfc-create.test.ts
+  - pnpm-lock.yaml
+
+postProcess:
+  - action: delete
+    path: AGENTS.md
+  - action: delete
+    path: pnpm-lock.yaml
+  - action: copy
+    from: packages/werkstatt/pnpm-workspace.override.yaml
+    to: pnpm-workspace.yaml
+
+git:
+  remote: git@github.com:syrokomskyi/werkstatt.git
+  autoPush: true
