@@ -1,6 +1,1 @@
-overrides:
-  "@warpgogol/werkstatt-engine": "1.4.4"
-  "@warpgogol/werkstatt-shared": "0.8.1"
-minimumReleaseAgeExclude:
-  - "@warpgogol/werkstatt-shared@0.8.1"
-  - "@warpgogol/werkstatt-engine@1.4.4"
+overrides: {}
