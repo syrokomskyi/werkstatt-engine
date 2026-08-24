@@ -17,7 +17,7 @@ preservePackages:
   - "@warpgogol/forge"
 stubPackages:
   - "@warpgogol/werkstatt-site"
-packageManager: "pnpm"
+packageManager: pnpm
 
 ci:
   provider: github-actions

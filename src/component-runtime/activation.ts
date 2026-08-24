@@ -2,7 +2,7 @@ import type {
   ResolvedComponentSetV1,
   ResolvedComponentIdentityV1,
 } from "../component/contracts.ts";
-import { ComponentFiber } from "./fiber.ts";
+import type { ComponentFiber } from "./fiber.ts";
 import type { QuiescenceResult, Deadline } from "./fiber.ts";
 import type { EffectUnwindReportV1 } from "./effects.ts";
 

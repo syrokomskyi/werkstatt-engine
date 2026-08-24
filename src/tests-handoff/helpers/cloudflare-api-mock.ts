@@ -16,7 +16,7 @@ cloudflare-api test files.
 </CHANGE_SUMMARY>
 */
 
-import { vi } from "vitest";
+import type { vi } from "vitest";
 
 export interface CloudflareMockHandlers {
   dnsList?: () => Response;
