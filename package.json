@@ -339,12 +339,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os",
-    "dist"
-  ],
+  "files": ["src", "bin", "os", "dist"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
@@ -371,7 +366,7 @@
     "@types/picomatch": "^4.0.3",
     "@typescript-eslint/typescript-estree": "^8.65.0",
     "@warpgogol/forge": "^2.9.1",
-    "@warpgogol/werkstatt-shared": "*",
+    "@warpgogol/werkstatt-shared": "^0.8.6",
     "ai": "^7.0.47",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",

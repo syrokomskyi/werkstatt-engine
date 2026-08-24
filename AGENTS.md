@@ -1,4 +1,4 @@
-# `@warpgogol/werkstatt` — Agent Guide
+# `@warpgogol/werkstatt-engine` — Agent Guide
 
 RFC-0769/0772: Werkstatt engine — stack-agnostic lifecycle platform. Consolidated from `packages/os/site-kernel`, `packages/os/site-kernel-handoff`, `packages/os/site-kernel-integrity`, `packages/os/site-kernel-observability`, `packages/os/site-kernel-changelog`, `packages/fingerprint`, `packages/agent-gate`, and `packages/ontology/operations` into a single engine package.
 
@@ -10,29 +10,29 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 
 | Entry point | Module |
 | --- | --- |
-| `@warpgogol/werkstatt` | `./src/index.ts` |
-| `@warpgogol/werkstatt/os/werkstatt-autonomy-module` | `./os/werkstatt-autonomy.module.ts` |
-| `@warpgogol/werkstatt/kernel` | `./src/kernel/index.ts` |
-| `@warpgogol/werkstatt/kernel/*` | `./src/kernel/*` (all kernel subpath exports) |
-| `@warpgogol/werkstatt/mission` | `./src/mission/index.ts` |
-| `@warpgogol/werkstatt/sternsystem` | `./src/sternsystem/index.ts` |
-| `@warpgogol/werkstatt/release` | `./src/release/index.ts` |
-| `@warpgogol/werkstatt/leitstand` | `./src/leitstand/index.ts` |
-| `@warpgogol/werkstatt/bordbuch` | `./src/bordbuch/index.ts` |
-| `@warpgogol/werkstatt/notausgang` | `./src/notausgang/index.ts` |
-| `@warpgogol/werkstatt/artifact-store` | `./src/artifact-store/index.ts` |
-| `@warpgogol/werkstatt/evidence` | `./src/evidence/index.ts` |
-| `@warpgogol/werkstatt/integrity` | `./src/integrity/index.ts` |
-| `@warpgogol/werkstatt/signing` | `./src/signing/index.ts` |
-| `@warpgogol/werkstatt/observability` | `./src/observability/index.ts` |
-| `@warpgogol/werkstatt/fingerprint` | `./src/fingerprint/index.ts` |
-| `@warpgogol/werkstatt/fingerprint/semantic` | `./src/fingerprint/semantic.ts` |
-| `@warpgogol/werkstatt/agent-gate` | `./src/agent-gate/index.ts` |
-| `@warpgogol/werkstatt/changelog` | `./src/changelog/index.ts` |
-| `@warpgogol/werkstatt/schemas` | `./src/schemas/index.ts` |
-| `@warpgogol/werkstatt/component` | `./src/component/index.ts` |
-| `@warpgogol/werkstatt/handoff` | `./src/handoff/index.ts` |
-| `@warpgogol/werkstatt/*-module` | `./src/*/*.module.ts` (all module entry points) |
+| `@warpgogol/werkstatt-engine` | `./src/index.ts` |
+| `@warpgogol/werkstatt-engine/os/werkstatt-autonomy-module` | `./os/werkstatt-autonomy.module.ts` |
+| `@warpgogol/werkstatt-engine/kernel` | `./src/kernel/index.ts` |
+| `@warpgogol/werkstatt-engine/kernel/*` | `./src/kernel/*` (all kernel subpath exports) |
+| `@warpgogol/werkstatt-engine/mission` | `./src/mission/index.ts` |
+| `@warpgogol/werkstatt-engine/sternsystem` | `./src/sternsystem/index.ts` |
+| `@warpgogol/werkstatt-engine/release` | `./src/release/index.ts` |
+| `@warpgogol/werkstatt-engine/leitstand` | `./src/leitstand/index.ts` |
+| `@warpgogol/werkstatt-engine/bordbuch` | `./src/bordbuch/index.ts` |
+| `@warpgogol/werkstatt-engine/notausgang` | `./src/notausgang/index.ts` |
+| `@warpgogol/werkstatt-engine/artifact-store` | `./src/artifact-store/index.ts` |
+| `@warpgogol/werkstatt-engine/evidence` | `./src/evidence/index.ts` |
+| `@warpgogol/werkstatt-engine/integrity` | `./src/integrity/index.ts` |
+| `@warpgogol/werkstatt-engine/signing` | `./src/signing/index.ts` |
+| `@warpgogol/werkstatt-engine/observability` | `./src/observability/index.ts` |
+| `@warpgogol/werkstatt-engine/fingerprint` | `./src/fingerprint/index.ts` |
+| `@warpgogol/werkstatt-engine/fingerprint/semantic` | `./src/fingerprint/semantic.ts` |
+| `@warpgogol/werkstatt-engine/agent-gate` | `./src/agent-gate/index.ts` |
+| `@warpgogol/werkstatt-engine/changelog` | `./src/changelog/index.ts` |
+| `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` |
+| `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` |
+| `@warpgogol/werkstatt-engine/handoff` | `./src/handoff/index.ts` |
+| `@warpgogol/werkstatt-engine/*-module` | `./src/*/*.module.ts` (all module entry points) |
 
 ## Scripts
 
@@ -49,10 +49,10 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 
 - This package owns the Werkstatt engine: kernel runtime, missions, mirrors (Sternsystem), releases, Leitstand, Bordbuch, Notausgang, artifact store, evidence, deploy orchestration, werkstatt consistency primitives, fingerprint, integrity, observability, agent-gate, changelog, and operations schemas.
 - The package is stack-agnostic (DNA-64). It MUST NOT import stack plugins.
-- The legacy `werkstatt/plugin@1` contract, registry, and invoke-hook were removed by RFC-0942. The engine now uses `forge` profile-selected capabilities; no stack plugin contract remains in `@warpgogol/werkstatt`.
+- The legacy `werkstatt/plugin@1` contract, registry, and invoke-hook were removed by RFC-0942. The engine now uses `forge` profile-selected capabilities; no stack plugin contract remains in `@warpgogol/werkstatt-engine`.
 - The `werkstatt.autonomy.validate` command (DNA-64 enforcement) scans `src/**` for forbidden `@warpgogol/*` static imports. The `werkstatt.shared.validate` command (RFC-0868) enforces that no `@warpgogol/werkstatt-site/*` static imports remain in `src/**`.
 - **Dynamic `import()` for stack-specific code**: When the engine needs to call stack-specific functions from a plugin (e.g. `werkstatt-site/codegen`, `werkstatt-site/onboarding`, `werkstatt-site/checks`), use dynamic `import()` at the call site, not static `import ... from`. The autonomy and shared guards scan only static import statements — dynamic `import()` is the sanctioned escape hatch for genuinely stack-specific runtime calls, same pattern used by `moduleLoaders` and `deployAdapters` in the plugin contract. Example: `const { runContentRefIndexGenerate } = await import("@warpgogol/werkstatt-site/codegen");`
-- RFC-0776 completed the migration: old packages (`packages/os/site-kernel*`, `packages/fingerprint`, `packages/agent-gate`) are deleted. All imports now go through `@warpgogol/werkstatt` subpath exports.
+- RFC-0776 completed the migration: old packages (`packages/os/site-kernel*`, `packages/fingerprint`, `packages/agent-gate`) are deleted. All imports now go through `@warpgogol/werkstatt-engine` subpath exports.
 
 ### Canonical JSON identity bytes (RFC-0849)
 
@@ -66,7 +66,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 ### Canonical Diagnostic schema (RFC-0852)
 
 - `packages/werkstatt/src/schemas/diagnostic.ts` is the **sole owner** of `DiagnosticSeverity`, `DiagnosticEvidence`, and `Diagnostic` strict Zod schemas and inferred types. `kernel/types.ts` re-exports these types (type-only); no duplicate interface, severity union, or schema implementation may exist elsewhere.
-- The site plugin (`@warpgogol/werkstatt-site`) imports diagnostic schemas from `@warpgogol/werkstatt/schemas`. Legacy aliases (`auditSeveritySchema`, `auditEvidenceSchema`, `auditFindingSchema`, `AuditFinding`) and deprecated fields (`id`, `blockId`, `suggestion`) are removed; no compatibility alias or parser may be reintroduced.
+- The site plugin (`@warpgogol/werkstatt-site`) imports diagnostic schemas from `@warpgogol/werkstatt-engine/schemas`. Legacy aliases (`auditSeveritySchema`, `auditEvidenceSchema`, `auditFindingSchema`, `AuditFinding`) and deprecated fields (`id`, `blockId`, `suggestion`) are removed; no compatibility alias or parser may be reintroduced.
 - `data` accepts only runtime-branded `CanonicalJsonObjectV1` (RFC-0849) validated via `z.custom` + `isCanonicalJsonObjectV1`; arbitrary objects and every RFC-0849-invalid value fail before persistence.
 - Field/collection limits: `ruleId` 128 chars `[A-Z0-9][A-Z0-9._-]*`, `message` 4 KiB, `fixHint` 8 KiB, `file`/`ruleFile` 1 KiB, `url` 4 KiB, `snippet` 16 KiB, 32 evidence items, 64 KiB canonical `data` bytes, 128 KiB per Diagnostic, 1000 diagnostics per persisted result.
 - Safe locator rules: `file`/`ruleFile` use workspace-relative POSIX paths (reject absolute, backslashes, `..`, empty, URI schemes, home expansion, credentials). URLs must be absolute `http:`/`https:` with no userinfo or credential-bearing query values.
@@ -77,7 +77,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - The integration suite at `packages/werkstatt/src/tests/certification-foundation.integration.test.ts` proves ten `CERT-INTEGRATION-*` laws using public child APIs only (RFC-0849, 0850, 0851, 0852, 0853).
 - No child logic is reimplemented in the integration suite; failures route to the owning child RFC for correction.
 - The suite verifies: canonical JSON snapshotting of diagnostic/certification values, identity digest determinism, immutable evaluation cut, permutation invariance, dossier root sensitivity, fail > stale > incomplete > pass precedence, deployment/artifact separation, legacy state rejection, transition block fail-closed, and engine/plugin Diagnostic ownership boundary.
-- `@warpgogol/werkstatt` imports no stack plugin; the site plugin defines no duplicate Diagnostic/certification authority.
+- `@warpgogol/werkstatt-engine` imports no stack plugin; the site plugin defines no duplicate Diagnostic/certification authority.
 
 ### Resolved certification profile (CERT-002, packet 140)
 
@@ -197,7 +197,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `packages/werkstatt/src/component-runtime/reflection.ts` owns the read-only, policy-filtered live capability catalog: `CapabilityCatalogV1`, `CapabilityCatalogEntryV1`, `createCapabilityCatalog`, `assertNoForbiddenFields`. Catalog entries are canonically ordered, exact-set-bound, caller-filtered, and omit secrets, raw grants, private state, credentials, prompts, executable bytes, and authority material.
 - `packages/werkstatt/src/component-runtime/conformance.ts` owns scenario/result contracts: `ConformanceScenarioV1`, `ConformanceEventV1`, `ConformanceExpectationV1`, `ConformanceResultV1`, `ConformanceTraceEntryV1`, `ConformanceMismatchV1`, `ConformanceCleanupReportV1`. Results are always marked `testOnly: true` and contain no admission/promotion decision.
 - `packages/werkstatt/src/component-runtime/testing/harness.ts` owns the test-only conformance harness: `runConformanceScenario`, `buildCatalog`, `TrustedFixture`. Guards reject non-test mode (`CONFORMANCE-01`), untrusted fixtures (`CONFORMANCE-02`), unpinned artifacts (`CONFORMANCE-03`), and hash mismatches (`CONFORMANCE-04`). Fixtures are embedded, hash-pinned, and trusted — no network/package discovery.
-- Subpath exports: `@warpgogol/werkstatt/component-runtime/reflection`, `@warpgogol/werkstatt/component-runtime/conformance`, `@warpgogol/werkstatt/component-runtime/testing`.
+- Subpath exports: `@warpgogol/werkstatt-engine/component-runtime/reflection`, `@warpgogol/werkstatt-engine/component-runtime/conformance`, `@warpgogol/werkstatt-engine/component-runtime/testing`.
 - No production define/install/run/activate/promote command or authority decision is exported. Reflection and conformance results are projections/evidence, not authority.
 
 ### Provider-neutral isolation contract (RFC-0862)
@@ -205,7 +205,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `packages/werkstatt/src/isolation/contracts.ts` owns neutral adapter/workload/bridge contracts: `IsolationAdapterV1`, `SandboxedWorkloadCreateV1`, `SandboxedWorkloadV1`, `CapabilityBridgeRequestV1`, `CapabilityBridgeResponseV1`, `TerminationReportV1`, `AttenuatedGrantSetV1`, `WorkloadLimitsV1`, `IsolationPropertyEvidenceV1`, `IsolationConformanceResultV1`. Workloads receive no ambient filesystem, network, process, environment, clock, randomness, credential, IPC, or host-object access.
 - `packages/werkstatt/src/isolation/schemas.ts` owns strict Zod schemas with `.strict()` validation for all isolation messages, grants, limits, and evidence. Unknown fields, invalid grants, replay, confused identity, and all bound violations are rejected. `validateIsolationAdapter` and `validateBridgeRequest` are the public validators.
 - `packages/werkstatt/src/isolation/conformance.ts` owns the provider-neutral adversarial conformance suite: `runIsolationConformance`, `createConformanceResult`. Covers filesystem/network/process/env/credential/descriptor escape, resource exhaustion, workload separation, teardown, crash, bridge confusion/replay. `node:vm`, `worker_threads`, and ordinary subprocesses fail the security-tier contract by definition. Missing property evidence returns `incomplete`, never `pass`.
-- Subpath exports: `@warpgogol/werkstatt/isolation/contracts`, `@warpgogol/werkstatt/isolation/schemas`, `@warpgogol/werkstatt/isolation/conformance`.
+- Subpath exports: `@warpgogol/werkstatt-engine/isolation/contracts`, `@warpgogol/werkstatt-engine/isolation/schemas`, `@warpgogol/werkstatt-engine/isolation/conformance`.
 - No concrete provider dependency, credential, artifact store, network endpoint, or production loader is added. Packet 190 selects and implements the first real provider.
 
 ### Certification contracts and identity builders (RFC-0853)
@@ -214,7 +214,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `packages/werkstatt/src/certification/identity.ts` owns explicit identity builders for each certification object. Each builder constructs a fresh payload object field-by-field, snapshots through RFC-0849 `snapshotCanonicalJsonObjectV1`, and hashes through `canonicalJsonHashV1`. No clone/delete, generic hash, object spread from source, or parallel interface exists.
 - Identity payloads include only semantic fields — excluded fields (candidate IDs, evidence IDs, event IDs, timestamps, locators, observed environments) do not affect identity digests. Included field changes (source hashes, content hashes, policy bundle roots, binding hashes, statuses, event kinds, task lists) always produce different digests.
 - Evidence identity enforces redaction closure: unresolved redaction reports fail with `CERT-REDACTION-01` before identity construction.
-- Subpath export: `@warpgogol/werkstatt/certification`.
+- Subpath export: `@warpgogol/werkstatt-engine/certification`.
 - No evaluation algorithms, state cutover, storage, commands, producers, adapters, authority execution, or deployment logic exists. Later packets implement those concerns.
 
 ### Deterministic certification evaluation and remediation (RFC-0850)
@@ -258,7 +258,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 
 The `werkstatt.autonomy.validate` command enforces DNA-64. It scans `packages/werkstatt/src/**` for `@warpgogol/*` import specifiers. Exemptions:
 
-- `@warpgogol/werkstatt` (self-imports)
+- `@warpgogol/werkstatt-engine` (self-imports)
 - `@warpgogol/werkstatt-site/ontology`, `@warpgogol/werkstatt-site/share` (shared schema subpaths)
 - `@warpgogol/forge` (governance)
 - `@warpgogol/werkstatt-site/passport`, `@warpgogol/werkstatt-site/observability`, `@warpgogol/werkstatt-site/integration`, `@warpgogol/werkstatt-site/surface` (shared infrastructure subpaths)
