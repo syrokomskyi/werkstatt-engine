@@ -1,6 +1,6 @@
 {
   "name": "@warpgogol/werkstatt-engine",
-  "version": "1.4.12",
+  "version": "1.4.13",
   "private": false,
   "type": "module",
   "engines": {
