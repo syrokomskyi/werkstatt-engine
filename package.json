@@ -9,7 +9,7 @@
   "description": "Werkstatt engine — stack-agnostic lifecycle platform (RFC-0769/0772).",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/syrokomskyi/werkstatt.git"
+    "url": "git+https://github.com/syrokomskyi/werkstatt-engine.git"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -339,12 +339,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os",
-    "dist"
-  ],
+  "files": ["src", "bin", "os", "dist"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
