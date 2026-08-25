@@ -436,21 +436,42 @@ export async function commitAndPushBordbuch(
     return { commitSha, pushed: false, error: "could not detect current branch" };
   }
 
+  let stashed = false;
   try {
     try {
       gitExec(systemDir, "stash push -m bordbuch-pull-rebase");
+      stashed = true;
     } catch {
       // No changes to stash — proceed with pull
     }
     gitExec(systemDir, `pull --rebase origin ${branch}`);
-    try {
-      gitExec(systemDir, "stash pop");
-    } catch {
-      // Stash pop may fail if rebase introduced conflicts — non-fatal, stash remains for manual recovery
+    if (stashed) {
+      try {
+        gitExec(systemDir, "stash pop");
+        stashed = false;
+      } catch {
+        // Stash pop failed — drop the stash to prevent accumulation.
+        // The stashed changes are lost, but they were auto-generated
+        // (bordbuch/status files) and will be recreated on next commit.
+        try {
+          gitExec(systemDir, "stash drop");
+          stashed = false;
+        } catch {
+          // Stash may have been already popped — ignore
+        }
+      }
     }
     gitExec(systemDir, `push origin ${branch}`);
     return { commitSha, pushed: true, error: null };
   } catch (err) {
+    // Clean up stash on push failure too
+    if (stashed) {
+      try {
+        gitExec(systemDir, "stash drop");
+      } catch {
+        // Ignore — stash may not exist
+      }
+    }
     const stderr = (err as Error).message;
     return { commitSha, pushed: false, error: stderr };
   }
