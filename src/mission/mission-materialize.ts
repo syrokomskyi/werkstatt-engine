@@ -469,6 +469,22 @@ async function syncCacheClone(
     // Cache clone exists — fetch and reset to origin/main
     logger.info(`  Fetching latest from ${bareRepoPath}…`);
     try {
+      // Auto-abort any stuck rebase from a previous interrupted sync.
+      // .git/rebase-merge or .git/rebase-apply indicates an in-progress rebase
+      // that will cause git fetch / git reset to fail with "cannot rebase: you have
+      // unstaged changes" or "It seems that there is already a rebase-merge directory".
+      const rebaseMerge = path.join(gitDir, "rebase-merge");
+      const rebaseApply = path.join(gitDir, "rebase-apply");
+      if (existsSync(rebaseMerge) || existsSync(rebaseApply)) {
+        logger.warn(`  ⚠ Cache clone has an in-progress rebase — aborting it before sync.`);
+        try {
+          execSync("git rebase --abort", { cwd: cachePath, stdio: "pipe", timeout: 10_000 });
+        } catch {
+          // If git rebase --abort fails, manually remove the rebase state directories
+          await fs.rm(rebaseMerge, { recursive: true, force: true }).catch(() => {});
+          await fs.rm(rebaseApply, { recursive: true, force: true }).catch(() => {});
+        }
+      }
       // ADR-0031: warn on uncommitted changes before hard reset
       const status = execSync("git status --porcelain", {
         cwd: cachePath,

@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0583: bordbuch.repair — detect orphan-mission-close violations, insert missing mission-open events, recompute hash chain and event-id sequence, write atomically.</purpose>
+  <purpose>RFC-0583: bordbuch.repair — detect orphan-mission-close and unmatched-mission-open violations, insert missing events, recompute hash chain and event-id sequence, write atomically.</purpose>
   <non-goals>
     <item>Do not repair duplicate-mission-id, sensitive-payload, hash-mismatch, or hash-chain-gap violations — these are unrepairable by this command.</item>
     <item>Do not add bordbuch.repair to any pipeline — it is an on-demand operator command.</item>
@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0583: initial bordbuch.repair command handler.</item>
   <item>Bug fix: auto-commit repaired bordbuch to prevent dirty cache clone blocking mission.open; throw on commit failure.</item>
+  <item>Make unmatched-mission-open repairable: insert mission-close events for orphaned opens and clear stale currentMission in system-state.yaml.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -40,6 +41,13 @@ export interface BordbuchRepairOrphan {
   metadataSource: "auto-derived" | "operator-supplied";
 }
 
+export interface BordbuchRepairUnmatched {
+  missionId: string;
+  openEventId: string;
+  proposedClose: Omit<BordbuchEntry, "hash" | "id" | "previousHash">;
+  metadataSource: "auto-derived" | "operator-supplied";
+}
+
 export interface BordbuchRepairResult {
   systemId: string;
   insertedEvents: number;
@@ -65,7 +73,6 @@ const UNREPAIRABLE_RULES = new Set([
   "hash-mismatch",
   "hash-chain-gap",
   "event-id-gap",
-  "unmatched-mission-open",
 ]);
 
 function entriesToNdjson(entries: BordbuchEntry[]): string {
@@ -117,6 +124,7 @@ export async function runBordbuchRepair(
     }
 
     const orphanViolations = violations.filter((v) => v.rule === "orphan-mission-close");
+    const unmatchedViolations = violations.filter((v) => v.rule === "unmatched-mission-open");
     const unrepairable = violations.filter((v) => UNREPAIRABLE_RULES.has(v.rule));
 
     if (unrepairable.length > 0) {
@@ -126,14 +134,16 @@ export async function runBordbuchRepair(
       );
     }
 
-    if (orphanViolations.length === 0) {
+    if (orphanViolations.length === 0 && unmatchedViolations.length === 0) {
       throw new Error(
-        `[bordbuch.repair] no orphan-mission-close violations found. Other violations require manual intervention.`,
+        `[bordbuch.repair] no repairable violations found. Other violations require manual intervention.`,
       );
     }
 
     const orphans: BordbuchRepairOrphan[] = [];
+    const unmatched: BordbuchRepairUnmatched[] = [];
     const insertions: Array<{ index: number; entry: BordbuchEntry }> = [];
+    const appends: BordbuchEntry[] = [];
 
     for (const violation of orphanViolations) {
       const closeEntry = entries.find((e) => e.id === violation.eventId);
@@ -176,10 +186,52 @@ export async function runBordbuchRepair(
       insertions.push({ index: closeIndex, entry: openEntry });
     }
 
-    if (missionFilter && orphans.length === 0) {
+    if (missionFilter && orphans.length === 0 && unmatched.length === 0) {
       throw new Error(
-        `[bordbuch.repair] no orphan-mission-close violations found for mission '${missionFilter}'.`,
+        `[bordbuch.repair] no repairable violations found for mission '${missionFilter}'.`,
       );
+    }
+
+    // Process unmatched-mission-open: append mission-close events for orphaned opens.
+    for (const violation of unmatchedViolations) {
+      const missionId = violation.message.match(/'([^']+)'/)?.[1] ?? "";
+      if (!missionId) continue;
+
+      if (missionFilter && missionId !== missionFilter) continue;
+
+      const openEntry = entries.find((e) => e.kind === "mission-open" && e.missionId === missionId);
+
+      const occurredAt = operatorMetadata?.occurredAt ?? new Date().toISOString();
+      const summary =
+        operatorMetadata?.summary ?? "Mission closed (auto-repaired — unmatched open)";
+      const actor = operatorMetadata?.actor ?? "agent";
+
+      const proposedClose: Omit<BordbuchEntry, "hash" | "id" | "previousHash"> = {
+        schemaVersion: "1.0.0",
+        systemId,
+        occurredAt,
+        kind: "mission-close",
+        status: "done",
+        missionId,
+        releaseId: null,
+        actor,
+        summary,
+        metadata: { autoRepaired: true },
+      };
+
+      unmatched.push({
+        missionId,
+        openEventId: openEntry?.id ?? "unknown",
+        proposedClose,
+        metadataSource: operatorMetadata ? "operator-supplied" : "auto-derived",
+      });
+
+      appends.push({
+        ...proposedClose,
+        id: "event-000000",
+        previousHash: null,
+        hash: "sha256:placeholder",
+      });
     }
 
     const repairedEntries: BordbuchEntry[] = [];
@@ -194,6 +246,10 @@ export async function runBordbuchRepair(
     while (insertIdx < insertions.length) {
       repairedEntries.push(insertions[insertIdx].entry);
       insertIdx++;
+    }
+    // Append mission-close events for unmatched-mission-open violations
+    for (const entry of appends) {
+      repairedEntries.push(entry);
     }
 
     let prevHash: string | null = null;
@@ -228,7 +284,8 @@ export async function runBordbuchRepair(
 
     if (dryRun) {
       await atomicWriteFile(filePath, originalContent);
-      logger.info(`[bordbuch.repair] ${systemId}: dry-run — ${orphans.length} repair(s) planned`);
+      const totalRepairs = orphans.length + unmatched.length;
+      logger.info(`[bordbuch.repair] ${systemId}: dry-run — ${totalRepairs} repair(s) planned`);
       return {
         data: {
           systemId,
@@ -238,7 +295,7 @@ export async function runBordbuchRepair(
           dryRun: true,
           orphans,
         },
-        summary: `[bordbuch.repair] ${systemId}: dry-run — ${orphans.length} repair(s) planned`,
+        summary: `[bordbuch.repair] ${systemId}: dry-run — ${totalRepairs} repair(s) planned`,
         nextSteps: [
           {
             action: `Apply repairs: pnpm exec werkstatt run bordbuch.repair --site ${systemId}`,
@@ -249,10 +306,32 @@ export async function runBordbuchRepair(
     }
 
     const cacheCloneDir = await resolveCacheClonePath(workspaceRoot, systemId);
+
+    // Clear stale currentMission in system-state.yaml for repaired unmatched missions.
+    // This prevents "ghost mission" errors where system-state.yaml references a mission
+    // that was closed via bordbuch.repair but the state file was not updated.
+    if (unmatched.length > 0) {
+      try {
+        const { readSystemState, writeSystemState } = await import("../sternsystem/registry-io.ts");
+        const state = await readSystemState(workspaceRoot, systemId);
+        const repairedMissionIds = new Set(unmatched.map((u) => u.missionId));
+        if (state.currentMission && repairedMissionIds.has(state.currentMission)) {
+          state.currentMission = "";
+          await writeSystemState(workspaceRoot, systemId, state);
+          logger.info(
+            `[bordbuch.repair] ${systemId}: cleared stale currentMission in system-state.yaml`,
+          );
+        }
+      } catch {
+        // System state not available — non-fatal, bordbuch repair still succeeds
+      }
+    }
+
     if (existsSync(path.join(cacheCloneDir, ".git"))) {
+      const totalRepairs = orphans.length + unmatched.length;
       const commitResult = await commitAndPushBordbuch(
         cacheCloneDir,
-        `bordbuch.repair: ${systemId} — auto-repair ${orphans.length} orphan-mission-close event(s)`,
+        `bordbuch.repair: ${systemId} — auto-repair ${totalRepairs} violation(s) (${orphans.length} orphan-close, ${unmatched.length} unmatched-open)`,
       );
       if (!commitResult.commitSha) {
         throw new Error(
@@ -263,19 +342,20 @@ export async function runBordbuchRepair(
       }
     }
 
+    const totalInserted = orphans.length + unmatched.length;
     logger.success(
-      `[bordbuch.repair] ${systemId}: inserted ${orphans.length} mission-open event(s), recomputed ${recomputedHashes} hashes`,
+      `[bordbuch.repair] ${systemId}: inserted ${orphans.length} mission-open + ${unmatched.length} mission-close event(s), recomputed ${recomputedHashes} hashes`,
     );
 
     return {
       data: {
         systemId,
-        insertedEvents: orphans.length,
+        insertedEvents: totalInserted,
         recomputedHashes,
         repairedFilePath: filePath,
         dryRun: false,
       },
-      summary: `[bordbuch.repair] ${systemId}: inserted ${orphans.length} mission-open event(s), recomputed ${recomputedHashes} hashes`,
+      summary: `[bordbuch.repair] ${systemId}: inserted ${orphans.length} mission-open + ${unmatched.length} mission-close event(s), recomputed ${recomputedHashes} hashes`,
       nextSteps: [],
     };
   } finally {

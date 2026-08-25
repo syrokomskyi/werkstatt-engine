@@ -70,7 +70,7 @@ export interface MissionOpenData {
   staleEntries: StaleEntryCheck;
 }
 
-const REPAIRABLE_RULES = new Set(["orphan-mission-close"]);
+const REPAIRABLE_RULES = new Set(["orphan-mission-close", "unmatched-mission-open"]);
 
 async function cleanupStaleMissionEntries(
   workspaceRoot: string,
@@ -193,7 +193,7 @@ export async function runMissionOpen(
         // clean after repair, preventing git pull --rebase failures.
       } catch (repairErr) {
         throw new Error(
-          `[mission.open] bordbuch for system '${systemId}' has ${bordbuchCheck.violations.length} orphan-mission-close violation${bordbuchCheck.violations.length === 1 ? "" : "s"} — auto-repair failed: ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`,
+          `[mission.open] bordbuch for system '${systemId}' has ${bordbuchCheck.violations.length} repairable violation${bordbuchCheck.violations.length === 1 ? "" : "s"} — auto-repair failed: ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`,
         );
       }
     } else {

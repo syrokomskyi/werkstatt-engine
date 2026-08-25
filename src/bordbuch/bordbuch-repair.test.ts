@@ -348,3 +348,33 @@ test("throws on auto-commit failure to prevent dirty cache clone", async () => {
     runBordbuchRepair(makeInput({ system: systemId }), mockContext(tmpDir)),
   ).rejects.toThrow(/commit failed/);
 });
+
+test("repairs unmatched-mission-open by appending mission-close", async () => {
+  // Build a bordbuch with a mission-open but no matching close
+  const e1 = makeEntry(
+    {
+      id: "event-000001",
+      kind: "mission-open",
+      missionId: "m003",
+      occurredAt: "2026-07-28T10:00:00.000Z",
+      summary: "Mission m003 opened",
+    },
+    null,
+  );
+  await writeBordbuch([e1]);
+
+  const result = await runBordbuchRepair(makeInput({ system: systemId }), mockContext(tmpDir));
+
+  expect(result.data!.insertedEvents).toBe(1);
+
+  const repaired = await readBordbuchFile();
+  // Should now have 2 entries: the original open + appended close
+  expect(repaired.length).toBe(2);
+  const closeEntry = repaired.find((e) => e.kind === "mission-close" && e.missionId === "m003");
+  expect(closeEntry).toBeDefined();
+  expect(closeEntry!.metadata).toEqual({ autoRepaired: true });
+
+  // Verify hash chain is valid
+  expect(repaired[1].previousHash).toBe(repaired[0].hash);
+  expect(repaired[1].id).toBe("event-000002");
+});
