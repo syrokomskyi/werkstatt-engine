@@ -200,48 +200,74 @@ export async function runNachweisManifestGenerate(
     `[nachweis.manifest.generate] wrote ${records.length} record(s) to ${MANIFEST_OUTPUT_DIR}/${MANIFEST_OUTPUT_FILE}`,
   );
 
-  // RFC-0888: Append sichtpass Bordbuch entry unless --skip-bordbuch is set
+  // RFC-0888/RFC-0947: Append sichtpass Bordbuch entry unless --skip-bordbuch is set.
+  // RFC-0947: Deduplicate — skip append when manifest hash is unchanged from last __manifest__ entry.
   const skipBordbuch = flagBool(input, "skip-bordbuch");
   if (!skipBordbuch) {
     const manifestHash = createHash("sha256").update(manifestJson).digest("hex");
-    const sichtpassOperationId = generateOperationId();
-    await acquireLock(
-      workspaceRoot,
-      `system:${systemId}`,
-      sichtpassOperationId,
-      "nachweis.manifest.generate",
-      "agent",
-    );
-    await acquireLock(
-      workspaceRoot,
-      `bordbuch:${systemId}`,
-      sichtpassOperationId,
-      "nachweis.manifest.generate",
-      "agent",
-    );
+
+    // RFC-0947: Deduplication — check last sichtpass __manifest__ entry
+    let deduplicated = false;
     try {
-      await appendAndCommitBordbuch(
+      const entries = await readBordbuch(workspaceRoot, systemId);
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i];
+        if (entry.kind !== "sichtpass") continue;
+        const meta = entry.metadata as Record<string, unknown> | undefined;
+        if (meta?.slug !== "__manifest__") continue;
+        const lastHash = typeof meta.recordHash === "string" ? meta.recordHash : null;
+        if (lastHash === manifestHash) {
+          deduplicated = true;
+          logger.info(
+            `[nachweis.manifest.generate] manifest hash unchanged (${manifestHash.slice(0, 16)}...) — skipping sichtpass Bordbuch append`,
+          );
+        }
+        break;
+      }
+    } catch {
+      // Bordbuch read failure is non-fatal — proceed with append
+    }
+
+    if (!deduplicated) {
+      const sichtpassOperationId = generateOperationId();
+      await acquireLock(
         workspaceRoot,
-        systemId,
-        "sichtpass",
-        `Sichtpass manifest regenerated for '${systemId}'`,
+        `system:${systemId}`,
+        sichtpassOperationId,
+        "nachweis.manifest.generate",
         "agent",
-        {
-          writerRole: "nachweis",
-          metadata: {
-            slug: "__manifest__",
-            manifestVersion: MANIFEST_SCHEMA_VERSION,
-            recordHash: manifestHash,
-            signaturePresent: false,
-            timestampPresent: false,
-            verificationLevel: "N0",
-          },
-        },
-        `Bordbuch: sichtpass ${systemId} manifest-regenerated`,
       );
-    } finally {
-      await releaseLock(workspaceRoot, `bordbuch:${systemId}`);
-      await releaseLock(workspaceRoot, `system:${systemId}`);
+      await acquireLock(
+        workspaceRoot,
+        `bordbuch:${systemId}`,
+        sichtpassOperationId,
+        "nachweis.manifest.generate",
+        "agent",
+      );
+      try {
+        await appendAndCommitBordbuch(
+          workspaceRoot,
+          systemId,
+          "sichtpass",
+          `Sichtpass manifest regenerated for '${systemId}'`,
+          "agent",
+          {
+            writerRole: "nachweis",
+            metadata: {
+              slug: "__manifest__",
+              manifestVersion: MANIFEST_SCHEMA_VERSION,
+              recordHash: manifestHash,
+              signaturePresent: false,
+              timestampPresent: false,
+              verificationLevel: "N0",
+            },
+          },
+          `Bordbuch: sichtpass ${systemId} manifest-regenerated`,
+        );
+      } finally {
+        await releaseLock(workspaceRoot, `bordbuch:${systemId}`);
+        await releaseLock(workspaceRoot, `system:${systemId}`);
+      }
     }
   } else {
     logger.info(

@@ -54,4 +54,12 @@ export default tseslint.config(
       ],
     },
   },
+  // Test files — allow `any` and `as any` for partial mocking of complex types
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "local-rules/no-as-any": "off",
+    },
+  },
 );

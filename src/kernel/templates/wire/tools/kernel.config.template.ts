@@ -45,6 +45,8 @@ export default defineKernelConfig({
       (await import("@warpgogol/werkstatt-engine/handoff")).createBordbuchModule(),
     nachweis: async () =>
       (await import("@warpgogol/werkstatt-engine/handoff")).createNachweisModule(),
+    sichtpass: async () =>
+      (await import("@warpgogol/werkstatt-engine/sichtpass-module")).createSichtpassModule(),
     dns: async () => (await import("@warpgogol/werkstatt-engine/dns-module")).createDnsModule(),
     onboarding: async () =>
       (await import("@warpgogol/werkstatt-site/onboarding")).createOnboardingModule(),

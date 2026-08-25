@@ -250,6 +250,10 @@
       "types": "./src/nachweis/nachweis.module.ts",
       "default": "./src/nachweis/nachweis.module.ts"
     },
+    "./sichtpass-module": {
+      "types": "./src/sichtpass/sichtpass.module.ts",
+      "default": "./src/sichtpass/sichtpass.module.ts"
+    },
     "./signing": {
       "types": "./src/signing/index.ts",
       "default": "./src/signing/index.ts"
@@ -339,11 +343,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os"
-  ],
+  "files": ["src", "bin", "os"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
