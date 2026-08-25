@@ -285,6 +285,10 @@ This is the only **hard guard** preventing agents from directly committing to St
 
 Agents MUST NOT use `git commit --no-verify` in cache clones to bypass this guard. If a file needs to be committed to a cache clone, use `mission.git.commit` or open a mission and work through the workpiece.
 
+## Cache-clone as content source for mission.materialize
+
+When `mission.materialize` fails on content validation (YAML-PARSE-01, YAML-PARSE-02, etc.), fix the source files in the **cache clone** (`systems-cache/{id}/`), not in the workpiece. `mission.materialize --force` re-copies content from the cache clone, overwriting any manual fixes in the workpiece. Editing the workpiece first and then re-running `--force` is a waste of time — the errors will reappear.
+
 ## Command handler patterns
 
 - **Kernel command output standard (DNA-82, RFC-0903).** Every kernel command handler MUST return a `KernelCommandResult` where: (1) `exitCode` is explicitly set on every return path (both `0` and `1`); (2) `summary` is present on every return path and starts with the `[command.name]` prefix (e.g. `"[nachweis.sign] OK"`); (3) `nextSteps` is present and non-empty when `exitCode` is `1`, containing at least one `KernelNextStep` with `kind: "required"`. On success, `nextSteps` is optional. Enforced by `werkstatt.commands.validate` (static analysis). Use `passResult`/`failResult`/`diagnosticsResult` from `@warpgogol/werkstatt-shared/checks` for compliant output by default — returns that delegate to these helpers are exempt from scanning.
