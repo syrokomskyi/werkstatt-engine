@@ -269,26 +269,6 @@ The `werkstatt.autonomy.validate` command enforces DNA-64. It scans `packages/we
 
 Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 
-## Pre-dev critical file check in mission.preview
-
-`mission.preview` must verify that dev-critical generated files exist before starting the dev server. The check uses `existsSync` (instant, no pipeline overhead) and auto-generates missing files via `executeKernelCommand`. If generation fails, the server launch is blocked with an actionable error message explaining what is missing, why it matters, and how to fix it. The `--skip-prepare` flag bypasses the check for fast restarts when files are known to exist.
-
-RFC-0817: `mission.preview` also enforces a materialization gate before the dev-critical file check. If `materializedAt` is null and mission state is `open`, `mission.materialize` is auto-run. This gate is NOT bypassed by `--skip-prepare` — materialization is the formal lifecycle gate, not a convenience check. Non-open missions (closed, aborted) skip the materialization check.
-
-Dev-critical files: `src/content-ref-index.generated.yaml`, `src/derived-prices.generated.json`, `src/video-manifest.generated.yaml`. Some generators have prerequisites (e.g. `derived-prices.materialize` requires `entitlements.resolve`, `rate-snapshot.resolve`, `currency-pricing.compile`) — the check runs prerequisites before the owning command.
-
-## Cache-clone commit guard (RFC-0821)
-
-`installBordbuchPreCommitHook` (RFC-0658) installs a **combined pre-commit hook** in cache clones that includes both the bordbuch integrity guard and a **commit guard** that blocks direct `git commit` unless the `MISSION_GIT_COMMIT=1` environment variable is set. `mission.git.commit` sets this variable; raw `git commit` does not.
-
-This is the only **hard guard** preventing agents from directly committing to Sternsystem cache clones. AGENTS.md rules are soft guards — they rely on agent compliance. The pre-commit hook is enforced by git itself and cannot be bypassed without `--no-verify` (which AGENTS.md already restricts to last-resort use on closed missions).
-
-Agents MUST NOT use `git commit --no-verify` in cache clones to bypass this guard. If a file needs to be committed to a cache clone, use `mission.git.commit` or open a mission and work through the workpiece.
-
-## Cache-clone as content source for mission.materialize
-
-When `mission.materialize` fails on content validation (YAML-PARSE-01, YAML-PARSE-02, etc.), fix the source files in the **cache clone** (`systems-cache/{id}/`), not in the workpiece. `mission.materialize --force` re-copies content from the cache clone, overwriting any manual fixes in the workpiece. Editing the workpiece first and then re-running `--force` is a waste of time — the errors will reappear.
-
 ## Command handler patterns
 
 - **Kernel command output standard (DNA-82, RFC-0903).** Every kernel command handler MUST return a `KernelCommandResult` where: (1) `exitCode` is explicitly set on every return path (both `0` and `1`); (2) `summary` is present on every return path and starts with the `[command.name]` prefix (e.g. `"[nachweis.sign] OK"`); (3) `nextSteps` is present and non-empty when `exitCode` is `1`, containing at least one `KernelNextStep` with `kind: "required"`. On success, `nextSteps` is optional. Enforced by `werkstatt.commands.validate` (static analysis). Use `passResult`/`failResult`/`diagnosticsResult` from `@warpgogol/werkstatt-shared/checks` for compliant output by default — returns that delegate to these helpers are exempt from scanning.
