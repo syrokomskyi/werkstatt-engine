@@ -36,6 +36,7 @@
   <item>RFC-0866 audit: add alt health check before main deploy in executeDeployPhases for channel=main.</item>
   <item>RFC-0927: add runLeitstandHotfixDevDeploy composite command handler chaining 7 phases via executeKernelCommand.</item>
   <item>RFC-0930: add runLeitstandVerify command handler — fetches build-identity.json from live CDN URLs for all configured channels, compares distTreeHash cross-channel, optionally compares against local system-state.yaml records.</item>
+  <item>RFC-0948: add channel drift warning to runLeitstandDevDeploy — compares dev releaseId against alt/main lastPropagated and emits non-fatal warning when they differ.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -716,6 +717,30 @@ export interface DevDeployResult {
   evidenceSyncError: string | null;
   releaseDeployed?: string;
   failingPhase?: string;
+  channelDriftWarning?: string | null;
+}
+
+async function emitChannelDriftWarning(
+  workspaceRoot: string,
+  systemId: string,
+  devReleaseId: string,
+): Promise<string | null> {
+  try {
+    const state = await readSystemStateSmart(workspaceRoot, systemId);
+    const altRelease = state.lastPropagated?.alt?.releaseId;
+    const mainRelease = state.lastPropagated?.main?.releaseId;
+    const driftChannels: string[] = [];
+    if (altRelease && altRelease !== devReleaseId) {
+      driftChannels.push(`alt=${altRelease}`);
+    }
+    if (mainRelease && mainRelease !== devReleaseId) {
+      driftChannels.push(`main=${mainRelease}`);
+    }
+    if (driftChannels.length === 0) return null;
+    return `Channel drift: dev=${devReleaseId}, ${driftChannels.join(", ")} — run leitstand.propagate + leitstand.promote to align`;
+  } catch {
+    return null;
+  }
 }
 
 export async function runLeitstandDevDeploy(
@@ -831,6 +856,10 @@ export async function runLeitstandDevDeploy(
     "dev",
   );
 
+  const driftWarning = deployResult.failingPhase
+    ? null
+    : await emitChannelDriftWarning(context.workspaceRoot, systemId, releaseId);
+
   return {
     data: {
       command: "leitstand.dev-deploy",
@@ -853,10 +882,13 @@ export async function runLeitstandDevDeploy(
       evidenceSyncError: deployResult.evidenceSyncError,
       releaseDeployed: releaseId,
       failingPhase: deployResult.failingPhase,
+      channelDriftWarning: driftWarning,
     },
     summary: deployResult.failingPhase
       ? `[leitstand.dev-deploy] failed at phase: ${deployResult.failingPhase}`
-      : `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl}`,
+      : driftWarning
+        ? `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl} — WARN: ${driftWarning}`
+        : `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl}`,
     exitCode: deployResult.failingPhase ? 1 : 0,
     nextSteps: deployResult.failingPhase
       ? [
@@ -865,12 +897,23 @@ export async function runLeitstandDevDeploy(
             kind: "required",
           },
         ]
-      : [
-          {
-            action: `Propagate to alt: pnpm exec werkstatt run leitstand.propagate --site ${systemId} --release ${releaseId}`,
-            kind: "optional",
-          },
-        ],
+      : driftWarning
+        ? [
+            {
+              action: `Propagate to alt: pnpm exec werkstatt run leitstand.propagate --site ${systemId} --release ${releaseId}`,
+              kind: "required",
+            },
+            {
+              action: `Promote to main: pnpm exec werkstatt run leitstand.promote --site ${systemId} --release ${releaseId}`,
+              kind: "required",
+            },
+          ]
+        : [
+            {
+              action: `Propagate to alt: pnpm exec werkstatt run leitstand.propagate --site ${systemId} --release ${releaseId}`,
+              kind: "optional",
+            },
+          ],
   } as unknown as KernelCommandResult<DevDeployResult>;
 }
 

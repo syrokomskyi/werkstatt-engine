@@ -14,6 +14,7 @@
 <item>RFC-0866 fix: capture error message in outer catch and add errorMessage to DeployExecutionResult.</item>
 <item>RFC-0925: read accessPin from system-state.yaml, build authHeaders, pass to verifyFreshness and health checks for access-protected staging channels.</item>
 <item>RFC-0931: insert signing phase between build-identity write and wrangler-deploy; add releaseSignResult to DeployExecutionResult.</item>
+<item>RFC-0948: add post-deploy feature smoke check — fetches a page from the deployed URL and checks for feature markers in HTML. Non-fatal, warnings only.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -89,6 +90,13 @@ export interface DeployExecutionContext {
   forceBuild?: boolean;
 }
 
+export interface FeatureSmokeCheckResult {
+  checked: boolean;
+  markersFound: string[];
+  markersMissing: string[];
+  error: string | null;
+}
+
 export interface DeployExecutionResult {
   deploymentUrl: string;
   buildSkipped: boolean;
@@ -103,6 +111,7 @@ export interface DeployExecutionResult {
   purgeResult?: PurgeResult;
   healthState: "healthy" | "unhealthy" | "unknown";
   healthChecks: HealthCheck[];
+  featureSmokeCheck?: FeatureSmokeCheckResult;
   effectRecord: DeploymentEffectRecordV1;
   bordbuchCommitted: boolean;
   systemStateUpdated: boolean;
@@ -144,6 +153,71 @@ async function runPurgeStep(
   const routes = snapshot?.routes ?? [];
   const urls = collectPurgeUrls(deploymentUrl, routes);
   return purgeCacheByUrls(zoneId, apiToken, urls);
+}
+
+const FEATURE_SMOKE_MARKERS = ['externalLinkQrEntitled":true', "data-external-link-qr-modal"];
+
+async function runFeatureSmokeCheck(
+  deploymentUrl: string,
+  authHeaders: Record<string, string>,
+  workspaceRoot: string,
+  releaseId: string | undefined,
+): Promise<FeatureSmokeCheckResult> {
+  try {
+    let smokePath = "/";
+    if (releaseId) {
+      try {
+        const snapshot = await readBehaviorSnapshot(workspaceRoot, releaseId);
+        const routes = snapshot?.routes ?? [];
+        const firstHtmlRoute = routes.find((r) => r.path && r.path !== "/" && !r.redirectTarget);
+        if (firstHtmlRoute?.path) {
+          smokePath = firstHtmlRoute.path;
+        }
+      } catch {
+        // Non-fatal — fall back to "/"
+      }
+    }
+    const base = deploymentUrl.replace(/\/$/, "");
+    const fetchUrl = `${base}${smokePath}`;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(fetchUrl, {
+        headers: authHeaders,
+        redirect: "follow",
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        return {
+          checked: false,
+          markersFound: [],
+          markersMissing: [],
+          error: `HTTP ${response.status} fetching ${fetchUrl}`,
+        };
+      }
+      const html = await response.text();
+      const markersFound: string[] = [];
+      const markersMissing: string[] = [];
+      for (const marker of FEATURE_SMOKE_MARKERS) {
+        if (html.includes(marker)) {
+          markersFound.push(marker);
+        } else {
+          markersMissing.push(marker);
+        }
+      }
+      return { checked: true, markersFound, markersMissing, error: null };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  } catch (err) {
+    return {
+      checked: false,
+      markersFound: [],
+      markersMissing: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 async function runHealthCheckWithRetry(
@@ -214,6 +288,7 @@ export async function executeDeployPhases(
   let systemStateUpdated = false;
   let failingPhase: string | undefined;
   let releaseSignResult: DeployExecutionResult["releaseSignResult"];
+  let featureSmokeCheck: FeatureSmokeCheckResult | undefined;
 
   const gate =
     channel === "dev" ? "dev-deploy" : channel === "alt" ? "propagate-alt" : "promote-main";
@@ -413,6 +488,16 @@ export async function executeDeployPhases(
       throw new Error("Health check failed — deployment is unhealthy");
     }
 
+    // RFC-0948: Post-deploy feature smoke check — non-fatal warning
+    if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
+      featureSmokeCheck = await runFeatureSmokeCheck(
+        actualDeploymentUrl,
+        authHeaders,
+        ctx.workspaceRoot,
+        ctx.releaseId,
+      );
+    }
+
     if (channel === "dev" && ctx.missionId && ctx.commitSha) {
       try {
         const missionResult = await runMissionCheckWithResilience(
@@ -566,6 +651,7 @@ export async function executeDeployPhases(
       purgeResult,
       healthState,
       healthChecks,
+      featureSmokeCheck,
       effectRecord: finalEffectRecord,
       bordbuchCommitted,
       systemStateUpdated,
@@ -601,6 +687,7 @@ export async function executeDeployPhases(
       purgeResult,
       healthState,
       healthChecks,
+      featureSmokeCheck,
       effectRecord: failedEffectRecord,
       bordbuchCommitted,
       systemStateUpdated,

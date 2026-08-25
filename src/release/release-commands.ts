@@ -20,6 +20,7 @@
   <item>Fix: correct resolveStagingDir call to use workspaceRoot instead of releasesBase; write release.yaml directly into stagingDir and remove redundant re-write after atomicMoveDir.</item>
   <item>RFC-0845: add Playwright Chromium pre-flight check before build.prepare (after distribution-reuse check) — fail fast with actionable error when Chromium is not installed.</item>
   <item>RFC-0931: add runReleaseSign command handler for Ed25519 signing of build-identity.json and signed-manifest.json production.</item>
+  <item>RFC-0948: add entitlement diff logging — compares workpiece entitlements against previous release and logs added/removed features.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -97,6 +98,83 @@ async function listReleaseIds(workspaceRoot: string): Promise<string[]> {
   if (!existsSync(releasesDir)) return [];
   const entries = await fs.readdir(releasesDir, { withFileTypes: true });
   return entries.filter((e) => e.isDirectory() && !e.name.includes(".staging-")).map((e) => e.name);
+}
+
+async function readEntitlementFeatures(dir: string): Promise<string[] | null> {
+  try {
+    const filePath = path.join(dir, "src", "entitlements.generated.yaml");
+    if (!existsSync(filePath)) return null;
+    const raw = await fs.readFile(filePath, "utf8");
+    const parsed = parseYaml(raw) as { features?: unknown };
+    return Array.isArray(parsed.features) ? parsed.features.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function logEntitlementDiff(
+  logger: { info: (msg: string) => void; warn: (msg: string) => void },
+  workpieceDir: string,
+  releasesBase: string,
+  systemReleases: string[],
+  currentReleaseId: string,
+): Promise<void> {
+  try {
+    const currentFeatures = await readEntitlementFeatures(workpieceDir);
+    if (!currentFeatures) {
+      logger.warn(`  [entitlements] No entitlements.generated.yaml found in workpiece`);
+      return;
+    }
+
+    const prevReleases = systemReleases
+      .filter((id) => id !== currentReleaseId)
+      .sort()
+      .reverse();
+    const prevReleaseId = prevReleases[0];
+    if (!prevReleaseId) {
+      logger.info(
+        `  [entitlements] ${currentFeatures.length} feature(s): ${currentFeatures.join(", ")}`,
+      );
+      return;
+    }
+
+    const prevReleaseDir = path.join(releasesBase, prevReleaseId);
+    let prevFeatures: string[] | null = null;
+
+    // Try dist/client first (build output), then release root
+    const distClientDir = path.join(prevReleaseDir, "dist", "client");
+    if (existsSync(distClientDir)) {
+      prevFeatures = await readEntitlementFeatures(distClientDir);
+    }
+    if (!prevFeatures) {
+      prevFeatures = await readEntitlementFeatures(prevReleaseDir);
+    }
+
+    if (!prevFeatures) {
+      logger.info(
+        `  [entitlements] ${currentFeatures.length} feature(s): ${currentFeatures.join(", ")} (no previous release entitlements found for diff)`,
+      );
+      return;
+    }
+
+    const added = currentFeatures.filter((f) => !prevFeatures!.includes(f));
+    const removed = prevFeatures.filter((f) => !currentFeatures.includes(f));
+
+    if (added.length === 0 && removed.length === 0) {
+      logger.info(
+        `  [entitlements] No changes vs ${prevReleaseId} (${currentFeatures.length} feature(s))`,
+      );
+    } else {
+      const parts: string[] = [];
+      if (added.length > 0) parts.push(`+${added.join(",+")}`);
+      if (removed.length > 0) parts.push(`-${removed.join(",-")}`);
+      logger.info(`  [entitlements] Diff vs ${prevReleaseId}: ${parts.join(" ")}`);
+    }
+  } catch (err) {
+    logger.warn(
+      `  [entitlements] Diff failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 export class LegacyReleaseError extends Error {
@@ -531,6 +609,9 @@ export async function runReleasePrepare(
       // to the final location, avoiding a redundant re-write after the move.
       const manifestYaml = stringifyYaml(releaseManifest, { sortMapEntries: false });
       await atomicWriteFile(path.join(stagingDir, "release.yaml"), manifestYaml);
+
+      // RFC-0948: Entitlement diff — log added/removed features vs previous release
+      await logEntitlementDiff(logger, workpieceDir, releasesBase, systemReleases, releaseId);
 
       // RFC-0761: Copy .env from workpiece to release directory
       const srcEnv = path.join(workpieceDir, ".env");
