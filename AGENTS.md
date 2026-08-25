@@ -45,6 +45,10 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `test`        | `vitest run`                                  |
 | `test:watch`  | `vitest`                                      |
 
+## ESLint config
+
+- **The package-level `eslint.config.js` MUST include a test file override** matching the root config pattern: `files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"]` with `@typescript-eslint/no-explicit-any: "off"` and `local-rules/no-as-any: "off"`. Without this override, test mocks using `as any` for partial implementations of complex interfaces fail with `local-rules/no-as-any`. The root `eslint.config.js` has this override at line 248, but the engine package has its own `eslint.config.js` that does not inherit from root — the override must be duplicated locally.
+
 ## Package architecture
 
 - This package owns the Werkstatt engine: kernel runtime, missions, mirrors (Sternsystem), releases, Leitstand, Bordbuch, Notausgang, artifact store, evidence, deploy orchestration, werkstatt consistency primitives, fingerprint, integrity, observability, agent-gate, changelog, and operations schemas.
