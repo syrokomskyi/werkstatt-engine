@@ -27,6 +27,7 @@
   <item>Hardcode production domain in SITE_LINE — remove PUBLIC_SITE_URL override that allowed .env to bake dev domain into build artifacts.</item>
   <item>RFC-0952: add defensive guards — actionable error for missing mission.yaml, auto-set currentMission in system-state.yaml when null or mismatched.</item>
   <item>RFC-0954: rescue uncommitted/unpushed workpiece edits before atomicMoveDir — commit dirty changes, merge workpiece HEAD into cache clone, backup on merge failure.</item>
+  <item>RFC-0954: fail-closed guard blocks re-materialization when workpiece has uncommitted changes — operator must commit or reconcile first. --force bypasses with rescue.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -865,13 +866,56 @@ export async function runMissionMaterializeInternal(
     );
   }
 
+  // RFC-0954: Fail-closed guard — block re-materialization when workpiece has
+  // uncommitted changes. Prevents silent content loss.
+  // Primary materialization (materializedAt === null) skips the guard — rescue
+  // handles any stale workpiece from a failed previous attempt.
+  // --force bypasses the guard (rescue still runs as safety net).
+  const missionDirForRescue = resolveMissionDir(workspaceRoot, missionId);
+  const workpieceDirForRescue = path.join(missionDirForRescue, "workpiece");
+
+  if (
+    manifest.materializedAt &&
+    !force &&
+    existsSync(workpieceDirForRescue) &&
+    existsSync(path.join(workpieceDirForRescue, ".git")) &&
+    !existsSync(path.join(workpieceDirForRescue, ".closed"))
+  ) {
+    let dirty = false;
+    try {
+      const status = execSync("git status --porcelain", {
+        cwd: workpieceDirForRescue,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      dirty = status.length > 0;
+    } catch {
+      // git status failed — not a valid git repo, skip guard
+    }
+    if (dirty) {
+      throw new Error(
+        `[mission.materialize] workpiece has uncommitted changes — refusing to overwrite.
+` +
+          `Commit your edits first:
+` +
+          `  pnpm exec werkstatt run mission.git.commit --mission ${missionId} --message "your message"
+` +
+          `Or reconcile to merge edits into cache clone:
+` +
+          `  pnpm exec werkstatt run mission.reconcile --mission ${missionId}
+` +
+          `To override (rescue will attempt to preserve edits):
+` +
+          `  pnpm exec werkstatt run mission.materialize --mission ${missionId} --force`,
+      );
+    }
+  }
+
   // RFC-0954: Rescue uncommitted/unpushed workpiece edits BEFORE staging clone.
   // Must run after syncCacheClone (so cache clone is at origin/main) but BEFORE
   // staging clone (so rescued edits appear in the new workpiece) and BEFORE
   // artifact cache key computation (so cache key includes rescued commits →
   // cache miss → full materialization with rescued edits).
-  const missionDirForRescue = resolveMissionDir(workspaceRoot, missionId);
-  const workpieceDirForRescue = path.join(missionDirForRescue, "workpiece");
   const rescueResult = await rescueWorkpieceEdits(
     workpieceDirForRescue,
     systemDir,

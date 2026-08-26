@@ -236,3 +236,103 @@ test("Guard 2: does not write state when currentMission already matches", async 
   expect(mockWriteSystemState).not.toHaveBeenCalled();
   expect(mockCommitWerkstatt).not.toHaveBeenCalled();
 });
+
+test("Guard 3 (RFC-0954): blocks re-materialization when workpiece has uncommitted changes", async () => {
+  const missionDir = path.join(workspaceRoot, "missions", "test-system-m000001");
+  mkdirSync(missionDir, { recursive: true });
+  writeFileSync(path.join(missionDir, "mission.yaml"), "test: true\n");
+
+  // Create a workpiece with a git repo and uncommitted changes
+  const workpieceDir = path.join(missionDir, "workpiece");
+  mkdirSync(workpieceDir, { recursive: true });
+  const { execSync } = await import("node:child_process");
+  execSync("git init -b main", { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git config user.email "test@test.local"', { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git config user.name "Test"', { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git commit --allow-empty -m "initial"', { cwd: workpieceDir, stdio: "pipe" });
+  // Add uncommitted change
+  writeFileSync(path.join(workpieceDir, "content.md"), "dirty content");
+
+  // manifest.materializedAt is set — this is a re-materialization
+  mockReadMissionManifest.mockResolvedValue({
+    ...validManifest,
+    materializedAt: "2026-08-25T00:00:00Z",
+  } as any);
+  mockReadSystemState.mockResolvedValue({
+    schemaVersion: "1.0.0",
+    systemId: "test-system",
+    currentMission: "test-system-m000001",
+    lastRelease: null,
+    lastPropagated: {},
+    accessPin: null,
+  } as any);
+
+  const error = await runMissionMaterialize(
+    makeInput("test-system-m000001"),
+    makeContext(workspaceRoot),
+  ).catch((e: Error) => e.message);
+
+  expect(error).toContain("uncommitted changes");
+  expect(error).toContain("mission.git.commit");
+  expect(error).toContain("mission.reconcile");
+  expect(error).toContain("--force");
+});
+
+test("Guard 3 (RFC-0954): allows re-materialization with --force even when workpiece is dirty", async () => {
+  const missionDir = path.join(workspaceRoot, "missions", "test-system-m000001");
+  mkdirSync(missionDir, { recursive: true });
+  writeFileSync(path.join(missionDir, "mission.yaml"), "test: true\n");
+
+  const workpieceDir = path.join(missionDir, "workpiece");
+  mkdirSync(workpieceDir, { recursive: true });
+  const { execSync } = await import("node:child_process");
+  execSync("git init -b main", { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git config user.email "test@test.local"', { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git config user.name "Test"', { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git commit --allow-empty -m "initial"', { cwd: workpieceDir, stdio: "pipe" });
+  writeFileSync(path.join(workpieceDir, "content.md"), "dirty content");
+
+  mockReadMissionManifest.mockResolvedValue({
+    ...validManifest,
+    materializedAt: "2026-08-25T00:00:00Z",
+  } as any);
+  mockReadSystemState.mockResolvedValue({
+    schemaVersion: "1.0.0",
+    systemId: "test-system",
+    currentMission: "test-system-m000001",
+    lastRelease: null,
+    lastPropagated: {},
+    accessPin: null,
+  } as any);
+
+  // With --force, guard is bypassed — execution proceeds past it
+  // (will still fail later at pin check, but NOT at the dirty guard)
+  const input = makeInput("test-system-m000001");
+  (input.flags as any).force = true;
+
+  await expect(runMissionMaterialize(input, makeContext(workspaceRoot))).rejects.toThrow(
+    "no system.pin.json",
+  );
+});
+
+test("Guard 3 (RFC-0954): skips guard for primary materialization (materializedAt is null)", async () => {
+  const missionDir = path.join(workspaceRoot, "missions", "test-system-m000001");
+  mkdirSync(missionDir, { recursive: true });
+  writeFileSync(path.join(missionDir, "mission.yaml"), "test: true\n");
+
+  // No workpiece directory — primary materialization
+  mockReadMissionManifest.mockResolvedValue(validManifest as any);
+  mockReadSystemState.mockResolvedValue({
+    schemaVersion: "1.0.0",
+    systemId: "test-system",
+    currentMission: "test-system-m000001",
+    lastRelease: null,
+    lastPropagated: {},
+    accessPin: null,
+  } as any);
+
+  // No dirty guard error — proceeds to pin check
+  await expect(
+    runMissionMaterialize(makeInput("test-system-m000001"), makeContext(workspaceRoot)),
+  ).rejects.toThrow("no system.pin.json");
+});
