@@ -17,6 +17,7 @@
   <item>Bug fix: clean up mission directories on bordbuch push/commit failure to prevent stale entries on retry.</item>
   <item>Bug fix: list available systems on unknown --system ID for better agent self-correction.</item>
   <item>Bug fix: bordbuch.repair now auto-commits, removed redundant commitAndPushBordbuch call from auto-repair path.</item>
+  <item>RFC-0951: auto-materialize workpiece during mission.open with forward-only rollback on failure.</item>
 </CHANGE_SUMMARY>
 */
 
