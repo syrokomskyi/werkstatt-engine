@@ -26,6 +26,7 @@
   <item>RFC-0870: restore registry-only generated files from git after atomicMoveDir — prevents silent loss of committed manifests when staging dir lacks them.</item>
   <item>Hardcode production domain in SITE_LINE — remove PUBLIC_SITE_URL override that allowed .env to bake dev domain into build artifacts.</item>
   <item>RFC-0952: add defensive guards — actionable error for missing mission.yaml, auto-set currentMission in system-state.yaml when null or mismatched.</item>
+  <item>RFC-0954: rescue uncommitted/unpushed workpiece edits before atomicMoveDir — commit dirty changes, merge workpiece HEAD into cache clone, backup on merge failure.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -63,6 +64,7 @@ import { acquireLock, releaseLock, commitWerkstattSideEffects } from "../werksta
 import { atomicMoveDir, atomicWriteFile, resolveStagingDir } from "../werkstatt/atomic.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { installWorkpieceCommitHook } from "./workpiece-commit-hook.ts";
+import { rescueWorkpieceEdits } from "./workpiece-rescue.ts";
 import { resolveCurrentEcosystem, resolvePlatformSemanticHash } from "../handoff/bundle-io.ts";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { compareSemver } from "@warpgogol/werkstatt-engine/kernel";
@@ -860,6 +862,29 @@ export async function runMissionMaterializeInternal(
       workspaceRoot,
       [path.join("..", "systems-cache", manifest.systemId, "system-state.yaml")],
       `werkstatt: mission.materialize state-repair ${manifest.missionId}`,
+    );
+  }
+
+  // RFC-0954: Rescue uncommitted/unpushed workpiece edits BEFORE staging clone.
+  // Must run after syncCacheClone (so cache clone is at origin/main) but BEFORE
+  // staging clone (so rescued edits appear in the new workpiece) and BEFORE
+  // artifact cache key computation (so cache key includes rescued commits →
+  // cache miss → full materialization with rescued edits).
+  const missionDirForRescue = resolveMissionDir(workspaceRoot, missionId);
+  const workpieceDirForRescue = path.join(missionDirForRescue, "workpiece");
+  const rescueResult = await rescueWorkpieceEdits(
+    workpieceDirForRescue,
+    systemDir,
+    missionId,
+    logger,
+    workspaceRoot,
+    manifest.systemId,
+  );
+  if (rescueResult.rescued) {
+    logger.info(`  [rescue] Workpiece edits preserved in cache clone + bare repo`);
+  } else if (rescueResult.backupDir) {
+    logger.warn(
+      `  [rescue] Old workpiece backed up to ${path.basename(rescueResult.backupDir)} — recover edits manually`,
     );
   }
 
