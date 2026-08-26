@@ -17,9 +17,18 @@ vi.mock("../sternsystem/registry-io.ts", () => ({
   readSystemConfig: vi.fn().mockResolvedValue({ status: "active" }),
   readSystemState: vi.fn(),
   writeSystemState: vi.fn(),
-  resolveCacheClonePath: vi.fn(),
-  resolveMirrors: vi.fn().mockReturnValue([]),
+  resolveCacheClonePath: vi.fn().mockReturnValue("/nonexistent-cache-clone"),
+  resolveMirrors: vi
+    .fn()
+    .mockReturnValue({ cachePath: "/nonexistent", gitMirrors: [], backupMirrors: [] }),
   resolveMirrorPath: vi.fn().mockReturnValue(null),
+}));
+
+// Mock atomic.ts — syncCacheClone and other atomic ops
+vi.mock("../werkstatt/atomic.ts", () => ({
+  atomicMoveDir: vi.fn(),
+  atomicWriteFile: vi.fn(),
+  resolveStagingDir: vi.fn(),
 }));
 
 // Mock werkstatt index
@@ -111,9 +120,14 @@ beforeEach(() => {
   testRoot = mkdtempSync(path.join(os.tmpdir(), "mission-materialize-guards-test-"));
   workspaceRoot = path.join(testRoot, "workspace");
   mkdirSync(workspaceRoot, { recursive: true });
-  vi.clearAllMocks();
-  // Default: acquireLock throws to stop execution after guards but before runMissionMaterializeInternal
-  mockAcquireLock.mockRejectedValue(new Error("STOP-TEST"));
+  // Clear only specific mocks — vi.clearAllMocks() wipes factory-set implementations
+  mockReadMissionManifest.mockClear();
+  mockReadSystemState.mockClear();
+  mockWriteSystemState.mockClear();
+  mockAcquireLock.mockClear();
+  mockCommitWerkstatt.mockClear();
+  // acquireLock passes so execution proceeds into runMissionMaterializeInternal
+  mockAcquireLock.mockResolvedValue(undefined as any);
 });
 
 afterEach(() => {
@@ -153,9 +167,11 @@ test("Guard 2: auto-sets currentMission when null and commits state", async () =
     accessPin: null,
   } as any);
 
+  // Execution proceeds past acquireLock, syncCacheClone (no-op — no mirrors),
+  // Guard 2 runs, then stops at pin check (no system.pin.json in temp dir)
   await expect(
     runMissionMaterialize(makeInput("test-system-m000001"), makeContext(workspaceRoot)),
-  ).rejects.toThrow("STOP-TEST"); // acquireLock throws after guards
+  ).rejects.toThrow("no system.pin.json");
 
   expect(mockReadSystemState).toHaveBeenCalledWith(workspaceRoot, "test-system");
   expect(mockWriteSystemState).toHaveBeenCalledWith(
@@ -187,7 +203,7 @@ test("Guard 2: auto-sets currentMission when mismatched and commits state", asyn
 
   await expect(
     runMissionMaterialize(makeInput("test-system-m000001"), makeContext(workspaceRoot)),
-  ).rejects.toThrow("STOP-TEST");
+  ).rejects.toThrow("no system.pin.json");
 
   expect(mockWriteSystemState).toHaveBeenCalledWith(
     workspaceRoot,
@@ -214,7 +230,7 @@ test("Guard 2: does not write state when currentMission already matches", async 
 
   await expect(
     runMissionMaterialize(makeInput("test-system-m000001"), makeContext(workspaceRoot)),
-  ).rejects.toThrow("STOP-TEST");
+  ).rejects.toThrow("no system.pin.json");
 
   expect(mockReadSystemState).toHaveBeenCalled();
   expect(mockWriteSystemState).not.toHaveBeenCalled();

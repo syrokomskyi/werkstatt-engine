@@ -837,6 +837,32 @@ export async function runMissionMaterializeInternal(
   // RFC-0356 §1.1 step 2: fetch the latest remote state into the cache clone.
   await syncCacheClone(workspaceRoot, manifest.systemId, logger);
 
+  // RFC-0953 Guard 2 (moved from runMissionMaterialize): auto-set currentMission
+  // when null or mismatched. Must run AFTER syncCacheClone because sync resets
+  // the cache clone to origin/main, wiping uncommitted state changes. If this
+  // guard ran before sync (as in RFC-0952), it would see the correct value,
+  // skip the repair, and sync would erase it — leaving currentMission null and
+  // causing "No target site with a kernel config could be resolved".
+  const state = await readSystemState(workspaceRoot, manifest.systemId);
+  if (state.currentMission !== manifest.missionId) {
+    if (state.currentMission === null) {
+      logger.info(
+        `  [mission.materialize] currentMission was null in system-state.yaml — set to ${manifest.missionId}.`,
+      );
+    } else {
+      logger.warn(
+        `  [mission.materialize] currentMission was "${state.currentMission}" in system-state.yaml — set to ${manifest.missionId}.`,
+      );
+    }
+    state.currentMission = manifest.missionId;
+    await writeSystemState(workspaceRoot, manifest.systemId, state);
+    await commitWerkstattSideEffects(
+      workspaceRoot,
+      [path.join("..", "systems-cache", manifest.systemId, "system-state.yaml")],
+      `werkstatt: mission.materialize state-repair ${manifest.missionId}`,
+    );
+  }
+
   // RFC-0658: Install bordbuch pre-commit hook in cache clone to prevent
   // accidental deletion of bordbuch/events.ndjson via git add -A + commit.
   // Non-fatal: non-git cache clones skip hook installation silently.
@@ -1590,27 +1616,6 @@ export async function runMissionMaterialize(
   if (manifest.state !== "open") {
     throw new Error(
       `[mission.materialize] mission '${missionId}' is not open (state: ${manifest.state})`,
-    );
-  }
-
-  // RFC-0952 Guard 2: auto-set currentMission when null or mismatched
-  const state = await readSystemState(workspaceRoot, manifest.systemId);
-  if (state.currentMission !== manifest.missionId) {
-    if (state.currentMission === null) {
-      logger.info(
-        `  [mission.materialize] currentMission was null in system-state.yaml — set to ${manifest.missionId}.`,
-      );
-    } else {
-      logger.warn(
-        `  [mission.materialize] currentMission was "${state.currentMission}" in system-state.yaml — set to ${manifest.missionId}.`,
-      );
-    }
-    state.currentMission = manifest.missionId;
-    await writeSystemState(workspaceRoot, manifest.systemId, state);
-    await commitWerkstattSideEffects(
-      workspaceRoot,
-      [path.join("..", "systems-cache", manifest.systemId, "system-state.yaml")],
-      `werkstatt: mission.materialize state-repair ${manifest.missionId}`,
     );
   }
 
