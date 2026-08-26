@@ -17,7 +17,12 @@ export { runMissionStatus, type MissionStatusData } from "./mission-status.ts";
 export { runMissionClose, type MissionCloseData } from "./mission-close.ts";
 export { runMissionAbort, type MissionAbortData } from "./mission-abort.ts";
 export { runMissionList, type MissionListData } from "./mission-list.ts";
-export { runMissionMaterialize, type MissionMaterializeData } from "./mission-materialize.ts";
+export {
+  runMissionMaterialize,
+  type MissionMaterializeData,
+  runMissionMaterializeInternal,
+  type MissionMaterializeInternalOptions,
+} from "./mission-materialize.ts";
 export {
   runMissionValidate,
   type MissionValidateData,
