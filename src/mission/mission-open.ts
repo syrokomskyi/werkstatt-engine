@@ -53,6 +53,7 @@ import {
 import { resolveActor } from "./actor-identity.ts";
 import { trashPath } from "@warpgogol/forge/utils";
 import { gitExec } from "../werkstatt/git-exec.ts";
+import { runMissionMaterializeInternal } from "./mission-materialize.ts";
 
 export interface StaleEntryCheck {
   removedPaths: string[];
@@ -68,6 +69,7 @@ export interface MissionOpenData {
   pinAtOpen: string;
   operationId: string;
   staleEntries: StaleEntryCheck;
+  materializedAt: string | null;
 }
 
 const REPAIRABLE_RULES = new Set(["orphan-mission-close", "unmatched-mission-open"]);
@@ -332,13 +334,70 @@ export async function runMissionOpen(
     state.currentMission = missionId;
     await writeSystemState(workspaceRoot, systemId, state);
 
-    // RFC-0580: auto-commit werkstatt side-effects
+    // RFC-0951: Auto-materialize workpiece during mission.open.
+    // runMissionMaterializeInternal commits mission.yaml (with materializedAt) and pnpm-lock.yaml.
+    // On failure, forward-only rollback appends a compensating bordbuch entry (Step 3).
+    let materializedAt: string | null = null;
+    try {
+      const materializeResult = await runMissionMaterializeInternal(
+        workspaceRoot,
+        manifest,
+        context,
+        { reportOnly: false, skipPreflight: false, force: false },
+      );
+      materializedAt = materializeResult.data?.materializedAt ?? null;
+    } catch (materializeErr) {
+      // Forward-only rollback — RFC-0951, DNA-46 append-only log.
+      // Append compensating bordbuch entry, remove mission dir, clear state.
+      try {
+        await appendAndCommitBordbuch(
+          workspaceRoot,
+          systemId,
+          "mission-open-rolled-back",
+          `Materialization failed: ${materializeErr instanceof Error ? materializeErr.message : String(materializeErr)}`,
+          actor,
+          {
+            missionId,
+            writerRole: "mission",
+            metadata: {
+              reason:
+                materializeErr instanceof Error ? materializeErr.message : String(materializeErr),
+            },
+          },
+          `Bordbuch: mission-open-rolled-back ${missionId}`,
+        );
+      } catch (bordbuchRollbackErr) {
+        logger.warn(
+          `[mission.open] compensating bordbuch entry failed: ${bordbuchRollbackErr instanceof Error ? bordbuchRollbackErr.message : String(bordbuchRollbackErr)}. ` +
+            `Run bordbuch.repair to fix the bordbuch manually.`,
+        );
+      }
+      // Remove mission directory
+      const missionDir = path.join(workspaceRoot, "missions", missionId);
+      try {
+        await fs.rm(missionDir, { recursive: true, force: true });
+      } catch {
+        // best-effort cleanup
+      }
+      // Clear state
+      state.currentMission = null;
+      await writeSystemState(workspaceRoot, systemId, state);
+      // Commit cleared state (mission.yaml no longer exists)
+      await commitWerkstattSideEffects(
+        workspaceRoot,
+        [path.join("..", "systems-cache", systemId, "system-state.yaml")],
+        `werkstatt: mission.open rollback ${missionId}`,
+      );
+      throw new Error(
+        `[mission.open] materialization failed — mission rolled back: ${materializeErr instanceof Error ? materializeErr.message : String(materializeErr)}`,
+      );
+    }
+
+    // RFC-0580: auto-commit werkstatt side-effects (system-state.yaml only;
+    // mission.yaml + pnpm-lock.yaml already committed by runMissionMaterializeInternal)
     await commitWerkstattSideEffects(
       workspaceRoot,
-      [
-        path.join("missions", missionId, "mission.yaml"),
-        path.join("..", "systems-cache", systemId, "system-state.yaml"),
-      ],
+      [path.join("..", "systems-cache", systemId, "system-state.yaml")],
       `werkstatt: mission.open ${missionId}`,
     );
 
@@ -352,12 +411,13 @@ export async function runMissionOpen(
         pinAtOpen,
         operationId,
         staleEntries,
+        materializedAt,
       },
-      summary: `[mission.open] opened mission ${missionId} for ${systemId}`,
+      summary: `[mission.open] opened and materialized mission ${missionId} for ${systemId}`,
       nextSteps: [
         {
-          action: `Materialize the workpiece: pnpm exec werkstatt run mission.materialize --mission ${missionId}`,
-          kind: "required",
+          action: `Validate the workpiece: pnpm exec werkstatt run mission.validate --mission ${missionId}`,
+          kind: "optional",
         },
       ],
     };

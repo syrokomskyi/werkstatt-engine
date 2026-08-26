@@ -64,7 +64,13 @@ export async function resolveBordbuchProjectionDir(
 }
 
 const WRITER_ROLE_KINDS: Record<string, BordbuchEntryKind[]> = {
-  mission: ["mission-open", "mission-close", "mission-abort", "preflight-skipped"],
+  mission: [
+    "mission-open",
+    "mission-close",
+    "mission-abort",
+    "mission-open-rolled-back",
+    "preflight-skipped",
+  ],
   release: ["release-ready", "release-rolled-back"],
   sternsystem: ["pin-update"],
   leitstand: ["deployment"],
@@ -301,7 +307,11 @@ export async function validateBordbuch(
         openMissions.add(entry.missionId);
         allMissionIds.add(entry.missionId);
       }
-    } else if (entry.kind === "mission-close" || entry.kind === "mission-abort") {
+    } else if (
+      entry.kind === "mission-close" ||
+      entry.kind === "mission-abort" ||
+      entry.kind === "mission-open-rolled-back"
+    ) {
       if (entry.missionId && !openMissions.has(entry.missionId)) {
         violations.push({
           rule: "orphan-mission-close",

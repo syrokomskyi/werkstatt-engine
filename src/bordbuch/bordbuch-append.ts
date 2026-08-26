@@ -57,7 +57,12 @@ export async function runBordbuchAppend(
   }
 
   // Check mission-lifecycle kinds require open mission
-  if (kind === "mission-open" || kind === "mission-close" || kind === "mission-abort") {
+  if (
+    kind === "mission-open" ||
+    kind === "mission-close" ||
+    kind === "mission-abort" ||
+    kind === "mission-open-rolled-back"
+  ) {
     if (!missionId) {
       throw new Error(`[bordbuch.append] --mission is required for kind '${kind}'`);
     }
