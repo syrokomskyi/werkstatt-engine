@@ -37,7 +37,6 @@ import {
 } from "./registry-io.ts";
 import { runSternsystemPin } from "./sternsystem-pin.ts";
 import { runMissionOpen } from "../mission/mission-open.ts";
-import { runMissionMaterialize } from "../mission/mission-materialize.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "../schemas/naming-policy.ts";
 
@@ -180,28 +179,6 @@ export async function runSternsystemRegister(
     const missionResult = await runMissionOpen(makeInput({ system: id, brief }), context);
     const missionId = missionResult.data!.missionId;
 
-    try {
-      await runMissionMaterialize(makeInput({ mission: missionId }), context);
-    } catch (materializeError) {
-      logger.info(
-        `[sternsystem.register] mission.materialize failed during amend — aborting mission ${missionId}`,
-      );
-      try {
-        await runMissionAbort(
-          makeInput({
-            mission: missionId,
-            reason: "sternsystem.register amend: materialize failed",
-          }),
-          context,
-        );
-      } catch (abortError) {
-        diagnostics.push(
-          `mission.abort also failed: ${abortError instanceof Error ? abortError.message : String(abortError)}`,
-        );
-      }
-      throw materializeError;
-    }
-
     return {
       data: {
         command: "sternsystem.register",
@@ -301,24 +278,8 @@ export async function runSternsystemRegister(
     missionId = missionResult.data!.missionId;
     missionOpened = true;
 
-    try {
-      await runMissionMaterialize(makeInput({ mission: missionId }), context);
-    } catch (materializeError) {
-      logger.info(
-        `[sternsystem.register] mission.materialize failed — rolling back mission ${missionId}`,
-      );
-      try {
-        await runMissionAbort(
-          makeInput({ mission: missionId, reason: "sternsystem.register: materialize failed" }),
-          context,
-        );
-      } catch (abortError) {
-        diagnostics.push(
-          `mission.abort also failed: ${abortError instanceof Error ? abortError.message : String(abortError)}`,
-        );
-      }
-      throw materializeError;
-    }
+    // RFC-0951: mission.open now auto-materializes the workpiece internally.
+    // No explicit runMissionMaterialize call needed here.
 
     // RFC-0574: mirror hook removed — star topology uses explicit sternsystem.sync
     void workspaceRoot;
