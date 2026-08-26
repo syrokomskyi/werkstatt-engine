@@ -34,6 +34,16 @@ vi.mock("../bordbuch/bordbuch-commit-helper.ts", () => ({
   })),
 }));
 
+// RFC-0951: mock runMissionMaterializeInternal so mission.open doesn't require a real system
+vi.mock("../mission/mission-materialize.ts", () => ({
+  runMissionMaterializeInternal: vi.fn(async () => ({
+    data: { materializedAt: "2026-01-01T00:00:00.000Z" },
+    summary: "materialized",
+    nextSteps: [],
+  })),
+  runMissionMaterialize: vi.fn(),
+}));
+
 // Mock registry-io so mission.open reads config/state/pin from tmp dir
 vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
   const original = (await importOriginal()) as Record<string, unknown>;

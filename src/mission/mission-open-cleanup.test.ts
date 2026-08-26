@@ -79,6 +79,16 @@ vi.mock("./actor-identity.ts", () => ({
   resolveActor: vi.fn().mockReturnValue("test-agent"),
 }));
 
+// Mock mission-materialize — RFC-0951: mission.open calls runMissionMaterializeInternal
+vi.mock("./mission-materialize.ts", () => ({
+  runMissionMaterializeInternal: vi.fn().mockResolvedValue({
+    data: { materializedAt: "2026-01-01T00:00:00.000Z" },
+    summary: "materialized",
+    nextSteps: [],
+  }),
+  runMissionMaterialize: vi.fn(),
+}));
+
 import { runMissionOpen } from "./mission-open.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { readSystemConfig, discoverSystems } from "../sternsystem/registry-io.ts";
@@ -235,7 +245,7 @@ test("succeeds end-to-end when all preconditions are met", async () => {
   expect(result.data!.state).toBe("open");
   expect(result.data!.systemId).toBe("test-system");
   expect(result.data!.brief).toBe("Test mission");
-  expect(result.summary).toContain("opened mission");
+  expect(result.summary).toContain("opened and materialized mission");
 
   // Mission directory should exist
   const missionDir = path.join(workspaceRoot, "missions", "test-system-m000001");

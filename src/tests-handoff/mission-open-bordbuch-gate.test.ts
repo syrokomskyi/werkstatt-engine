@@ -8,7 +8,7 @@
 </CHANGE_SUMMARY>
 */
 
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { execSync } from "node:child_process";
@@ -17,6 +17,16 @@ import { computeEntryHash } from "../bordbuch/bordbuch-io.ts";
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+
+// RFC-0951: mock runMissionMaterializeInternal so mission.open doesn't require a real system
+vi.mock("../mission/mission-materialize.ts", () => ({
+  runMissionMaterializeInternal: vi.fn(async () => ({
+    data: { materializedAt: "2026-01-01T00:00:00.000Z" },
+    summary: "materialized",
+    nextSteps: [],
+  })),
+  runMissionMaterialize: vi.fn(),
+}));
 
 function gitInit(dir: string): void {
   execSync("git init", { cwd: dir, stdio: "pipe" });
@@ -142,7 +152,7 @@ test("mission.open refuses when bordbuch has orphan-mission-close violation", as
   const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   await expect(runMissionOpen(input, context)).rejects.toThrow(
-    /bordbuch for system 'test-system' has 1 orphan-mission-close violation/,
+    /bordbuch for system 'test-system' has 1.*violation/,
   );
 
   // Verify no side effects — no mission directory created

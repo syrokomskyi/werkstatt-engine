@@ -8,13 +8,45 @@
 </CHANGE_SUMMARY>
 */
 
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { execSync } from "node:child_process";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+
+// RFC-0951: mock runMissionMaterializeInternal so mission.open doesn't require a real system
+// The mock simulates the git commit of mission.yaml that the real internal function does
+vi.mock("../mission/mission-materialize.ts", () => ({
+  runMissionMaterializeInternal: vi.fn(
+    async (workspaceRoot: string, manifest: { missionId: string }) => {
+      const { execSync: exec } = await import("node:child_process");
+      const { join: joinPath } = await import("node:path");
+      try {
+        exec(
+          `git add ${JSON.stringify(joinPath("missions", manifest.missionId, "mission.yaml"))}`,
+          {
+            cwd: workspaceRoot,
+            stdio: "pipe",
+          },
+        );
+        exec('git commit -m "werkstatt: mission.materialize (mock)"', {
+          cwd: workspaceRoot,
+          stdio: "pipe",
+        });
+      } catch {
+        // best-effort — test env may not have git configured
+      }
+      return {
+        data: { materializedAt: "2026-01-01T00:00:00.000Z" },
+        summary: "materialized",
+        nextSteps: [],
+      };
+    },
+  ),
+  runMissionMaterialize: vi.fn(),
+}));
 
 function gitInit(dir: string): void {
   execSync("git init -b main", { cwd: dir, stdio: "pipe" });
