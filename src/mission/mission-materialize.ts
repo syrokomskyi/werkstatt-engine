@@ -25,6 +25,7 @@
   <item>RFC-0822: replace old-workpiece .env preservation with restoreEnvFilesFromCacheClone — cache clone is the canonical inter-mission store for secrets.</item>
   <item>RFC-0870: restore registry-only generated files from git after atomicMoveDir — prevents silent loss of committed manifests when staging dir lacks them.</item>
   <item>Hardcode production domain in SITE_LINE — remove PUBLIC_SITE_URL override that allowed .env to bake dev domain into build artifacts.</item>
+  <item>RFC-0952: add defensive guards — actionable error for missing mission.yaml, auto-set currentMission in system-state.yaml when null or mismatched.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -47,6 +48,8 @@ import {
 } from "@warpgogol/werkstatt-engine/kernel";
 import {
   readSystemConfig,
+  readSystemState,
+  writeSystemState,
   resolveCacheClonePath,
   resolveMirrors,
   resolveMirrorPath,
@@ -1555,7 +1558,7 @@ export async function runMissionMaterialize(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<MissionMaterializeData>> {
-  const { workspaceRoot } = context;
+  const { workspaceRoot, logger } = context;
   const missionId = flagString(input, "mission");
   const reportOnly = flagBool(input, "report-only");
   const skipPreflight = flagBool(input, "skip-preflight");
@@ -1563,11 +1566,51 @@ export async function runMissionMaterialize(
 
   if (!missionId) throw new Error("[mission.materialize] --mission is required");
 
+  // RFC-0952 Guard 1: actionable error for missing manifest
+  const manifestPath = path.join(workspaceRoot, "missions", missionId, "mission.yaml");
+  try {
+    await fs.access(manifestPath);
+  } catch {
+    const mIdx = missionId.lastIndexOf("-m");
+    const systemId = mIdx > 0 ? missionId.slice(0, mIdx) : null;
+    const openHint = systemId
+      ? `pnpm exec werkstatt run mission.open --system ${systemId} --brief "<brief>"`
+      : `pnpm exec werkstatt run mission.open --system <systemId> --brief "<brief>"`;
+    throw new Error(
+      `[mission.materialize] mission manifest not found at ${path.relative(workspaceRoot, manifestPath)}.
+` +
+        `Run mission.open first to create the mission:
+` +
+        `  ${openHint}`,
+    );
+  }
+
   const manifest = await readMissionManifest(workspaceRoot, missionId);
 
   if (manifest.state !== "open") {
     throw new Error(
       `[mission.materialize] mission '${missionId}' is not open (state: ${manifest.state})`,
+    );
+  }
+
+  // RFC-0952 Guard 2: auto-set currentMission when null or mismatched
+  const state = await readSystemState(workspaceRoot, manifest.systemId);
+  if (state.currentMission !== manifest.missionId) {
+    if (state.currentMission === null) {
+      logger.info(
+        `  [mission.materialize] currentMission was null in system-state.yaml — set to ${manifest.missionId}.`,
+      );
+    } else {
+      logger.warn(
+        `  [mission.materialize] currentMission was "${state.currentMission}" in system-state.yaml — set to ${manifest.missionId}.`,
+      );
+    }
+    state.currentMission = manifest.missionId;
+    await writeSystemState(workspaceRoot, manifest.systemId, state);
+    await commitWerkstattSideEffects(
+      workspaceRoot,
+      [path.join("..", "systems-cache", manifest.systemId, "system-state.yaml")],
+      `werkstatt: mission.materialize state-repair ${manifest.missionId}`,
     );
   }
 
