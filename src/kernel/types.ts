@@ -15,10 +15,12 @@
   <item>RFC-0518: add GateMetadata, GateSeverity, GatePhase, GateConditional types and optional gate field to KernelCommandMetadata.</item>
   <item>RFC-0579: add KernelNextStep interface and optional nextSteps field to KernelCommandResult and KernelExecutionReport.</item>
   <item>RFC-0686: add dependsOn to KernelPipelineStep and concurrency to ExecuteKernelPipelineOptions for parallel step execution.</item>
+  <item>RFC-0960: add GeneratedArtifactSpec, GeneratorOwnershipEntry, modulePath + generates on KernelCommandDefinition, registry + ownershipMap on KernelRuntimeContext, postBuildValidation on KernelAppConfig.</item>
 </CHANGE_SUMMARY>
 */
 
 import type { WorkspaceIO, WriteIntent } from "./workspace-io.ts";
+import type { KernelRegistry } from "./registry.ts";
 // @ai-invariant: Kernel command contracts must stay explicit so agents cannot pass untyped command inputs.
 
 export type KernelOutputFormat = "pretty" | "json";
@@ -188,6 +190,37 @@ export interface CheckResult {
   summary: { error: number; warning: number; info: number };
 }
 
+/**
+ * RFC-0960: Declared generated artifact specification on a kernel command.
+ * Lives on `KernelCommandDefinition.generates[]` and is the source of truth
+ * for the derived generator ownership map.
+ */
+export interface GeneratedArtifactSpec {
+  /** Workpiece-relative path or glob, e.g. "src/content/system-health.generated.yaml". */
+  path: string;
+  /** Skip absence checks (RFC-0636 semantics) — e.g. produced only in build.post. */
+  conditional?: boolean;
+  /** Pipeline phase that produces it: informs which validator phase may assert existence. */
+  phase: "build.prepare" | "build.post" | "on-demand";
+  /**
+   * Override the default markerPolicy derivation. Default: public/** → "registry-only",
+   * everything else → "embedded". Set explicitly only for edge cases (e.g. .cache/pdf/**).
+   */
+  markerPolicy?: "embedded" | "registry-only";
+}
+
+/**
+ * RFC-0960: A derived entry in the generator ownership map. Produced by
+ * `buildGeneratorOwnership(registry)` from all registered commands' `generates[]`.
+ * Engine defines the structural type; the site plugin owns the concrete derivation.
+ */
+export interface GeneratorOwnershipEntry {
+  command: string;
+  modulePath: string;
+  artifact: GeneratedArtifactSpec;
+  markerPolicy: "embedded" | "registry-only";
+}
+
 export interface KernelRuntimeContext {
   workspaceRoot: string;
   site?: DiscoveredSiteWorkspace;
@@ -215,6 +248,14 @@ export interface KernelRuntimeContext {
    * `filesModified` on the execution report.
    */
   fileIntents?: WriteIntent[];
+  /** RFC-0960: the kernel registry, available to validators for derived projections like buildGeneratorOwnership. */
+  registry: KernelRegistry;
+  /**
+   * RFC-0960: pre-computed derived generator ownership map. Computed once by
+   * the executor via dynamic import of buildGeneratorOwnership from the site
+   * plugin. Validators consume this instead of a static constant.
+   */
+  ownershipMap?: GeneratorOwnershipEntry[];
 }
 
 export interface KernelCommandDefinition<TData = unknown> extends KernelCommandMetadata {
@@ -257,6 +298,18 @@ export interface KernelCommandDefinition<TData = unknown> extends KernelCommandM
    * an additional skip signal on top of the existing cache mechanism.
    */
   validatesOutputs?: string[];
+  /**
+   * RFC-0960: repo-relative path to the implementing source file (e.g.
+   * "packages/werkstatt-site/src/checks/robots.ts"). Required on ALL commands.
+   * Distinct from modulePaths (ADR-0024, relative to src/, for cache hashing).
+   */
+  modulePath: string;
+  /**
+   * RFC-0960: declared generated artifacts. Required on every `.generate`
+   * command and every command with `writes`. Commands with `writes` but no
+   * generated files declare `generates: []` (empty array).
+   */
+  generates?: GeneratedArtifactSpec[];
   execute(
     input: KernelCommandInput,
     context: KernelRuntimeContext,
@@ -296,6 +349,13 @@ export interface KernelAppConfig {
   /** Lazy module loaders — enables manifest-driven single-module loading. Functions are defined in kernel.config.ts so import() resolves from the workspace root. */
   moduleLoaders?: Record<string, () => Promise<KernelModule>>;
   pipelines?: Record<string, KernelPipelineStep[]>;
+  /**
+   * RFC-0960: callback invoked after all modules are loaded and commands are
+   * registered, before the registry is returned. Used by the site plugin to
+   * inject validateRegistration for fail-closed enforcement of modulePath and
+   * generates declarations. Engine calls the callback — does NOT import site code.
+   */
+  postBuildValidation?: (registry: KernelRegistry) => void;
 }
 export interface KernelExecutionReport<TData = unknown> {
   siteName?: string;
