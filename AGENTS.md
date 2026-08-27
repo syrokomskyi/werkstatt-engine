@@ -265,6 +265,16 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `mission.reconcile` includes a post-push divergence check (RFC-0918): after pushing to origin, it compares cache clone HEAD against `origin/main` using `git rev-parse`. If the SHAs differ, a `divergenceWarning` is logged and included in the reconciliation report. This is a non-fatal diagnostic — it does not block reconcile.
 - The band-aid fix from 6.92.5 (updating `workpieceHeadAtReconcile` after auto-commit in `mission.close`) remains as a safety net for the full-build path when dist reuse is not active.
 
+## Boot-smoke runtime verification (RFC-0961)
+
+- `src/release/boot-smoke.ts` owns the `release.boot-smoke` command: route planner, binding simulator, egress interceptor, and miniflare boot logic.
+- `planBootSmokeRequests({ distDir, languages })` — pure function that reads `surface.generated.json` from distDir to discover route-template kinds; picks root, one route per language, one API route, one static asset, and an intentional 404 probe.
+- `simulateBindings(wranglerConfig)` — pure function that maps wrangler binding declarations to in-memory equivalents: KV→Map, R2→Map, D1→type marker, Vectorize→stub query/upsert, vars/secrets→placeholder strings, ASSETS→type marker. Unknown binding types (e.g. `durable_objects`) are reported in `missingBindings` (fail-closed).
+- Egress interceptor blocks all external `fetch()` calls; localhost requests are allowed for miniflare internal routing.
+- `release.prepare` calls `runBootSmoke` after `build.post` and before snapshot capture; persists `boot-smoke.json` as release evidence; `ReleaseManifest` includes `bootSmokeVerdict: pass|fail`.
+- `leitstand.dev-deploy` pre-flight includes `boot-smoke-evidence` check — asserts `releases/{releaseId}/boot-smoke.json` exists. No legacy exemption: all releases must have boot-smoke evidence.
+- `miniflare` is an `optionalDependency` — dynamically imported at runtime. Type declaration shim at `src/types/miniflare.d.ts`.
+
 ## Env file persistence (RFC-0822)
 
 - `persistEnvFilesToCacheClone(workpieceDir, cacheCloneDir)` (RFC-0822): copies `.env*` files from workpiece to cache clone (untracked). Excludes `.env.example` and `.env.*.example`. Used by `mission.close` as a final step. Non-fatal on failure.
