@@ -18,6 +18,7 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>ADR-0022: workspace registry now uses process-lifetime cache via getOrBuildWorkspaceRegistry.</item>
   <item>RFC-0842: add assertAllSitesAllowed guard — rejects --all for commands where supportsAllSites is not true (covers false and undefined).</item>
   <item>RFC-0870: add pipeline hint to not-registered and no-target-site error messages.</item>
+  <item>RFC-0960: inject registry and ownershipMap into KernelRuntimeContext at all 3 construction sites.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -49,6 +50,27 @@ import { buildRegistryForModule, ensureTargetSites, loadAppRuntime } from "./reg
 import { getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { getFactoryTelemetryPusher, recordCommandTelemetry } from "./telemetry.ts";
 import { manifestFilePath, type CommandManifest } from "../command-manifest.ts";
+import type { KernelRegistry } from "../registry.ts";
+import type { GeneratorOwnershipEntry } from "../types.ts";
+
+/**
+ * RFC-0960: Compute the derived generator ownership map via dynamic import
+ * of the site plugin's buildGeneratorOwnership. Engine cannot static-import
+ * site code (DNA-64). Returns undefined if the site plugin is unavailable
+ * or buildGeneratorOwnership is not yet exported.
+ */
+export async function computeOwnershipMap(
+  registry: KernelRegistry,
+): Promise<GeneratorOwnershipEntry[] | undefined> {
+  try {
+    const mod = (await import("@warpgogol/werkstatt-site/checks")) as unknown as {
+      buildGeneratorOwnership?: (registry: KernelRegistry) => GeneratorOwnershipEntry[];
+    };
+    return mod.buildGeneratorOwnership?.(registry);
+  } catch {
+    return undefined;
+  }
+}
 
 class KernelCommandTimeoutError extends Error {
   constructor(
@@ -379,11 +401,10 @@ export async function executeKernelCommand(
   // resolved site context, avoiding a full site registry build that would eagerly
   // load all site modules via tsImport.
   let wsCommand: KernelCommandDefinition | undefined;
+  let wsRegistry: KernelRegistry | undefined;
   {
     const workspaceConfig = await loadWorkspaceConfig(options.workspaceRoot);
     if (workspaceConfig) {
-      let wsRegistry;
-
       if (workspaceConfig.moduleLoaders) {
         let moduleName: string | undefined;
         try {
@@ -412,6 +433,7 @@ export async function executeKernelCommand(
         assertAllSitesAllowed(wsCommand, options.allSites ?? false);
         const logger = createKernelLogger(outputFormat);
         const { io, intents } = createDefaultIO();
+        const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
           site: undefined,
@@ -422,6 +444,8 @@ export async function executeKernelCommand(
           outputFormat,
           io,
           fileIntents: intents,
+          registry: wsRegistry!,
+          ownershipMap,
         };
         if (outputFormat === "pretty") {
           logger.section(`workspace: ${wsCommand.name}`);
@@ -477,6 +501,7 @@ export async function executeKernelCommand(
     for (const site of targetSites) {
       const logger = createKernelLogger(outputFormat);
       const { io, intents } = createDefaultIO();
+      const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
       const context: KernelRuntimeContext = {
         workspaceRoot: options.workspaceRoot,
         site,
@@ -487,6 +512,8 @@ export async function executeKernelCommand(
         outputFormat,
         io,
         fileIntents: intents,
+        registry: wsRegistry!,
+        ownershipMap,
       };
 
       if (outputFormat === "pretty") {
@@ -515,15 +542,17 @@ export async function executeKernelCommand(
 
   for (const site of targetSites) {
     let command: KernelCommandDefinition | undefined;
+    let siteRegistry: KernelRegistry | undefined;
     const siteConfig = await loadKernelAppConfig(site);
 
     if (siteConfig.moduleLoaders && siteManifestModule) {
-      const registry = await buildRegistryForModule(siteConfig, siteManifestModule);
-      command = registry.getCommand(options.commandName);
+      siteRegistry = await buildRegistryForModule(siteConfig, siteManifestModule);
+      command = siteRegistry.getCommand(options.commandName);
     }
 
     if (!command) {
       const { registry } = await loadAppRuntime(options.workspaceRoot, site);
+      siteRegistry = registry;
       command = registry.getCommand(options.commandName);
     }
 
@@ -537,6 +566,7 @@ export async function executeKernelCommand(
 
     const logger = createKernelLogger(outputFormat);
     const { io, intents } = createDefaultIO();
+    const ownershipMap = siteRegistry ? await computeOwnershipMap(siteRegistry) : undefined;
     const context: KernelRuntimeContext = {
       workspaceRoot: options.workspaceRoot,
       site,
@@ -547,6 +577,8 @@ export async function executeKernelCommand(
       outputFormat,
       io,
       fileIntents: intents,
+      registry: siteRegistry!,
+      ownershipMap,
     };
 
     if (outputFormat === "pretty") {

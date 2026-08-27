@@ -62,7 +62,7 @@ import type {
   KernelRuntimeContext,
   PipelineStepTiming,
 } from "../types.ts";
-import { executeRegisteredCommand } from "./execute-command.ts";
+import { executeRegisteredCommand, computeOwnershipMap } from "./execute-command.ts";
 import { assertKnownOptionKeys, summarizeLogs } from "./shared.ts";
 import { ensureTargetSites, loadAppRuntime } from "./registry.ts";
 import { getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
@@ -702,6 +702,7 @@ async function executePipelineForSite(
 
         const logger = createKernelLogger(options.outputFormat ?? "pretty");
         const { io, intents } = createDefaultIO();
+        const ownershipMap = await computeOwnershipMap(registry);
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
           site,
@@ -711,6 +712,8 @@ async function executePipelineForSite(
           outputFormat: options.outputFormat ?? "pretty",
           io,
           fileIntents: intents,
+          registry,
+          ownershipMap,
         };
 
         const stepLabel = `[${stepIndex + 1}/${totalSteps}]`;
@@ -960,6 +963,7 @@ async function executePipelineForWorkspace(
 
         const logger = createKernelLogger(options.outputFormat ?? "pretty");
         const { io, intents } = createDefaultIO();
+        const ownershipMap = await computeOwnershipMap(registry);
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
           site: undefined,
@@ -969,6 +973,8 @@ async function executePipelineForWorkspace(
           outputFormat: options.outputFormat ?? "pretty",
           io,
           fileIntents: intents,
+          registry,
+          ownershipMap,
         };
 
         const stepLabel = `[${stepIndex + 1}/${totalSteps}]`;
