@@ -519,6 +519,17 @@ async function _runPreflight(
   const env = { ...filterEnv(process.env), ...secretsEnv };
   const zoneId = env["CLOUDFLARE_ZONE_ID"];
   const apiToken = env["CLOUDFLARE_API_TOKEN"];
+
+  // 8. RFC-0961: Boot-smoke evidence file exists
+  const bootSmokeEvidencePath = path.join(workspaceRoot, "releases", releaseId, "boot-smoke.json");
+  checks.push({
+    name: "boot-smoke-evidence",
+    passed: existsSync(bootSmokeEvidencePath),
+    detail: existsSync(bootSmokeEvidencePath)
+      ? "boot-smoke.json evidence found"
+      : "boot-smoke.json evidence missing — run release.prepare to generate",
+  });
+
   if (!zoneId || !apiToken) {
     checks.push({
       name: "cloudflare-token",
