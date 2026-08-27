@@ -244,6 +244,15 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - Complexity: indexing/selection/aggregation in O(E + R log R) time and O(E + R) memory. No per-requirement full evidence scan. Action-pack ordering in O(T + D + T log T).
 - No function reads/writes `releases/**`, `missions/**`, `systems-cache/**`, object storage, URLs, clocks, environment variables, or provider APIs. All modules are pure and independently testable.
 
+## Kernel command registration (RFC-0960)
+
+- Every `KernelCommandDefinition` MUST declare `modulePath`: a repo-relative path to the implementing source file (e.g. `packages/werkstatt-site/src/checks/robots.ts`). This is **required on ALL commands** — not just `.generate` commands. It is distinct from `modulePaths` (ADR-0024, relative to `src/`, for cache hashing).
+- Every `.generate` command and every command with non-empty `writes` MUST declare `generates: GeneratedArtifactSpec[]`. Commands with `writes` but no generated files declare `generates: []`. Each spec includes `path`, `phase` (`build.prepare` | `build.post` | `on-demand`), optional `conditional`, and optional `markerPolicy` override.
+- `validateRegistration(registry)` enforces completeness at registry build time via `config.postBuildValidation`. It checks: non-empty `modulePath`, `generates` on `.generate`/`writes` commands, exempt list consistency, and non-glob path uniqueness. Fail-closed: throws on any violation.
+- `KernelRuntimeContext` carries `registry: KernelRegistry` and `ownershipMap?: GeneratorOwnershipEntry[]` (pre-computed via `buildGeneratorOwnership`). Validators consume `context.ownershipMap` instead of a static constant.
+- The static `GENERATOR_OWNERSHIP_MAP` is deleted. Ownership is derived by `buildGeneratorOwnership(registry)` from `generates[]` declarations. The derivation function lives in the site plugin (`@warpgogol/werkstatt-site/checks`).
+- `KernelAppConfig` has an optional `postBuildValidation?: (registry: KernelRegistry) => void` callback. The workspace `tools/kernel.config.ts` wires `validateRegistration` from the site plugin.
+
 ## Mission git helpers
 
 - `commitWorkpieceIfDirty(workpieceDir, missionId)` (RFC-0644): auto-commits all dirty files in the workpiece via `git add -A` + `git commit --no-verify`. Returns `{ committed: boolean, commitSha: string | null }`. Used by `mission.reconcile` and `mission.close` (RFC-0797) to auto-commit dirty workpieces instead of throwing.
