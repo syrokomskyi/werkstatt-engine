@@ -16,6 +16,7 @@
   <item>RFC-0579: add KernelNextStep interface and optional nextSteps field to KernelCommandResult and KernelExecutionReport.</item>
   <item>RFC-0686: add dependsOn to KernelPipelineStep and concurrency to ExecuteKernelPipelineOptions for parallel step execution.</item>
   <item>RFC-0960: add GeneratedArtifactSpec, GeneratorOwnershipEntry, modulePath + generates on KernelCommandDefinition, registry + ownershipMap on KernelRuntimeContext, postBuildValidation on KernelAppConfig.</item>
+  <item>RFC-0960 fo-fix: make modulePath optional (modulePath?: string) — forge commands don't declare it; validateRegistration skips undefined modulePath.</item>
 </CHANGE_SUMMARY>
 */
 

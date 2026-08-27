@@ -19,6 +19,7 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>RFC-0842: add assertAllSitesAllowed guard — rejects --all for commands where supportsAllSites is not true (covers false and undefined).</item>
   <item>RFC-0870: add pipeline hint to not-registered and no-target-site error messages.</item>
   <item>RFC-0960: inject registry and ownershipMap into KernelRuntimeContext at all 3 construction sites.</item>
+  <item>RFC-0960 fo-fix: add console.warn to computeOwnershipMap catch block for agent-facing clarity on import failures.</item>
 </CHANGE_SUMMARY>
 */
 
