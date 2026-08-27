@@ -285,7 +285,13 @@ async function generateFullBoilerplate(
     runFontsImportsGenerate,
     runBiomeCssGenerate,
   } = codegenMod;
-  const { applyTokens, readTemplate, readRuntimeTemplate } = onboardingMod;
+  const {
+    applyTokens,
+    readTemplate,
+    readRuntimeTemplate,
+    generateWorkpiecePackageJson,
+    readTemplateFields,
+  } = onboardingMod;
   const { runEnvExampleGenerate } = checksMod;
 
   const regeneratedFiles: string[] = [];
@@ -316,8 +322,14 @@ async function generateFullBoilerplate(
   };
 
   // Step 1: Write template files into staging directory
+  // RFC-0959: package.json is generated from WORKPIECE_DEPENDENCY_MANIFEST, not the template.
+  const { packageJson: generatedPkgJson } = generateWorkpiecePackageJson({
+    workspaceRoot: context.workspaceRoot,
+    siteId: systemId,
+    templateFields: readTemplateFields(),
+  });
   const templateFiles: Array<{ dest: string; content: string }> = [
-    { dest: "package.json", content: applyTokens(readTemplate("package.template.json"), tokens) },
+    { dest: "package.json", content: generatedPkgJson },
     {
       dest: "astro.config.mjs",
       content: applyTokens(
