@@ -300,9 +300,7 @@ test("freshness gate: fails closed when reconciliation report is missing", async
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
 
-  await expect(runMissionClose(input, context)).rejects.toThrow(
-    /reconciliation report not found or unreadable/,
-  );
+  await expect(runMissionClose(input, context)).rejects.toThrow(/reconciliation report not found/);
 });
 
 test("freshness gate: blocks when report lacks workpieceHeadAtReconcile field", async () => {

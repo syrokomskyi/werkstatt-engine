@@ -253,7 +253,7 @@ test("mission.close fails when bordbuch has orphan-mission-close violation", asy
   } as unknown as KernelRuntimeContext;
 
   await expect(runMissionClose(input, context)).rejects.toThrow(
-    /bordbuch for system 'test-system' has.*violation.*run bordbuch.repair/,
+    /bordbuch has.*violation.*run bordbuch.repair/,
   );
 });
 

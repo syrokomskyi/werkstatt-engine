@@ -163,6 +163,7 @@ export async function runOperation<C>(
         opId,
         completed: false,
         failedStep: step.name,
+        failedStepError: errorMsg,
         skipped,
         executed,
       };
@@ -183,6 +184,7 @@ export async function runOperation<C>(
           opId,
           completed: false,
           failedStep: step.name,
+          failedStepError: `verify returned false after run for step "${step.name}"`,
           skipped,
           executed,
         };

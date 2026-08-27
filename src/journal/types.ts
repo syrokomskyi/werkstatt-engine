@@ -12,11 +12,32 @@
 */
 
 export type JournalRecord =
-  | { kind: "op-started"; opId: string; op: string; missionId: string; at: string; platformVersion: string }
+  | {
+      kind: "op-started";
+      opId: string;
+      op: string;
+      missionId: string;
+      at: string;
+      platformVersion: string;
+    }
   | { kind: "step-started"; opId: string; step: string; seq: number; at: string }
-  | { kind: "step-done"; opId: string; step: string; seq: number; at: string; meta?: Record<string, unknown> }
+  | {
+      kind: "step-done";
+      opId: string;
+      step: string;
+      seq: number;
+      at: string;
+      meta?: Record<string, unknown>;
+    }
   | { kind: "step-failed"; opId: string; step: string; seq: number; at: string; error: string }
-  | { kind: "step-skipped"; opId: string; step: string; seq: number; at: string; reason: "already-satisfied" | "resume" }
+  | {
+      kind: "step-skipped";
+      opId: string;
+      step: string;
+      seq: number;
+      at: string;
+      reason: "already-satisfied" | "resume";
+    }
   | { kind: "op-done"; opId: string; at: string }
   | { kind: "op-abandoned"; opId: string; at: string; reason: string };
 
@@ -35,6 +56,7 @@ export interface RunOperationResult {
   opId: string;
   completed: boolean;
   failedStep?: string;
+  failedStepError?: string;
   skipped: string[];
   executed: string[];
 }

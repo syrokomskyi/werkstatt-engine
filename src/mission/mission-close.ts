@@ -30,6 +30,7 @@
   <item>RFC-0822: persist .env* files to cache clone as final close step.</item>
   <item>RFC-0878: write .closed sentinel file to workpiece as final step before returning.</item>
   <item>RFC-0913: add reconcile-freshness gate — compare workpiece HEAD against workpieceHeadAtReconcile from reconciliation report; fail-closed on missing report; add --skip-reconcile-check escape hatch.</item>
+  <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal — each step records to journal.jsonl for crash-safe resume.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -68,6 +69,8 @@ import { resolveActor } from "./actor-identity.ts";
 import { persistEnvFilesToCacheClone } from "./env-persist.ts";
 import { persistOperatorConfigFiles } from "./operator-config-files.ts";
 import { readFileSync } from "node:fs";
+import { runOperation } from "../journal/runner.ts";
+import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 
 // RFC-0597: Media cache directories to persist across missions
 const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
@@ -285,739 +288,68 @@ export async function runMissionClose(
     }
 
     const now = new Date().toISOString();
-
-    // RFC-0480: create git bundle from workpiece as audit artifact
     const missionDir = resolveMissionDir(workspaceRoot, missionId);
     const workpieceDir = path.join(missionDir, "workpiece");
     const evidenceDir = path.join(missionDir, "evidence");
     await fs.mkdir(evidenceDir, { recursive: true });
 
-    // ADR-0010: stop any running dev/preview server for the workpiece before
-    // transitioning the mission to closed. Best-effort — if no server is running,
-    // astro dev stop silently succeeds. This frees the dev port and prevents
-    // serving stale content from a closed mission.
-    if (existsSync(workpieceDir)) {
-      spawnSync("pnpm", ["run", "stop"], {
-        cwd: workpieceDir,
-        stdio: "ignore",
-      });
-    }
-
-    // RFC-0797: Auto-commit dirty workpiece instead of throwing.
-    // Same pattern as mission.reconcile (RFC-0644).
-    const workpieceCommit = commitWorkpieceIfDirty(workpieceDir, missionId);
-    if (workpieceCommit.committed) {
-      logger.info(
-        `  Auto-committed dirty workpiece (${workpieceCommit.commitSha?.slice(0, 8)}) before close`,
-      );
-      // RFC-0916: Update reconciliation report's workpieceHeadAtReconcile to the
-      // new HEAD. The auto-commit only contains build-generated files (behavior
-      // snapshots, PDFs, etc.) from the inline validate build — not operator
-      // changes. Without this update, the reconcile-freshness gate below fails
-      // because workpiece HEAD has moved past the recorded reconcile SHA.
-      try {
-        const reconcileReportPath = path.join(evidenceDir, "reconciliation-report.json");
-        if (existsSync(reconcileReportPath)) {
-          const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
-          report.workpieceHeadAtReconcile = workpieceCommit.commitSha;
-          await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
-        }
-      } catch {
-        // Non-fatal — freshness check will catch if report is missing
-      }
-    }
-
-    // RFC-0820 Level 2: Zero operator commit guard.
-    // Count commits since materialization. If zero, the mission brief was never
-    // fulfilled — block close unless --allow-no-op is explicitly set.
-    if (!allowNoOp) {
-      const operatorCommits = countOperatorCommits(workpieceDir, manifest.migratedAt);
-      if (!operatorCommits.hasOperatorCommits) {
-        throw new Error(
-          `[mission.close] ZERO-COMMIT-GUARD: Mission '${missionId}' has zero operator commits since materialization.\n` +
-            `  Brief: "${manifest.brief}"\n` +
-            `  This means no work was committed to the workpiece — the mission brief was not fulfilled.\n` +
-            `  Possible causes:\n` +
-            `    - Edits were never written to disk (agent reported success without actually editing files)\n` +
-            `    - mission.git.commit returned 'no changes' but the warning was missed\n` +
-            `    - Edits were written to the wrong directory\n` +
-            `  If this is a legitimate no-op mission (e.g., platform-only update, config sync),\n` +
-            `  re-run with --allow-no-op to override this guard.\n`,
-        );
-      }
-    }
-
-    // RFC-0913: Reconcile-freshness gate — verify workpiece HEAD matches
-    // the SHA recorded at reconcile time. Fail-closed if report is missing.
-    let freshnessChecked = false;
-    let unreconciledCommits = 0;
-    let workpieceHead: string | null = null;
-    let reconciledSha: string | null = null;
-
-    if (!skipReconcileCheck) {
-      const reconcileReportPath = path.join(evidenceDir, "reconciliation-report.json");
-      let reconciledWorkpieceSha: string | null = null;
-      try {
-        const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
-        reconciledWorkpieceSha = report.workpieceHeadAtReconcile ?? null;
-      } catch {
-        throw new Error(
-          `[mission.close] mission '${missionId}' reconciliation report not found or unreadable.\n` +
-            `Cannot verify reconcile freshness — re-run mission.reconcile --mission ${missionId}\n` +
-            `to regenerate the report, then re-run mission.close.\n` +
-            `If you are certain the workpiece is already synced, re-run with --skip-reconcile-check.`,
-        );
-      }
-
-      if (!reconciledWorkpieceSha) {
-        throw new Error(
-          `[mission.close] mission '${missionId}' reconciliation report missing workpieceHeadAtReconcile field.\n` +
-            `Re-run mission.reconcile --mission ${missionId} to regenerate the report.\n` +
-            `If you are certain the workpiece is already synced, re-run with --skip-reconcile-check.`,
-        );
-      }
-
-      workpieceHead = gitExec(workpieceDir, "rev-parse HEAD");
-      reconciledSha = reconciledWorkpieceSha;
-
-      if (workpieceHead !== reconciledWorkpieceSha) {
-        try {
-          const countOutput = gitExec(
-            workpieceDir,
-            `rev-list --count ${reconciledWorkpieceSha}..${workpieceHead}`,
-          );
-          unreconciledCommits = parseInt(countOutput, 10);
-        } catch {
-          unreconciledCommits = 0;
-        }
-        throw new Error(
-          `[mission.close] mission '${missionId}' has ${unreconciledCommits} unreconciled commit(s) —\n` +
-            `  workpiece HEAD:    ${workpieceHead.slice(0, 12)}\n` +
-            `  reconciled SHA:    ${reconciledWorkpieceSha.slice(0, 12)}\n` +
-            `Run mission.reconcile --mission ${missionId} to transfer them to the cache clone,\n` +
-            `then re-run mission.close.\n` +
-            `If you are certain the workpiece is already synced, re-run with --skip-reconcile-check.`,
-        );
-      }
-
-      freshnessChecked = true;
-    } else {
-      logger.warn(
-        `  Reconcile-freshness check skipped (--skip-reconcile-check) — bordbuch audit entry will be written`,
-      );
-    }
-
-    if (existsSync(path.join(workpieceDir, ".git"))) {
-      const bundlePath = path.join(evidenceDir, "workpiece.git-bundle");
-      try {
-        execSync(`git bundle create ${JSON.stringify(bundlePath)} --all`, {
-          cwd: workpieceDir,
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-      } catch {
-        // Bundle creation failed — non-fatal, close proceeds
-      }
-    }
-
-    // RFC-0705: Gather mirror status BEFORE state transition and block if external
-    // mirrors are out of sync. This ensures a mirror desync blocks before any
-    // irreversible close actions (state transition, bordbuch entry, evidence sync).
-    let originSha: string | null = null;
-    let mirrorSha: string | null = null;
-    let mirrorInSync = false;
-    let recommendation: string | null = null;
-
-    const config = await readSystemConfigSmart(workspaceRoot, manifest.systemId);
-
-    // Pre-check: push cache clone to origin (bare repo) to ensure the bare repo
-    // HEAD is current before comparing with the mirror ref. Without this push,
-    // commits created between reconcile and close (e.g., system-state updates,
-    // bordbuch entries from other operations) would make the bare repo appear
-    // behind, causing a false "mirror out of sync" error.
-    if (config && config.mirrors.length > 1) {
-      const preCheckSystemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-      if (existsSync(path.join(preCheckSystemDir, ".git"))) {
-        try {
-          const branch = gitExec(preCheckSystemDir, "rev-parse --abbrev-ref HEAD");
-          gitExec(preCheckSystemDir, `push origin ${JSON.stringify(branch)}`);
-          logger.info(`  Pushed cache clone to origin before mirror sync check`);
-        } catch (pushErr) {
-          logger.warn(
-            `  Could not push cache clone to origin before mirror check: ${pushErr instanceof Error ? pushErr.message : String(pushErr)}`,
-          );
-        }
-      }
-    }
-
-    // RFC-0797: Pre-mirror-check sync — update refs/mirror to match origin HEAD
-    // after inline validate's bordbuch commits. Prevents false "out of sync" errors.
-    // Must run inside the lock, after the pre-check push, before the mirror sync check.
-    if (!skipAutoSync && config && config.mirrors.length > 2) {
-      try {
-        const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-        logger.info(`  Syncing mirrors before mirror sync check…`);
-        await executeKernelCommand({
-          workspaceRoot,
-          commandName: "sternsystem.sync",
-          argv: [`--id=${manifest.systemId}`],
-        });
-      } catch (syncErr) {
-        logger.warn(
-          `  Pre-check mirror sync failed (non-fatal): ${syncErr instanceof Error ? syncErr.message : String(syncErr)}`,
-        );
-      }
-    }
-
-    if (config && config.mirrors.length > 1) {
-      const bareMirror = config.mirrors[1];
-      const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
-      if (existsSync(bareRepoPath)) {
-        try {
-          let branch: string;
-          try {
-            branch = gitExec(bareRepoPath, "symbolic-ref HEAD").replace("refs/heads/", "");
-          } catch {
-            branch = "main";
-          }
-          try {
-            originSha = gitExec(bareRepoPath, `rev-parse ${branch}`);
-          } catch {
-            originSha = null;
-          }
-          if (config.mirrors.length > 2) {
-            try {
-              mirrorSha = gitExec(bareRepoPath, `rev-parse refs/mirror/${branch}`);
-            } catch {
-              mirrorSha = null;
-            }
-          }
-        } catch {
-          // bare repo not accessible
-        }
-      }
-    }
-
-    if (originSha && mirrorSha && originSha !== mirrorSha) {
-      mirrorInSync = false;
-      recommendation = `Mirror is behind origin. Run: sternsystem.sync --id ${manifest.systemId}`;
-    } else if (originSha && mirrorSha && originSha === mirrorSha) {
-      mirrorInSync = true;
-    } else if (config && config.mirrors.length > 2 && !mirrorSha) {
-      mirrorInSync = false;
-      recommendation = `Mirror ref not found in bare repo. Run: sternsystem.sync --id ${manifest.systemId}`;
-    } else {
-      mirrorInSync = true;
-    }
-
-    // RFC-0705: Block close if external mirrors are configured and out of sync.
-    if (config && config.mirrors.length > 2 && !mirrorInSync) {
-      throw new Error(
-        `[mission.close] external mirrors are out of sync for system '${manifest.systemId}'. ` +
-          `${recommendation ?? "Run: sternsystem.sync --id " + manifest.systemId}`,
-      );
-    }
-
-    manifest.state = "closed";
-    manifest.closedAt = now;
-    manifest.closedBy = actor;
-    manifest.releaseId = releaseId;
-
-    await writeMissionManifest(workspaceRoot, manifest);
-
-    // RFC-0658: Validate bordbuch integrity before appending the close event.
-    // This is defense-in-depth for the distribution-reuse skip path (RFC-0635)
-    // where mission.validate skips build.prepare (and thus bordbuch.validate).
-    const bordbuchCheck = await validateBordbuch(workspaceRoot, manifest.systemId);
-    if (bordbuchCheck.violations.length > 0) {
-      const violationLines = bordbuchCheck.violations
-        .map((v) => `  [${v.rule}] ${v.message}`)
-        .join("\n");
-      throw new Error(
-        `[mission.close] bordbuch for system '${manifest.systemId}' has ${bordbuchCheck.violations.length} violation${bordbuchCheck.violations.length === 1 ? "" : "s"} — run bordbuch.repair first\n${violationLines}`,
-      );
-    }
-
-    const { commitResult: bordbuchResult } = await appendAndCommitBordbuch(
+    // RFC-0958: Build step context and run post-lock lifecycle via journal
+    const stepCtx: CloseStepCtx = {
       workspaceRoot,
-      manifest.systemId,
-      "mission-close",
-      `Mission ${missionId} closed`,
+      missionId,
+      missionDir,
+      workpieceDir,
+      evidenceDir,
+      manifest: lockedManifest,
       actor,
-      {
-        missionId,
-        releaseId,
-        writerRole: "mission",
-        metadata: releaseId ? { releaseId } : undefined,
-      },
-      `Bordbuch: mission-close ${missionId}`,
-    );
-
-    const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-
-    // Gather dirty files (excluding bordbuch which was just committed)
-    let dirtyFiles: string[] = [];
-    try {
-      const status = gitExec(systemDir, "status --porcelain");
-      dirtyFiles = status
-        .split("\n")
-        .filter((l) => l.trim().length > 0)
-        .map((l) => l.slice(3));
-    } catch {
-      dirtyFiles = [];
-    }
-
-    // RFC-0522: build warnings array for null releaseId
-    const warnings: Array<{ rule: string; message: string }> = [];
-    if (!releaseId) {
-      warnings.push({
-        rule: "missing-release-id",
-        message:
-          "Mission closed without release — releaseId is null. Run release.prepare after close to associate a release.",
-      });
-    }
-
-    // RFC-0913: Bordbuch audit entry for --skip-reconcile-check escape hatch
-    if (skipReconcileCheck) {
-      try {
-        await appendAndCommitBordbuch(
-          workspaceRoot,
-          manifest.systemId,
-          "mission-close",
-          `mission-close-reconcile-check-skipped: ${missionId}`,
-          actor,
-          {
-            missionId,
-            writerRole: "mission",
-            metadata: { reconcileCheckSkipped: true, reason: "operator-used-skip-reconcile-check" },
-          },
-          `Bordbuch: mission-close-reconcile-check-skipped ${missionId}`,
-        );
-      } catch (bordbuchErr) {
-        logger.warn(
-          `  Warning: failed to append reconcile-check-skipped Bordbuch entry: ${bordbuchErr instanceof Error ? bordbuchErr.message : String(bordbuchErr)}`,
-        );
-      }
-    }
-
-    const closeReport: CloseReport = {
       releaseId,
-      git: {
-        commitSha: bordbuchResult.commitSha,
-        pushed: bordbuchResult.pushed,
-        pushError: bordbuchResult.error,
-        dirtyFiles,
-      },
-      mirror: {
-        originSha,
-        mirrorSha,
-        inSync: mirrorInSync,
-        recommendation,
-        synced: false,
-        syncError: null,
-      },
-      reconcile: {
-        reconciledAt: manifest.reconciledAt,
-        verified: true,
-        freshnessChecked,
-        unreconciledCommits,
-        workpieceHead,
-        reconciledSha,
-      },
-      templateSync: templateSyncResult,
-      warnings,
+      now,
+      skipEvidenceSync,
+      skipAutoSync,
+      skipReconcileCheck,
+      allowNoOp,
+      skipContentRegression: flagBoolean(input, "skip-content-regression"),
+      context,
+      templateSyncResult,
+      closeReport: null,
+      evidenceSynced: false,
+      evidenceSyncResult: null,
+      freshnessChecked: false,
+      unreconciledCommits: 0,
+      workpieceHead: null,
+      reconciledSha: null,
+      originSha: null,
+      mirrorSha: null,
+      mirrorInSync: false,
+      recommendation: null,
     };
 
-    // RFC-0652: Mandatory evidence.sync to R2 before writing close-report.json.
-    // If evidence.sync fails, mission.close exits 1 with EVIDENCE_SYNC_FAILED — the mission
-    // cannot close without archiving evidence to R2. The --skip-evidence-sync flag is an
-    // escape hatch for offline close (e.g., no R2 credentials available).
-    let evidenceSynced = false;
-    let evidenceSyncResult: { r2KeyPrefix: string; uploadedFiles: number } | null = null;
+    const steps = await buildCloseSteps(workspaceRoot, missionId, stepCtx);
+    const journalPath = path.join(missionDir, "journal.jsonl");
+    const def: OperationDefinition<unknown> = { op: "mission.close", steps };
+    const opResult = await runOperation(journalPath, def, stepCtx, {
+      missionId,
+      platformVersion: "",
+    });
 
-    if (skipEvidenceSync) {
-      logger.warn(
-        `  Evidence sync skipped — local evidence will be lost when mission.cleanup runs`,
-      );
-      // Append Bordbuch entry to make the escape hatch auditable (RFC-0750: commit atomically)
-      try {
-        await appendAndCommitBordbuch(
-          workspaceRoot,
-          manifest.systemId,
-          "mission-close",
-          `mission-close-evidence-skipped: ${missionId}`,
-          actor,
-          {
-            missionId,
-            writerRole: "mission",
-            metadata: { evidenceSyncSkipped: true, reason: "operator-used-skip-evidence-sync" },
-          },
-          `Bordbuch: mission-close-evidence-skipped ${missionId}`,
-        );
-      } catch (bordbuchErr) {
-        logger.warn(
-          `  Warning: failed to append evidence-skipped Bordbuch entry: ${bordbuchErr instanceof Error ? bordbuchErr.message : String(bordbuchErr)}`,
-        );
-      }
-    } else {
-      const axiomEvidenceDir = path.join(missionDir, "evidence", "axiom");
-      const metadataPath = path.join(axiomEvidenceDir, "evidence-metadata.json");
-      if (existsSync(axiomEvidenceDir) && existsSync(metadataPath)) {
-        try {
-          const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-          const syncResult = (await executeKernelCommand({
-            workspaceRoot,
-            commandName: "evidence.sync",
-            argv: [`--mission=${missionId}`],
-          })) as {
-            data?: { r2KeyPrefix?: string; uploadedFiles?: string[] };
-            exitCode?: number;
-          };
-          evidenceSynced = true;
-          const syncData = syncResult.data;
-          if (syncData) {
-            evidenceSyncResult = {
-              r2KeyPrefix: syncData.r2KeyPrefix ?? "",
-              uploadedFiles: syncData.uploadedFiles?.length ?? 0,
-            };
-          }
-          logger.info(`  Evidence synced to R2`);
-        } catch (syncError) {
-          logger.error(`  Evidence sync failed — mission cannot close without archiving evidence`);
-          throw new Error(
-            `EVIDENCE_SYNC_FAILED: ${syncError instanceof Error ? syncError.message : String(syncError)}`,
-          );
-        }
-      } else if (existsSync(axiomEvidenceDir)) {
-        // evidence/axiom/ exists but no evidence-metadata.json — mission never ran mission.check
-        logger.warn(
-          `  Evidence directory exists but evidence-metadata.json is missing — skipping sync (no Axiom evidence to archive)`,
-        );
-      }
-    }
-
-    // Write close-report.json to evidence directory
-    const evidencePath = path.join(missionDir, "evidence", "close-report.json");
-    await atomicWriteFile(evidencePath, JSON.stringify(closeReport, null, 2) + "\n");
-
-    const closeState = await readSystemState(workspaceRoot, manifest.systemId);
-    if (closeState.currentMission === missionId) {
-      closeState.currentMission = null;
-      await writeSystemState(workspaceRoot, manifest.systemId, closeState);
-    }
-
-    // RFC-0703: Auto-pin platform version on mission close.
-    // Called within the existing lock scope (registry, system, mission locks held).
-    // sternsystem.pin reads/writes the config without acquiring locks — safe here.
-    // Pin's writeSystemConfig updates pinnedPlatform.
-    // commitWerkstattSideEffects then commits the combined change in one commit.
-    try {
-      const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-      const pinResult = (await executeKernelCommand({
-        workspaceRoot,
-        commandName: "sternsystem.pin",
-        argv: [`--id=${manifest.systemId}`],
-      })) as {
-        exitCode?: number;
-        summary?: string;
-      };
-      const pinExitCode = pinResult.exitCode ?? 0;
-      if (pinExitCode !== 0) {
-        throw new Error(
-          `sternsystem.pin failed with exitCode ${pinExitCode}: ${pinResult.summary ?? "no summary"}`,
-        );
-      }
-      logger.info(`  Auto-pinned platform version for ${manifest.systemId}`);
-    } catch (pinError) {
+    if (!opResult.completed) {
+      const detail = opResult.failedStepError ?? "unknown error";
       throw new Error(
-        `[mission.close] sternsystem.pin failed for '${manifest.systemId}': ${pinError instanceof Error ? pinError.message : String(pinError)}`,
+        `[mission.close] step "${opResult.failedStep}" failed: ${detail} — run mission.resume --mission ${missionId} to retry`,
       );
     }
 
-    // RFC-0703: Commit system.pin.json to cache clone after pin
-    try {
-      const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-      gitExec(systemDir, "add system.pin.json system-config.yaml");
-      cacheCloneCommit(systemDir, `chore: auto-pin platform version for ${missionId}`);
-      logger.info(`  Committed system.pin.json to cache clone`);
-    } catch (pinCommitError) {
-      logger.warn(
-        `  Could not commit system.pin.json to cache clone: ${pinCommitError instanceof Error ? pinCommitError.message : String(pinCommitError)}`,
-      );
-    }
-
-    // RFC-0580: auto-commit werkstatt side-effects
-    // RFC-0800: include template file path so auto-synced template changes are committed.
-    await commitWerkstattSideEffects(
-      workspaceRoot,
-      [
-        path.join("missions", missionId, "mission.yaml"),
-        "packages/werkstatt-site/src/onboarding/templates/package.template.json",
-      ],
-      `werkstatt: mission.close ${missionId}`,
-    );
-
-    // RFC-0762: Sync external mirrors before writing .materialization-state.json.
-    // The sync creates a mirror-sync bordbuch commit in the cache clone (RFC-0477),
-    // so the state file must be written AFTER the sync to capture the final HEAD.
-    // Non-fatal: sync failure logs a warning but does not block close — the mission
-    // is already closed (irreversible). The operator can retry sternsystem.sync manually.
-    if (config && config.mirrors.length > 2) {
-      try {
-        const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-        logger.info(`  Syncing external mirrors via sternsystem.sync…`);
-        const syncResult = (await executeKernelCommand({
-          workspaceRoot,
-          commandName: "sternsystem.sync",
-          argv: [`--id=${manifest.systemId}`],
-        })) as { exitCode?: number; summary?: string };
-        const syncExitCode = syncResult.exitCode ?? 0;
-        if (syncExitCode !== 0) {
-          const syncError =
-            syncResult.summary ?? `sternsystem.sync exited with code ${syncExitCode}`;
-          logger.warn(
-            `[mission.close] sternsystem.sync failed — run manually: ` +
-              `sternsystem.sync --id ${manifest.systemId}`,
-          );
-          closeReport.mirror.synced = false;
-          closeReport.mirror.syncError = syncError;
-        } else {
-          closeReport.mirror.synced = true;
-          closeReport.mirror.syncError = null;
-          logger.info(`  External mirrors synced`);
-        }
-      } catch (syncErr) {
-        logger.warn(
-          `[mission.close] sternsystem.sync threw — run manually: ` +
-            `sternsystem.sync --id ${manifest.systemId}: ${syncErr instanceof Error ? syncErr.message : String(syncErr)}`,
-        );
-        closeReport.mirror.synced = false;
-        closeReport.mirror.syncError = syncErr instanceof Error ? syncErr.message : String(syncErr);
-      }
-    }
-
-    // RFC-0597: Write materialization state file and copy .cache/ to cache clone.
-    // This is the FINAL step — only executed after the close has succeeded (bundle created,
-    // bordbuch committed, state transitioned to closed). If close failed midway, no state
-    // file is written — next materialization runs full preflight (safe fallback).
-    try {
-      const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-      // Get current cache clone HEAD
-      let cacheCloneHead: string | null = null;
-      try {
-        cacheCloneHead = execSync("git rev-parse HEAD", {
-          cwd: systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
-      } catch {
-        // cache clone HEAD cannot be resolved — skip state file write
-      }
-      if (cacheCloneHead) {
-        const stateFile = {
-          systemId: manifest.systemId,
-          cacheCloneHead,
-          lastValidatedAt: now,
-          lastMissionId: missionId,
-        };
-        await atomicWriteFile(
-          path.join(systemDir, ".materialization-state.json"),
-          JSON.stringify(stateFile, null, 2) + "\n",
-        );
-        logger.info(`  Wrote .materialization-state.json (HEAD: ${cacheCloneHead.slice(0, 12)})`);
-        // Commit .materialization-state.json to prevent dirty cache clone (RFC-0597 fix)
-        try {
-          gitExec(systemDir, "add .materialization-state.json");
-          cacheCloneCommit(systemDir, `chore: update materialization state for ${missionId}`);
-          logger.info(`  Committed .materialization-state.json to cache clone`);
-        } catch {
-          // Nothing to commit or git not available — non-fatal
-        }
-      }
-
-      // RFC-0822: Persist .env* files from workpiece to cache clone (untracked).
-      // Done before .cache/ copy — groups all artifact-copy operations together.
-      // Non-fatal: failure logs a warning but does not block close.
-      const workpieceDir = path.join(missionDir, "workpiece");
-      try {
-        const envResult = await persistEnvFilesToCacheClone(workpieceDir, systemDir);
-        if (envResult.copied.length > 0) {
-          logger.info(
-            `  Persisted ${envResult.copied.length} .env file(s) to cache clone: ${envResult.copied.join(", ")}`,
-          );
-        }
-        if (envResult.skipped.length > 0) {
-          logger.warn(`  Warning: failed to persist .env file(s): ${envResult.skipped.join(", ")}`);
-        }
-      } catch (envErr) {
-        logger.warn(
-          `  Warning: failed to persist .env files to cache clone: ${envErr instanceof Error ? envErr.message : String(envErr)}`,
-        );
-      }
-
-      // RFC-0840: Persist operator config files from workpiece to cache clone (untracked).
-      // Done after .env* persistence — same pattern, different file set.
-      // Non-fatal: failure logs a warning but does not block close.
-      try {
-        const operatorConfigResult = await persistOperatorConfigFiles(workpieceDir, systemDir);
-        if (operatorConfigResult.copied.length > 0) {
-          logger.info(
-            `  Persisted ${operatorConfigResult.copied.length} operator config file(s) to cache clone: ${operatorConfigResult.copied.join(", ")}`,
-          );
-        }
-        if (operatorConfigResult.skipped.length > 0) {
-          logger.warn(
-            `  Warning: failed to persist operator config file(s): ${operatorConfigResult.skipped.join(", ")}`,
-          );
-        }
-      } catch (operatorConfigErr) {
-        logger.warn(
-          `  Warning: failed to persist operator config files to cache clone: ${operatorConfigErr instanceof Error ? operatorConfigErr.message : String(operatorConfigErr)}`,
-        );
-      }
-
-      // Copy .cache/video/ and .cache/video-live/ from workpiece to cache clone
-      for (const cacheDir of MEDIA_CACHE_DIRS) {
-        const srcCache = path.join(workpieceDir, cacheDir);
-        if (existsSync(srcCache)) {
-          const destCache = path.join(systemDir, cacheDir);
-          try {
-            // Replace (not merge) — clean copy from workpiece
-            if (existsSync(destCache)) {
-              await fs.rm(destCache, { recursive: true, force: true });
-            }
-            // Ensure parent directory exists
-            await fs.mkdir(path.dirname(destCache), { recursive: true });
-            // Copy recursively
-            await copyDirRecursive(srcCache, destCache);
-            logger.info(`  Copied ${cacheDir} from workpiece to cache clone`);
-          } catch (err) {
-            logger.info(
-              `  Warning: failed to copy ${cacheDir} to cache clone: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        }
-      }
-
-      // RFC-0734 + ADR-0050: CREG-05 check — warn about unreviewed content drift before copying golden snapshot (non-blocking)
-      const skipContentRegression = flagBoolean(input, "skip-content-regression");
-      if (!skipContentRegression) {
-        const contentRegressionSrc = path.join(
-          workpieceDir,
-          ".cache",
-          "content-regression",
-          "current.snapshot.yaml",
-        );
-        if (existsSync(contentRegressionSrc)) {
-          // Load current snapshot hash from workpiece
-          let currentHash: string | null = null;
-          try {
-            const raw = await fs.readFile(contentRegressionSrc, "utf8");
-            const parsed = yamlParse(raw) as { contentHash?: string };
-            currentHash = parsed?.contentHash ?? null;
-          } catch {
-            // If we can't read it, proceed — the copy will handle it
-          }
-
-          // Load golden snapshot hash from cache clone
-          let goldenHash: string | null = null;
-          const goldenSnapshotPath = path.join(
-            systemDir,
-            ".cache",
-            "content-regression",
-            `${manifest.systemId}.snapshot.yaml`,
-          );
-          if (existsSync(goldenSnapshotPath)) {
-            try {
-              const raw = await fs.readFile(goldenSnapshotPath, "utf8");
-              const parsed = yamlParse(raw) as { contentHash?: string };
-              goldenHash = parsed?.contentHash ?? null;
-            } catch {
-              // Golden unreadable — treat as cold start
-            }
-          }
-
-          // If drift exists (hashes differ and both exist), check for apply-result.json
-          if (currentHash && goldenHash && currentHash !== goldenHash) {
-            const applyResultPath = path.join(
-              missionDir,
-              "evidence",
-              "content-regression",
-              "apply-result.json",
-            );
-            let hasValidApplyResult = false;
-            if (existsSync(applyResultPath)) {
-              try {
-                const raw = await fs.readFile(applyResultPath, "utf8");
-                const result = JSON.parse(raw) as { pending?: number; errors?: string[] };
-                if ((result.pending ?? 0) === 0 && (result.errors?.length ?? 0) === 0) {
-                  hasValidApplyResult = true;
-                }
-              } catch {
-                // Unreadable — not valid
-              }
-            }
-            if (!hasValidApplyResult) {
-              logger.warn(
-                `  [mission.close] CREG-05: Content drift detected (expected after content changes). Review generation skipped — run content.regression.review.generate --site ${manifest.systemId} if regression review is needed. This is non-blocking — mission.close will complete successfully.`,
-              );
-            }
-          }
-        }
-      }
-
-      // RFC-0732: Copy .cache/content-regression/current.snapshot.yaml from workpiece
-      // to cache clone as the new golden snapshot: {systemId}.snapshot.yaml
-      const contentRegressionSrc = path.join(
-        workpieceDir,
-        ".cache",
-        "content-regression",
-        "current.snapshot.yaml",
-      );
-      if (existsSync(contentRegressionSrc)) {
-        const contentRegressionDestDir = path.join(systemDir, ".cache", "content-regression");
-        const contentRegressionDest = path.join(
-          contentRegressionDestDir,
-          `${manifest.systemId}.snapshot.yaml`,
-        );
-        try {
-          await fs.mkdir(contentRegressionDestDir, { recursive: true });
-          await fs.copyFile(contentRegressionSrc, contentRegressionDest);
-          logger.info(
-            `  Copied .cache/content-regression/current.snapshot.yaml → ${manifest.systemId}.snapshot.yaml (golden baseline)`,
-          );
-        } catch (err) {
-          logger.warn(
-            `  Warning: failed to copy content regression snapshot to cache clone: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
-    } catch (err) {
-      logger.info(
-        `  Warning: failed to write materialization state or copy .cache/: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-
-    // RFC-0878: Write .closed sentinel file to workpiece as final step.
-    // The workpiece pre-commit hook checks this file and refuses all commits
-    // (including MISSION_GIT_COMMIT=1 bypass) when it exists.
-    try {
-      await fs.writeFile(path.join(workpieceDir, ".closed"), `${now}\n`);
-    } catch (sentinelErr) {
-      logger.warn(
-        `  Warning: failed to write .closed sentinel to workpiece: ${sentinelErr instanceof Error ? sentinelErr.message : String(sentinelErr)}`,
-      );
-    }
-
+    const cc = stepCtx;
     return {
       data: {
         missionId,
-        systemId: manifest.systemId,
+        systemId: cc.manifest.systemId,
         state: "closed",
         closedAt: now,
         releaseId,
-        closeReport,
-        evidenceSynced,
-        evidenceSyncResult,
+        closeReport: cc.closeReport!,
+        evidenceSynced: cc.evidenceSynced,
+        evidenceSyncResult: cc.evidenceSyncResult,
         bordbuchValidation: { violations: [], checked: true },
       },
       summary: `[mission.close] closed mission ${missionId}`,
@@ -1036,4 +368,729 @@ export async function runMissionClose(
     await releaseLock(workspaceRoot, `mission:${missionId}`);
     await releaseLock(workspaceRoot, `system:${manifest.systemId}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// RFC-0958: Journal-integrated close steps
+// ---------------------------------------------------------------------------
+
+export interface CloseStepCtx {
+  workspaceRoot: string;
+  missionId: string;
+  missionDir: string;
+  workpieceDir: string;
+  evidenceDir: string;
+  manifest: import("@warpgogol/werkstatt-engine/schemas").MissionManifest;
+  actor: ReturnType<typeof resolveActor>;
+  releaseId: string | null;
+  now: string;
+  skipEvidenceSync: boolean;
+  skipAutoSync: boolean;
+  skipReconcileCheck: boolean;
+  allowNoOp: boolean;
+  skipContentRegression: boolean;
+  context: KernelRuntimeContext;
+  templateSyncResult: CloseReportTemplateSync;
+  closeReport: CloseReport | null;
+  evidenceSynced: boolean;
+  evidenceSyncResult: { r2KeyPrefix: string; uploadedFiles: number } | null;
+  freshnessChecked: boolean;
+  unreconciledCommits: number;
+  workpieceHead: string | null;
+  reconciledSha: string | null;
+  originSha: string | null;
+  mirrorSha: string | null;
+  mirrorInSync: boolean;
+  recommendation: string | null;
+}
+
+export async function buildCloseSteps(
+  workspaceRoot: string,
+  missionId: string,
+  manifest: unknown,
+): Promise<OperationStep<unknown>[]> {
+  const ctx = manifest as CloseStepCtx;
+  const logger = ctx.context.logger;
+
+  const steps: OperationStep<unknown>[] = [
+    {
+      name: "stop-dev-servers",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (existsSync(cc.workpieceDir)) {
+          spawnSync("pnpm", ["run", "stop"], { cwd: cc.workpieceDir, stdio: "ignore" });
+        }
+      },
+      verify: async () => true,
+    },
+    {
+      name: "auto-commit-workpiece",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const workpieceCommit = commitWorkpieceIfDirty(cc.workpieceDir, cc.missionId);
+        if (workpieceCommit.committed) {
+          logger.info(
+            `  Auto-committed dirty workpiece (${workpieceCommit.commitSha?.slice(0, 8)}) before close`,
+          );
+          try {
+            const reconcileReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
+            if (existsSync(reconcileReportPath)) {
+              const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
+              report.workpieceHeadAtReconcile = workpieceCommit.commitSha;
+              await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
+            }
+          } catch {
+            // Non-fatal
+          }
+        }
+      },
+    },
+    {
+      name: "zero-commit-guard",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (!cc.allowNoOp) {
+          const operatorCommits = countOperatorCommits(cc.workpieceDir, cc.manifest.migratedAt);
+          if (!operatorCommits.hasOperatorCommits) {
+            throw new Error(
+              `[mission.close] ZERO-COMMIT-GUARD: Mission '${cc.missionId}' has zero operator commits since materialization.\n` +
+                `  Brief: "${cc.manifest.brief}"\n` +
+                `  If this is a legitimate no-op mission, re-run with --allow-no-op.`,
+            );
+          }
+        }
+      },
+    },
+    {
+      name: "reconcile-freshness-check",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (!cc.skipReconcileCheck) {
+          const reconcileReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
+          let reconciledWorkpieceSha: string | null = null;
+          try {
+            const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
+            reconciledWorkpieceSha = report.workpieceHeadAtReconcile ?? null;
+          } catch {
+            throw new Error(
+              `[mission.close] reconciliation report not found — re-run mission.reconcile or use --skip-reconcile-check`,
+            );
+          }
+          if (!reconciledWorkpieceSha) {
+            throw new Error(
+              `[mission.close] reconciliation report missing workpieceHeadAtReconcile field`,
+            );
+          }
+          cc.workpieceHead = gitExec(cc.workpieceDir, "rev-parse HEAD");
+          cc.reconciledSha = reconciledWorkpieceSha;
+          if (cc.workpieceHead !== reconciledWorkpieceSha) {
+            try {
+              const countOutput = gitExec(
+                cc.workpieceDir,
+                `rev-list --count ${reconciledWorkpieceSha}..${cc.workpieceHead}`,
+              );
+              cc.unreconciledCommits = parseInt(countOutput, 10);
+            } catch {
+              cc.unreconciledCommits = 0;
+            }
+            throw new Error(
+              `[mission.close] mission '${cc.missionId}' has ${cc.unreconciledCommits} unreconciled commit(s)`,
+            );
+          }
+          cc.freshnessChecked = true;
+        }
+      },
+    },
+    {
+      name: "create-git-bundle",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (existsSync(path.join(cc.workpieceDir, ".git"))) {
+          const bundlePath = path.join(cc.evidenceDir, "workpiece.git-bundle");
+          try {
+            execSync(`git bundle create ${JSON.stringify(bundlePath)} --all`, {
+              cwd: cc.workpieceDir,
+              stdio: ["pipe", "pipe", "pipe"],
+            });
+          } catch {
+            // Non-fatal
+          }
+        }
+      },
+    },
+    {
+      name: "mirror-sync-check",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const config = await readSystemConfigSmart(cc.workspaceRoot, cc.manifest.systemId);
+        if (config && config.mirrors.length > 1) {
+          const preCheckSystemDir = await resolveCacheClonePath(
+            cc.workspaceRoot,
+            cc.manifest.systemId,
+          );
+          if (existsSync(path.join(preCheckSystemDir, ".git"))) {
+            try {
+              const branch = gitExec(preCheckSystemDir, "rev-parse --abbrev-ref HEAD");
+              gitExec(preCheckSystemDir, `push origin ${JSON.stringify(branch)}`);
+              logger.info(`  Pushed cache clone to origin before mirror sync check`);
+            } catch (pushErr) {
+              logger.warn(
+                `  Could not push cache clone to origin: ${pushErr instanceof Error ? pushErr.message : String(pushErr)}`,
+              );
+            }
+          }
+          if (!cc.skipAutoSync && config.mirrors.length > 2) {
+            try {
+              const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+              logger.info(`  Syncing mirrors before mirror sync check…`);
+              await executeKernelCommand({
+                workspaceRoot: cc.workspaceRoot,
+                commandName: "sternsystem.sync",
+                argv: [`--id=${cc.manifest.systemId}`],
+              });
+            } catch (syncErr) {
+              logger.warn(
+                `  Pre-check mirror sync failed (non-fatal): ${syncErr instanceof Error ? syncErr.message : String(syncErr)}`,
+              );
+            }
+          }
+          const bareMirror = config.mirrors[1];
+          const bareRepoPath = resolveMirrorPath(cc.workspaceRoot, bareMirror.path);
+          if (existsSync(bareRepoPath)) {
+            try {
+              let branch: string;
+              try {
+                branch = gitExec(bareRepoPath, "symbolic-ref HEAD").replace("refs/heads/", "");
+              } catch {
+                branch = "main";
+              }
+              try {
+                cc.originSha = gitExec(bareRepoPath, `rev-parse ${branch}`);
+              } catch {
+                cc.originSha = null;
+              }
+              if (config.mirrors.length > 2) {
+                try {
+                  cc.mirrorSha = gitExec(bareRepoPath, `rev-parse refs/mirror/${branch}`);
+                } catch {
+                  cc.mirrorSha = null;
+                }
+              }
+            } catch {
+              // bare repo not accessible
+            }
+          }
+          if (cc.originSha && cc.mirrorSha && cc.originSha !== cc.mirrorSha) {
+            cc.mirrorInSync = false;
+            cc.recommendation = `Run: sternsystem.sync --id ${cc.manifest.systemId}`;
+          } else if (cc.originSha && cc.mirrorSha && cc.originSha === cc.mirrorSha) {
+            cc.mirrorInSync = true;
+          } else if (config.mirrors.length > 2 && !cc.mirrorSha) {
+            cc.mirrorInSync = false;
+            cc.recommendation = `Mirror ref not found. Run: sternsystem.sync --id ${cc.manifest.systemId}`;
+          } else {
+            cc.mirrorInSync = true;
+          }
+          if (config.mirrors.length > 2 && !cc.mirrorInSync) {
+            throw new Error(
+              `[mission.close] external mirrors are out of sync for system '${cc.manifest.systemId}'. ${cc.recommendation ?? ""}`,
+            );
+          }
+        } else {
+          cc.mirrorInSync = true;
+        }
+      },
+    },
+    {
+      name: "transition-state",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        cc.manifest.state = "closed";
+        cc.manifest.closedAt = cc.now;
+        cc.manifest.closedBy = cc.actor;
+        cc.manifest.releaseId = cc.releaseId;
+        await writeMissionManifest(cc.workspaceRoot, cc.manifest);
+      },
+      verify: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const reRead = await readMissionManifest(cc.workspaceRoot, cc.missionId);
+        return reRead.state === "closed";
+      },
+    },
+    {
+      name: "bordbuch-validate-and-append",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const bordbuchCheck = await validateBordbuch(cc.workspaceRoot, cc.manifest.systemId);
+        if (bordbuchCheck.violations.length > 0) {
+          const violationLines = bordbuchCheck.violations
+            .map((v) => `  [${v.rule}] ${v.message}`)
+            .join("\n");
+          throw new Error(
+            `[mission.close] bordbuch has ${bordbuchCheck.violations.length} violation(s) — run bordbuch.repair first\n${violationLines}`,
+          );
+        }
+        await appendAndCommitBordbuch(
+          cc.workspaceRoot,
+          cc.manifest.systemId,
+          "mission-close",
+          `Mission ${cc.missionId} closed`,
+          cc.actor,
+          {
+            missionId: cc.missionId,
+            releaseId: cc.releaseId,
+            writerRole: "mission",
+            metadata: cc.releaseId ? { releaseId: cc.releaseId } : undefined,
+          },
+          `Bordbuch: mission-close ${cc.missionId}`,
+        );
+      },
+    },
+    {
+      name: "evidence-sync",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (cc.skipEvidenceSync) {
+          logger.warn(
+            `  Evidence sync skipped — local evidence will be lost when mission.cleanup runs`,
+          );
+          try {
+            await appendAndCommitBordbuch(
+              cc.workspaceRoot,
+              cc.manifest.systemId,
+              "mission-close",
+              `mission-close-evidence-skipped: ${cc.missionId}`,
+              cc.actor,
+              {
+                missionId: cc.missionId,
+                writerRole: "mission",
+                metadata: { evidenceSyncSkipped: true, reason: "operator-used-skip-evidence-sync" },
+              },
+              `Bordbuch: mission-close-evidence-skipped ${cc.missionId}`,
+            );
+          } catch (bordbuchErr) {
+            logger.warn(
+              `  Warning: failed to append evidence-skipped Bordbuch entry: ${bordbuchErr instanceof Error ? bordbuchErr.message : String(bordbuchErr)}`,
+            );
+          }
+          return;
+        }
+        const axiomEvidenceDir = path.join(cc.missionDir, "evidence", "axiom");
+        const metadataPath = path.join(axiomEvidenceDir, "evidence-metadata.json");
+        if (existsSync(axiomEvidenceDir) && existsSync(metadataPath)) {
+          try {
+            const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+            const syncResult = (await executeKernelCommand({
+              workspaceRoot: cc.workspaceRoot,
+              commandName: "evidence.sync",
+              argv: [`--mission=${cc.missionId}`],
+            })) as {
+              data?: { r2KeyPrefix?: string; uploadedFiles?: string[] };
+              exitCode?: number;
+            };
+            cc.evidenceSynced = true;
+            const syncData = syncResult.data;
+            if (syncData) {
+              cc.evidenceSyncResult = {
+                r2KeyPrefix: syncData.r2KeyPrefix ?? "",
+                uploadedFiles: syncData.uploadedFiles?.length ?? 0,
+              };
+            }
+            logger.info(`  Evidence synced to R2`);
+          } catch (syncError) {
+            logger.error(
+              `  Evidence sync failed — mission cannot close without archiving evidence`,
+            );
+            throw new Error(
+              `EVIDENCE_SYNC_FAILED: ${syncError instanceof Error ? syncError.message : String(syncError)}`,
+            );
+          }
+        } else if (existsSync(axiomEvidenceDir)) {
+          logger.warn(
+            `  Evidence directory exists but evidence-metadata.json is missing — skipping sync`,
+          );
+        }
+      },
+    },
+    {
+      name: "write-close-report",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
+        let dirtyFiles: string[] = [];
+        try {
+          const status = gitExec(systemDir, "status --porcelain");
+          dirtyFiles = status
+            .split("\n")
+            .filter((l) => l.trim().length > 0)
+            .map((l) => l.slice(3));
+        } catch {
+          dirtyFiles = [];
+        }
+        const warnings: Array<{ rule: string; message: string }> = [];
+        if (!cc.releaseId) {
+          warnings.push({
+            rule: "missing-release-id",
+            message:
+              "Mission closed without release — releaseId is null. Run release.prepare after close.",
+          });
+        }
+        if (cc.skipReconcileCheck) {
+          try {
+            await appendAndCommitBordbuch(
+              cc.workspaceRoot,
+              cc.manifest.systemId,
+              "mission-close",
+              `mission-close-reconcile-check-skipped: ${cc.missionId}`,
+              cc.actor,
+              {
+                missionId: cc.missionId,
+                writerRole: "mission",
+                metadata: {
+                  reconcileCheckSkipped: true,
+                  reason: "operator-used-skip-reconcile-check",
+                },
+              },
+              `Bordbuch: mission-close-reconcile-check-skipped ${cc.missionId}`,
+            );
+          } catch (bordbuchErr) {
+            logger.warn(
+              `  Warning: failed to append reconcile-check-skipped Bordbuch entry: ${bordbuchErr instanceof Error ? bordbuchErr.message : String(bordbuchErr)}`,
+            );
+          }
+        }
+        cc.closeReport = {
+          releaseId: cc.releaseId,
+          git: {
+            commitSha: null,
+            pushed: false,
+            pushError: null,
+            dirtyFiles,
+          },
+          mirror: {
+            originSha: cc.originSha,
+            mirrorSha: cc.mirrorSha,
+            inSync: cc.mirrorInSync,
+            recommendation: cc.recommendation,
+            synced: false,
+            syncError: null,
+          },
+          reconcile: {
+            reconciledAt: cc.manifest.reconciledAt ?? "",
+            verified: true,
+            freshnessChecked: cc.freshnessChecked,
+            unreconciledCommits: cc.unreconciledCommits,
+            workpieceHead: cc.workpieceHead,
+            reconciledSha: cc.reconciledSha,
+          },
+          templateSync: cc.templateSyncResult,
+          warnings,
+        };
+        const evidencePath = path.join(cc.missionDir, "evidence", "close-report.json");
+        await atomicWriteFile(evidencePath, JSON.stringify(cc.closeReport, null, 2) + "\n");
+      },
+      verify: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        return existsSync(path.join(cc.missionDir, "evidence", "close-report.json"));
+      },
+    },
+    {
+      name: "update-system-state",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const closeState = await readSystemState(cc.workspaceRoot, cc.manifest.systemId);
+        if (closeState.currentMission === cc.missionId) {
+          closeState.currentMission = null;
+          await writeSystemState(cc.workspaceRoot, cc.manifest.systemId, closeState);
+        }
+      },
+    },
+    {
+      name: "auto-pin-platform-version",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        try {
+          const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+          const pinResult = (await executeKernelCommand({
+            workspaceRoot: cc.workspaceRoot,
+            commandName: "sternsystem.pin",
+            argv: [`--id=${cc.manifest.systemId}`],
+          })) as { exitCode?: number; summary?: string };
+          const pinExitCode = pinResult.exitCode ?? 0;
+          if (pinExitCode !== 0) {
+            throw new Error(
+              `sternsystem.pin failed with exitCode ${pinExitCode}: ${pinResult.summary ?? "no summary"}`,
+            );
+          }
+          logger.info(`  Auto-pinned platform version for ${cc.manifest.systemId}`);
+        } catch (pinError) {
+          throw new Error(
+            `[mission.close] sternsystem.pin failed: ${pinError instanceof Error ? pinError.message : String(pinError)}`,
+          );
+        }
+        try {
+          const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
+          gitExec(systemDir, "add system.pin.json system-config.yaml");
+          cacheCloneCommit(systemDir, `chore: auto-pin platform version for ${cc.missionId}`);
+          logger.info(`  Committed system.pin.json to cache clone`);
+        } catch (pinCommitError) {
+          logger.warn(
+            `  Could not commit system.pin.json: ${pinCommitError instanceof Error ? pinCommitError.message : String(pinCommitError)}`,
+          );
+        }
+      },
+    },
+    {
+      name: "commit-werkstatt-side-effects",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        await commitWerkstattSideEffects(
+          cc.workspaceRoot,
+          [
+            path.join("missions", cc.missionId, "mission.yaml"),
+            "packages/werkstatt-site/src/onboarding/templates/package.template.json",
+          ],
+          `werkstatt: mission.close ${cc.missionId}`,
+        );
+      },
+    },
+    {
+      name: "sync-external-mirrors",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const config = await readSystemConfigSmart(cc.workspaceRoot, cc.manifest.systemId);
+        if (config && config.mirrors.length > 2) {
+          try {
+            const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+            logger.info(`  Syncing external mirrors via sternsystem.sync…`);
+            const syncResult = (await executeKernelCommand({
+              workspaceRoot: cc.workspaceRoot,
+              commandName: "sternsystem.sync",
+              argv: [`--id=${cc.manifest.systemId}`],
+            })) as { exitCode?: number; summary?: string };
+            const syncExitCode = syncResult.exitCode ?? 0;
+            if (syncExitCode !== 0) {
+              const syncError =
+                syncResult.summary ?? `sternsystem.sync exited with code ${syncExitCode}`;
+              logger.warn(
+                `[mission.close] sternsystem.sync failed — run manually: sternsystem.sync --id ${cc.manifest.systemId}`,
+              );
+              if (cc.closeReport) {
+                cc.closeReport.mirror.synced = false;
+                cc.closeReport.mirror.syncError = syncError;
+              }
+            } else {
+              if (cc.closeReport) {
+                cc.closeReport.mirror.synced = true;
+                cc.closeReport.mirror.syncError = null;
+              }
+              logger.info(`  External mirrors synced`);
+            }
+          } catch (syncErr) {
+            logger.warn(
+              `[mission.close] sternsystem.sync threw — run manually: ${syncErr instanceof Error ? syncErr.message : String(syncErr)}`,
+            );
+            if (cc.closeReport) {
+              cc.closeReport.mirror.synced = false;
+              cc.closeReport.mirror.syncError =
+                syncErr instanceof Error ? syncErr.message : String(syncErr);
+            }
+          }
+        }
+      },
+    },
+    {
+      name: "write-materialization-state",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        try {
+          const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
+          let cacheCloneHead: string | null = null;
+          try {
+            cacheCloneHead = execSync("git rev-parse HEAD", {
+              cwd: systemDir,
+              stdio: "pipe",
+              encoding: "utf-8",
+            }).trim();
+          } catch {
+            // skip
+          }
+          if (cacheCloneHead) {
+            const stateFile = {
+              systemId: cc.manifest.systemId,
+              cacheCloneHead,
+              lastValidatedAt: cc.now,
+              lastMissionId: cc.missionId,
+            };
+            await atomicWriteFile(
+              path.join(systemDir, ".materialization-state.json"),
+              JSON.stringify(stateFile, null, 2) + "\n",
+            );
+            logger.info(
+              `  Wrote .materialization-state.json (HEAD: ${cacheCloneHead.slice(0, 12)})`,
+            );
+            try {
+              gitExec(systemDir, "add .materialization-state.json");
+              cacheCloneCommit(
+                systemDir,
+                `chore: update materialization state for ${cc.missionId}`,
+              );
+              logger.info(`  Committed .materialization-state.json to cache clone`);
+            } catch {
+              // non-fatal
+            }
+          }
+          try {
+            const envResult = await persistEnvFilesToCacheClone(cc.workpieceDir, systemDir);
+            if (envResult.copied.length > 0) {
+              logger.info(`  Persisted ${envResult.copied.length} .env file(s) to cache clone`);
+            }
+          } catch (envErr) {
+            logger.warn(
+              `  Warning: failed to persist .env files: ${envErr instanceof Error ? envErr.message : String(envErr)}`,
+            );
+          }
+          try {
+            const operatorConfigResult = await persistOperatorConfigFiles(
+              cc.workpieceDir,
+              systemDir,
+            );
+            if (operatorConfigResult.copied.length > 0) {
+              logger.info(
+                `  Persisted ${operatorConfigResult.copied.length} operator config file(s)`,
+              );
+            }
+          } catch (operatorConfigErr) {
+            logger.warn(
+              `  Warning: failed to persist operator config files: ${operatorConfigErr instanceof Error ? operatorConfigErr.message : String(operatorConfigErr)}`,
+            );
+          }
+          for (const cacheDir of MEDIA_CACHE_DIRS) {
+            const srcCache = path.join(cc.workpieceDir, cacheDir);
+            if (existsSync(srcCache)) {
+              const destCache = path.join(systemDir, cacheDir);
+              try {
+                if (existsSync(destCache)) {
+                  await fs.rm(destCache, { recursive: true, force: true });
+                }
+                await fs.mkdir(path.dirname(destCache), { recursive: true });
+                await copyDirRecursive(srcCache, destCache);
+                logger.info(`  Copied ${cacheDir} from workpiece to cache clone`);
+              } catch (err) {
+                logger.info(
+                  `  Warning: failed to copy ${cacheDir}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+              }
+            }
+          }
+          if (!cc.skipContentRegression) {
+            const contentRegressionSrc = path.join(
+              cc.workpieceDir,
+              ".cache",
+              "content-regression",
+              "current.snapshot.yaml",
+            );
+            if (existsSync(contentRegressionSrc)) {
+              let currentHash: string | null = null;
+              try {
+                const raw = await fs.readFile(contentRegressionSrc, "utf8");
+                const parsed = yamlParse(raw) as { contentHash?: string };
+                currentHash = parsed?.contentHash ?? null;
+              } catch {
+                // proceed
+              }
+              let goldenHash: string | null = null;
+              const goldenSnapshotPath = path.join(
+                systemDir,
+                ".cache",
+                "content-regression",
+                `${cc.manifest.systemId}.snapshot.yaml`,
+              );
+              if (existsSync(goldenSnapshotPath)) {
+                try {
+                  const raw = await fs.readFile(goldenSnapshotPath, "utf8");
+                  const parsed = yamlParse(raw) as { contentHash?: string };
+                  goldenHash = parsed?.contentHash ?? null;
+                } catch {
+                  // cold start
+                }
+              }
+              if (currentHash && goldenHash && currentHash !== goldenHash) {
+                const applyResultPath = path.join(
+                  cc.missionDir,
+                  "evidence",
+                  "content-regression",
+                  "apply-result.json",
+                );
+                let hasValidApplyResult = false;
+                if (existsSync(applyResultPath)) {
+                  try {
+                    const raw = await fs.readFile(applyResultPath, "utf8");
+                    const result = JSON.parse(raw) as { pending?: number; errors?: string[] };
+                    if ((result.pending ?? 0) === 0 && (result.errors?.length ?? 0) === 0) {
+                      hasValidApplyResult = true;
+                    }
+                  } catch {
+                    // not valid
+                  }
+                }
+                if (!hasValidApplyResult) {
+                  logger.warn(
+                    `  [mission.close] CREG-05: Content drift detected. Review generation skipped — non-blocking.`,
+                  );
+                }
+              }
+            }
+          }
+          const contentRegressionSrc = path.join(
+            cc.workpieceDir,
+            ".cache",
+            "content-regression",
+            "current.snapshot.yaml",
+          );
+          if (existsSync(contentRegressionSrc)) {
+            const contentRegressionDestDir = path.join(systemDir, ".cache", "content-regression");
+            const contentRegressionDest = path.join(
+              contentRegressionDestDir,
+              `${cc.manifest.systemId}.snapshot.yaml`,
+            );
+            try {
+              await fs.mkdir(contentRegressionDestDir, { recursive: true });
+              await fs.copyFile(contentRegressionSrc, contentRegressionDest);
+              logger.info(
+                `  Copied content regression snapshot → ${cc.manifest.systemId}.snapshot.yaml`,
+              );
+            } catch (err) {
+              logger.warn(
+                `  Warning: failed to copy content regression snapshot: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }
+        } catch (err) {
+          logger.info(
+            `  Warning: failed to write materialization state or copy .cache/: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      },
+    },
+    {
+      name: "write-closed-sentinel",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        try {
+          await fs.writeFile(path.join(cc.workpieceDir, ".closed"), `${cc.now}\n`);
+        } catch (sentinelErr) {
+          logger.warn(
+            `  Warning: failed to write .closed sentinel: ${sentinelErr instanceof Error ? sentinelErr.message : String(sentinelErr)}`,
+          );
+        }
+      },
+      verify: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        return existsSync(path.join(cc.workpieceDir, ".closed"));
+      },
+    },
+  ];
+
+  return steps;
 }
