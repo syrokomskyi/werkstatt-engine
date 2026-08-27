@@ -58,6 +58,11 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - **Dynamic `import()` for stack-specific code**: When the engine needs to call stack-specific functions from a plugin (e.g. `werkstatt-site/codegen`, `werkstatt-site/onboarding`, `werkstatt-site/checks`), use dynamic `import()` at the call site, not static `import ... from`. The autonomy and shared guards scan only static import statements — dynamic `import()` is the sanctioned escape hatch for genuinely stack-specific runtime calls, same pattern used by `moduleLoaders` and `deployAdapters` in the plugin contract. Example: `const { runContentRefIndexGenerate } = await import("@warpgogol/werkstatt-site/codegen");`
 - RFC-0776 completed the migration: old packages (`packages/os/site-kernel*`, `packages/fingerprint`, `packages/agent-gate`) are deleted. All imports now go through `@warpgogol/werkstatt-engine` subpath exports.
 
+### Agent Gate (RFC-0286, RFC-0954)
+
+- `packages/werkstatt-engine/src/agent-gate/astro.ts` owns the Astro API route factories for the agent surface: `createAgentMcpRoute` (MCP endpoint), `createAgentActionRoute` (action dispatch), and `createAgentSearchRoute` (semantic search).
+- `createAgentSearchRoute(manifest)` (RFC-0954) returns `{ GET, POST, OPTIONS }` — handles search queries (GET/POST) and reindex (POST with `x-search-reindex-token` header). Uses `env.AI.run("@cf/baai/bge-m3", ...)` for embeddings and `env.SEARCH_INDEX` (Vectorize) for vector storage. Returns 503 if bindings missing, 502 if embedding fails, 500 if Vectorize query fails. Respects `ACCESS_PIN` middleware for access-protected channels.
+
 ### Canonical JSON identity bytes (RFC-0849)
 
 - `snapshotCanonicalJsonObjectV1` is the only creator of runtime-branded `CanonicalJsonObjectV1`. The snapshot takes an object-root input only — root scalars, arrays, and all forbidden descriptors/values return bounded typed failures without logging or partial output.
