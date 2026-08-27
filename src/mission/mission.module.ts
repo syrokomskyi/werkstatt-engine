@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Lazy-loading kernel module for RFC-0355/0356/0480 mission lifecycle commands: open, status, close, abort, list, materialize, validate, preview, build, diff, reconcile, git.commit, cleanup.</purpose>
+  <purpose>Lazy-loading kernel module for RFC-0355/0356/0480 mission lifecycle commands: open, status, close, abort, list, materialize, validate, preview, build, diff, reconcile, git.commit, cleanup, resume, journal.show.</purpose>
   <non-goals>
     <item>Do not re-export types or utilities — the barrel mission/index.ts remains the public API surface.</item>
     <item>Do not register sternsystem, bordbuch, or release commands here.</item>
@@ -33,6 +33,8 @@ export function createMissionModule(): KernelModule {
       const { runMissionValidate, runMissionBuild, runMissionDiff, runMissionReconcile } =
         await import("./mission-materialization-commands.ts");
       const { runValidatePostbuild } = await import("./validate-postbuild.ts");
+      const { runMissionResume } = await import("./mission-resume.ts");
+      const { runMissionJournalShow } = await import("./mission-journal-show.ts");
       const { runWorkpieceRead } = await import("../workpiece/workpiece-read.ts");
       const { runWorkpieceWrite } = await import("../workpiece/workpiece-write.ts");
       const { runMaterializeConfigValidate } = await import("./materialize-config-validate.ts");
@@ -452,6 +454,42 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/**", "apps/{site}/**"],
         cacheable: false,
         execute: runValidatePostbuild,
+      });
+      registry.registerCommand({
+        name: "mission.resume",
+        description: "Resume the last incomplete lifecycle operation for a mission (RFC-0958).",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          mission: { kind: "string", required: true, description: "Mission id." },
+          abandon: {
+            kind: "boolean",
+            description: "Abandon the incomplete operation (destructive — requires --force).",
+          },
+          force: {
+            kind: "boolean",
+            description: "Confirm destructive --abandon action.",
+          },
+        },
+        writes: ["missions/{mission}/journal.jsonl"],
+        reads: ["missions/{mission}/journal.jsonl", "missions/{mission}/mission.yaml"],
+        cacheable: false,
+        execute: runMissionResume,
+      });
+      registry.registerCommand({
+        name: "mission.journal.show",
+        description: "Show the operation journal for a mission (RFC-0958).",
+        scope: "workspace",
+        supportsAllSites: false,
+        flags: {
+          mission: { kind: "string", required: true, description: "Mission id." },
+          op: { kind: "string", description: "Filter by operation id." },
+          json: { kind: "boolean", description: "Output as JSON." },
+        },
+        reads: ["missions/{mission}/journal.jsonl"],
+        cacheable: false,
+        execute: runMissionJournalShow,
       });
     },
   };

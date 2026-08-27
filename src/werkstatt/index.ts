@@ -16,7 +16,14 @@ export {
   runWerkstattLockRecover,
   type WerkstattLockRecoverData,
 } from "./werkstatt-lock-recover.ts";
-export { acquireLock, releaseLock, heartbeatLock, readAllLocks, isLockStale } from "./lock.ts";
+export {
+  acquireLock,
+  releaseLock,
+  heartbeatLock,
+  readAllLocks,
+  isLockStale,
+  removeStaleLock,
+} from "./lock.ts";
 export {
   startOperation,
   completeOperation,
