@@ -574,6 +574,7 @@ describe("CERT-INTEGRATION-08: legacy states fail strict parsing", () => {
         snapshotDiffVerdict: "pass",
         migratorVerdict: "pass",
         versionCompareVerdict: "in-sync",
+        bootSmokeVerdict: "pass",
       };
       expect(releaseManifestSchema.safeParse(manifest).success).toBe(false);
     }

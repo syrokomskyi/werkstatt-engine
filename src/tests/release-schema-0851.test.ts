@@ -17,7 +17,14 @@ describe("releaseArtifactStateSchema (RFC-0851)", () => {
   });
 
   it("rejects legacy states", () => {
-    const legacy = ["published", "dev-deployed", "alt-deployed", "promoted", "main-deployed", "rolled-back"];
+    const legacy = [
+      "published",
+      "dev-deployed",
+      "alt-deployed",
+      "promoted",
+      "main-deployed",
+      "rolled-back",
+    ];
     for (const state of legacy) {
       expect(releaseArtifactStateSchema.safeParse(state).success).toBe(false);
     }
@@ -51,6 +58,7 @@ describe("releaseManifestSchema (RFC-0851)", () => {
     snapshotDiffVerdict: "pass",
     migratorVerdict: "pass",
     versionCompareVerdict: "in-sync",
+    bootSmokeVerdict: "pass",
   };
 
   it("accepts a valid prepared manifest", () => {
@@ -90,7 +98,14 @@ describe("releaseManifestSchema (RFC-0851)", () => {
 
 describe("legacyReleaseStateSchema", () => {
   it("accepts all legacy states", () => {
-    const legacy = ["published", "dev-deployed", "alt-deployed", "promoted", "main-deployed", "rolled-back"];
+    const legacy = [
+      "published",
+      "dev-deployed",
+      "alt-deployed",
+      "promoted",
+      "main-deployed",
+      "rolled-back",
+    ];
     for (const state of legacy) {
       expect(legacyReleaseStateSchema.safeParse(state).success).toBe(true);
     }

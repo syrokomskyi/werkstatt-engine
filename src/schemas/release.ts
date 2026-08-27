@@ -66,6 +66,7 @@ export const releaseManifestSchema = z
     snapshotDiffVerdict: z.enum(["pass", "fail"]),
     migratorVerdict: z.enum(["pass", "fail"]),
     versionCompareVerdict: z.enum(["in-sync", "catch-up", "refuse-downgrade"]),
+    bootSmokeVerdict: z.enum(["pass", "fail"]),
   })
   .strict();
 

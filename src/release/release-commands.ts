@@ -240,6 +240,7 @@ export interface ReleasePrepareData {
   siteContentHash: string;
   readableSnapshotHash: string;
   buildReused: boolean;
+  bootSmokeVerdict: "pass" | "fail";
 }
 
 export async function runReleasePrepare(
@@ -482,6 +483,52 @@ export async function runReleasePrepare(
       // RFC-0634: Clean up preliminary from workpiece/public/.well-known/
       await fs.rm(path.join(publicWellKnownDir, "build-identity.json"), { force: true });
 
+      // RFC-0961: Boot-smoke — boot built worker in miniflare and execute representative requests
+      const { runBootSmoke, planBootSmokeRequests } = await import("./boot-smoke.ts");
+      const wranglerConfigPath = path.join(workpieceDir, "wrangler.jsonc");
+      let bootSmokeVerdict: "pass" | "fail" = "pass";
+      if (existsSync(wranglerConfigPath)) {
+        const bootSmokeRequests = planBootSmokeRequests({
+          distDir: distDest,
+          languages: ["de", "en", "uk"],
+        });
+        logger.info(`  Running boot-smoke (${bootSmokeRequests.length} representative requests)…`);
+        const bootSmokeResult = await runBootSmoke({
+          distDir: distDest,
+          wranglerConfigPath,
+          requests: bootSmokeRequests,
+        });
+        const bootSmokeFailed =
+          !bootSmokeResult.booted ||
+          bootSmokeResult.requests.some((r) => !r.ok) ||
+          bootSmokeResult.egressViolations.length > 0 ||
+          bootSmokeResult.missingBindings.length > 0;
+        bootSmokeVerdict = bootSmokeFailed ? "fail" : "pass";
+        if (bootSmokeFailed) {
+          const parts: string[] = [];
+          if (!bootSmokeResult.booted)
+            parts.push(`boot failed: ${bootSmokeResult.bootError ?? "unknown"}`);
+          const failedReqs = bootSmokeResult.requests.filter((r) => !r.ok);
+          if (failedReqs.length > 0)
+            parts.push(`${failedReqs.length}/${bootSmokeResult.requests.length} requests failed`);
+          if (bootSmokeResult.egressViolations.length > 0)
+            parts.push(`${bootSmokeResult.egressViolations.length} egress violations`);
+          if (bootSmokeResult.missingBindings.length > 0)
+            parts.push(`missing bindings: ${bootSmokeResult.missingBindings.join(", ")}`);
+          throw new Error(`[release.prepare] boot-smoke failed — ${parts.join(", ")}`);
+        }
+        // Persist boot-smoke.json as release evidence
+        await atomicWriteFile(
+          path.join(stagingDir, "boot-smoke.json"),
+          JSON.stringify(bootSmokeResult, null, 2) + "\n",
+        );
+        logger.success(
+          `  boot-smoke passed (${bootSmokeResult.requests.length} requests, egress clean)`,
+        );
+      } else {
+        logger.warn(`  wrangler.jsonc not found — skipping boot-smoke (no worker to verify)`);
+      }
+
       const now = new Date().toISOString();
 
       // RFC-0585: Capture behavior snapshots and run diff
@@ -603,6 +650,7 @@ export async function runReleasePrepare(
         snapshotDiffVerdict,
         migratorVerdict: "pass",
         versionCompareVerdict: "in-sync",
+        bootSmokeVerdict,
       };
 
       // Write release.yaml directly into stagingDir — atomicMoveDir will carry it
@@ -717,8 +765,9 @@ export async function runReleasePrepare(
           siteContentHash,
           readableSnapshotHash,
           buildReused,
+          bootSmokeVerdict,
         },
-        summary: `[release.prepare] ${releaseId} prepared (snapshot diff: ${snapshotDiffVerdict}, C-surface: ${cSurfaceVerdict})`,
+        summary: `[release.prepare] ${releaseId} prepared (snapshot diff: ${snapshotDiffVerdict}, C-surface: ${cSurfaceVerdict}, boot-smoke: ${bootSmokeVerdict})`,
         nextSteps: [
           {
             action: `Mark release as ready: pnpm exec werkstatt run release.ready --release ${releaseId}`,

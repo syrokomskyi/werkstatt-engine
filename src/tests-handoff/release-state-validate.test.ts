@@ -120,6 +120,7 @@ async function writeReleaseManifest(
     snapshotDiffVerdict: "pass",
     migratorVerdict: "pass",
     versionCompareVerdict: "in-sync",
+    bootSmokeVerdict: "pass",
   };
   const merged = { ...defaults, ...overrides };
   await writeFile(join(releaseDir, "release.yaml"), stringifyYaml(merged));
