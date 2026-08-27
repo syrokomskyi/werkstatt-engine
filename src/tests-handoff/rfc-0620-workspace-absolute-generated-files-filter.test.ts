@@ -24,7 +24,7 @@ const mockPipeline = vi.hoisted(() => ({
 }));
 
 const mockOwnershipMap = vi.hoisted(() => [
-  // Real bordbuch entries (matching GENERATOR_OWNERSHIP_MAP)
+  // Real bordbuch entries (matching toOwnershipEntries([]))
   {
     path: "systems/{system}/public/.well-known/bordbuch.json",
     command: "bordbuch.generate",
@@ -100,7 +100,7 @@ vi.mock("@warpgogol/werkstatt-site/checks", () => ({
   runEnvExampleGenerate: vi.fn(async () => []),
   MISSION_PREFLIGHT_CRITICAL: [],
   MISSION_PREFLIGHT_WARNING: [],
-  GENERATOR_OWNERSHIP_MAP: mockOwnershipMap,
+  toOwnershipEntries: vi.fn(() => mockOwnershipMap),
   ensureChromium: vi.fn(async () => ({ ok: true, path: "/usr/bin/chromium", version: "1.0" })),
 }));
 
@@ -168,7 +168,7 @@ test("RFC-0620: workspace-absolute generated files are filtered from workpiece p
   // Bordbuch files must NOT exist in workpiece
   expect(existsSync(join(workpiecePublic, ".well-known", "bordbuch.json"))).toBe(false);
   expect(existsSync(join(workpiecePublic, ".well-known", "bordbuch", "index.html"))).toBe(false);
-  // Mock generated file must NOT exist — proves filter reads from GENERATOR_OWNERSHIP_MAP,
+  // Mock generated file must NOT exist — proves filter reads from toOwnershipEntries([]),
   // not from a hardcoded list of bordbuch paths
   expect(existsSync(join(workpiecePublic, "test-generated.json"))).toBe(false);
 });

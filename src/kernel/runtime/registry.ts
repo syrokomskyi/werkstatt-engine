@@ -89,7 +89,9 @@ export async function buildRegistryForModule(
     }
   }
 
-  config.postBuildValidation?.(registry);
+  // Note: postBuildValidation is NOT called here because only one module is
+  // loaded — the exempt list and cross-module checks would produce false
+  // positives. It runs only in buildRegistry (full registry assembly).
 
   return registry;
 }

@@ -80,11 +80,11 @@ export const FORBIDDEN_PATTERNS = [
 // RFC-0870: Committed generated manifest paths checked in cache clone HEAD.
 // These are registry-only generated files committed to git for drift detection.
 // Only checked when tracked in git — new systems without manifests are not flagged.
-// Source of truth: GENERATOR_OWNERSHIP_MAP in packages/werkstatt-site/src/checks/generator-ownership.ts
+// Source of truth: toOwnershipEntries(context.ownershipMap ?? []) in packages/werkstatt-site/src/checks/generator-ownership.ts
 // (filter for markerPolicy="registry-only", conditional=true, path starts with "src/").
 // This list is hardcoded here (not dynamically imported) to respect DNA-64 —
 // the engine must not statically import from the site plugin.
-// When adding a new registry-only conditional manifest to GENERATOR_OWNERSHIP_MAP,
+// When adding a new registry-only conditional manifest to toOwnershipEntries(context.ownershipMap ?? []),
 // also add it here.
 const COMMITTED_MANIFEST_PATHS = [
   "src/image-variants.generated.yaml",

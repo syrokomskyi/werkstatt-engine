@@ -2,7 +2,7 @@
 <MODULE_CONTRACT>
 <purpose>Maintains packages/os/site-kernel/src/command-manifest.module.ts as an authored site-kernel authored module so agents can evolve it without rediscovering local boundaries.</purpose>
 <non-goals>
-  <item>Does not register command.manifest.validate — that command lives in @warpgogol/site-kernel-checks so it can cross-check GENERATOR_OWNERSHIP_MAP (CMD-MAN-03) without a reverse package dependency.</item>
+  <item>Does not register command.manifest.validate — that command lives in @warpgogol/site-kernel-checks so it can cross-check toOwnershipEntries(context.ownershipMap ?? []) (CMD-MAN-03) without a reverse package dependency.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>

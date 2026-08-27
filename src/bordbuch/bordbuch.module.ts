@@ -109,6 +109,10 @@ export function createBordbuchModule(): KernelModule {
           "systems/{system}/public/.well-known/bordbuch/index.html",
           "systems/{system}/bordbuch/status.generated.yaml",
         ],
+        generates: [
+          { path: "systems/{system}/public/.well-known/bordbuch.json", phase: "build.post" },
+          { path: "systems/{system}/public/.well-known/bordbuch/index.html", phase: "build.post" },
+        ],
         cacheable: false,
         execute: runBordbuchGenerate,
       });

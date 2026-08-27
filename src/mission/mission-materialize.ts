@@ -40,6 +40,7 @@ import { execSync } from "node:child_process";
 import { parse as yamlParse } from "yaml";
 import type {
   DiscoveredSiteWorkspace,
+  GeneratorOwnershipEntry,
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
@@ -206,7 +207,7 @@ interface MaterializationState {
 const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
 
 /**
- * RFC-0620: Collect workspace-absolute generated paths from GENERATOR_OWNERSHIP_MAP.
+ * RFC-0620: Collect workspace-absolute generated paths from toOwnershipEntries(context.ownershipMap ?? []).
  * These are entries whose path starts with `systems/{system}/` — they represent
  * generated artifacts written to the cache clone (e.g. bordbuch projections), not
  * authored content. They must be excluded from the data-path copy to avoid
@@ -215,11 +216,13 @@ const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
  * The ownership map uses `{system}` as a template placeholder. This function
  * returns paths relative to the cache clone root (e.g. `public/.well-known/bordbuch.json`).
  */
-async function getWorkspaceAbsoluteGeneratedPaths(): Promise<Set<string>> {
-  const { GENERATOR_OWNERSHIP_MAP } = await import("@warpgogol/werkstatt-site/checks");
+async function getWorkspaceAbsoluteGeneratedPaths(
+  ownershipMap: GeneratorOwnershipEntry[] | undefined,
+): Promise<Set<string>> {
+  const { toOwnershipEntries } = await import("@warpgogol/werkstatt-site/checks");
   const prefix = "systems/{system}/";
   const paths = new Set<string>();
-  for (const entry of GENERATOR_OWNERSHIP_MAP) {
+  for (const entry of toOwnershipEntries(ownershipMap ?? [])) {
     if (entry.path.startsWith(prefix)) {
       const relativePath = entry.path.slice(prefix.length);
       paths.add(relativePath);
@@ -1318,7 +1321,7 @@ export async function buildMaterializeSteps(
           await copyDirExcluding(cacheDir, cc.stagingDir, new Set([".git"]));
           cc.logger.info(`  Restored workpiece from artifact cache`);
         } else {
-          const skipPathsGlobal = await getWorkspaceAbsoluteGeneratedPaths();
+          const skipPathsGlobal = await getWorkspaceAbsoluteGeneratedPaths(cc.context.ownershipMap);
 
           for (const dataPath of STERNSYSTEM_DATA_PATHS) {
             const src = path.join(cc.systemDir, dataPath);
@@ -1441,9 +1444,11 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         try {
-          const { GENERATOR_OWNERSHIP_MAP } =
+          const { toOwnershipEntries } =
             await import("@warpgogol/werkstatt-site/checks/generator-ownership");
-          const registryOnlyNonConditional = GENERATOR_OWNERSHIP_MAP.filter(
+          const registryOnlyNonConditional = toOwnershipEntries(
+            cc.context.ownershipMap ?? [],
+          ).filter(
             (e: { markerPolicy?: string; conditional?: boolean; path: string }) =>
               e.markerPolicy === "registry-only" && !e.conditional,
           );
