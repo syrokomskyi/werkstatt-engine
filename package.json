@@ -402,7 +402,8 @@
     "@syrokomskyi/axiom-factory-app": "link:../../../pipelines/apps/axiom/factory",
     "@syrokomskyi/axiom-study": "link:../../../pipelines/packages/axiom/axiom-study",
     "better-sqlite3": "^13.0.3",
-    "lighthouse": "13.4.1"
+    "lighthouse": "13.4.1",
+    "miniflare": "^3.20250101.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
