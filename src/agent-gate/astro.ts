@@ -141,6 +141,8 @@ const UPSERT_BATCH_SIZE = 100;
 
 class SearchValidationError extends Error {}
 
+const VALID_CHUNK_TYPES: readonly string[] = ["page", "knowledge", "faq", "prose"];
+
 /** Parse SearchQuery from URL search params. */
 function parseSearchQuery(url: URL): SearchQuery {
   const q = url.searchParams.get("q") ?? "";
@@ -160,14 +162,28 @@ function parseSearchQuery(url: URL): SearchQuery {
       topK = Math.min(parsed, SEARCH_MAX_TOP_K);
     }
   }
+  const typeRaw = url.searchParams.get("type");
+  if (typeRaw && !VALID_CHUNK_TYPES.includes(typeRaw)) {
+    throw new SearchValidationError(
+      `Invalid 'type' parameter — must be one of: ${VALID_CHUNK_TYPES.join(", ")}`,
+    );
+  }
   return {
     q,
     ...(url.searchParams.get("lang") ? { lang: url.searchParams.get("lang")! } : {}),
-    ...(url.searchParams.get("type")
-      ? { type: url.searchParams.get("type") as SearchChunk["type"] }
-      : {}),
+    ...(typeRaw ? { type: typeRaw as SearchChunk["type"] } : {}),
     topK,
   };
+}
+
+/** Resolve Cloudflare Workers env bindings via dynamic import (CF-IMPORT-01 compliant). */
+async function resolveSearchEnv(): Promise<SearchEnv> {
+  try {
+    const { env } = await import("cloudflare:workers");
+    return env as unknown as SearchEnv;
+  } catch {
+    return {};
+  }
 }
 
 /** Fetch the static search manifest from the site's own assets. */
@@ -195,7 +211,7 @@ export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
 } {
   return {
     GET: async ({ request }) => {
-      const env = (request as unknown as { env?: SearchEnv }).env ?? {};
+      const env = await resolveSearchEnv();
       if (!env.AI || !env.SEARCH_INDEX) {
         return withCors(
           new Response(
@@ -272,7 +288,7 @@ export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
     },
 
     POST: async ({ request }) => {
-      const env = (request as unknown as { env?: SearchEnv }).env ?? {};
+      const env = await resolveSearchEnv();
       const url = new URL(request.url);
 
       // Reindex endpoint — requires x-search-reindex-token header when configured
