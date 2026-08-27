@@ -12,6 +12,7 @@ discovered app, and resolve which app(s) a CLI invocation targets.
 <CHANGE_SUMMARY>
   <item>RFC-0303: split out of runtime.ts (Phase 3 file-size split, hot-path file 8/8).</item>
   <item>ADR-0022: loadAppRuntime and list functions now use process-lifetime registry cache from registry-cache.ts.</item>
+  <item>RFC-0960: buildRegistry and buildRegistryForModule call config.postBuildValidation after all modules are loaded.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -53,6 +54,8 @@ export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegi
     }
   }
 
+  config.postBuildValidation?.(registry);
+
   return registry;
 }
 
@@ -85,6 +88,8 @@ export async function buildRegistryForModule(
       registry.registerPipeline(name, steps);
     }
   }
+
+  config.postBuildValidation?.(registry);
 
   return registry;
 }
