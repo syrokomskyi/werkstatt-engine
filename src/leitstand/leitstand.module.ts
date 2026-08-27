@@ -17,6 +17,7 @@
   <item>RFC-0899: add leitstand.access.protect, unprotect, status commands for dev/alt subdomain PIN access protection.</item>
   <item>RFC-0927: add leitstand.hotfix.dev-deploy composite command chaining commit → validate.postbuild → reconcile → close → release → certify → deploy.</item>
   <item>RFC-0930: add leitstand.verify command for live deployment verification across channels.</item>
+  <item>RFC-0962: add leitstand.ship composite command — resumable full-pipeline deployment via RFC-0958 operation journal.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -39,6 +40,7 @@ export function createLeitstandModule(): KernelModule {
         runLeitstandVerify,
       } = await import("./leitstand-commands.ts");
       const { runLeitstandCertify } = await import("./certify.ts");
+      const { runLeitstandShip } = await import("./ship.ts");
       registry.registerCommand({
         name: "leitstand.dev-deploy",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
@@ -588,6 +590,54 @@ export function createLeitstandModule(): KernelModule {
         },
         reads: ["systems-cache/{system}/system-state.yaml"],
         execute: runLeitstandAccessStatus,
+      });
+      registry.registerCommand({
+        name: "leitstand.ship",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
+        description:
+          "Resumable full-pipeline deployment composite (RFC-0962). Chains preflight → validate → reconcile → close → release → certify → deploy → verify → archive with RFC-0958 operation journal. Flags: --site, --mission, [--until], [--resume].",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          site: {
+            kind: "string",
+            required: true,
+            description: "Sternsystem id with an active mission.",
+          },
+          system: {
+            kind: "string",
+            description: "Alias for --site.",
+          },
+          mission: {
+            kind: "string",
+            required: true,
+            description: "Open mission id with workpiece.",
+          },
+          until: {
+            kind: "string",
+            description:
+              "Stop after reaching this phase: validated, closed, dev, alt, main, archived (default: archived).",
+          },
+          resume: {
+            kind: "boolean",
+            description: "Resume from the last incomplete ship operation.",
+          },
+        },
+        writes: [
+          "missions/{mission}/**",
+          "releases/{release}/**",
+          "systems-cache/{system}/gate-decisions/**",
+          "systems-cache/{system}/operations/**",
+        ],
+        reads: [
+          "systems-cache/{system}/system-config.yaml",
+          "systems-cache/{system}/system-state.yaml",
+          "missions/{mission}/workpiece/**",
+        ],
+        cacheable: false,
+        execute: runLeitstandShip,
       });
     },
   };
