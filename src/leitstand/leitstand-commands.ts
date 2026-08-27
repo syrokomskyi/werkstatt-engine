@@ -1124,9 +1124,13 @@ export async function runLeitstandPromote(
   const artifactHashFlag = flagString(input, "artifact-hash");
 
   const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
-  const mainVerificationPath =
-    flagString(input, "main-verification-decision") ??
-    path.join(cacheCloneDir, "gate-decisions", `${releaseId}-main-verification.json`);
+  const gateDecisionsDir = path.join(cacheCloneDir, "gate-decisions");
+  const mainVerificationFlag = flagString(input, "main-verification-decision");
+  const mainVerificationPath = mainVerificationFlag
+    ? path.isAbsolute(mainVerificationFlag) || path.parse(mainVerificationFlag).dir !== ""
+      ? mainVerificationFlag
+      : path.join(gateDecisionsDir, mainVerificationFlag)
+    : path.join(gateDecisionsDir, `${releaseId}-main-verification.json`);
 
   const gateDecisionPath = resolveGateDecisionPath(
     cacheCloneDir,

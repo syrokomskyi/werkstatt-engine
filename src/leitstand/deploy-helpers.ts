@@ -105,9 +105,21 @@ export async function loadMainVerificationDecision(
   filePath: string,
 ): Promise<MainVerificationDecisionV1> {
   if (!existsSync(filePath)) {
+    const dir = path.dirname(filePath);
+    let available: string[] = [];
+    try {
+      available = (await fs.readdir(dir))
+        .filter((f) => f.endsWith("-main-verification.json"))
+        .sort();
+    } catch {
+      /* dir may not exist */
+    }
+    const availableHint =
+      available.length > 0 ? ` Available main-verification files: ${available.join(", ")}.` : "";
     throw new Error(
-      `[deploy] main verification decision file not found at ${filePath}. ` +
-        `Run 'leitstand.certify --site <site> --release <release> --gate main' first — it generates ` +
+      `[deploy] main verification decision file not found at ${filePath}.` +
+        availableHint +
+        ` Run 'leitstand.certify --site <site> --release <release> --gate main' first — it generates ` +
         `the main-verification file. The expected path is gate-decisions/<release>-main-verification.json.`,
     );
   }
