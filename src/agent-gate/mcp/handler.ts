@@ -143,6 +143,7 @@ async function handleToolsCall(
     const validated = validateAgainstCapabilitySchema(capability.input, params.arguments ?? {});
     if (!validated.ok) {
       return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.INVALID_PARAMS, "Invalid arguments.", {
+        schemaRef: `/.well-known/agent.openapi.json#/components/schemas/${capabilityId}-input`,
         errors: validated.errors,
       });
     }

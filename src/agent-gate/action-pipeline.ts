@@ -88,7 +88,12 @@ export function validateSchema(ctx: ActionContext): StepResult {
   const validated = validateAgainstCapabilitySchema(ctx.capability!.input, ctx.parsed!);
   if (!validated.ok) {
     return jsonResponse(
-      { accepted: false, error: "schema-violation", errors: validated.errors },
+      {
+        accepted: false,
+        error: "schema-violation",
+        schemaRef: `/.well-known/agent.openapi.json#/components/schemas/${ctx.capabilityId}-input`,
+        errors: validated.errors,
+      },
       400,
     );
   }

@@ -25,6 +25,20 @@ import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, type AgentGatePorts } from "./index.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Signature-Agent, Signature, User-Agent",
+  "Access-Control-Max-Age": "86400",
+};
+
+function withCors(response: Response): Response {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
 function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGatePorts {
   return {
     knowledge: {
@@ -58,13 +72,14 @@ function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGate
 export function createAgentMcpRoute(
   manifest: AgentSurfaceManifest,
   catalog: CapabilityRecord[],
-): { GET: APIRoute; POST: APIRoute } {
+): { GET: APIRoute; POST: APIRoute; OPTIONS: APIRoute } {
   return {
-    GET: async () => new Response(null, { status: 405, headers: { Allow: "POST" } }),
+    GET: async () => withCors(new Response(null, { status: 405, headers: { Allow: "POST" } })),
     POST: async ({ request }) => {
       const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
-      return gate.handleMcp(request);
+      return withCors(await gate.handleMcp(request));
     },
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }
 
@@ -72,11 +87,12 @@ export function createAgentMcpRoute(
 export function createAgentActionRoute(
   manifest: AgentSurfaceManifest,
   catalog: CapabilityRecord[],
-): { POST: APIRoute } {
+): { POST: APIRoute; OPTIONS: APIRoute } {
   return {
     POST: async ({ request, params }) => {
       const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
-      return gate.handleAction(String(params.id ?? ""), request);
+      return withCors(await gate.handleAction(String(params.id ?? ""), request));
     },
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }
