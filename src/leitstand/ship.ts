@@ -309,10 +309,26 @@ export function buildShipPlan(input: { until: ShipPhase }): OperationDefinition<
       `--release=${releaseId}`,
     ]),
     buildSimpleStep("verify", "leitstand.verify", (ctx) => [`--site=${ctx.systemId}`]),
-    buildSimpleStep("mission-archive", "mission.archive", (ctx) => [
-      `--mission=${ctx.missionId}`,
-      `--status=closed`,
-    ]),
+    {
+      name: "mission-archive",
+      run: async (ctx: ShipContext) => {
+        // mission.archive is not yet registered as a kernel command (RFC-0801 gap).
+        // Best-effort: try to call it, non-fatal on failure.
+        try {
+          const result = await runShipPhase(ctx, "mission.archive", [
+            `--mission=${ctx.missionId}`,
+            `--status=closed`,
+          ]);
+          if (result.exitCode !== 0) {
+            ctx.logger.info(
+              `  [ship] mission-archive: skipped (mission.archive unavailable or failed: ${result.summary ?? ""})`,
+            );
+          }
+        } catch {
+          ctx.logger.info("  [ship] mission-archive: skipped (mission.archive not registered)");
+        }
+      },
+    },
   ];
 
   return {
