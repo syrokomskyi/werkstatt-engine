@@ -498,6 +498,18 @@ export async function executeDeployPhases(
       );
     }
 
+    // RFC-0954: Warm the search index — non-fatal on failure
+    try {
+      const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+      await executeKernelCommand({
+        workspaceRoot: ctx.workspaceRoot,
+        commandName: "agent.search.warm",
+        argv: [`--site=${ctx.systemId}`],
+      });
+    } catch {
+      // Non-fatal — search index warm-up is best-effort
+    }
+
     if (channel === "dev" && ctx.missionId && ctx.commitSha) {
       try {
         const missionResult = await runMissionCheckWithResilience(
