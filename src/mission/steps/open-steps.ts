@@ -1,18 +1,21 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0958: step definitions for mission.open — stub, populated in step 6.</purpose>
+  <purpose>RFC-0958: step definitions for mission.open — delegates to buildOpenSteps in mission-open.ts.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0958: initial stub — populated in step 6.</item>
+  <item>RFC-0958: initial open steps resolver — delegates to mission-open.ts.</item>
 </CHANGE_SUMMARY>
 */
 
 import type { OperationStep } from "../../journal/index.ts";
+import { buildOpenSteps, type OpenStepCtx } from "../mission-open.ts";
 
-export async function buildOpenSteps(
+export { buildOpenSteps, type OpenStepCtx };
+
+export async function resolveOpenSteps(
   workspaceRoot: string,
   missionId: string,
-  manifest: unknown,
+  ctx: OpenStepCtx,
 ): Promise<OperationStep<unknown>[]> {
-  return [];
+  return buildOpenSteps(workspaceRoot, missionId, ctx);
 }

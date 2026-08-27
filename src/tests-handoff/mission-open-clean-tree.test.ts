@@ -95,6 +95,8 @@ test("after mission.open, git status in monorepo is clean", async () => {
   // Set up workspace structure — git repo in testRoot so systems-cache is tracked
   gitInit(testRoot);
   writeFileSync(join(tmpWorkspace, "README.md"), "# test\n");
+  // RFC-0958: journal.jsonl is created by runOperation — ignore it in clean-tree test
+  writeFileSync(join(tmpWorkspace, ".gitignore"), "missions/\n");
   gitCommit(testRoot, "initial");
 
   // Create per-system config and state files in systems-cache

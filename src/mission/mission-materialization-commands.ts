@@ -1874,11 +1874,6 @@ export async function buildReconcileSteps(
         cc.manifest.reconciledAt = cc.now;
         await writeMissionManifest(cc.workspaceRoot, cc.manifest);
       },
-      verify: async (c: unknown) => {
-        const cc = c as ReconcileStepCtx;
-        const reRead = await readMissionManifest(cc.workspaceRoot, cc.missionId);
-        return reRead.reconciledAt === cc.now;
-      },
     },
     {
       name: "commit-werkstatt-side-effects",

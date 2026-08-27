@@ -18,6 +18,7 @@
   <item>Bug fix: list available systems on unknown --system ID for better agent self-correction.</item>
   <item>Bug fix: bordbuch.repair now auto-commits, removed redundant commitAndPushBordbuch call from auto-repair path.</item>
   <item>RFC-0951: auto-materialize workpiece during mission.open with forward-only rollback on failure.</item>
+  <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,7 +30,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
-import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
+import type { MissionManifest, SystemState } from "@warpgogol/werkstatt-engine/schemas";
 import {
   readSystemConfig,
   readSystemState,
@@ -55,6 +56,8 @@ import { resolveActor } from "./actor-identity.ts";
 import { trashPath } from "@warpgogol/forge/utils";
 import { gitExec } from "../werkstatt/git-exec.ts";
 import { runMissionMaterializeInternal } from "./mission-materialize.ts";
+import { runOperation } from "../journal/runner.ts";
+import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 
 export interface StaleEntryCheck {
   removedPaths: string[];
@@ -264,7 +267,6 @@ export async function runMissionOpen(
     // Create mission directories
     await createMissionDirectories(workspaceRoot, missionId);
 
-    // Write mission manifest
     const now = new Date().toISOString();
     const manifest: MissionManifest = {
       schemaVersion: "1.0.0",
@@ -284,124 +286,90 @@ export async function runMissionOpen(
       rfcId: null,
       operationId,
     };
-    await writeMissionManifest(workspaceRoot, manifest);
 
-    // Append Bordbuch entry and commit+push atomically (RFC-0750, ADR-0030)
-    try {
-      const { commitResult: pushResult } = await appendAndCommitBordbuch(
-        workspaceRoot,
-        systemId,
-        "mission-open",
-        brief,
-        actor,
-        {
-          missionId,
-          writerRole: "mission",
-          metadata: { brief, pinAtOpen },
-        },
-        `Bordbuch: mission-open ${missionId}`,
-      );
-      if (pushResult.commitSha === null) {
-        throw new Error(
-          `[mission.open] bordbuch commit failed for system '${systemId}' — mission-open event was not committed. ` +
-            `Check git state in the cache clone and re-run mission.open.`,
-        );
-      }
-      if (!pushResult.pushed) {
-        const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
-        try {
-          gitExec(cacheDir, "reset --hard HEAD~1");
-        } catch {
-          // best-effort rollback — if reset fails, manual intervention needed
-        }
-        throw new Error(
-          `[mission.open] bordbuch push failed for system '${systemId}' — mission-open event was rolled back. ` +
-            `Error: ${pushResult.error ?? "unknown"}. ` +
-            `Check git remote connectivity and re-run mission.open.`,
-        );
-      }
-    } catch (bordbuchErr) {
-      // Clean up mission directories to prevent stale entries on retry
-      const missionDir = path.join(workspaceRoot, "missions", missionId);
-      try {
-        await fs.rm(missionDir, { recursive: true, force: true });
-      } catch {
-        // best-effort cleanup — if rm fails, manual intervention needed
-      }
-      throw bordbuchErr;
-    }
-
-    // Update state
-    state.currentMission = missionId;
-    await writeSystemState(workspaceRoot, systemId, state);
-
-    // RFC-0951: Auto-materialize workpiece during mission.open.
-    // runMissionMaterializeInternal commits mission.yaml (with materializedAt) and pnpm-lock.yaml.
-    // On failure, forward-only rollback appends a compensating bordbuch entry (Step 3).
-    let materializedAt: string | null = null;
-    try {
-      const materializeResult = await runMissionMaterializeInternal(
-        workspaceRoot,
-        manifest,
-        context,
-        { reportOnly: false, skipPreflight: false, force: false },
-      );
-      materializedAt = materializeResult.data?.materializedAt ?? null;
-    } catch (materializeErr) {
-      // Forward-only rollback — RFC-0951, DNA-46 append-only log.
-      // Append compensating bordbuch entry, remove mission dir, clear state.
-      try {
-        await appendAndCommitBordbuch(
-          workspaceRoot,
-          systemId,
-          "mission-open-rolled-back",
-          `Materialization failed: ${materializeErr instanceof Error ? materializeErr.message : String(materializeErr)}`,
-          actor,
-          {
-            missionId,
-            writerRole: "mission",
-            metadata: {
-              reason:
-                materializeErr instanceof Error ? materializeErr.message : String(materializeErr),
-            },
-          },
-          `Bordbuch: mission-open-rolled-back ${missionId}`,
-        );
-      } catch (bordbuchRollbackErr) {
-        logger.warn(
-          `[mission.open] compensating bordbuch entry failed: ${bordbuchRollbackErr instanceof Error ? bordbuchRollbackErr.message : String(bordbuchRollbackErr)}. ` +
-            `Run bordbuch.repair to fix the bordbuch manually.`,
-        );
-      }
-      // Remove mission directory
-      const missionDir = path.join(workspaceRoot, "missions", missionId);
-      try {
-        await fs.rm(missionDir, { recursive: true, force: true });
-      } catch {
-        // best-effort cleanup
-      }
-      // Clear state
-      state.currentMission = null;
-      await writeSystemState(workspaceRoot, systemId, state);
-      // Commit cleared state (mission.yaml no longer exists)
-      await commitWerkstattSideEffects(
-        workspaceRoot,
-        [path.join("..", "systems-cache", systemId, "system-state.yaml")],
-        `werkstatt: mission.open rollback ${missionId}`,
-      );
-      throw new Error(
-        `[mission.open] materialization failed — mission rolled back: ${materializeErr instanceof Error ? materializeErr.message : String(materializeErr)}`,
-      );
-    }
-
-    // RFC-0580: auto-commit werkstatt side-effects (system-state.yaml only;
-    // mission.yaml + pnpm-lock.yaml already committed by runMissionMaterializeInternal)
-    await commitWerkstattSideEffects(
+    // RFC-0958: Build step context and run post-lock lifecycle via journal
+    const openCtx: OpenStepCtx = {
       workspaceRoot,
-      [path.join("..", "systems-cache", systemId, "system-state.yaml")],
-      `werkstatt: mission.open ${missionId}`,
-    );
+      systemId,
+      missionId,
+      manifest,
+      actor,
+      now,
+      pinAtOpen,
+      operationId,
+      staleEntries,
+      context,
+      state,
+      materializedAt: null,
+    };
 
+    const steps = await buildOpenSteps(workspaceRoot, missionId, openCtx);
+    const journalPath = path.join(workspaceRoot, "missions", missionId, "journal.jsonl");
+    const def: OperationDefinition<unknown> = { op: "mission.open", steps };
+    const opResult = await runOperation(journalPath, def, openCtx, {
+      missionId,
+      platformVersion: "",
+    });
+
+    if (!opResult.completed) {
+      const detail = opResult.failedStepError ?? "unknown error";
+      const failedStep = opResult.failedStep;
+
+      // Domain-specific rollback (RFC-0951, bug fix cleanup)
+      if (failedStep === "bordbuch-append") {
+        const missionDir = path.join(workspaceRoot, "missions", missionId);
+        try {
+          await fs.rm(missionDir, { recursive: true, force: true });
+        } catch {
+          // best-effort cleanup
+        }
+        throw new Error(detail);
+      }
+
+      if (failedStep === "auto-materialize") {
+        // Forward-only rollback — RFC-0951, DNA-46 append-only log
+        try {
+          await appendAndCommitBordbuch(
+            workspaceRoot,
+            systemId,
+            "mission-open-rolled-back",
+            `Materialization failed: ${detail}`,
+            actor,
+            {
+              missionId,
+              writerRole: "mission",
+              metadata: { reason: detail },
+            },
+            `Bordbuch: mission-open-rolled-back ${missionId}`,
+          );
+        } catch (bordbuchRollbackErr) {
+          logger.warn(
+            `[mission.open] compensating bordbuch entry failed: ${bordbuchRollbackErr instanceof Error ? bordbuchRollbackErr.message : String(bordbuchRollbackErr)}. ` +
+              `Run bordbuch.repair to fix the bordbuch manually.`,
+          );
+        }
+        const missionDir = path.join(workspaceRoot, "missions", missionId);
+        try {
+          await fs.rm(missionDir, { recursive: true, force: true });
+        } catch {
+          // best-effort cleanup
+        }
+        state.currentMission = null;
+        await writeSystemState(workspaceRoot, systemId, state);
+        await commitWerkstattSideEffects(
+          workspaceRoot,
+          [path.join("..", "systems-cache", systemId, "system-state.yaml")],
+          `werkstatt: mission.open rollback ${missionId}`,
+        );
+        throw new Error(`[mission.open] materialization failed — mission rolled back: ${detail}`);
+      }
+
+      throw new Error(
+        `[mission.open] step "${failedStep}" failed: ${detail} — run mission.resume --mission ${missionId} to retry`,
+      );
+    }
+
+    const cc = openCtx;
     return {
       data: {
         missionId,
@@ -412,7 +380,7 @@ export async function runMissionOpen(
         pinAtOpen,
         operationId,
         staleEntries,
-        materializedAt,
+        materializedAt: cc.materializedAt,
       },
       summary: `[mission.open] opened and materialized mission ${missionId} for ${systemId}`,
       nextSteps: [
@@ -425,4 +393,111 @@ export async function runMissionOpen(
   } finally {
     await releaseLock(workspaceRoot, `system:${systemId}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// RFC-0958: Journal-integrated open steps
+// ---------------------------------------------------------------------------
+
+export interface OpenStepCtx {
+  workspaceRoot: string;
+  systemId: string;
+  missionId: string;
+  manifest: MissionManifest;
+  actor: ReturnType<typeof resolveActor>;
+  now: string;
+  pinAtOpen: string;
+  operationId: string;
+  staleEntries: StaleEntryCheck;
+  context: KernelRuntimeContext;
+  state: SystemState;
+  materializedAt: string | null;
+}
+
+export async function buildOpenSteps(
+  _workspaceRoot: string,
+  _missionId: string,
+  ctx: unknown,
+): Promise<OperationStep<unknown>[]> {
+  const steps: OperationStep<unknown>[] = [
+    {
+      name: "write-manifest",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        await writeMissionManifest(cc.workspaceRoot, cc.manifest);
+      },
+    },
+    {
+      name: "bordbuch-append",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        const { commitResult: pushResult } = await appendAndCommitBordbuch(
+          cc.workspaceRoot,
+          cc.systemId,
+          "mission-open",
+          cc.manifest.brief,
+          cc.actor,
+          {
+            missionId: cc.missionId,
+            writerRole: "mission",
+            metadata: { brief: cc.manifest.brief, pinAtOpen: cc.pinAtOpen },
+          },
+          `Bordbuch: mission-open ${cc.missionId}`,
+        );
+        if (pushResult.commitSha === null) {
+          throw new Error(
+            `[mission.open] bordbuch commit failed for system '${cc.systemId}' — mission-open event was not committed. ` +
+              `Check git state in the cache clone and re-run mission.open.`,
+          );
+        }
+        if (!pushResult.pushed) {
+          const cacheDir = resolveCacheClonePath(cc.workspaceRoot, cc.systemId);
+          try {
+            gitExec(cacheDir, "reset --hard HEAD~1");
+          } catch {
+            // best-effort rollback
+          }
+          throw new Error(
+            `[mission.open] bordbuch push failed for system '${cc.systemId}' — mission-open event was rolled back. ` +
+              `Error: ${pushResult.error ?? "unknown"}. ` +
+              `Check git remote connectivity and re-run mission.open.`,
+          );
+        }
+      },
+    },
+    {
+      name: "update-system-state",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        cc.state.currentMission = cc.missionId;
+        await writeSystemState(cc.workspaceRoot, cc.systemId, cc.state);
+      },
+    },
+    {
+      name: "auto-materialize",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        const materializeResult = await runMissionMaterializeInternal(
+          cc.workspaceRoot,
+          cc.manifest,
+          cc.context,
+          { reportOnly: false, skipPreflight: false, force: false },
+        );
+        cc.materializedAt = materializeResult.data?.materializedAt ?? null;
+      },
+    },
+    {
+      name: "commit-side-effects",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        await commitWerkstattSideEffects(
+          cc.workspaceRoot,
+          [path.join("..", "systems-cache", cc.systemId, "system-state.yaml")],
+          `werkstatt: mission.open ${cc.missionId}`,
+        );
+      },
+    },
+  ];
+
+  return steps;
 }
