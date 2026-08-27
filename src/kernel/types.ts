@@ -313,6 +313,22 @@ export interface KernelCommandDefinition<TData = unknown> extends KernelCommandM
    * generated files declare `generates: []` (empty array).
    */
   generates?: GeneratedArtifactSpec[];
+  /**
+   * RFC-0963: the single contract this validator enforces (e.g.
+   * "canonical-url", "image-delivery", "generated-files", "a11y").
+   * Required on validator commands (name matching *.validate|*.check|*.lint).
+   * Enforced fail-closed by `validator.inventory.generate`; warn-only by
+   * `validateRegistration` (same pattern as RFC-0960 modulePath/generates).
+   */
+  contract?: string;
+  /**
+   * RFC-0963: the rule IDs this validator enforces (e.g.
+   * ["CANON-01", "CANON-04"]). Declared at registration, not discovered at
+   * runtime. Enables `validator.inventory.generate` to produce a full
+   * contract → validators → rules mapping without source scanning.
+   * Required on validator commands.
+   */
+  rules?: string[];
   execute(
     input: KernelCommandInput,
     context: KernelRuntimeContext,
