@@ -1,18 +1,21 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0958: step definitions for mission.abort — stub, populated in step 6.</purpose>
+  <purpose>RFC-0958: step definitions for mission.abort — delegates to buildAbortSteps in mission-abort.ts.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0958: initial stub — populated in step 6.</item>
+  <item>RFC-0958: initial abort steps resolver — delegates to mission-abort.ts.</item>
 </CHANGE_SUMMARY>
 */
 
 import type { OperationStep } from "../../journal/index.ts";
+import { buildAbortSteps, type AbortStepCtx } from "../mission-abort.ts";
 
-export async function buildAbortSteps(
+export { buildAbortSteps, type AbortStepCtx };
+
+export async function resolveAbortSteps(
   workspaceRoot: string,
   missionId: string,
-  manifest: unknown,
+  ctx: AbortStepCtx,
 ): Promise<OperationStep<unknown>[]> {
-  return [];
+  return buildAbortSteps(workspaceRoot, missionId, ctx);
 }

@@ -36,6 +36,7 @@
   <item>RFC-0913: add post-merge .gitignore restoration and untrackForbiddenGeneratedFiles call; add workpieceHeadAtReconcile, gitignoreRestored, forbiddenFilesUntracked to reconciliation report.</item>
   <item>RFC-0918: add post-push divergence check in mission.reconcile comparing cache clone HEAD against origin/main; add divergenceWarning to reconciliation report.</item>
   <item>ADR-0060: split bordbuch auto-resolution conflicted paths into tracked (git checkout HEAD) and untracked generated (git add only) — CACHE_CLONE_GENERATED_PATTERNS files are not in HEAD, so git checkout HEAD fails for them.</item>
+  <item>RFC-0958: wrap mission.reconcile post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -80,6 +81,9 @@ import {
   untrackForbiddenGeneratedFiles,
   CACHE_CLONE_GENERATED_PATTERNS,
 } from "./cache-clone-gitignore.ts";
+import { runOperation } from "../journal/runner.ts";
+import type { OperationStep, OperationDefinition } from "../journal/index.ts";
+import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
 
 const STERNSYSTEM_DATA_PATHS = [
   "src/content",
@@ -1236,521 +1240,57 @@ export async function runMissionReconcile(
 
   try {
     const now = new Date().toISOString();
+    const missionDir = resolveMissionDir(workspaceRoot, missionId);
 
-    // RFC-0568: transfer workpiece commits to cache clone via git merge --no-ff
-    const gitDir = path.join(systemDir, ".git");
-    let commitSha: string | null = null;
-    let preReconcileSha: string | null = null;
-    let mergeCommitSha: string | null = null;
-    let transferredCommits = 0;
-    const copiedPaths: string[] = [];
-    let autoResolvedPaths: string[] = [];
-    // RFC-0913: workpiece HEAD at reconcile time, .gitignore restoration results
-    let workpieceHeadAtReconcile: string | null = null;
-    let gitignoreRestored = false;
-    let forbiddenFilesUntracked: string[] = [];
-    // RFC-0705: mirror sync status — populated inside the git branch, used in report and return data
-    const mirrorSync: { attempted: boolean; succeeded: boolean; error: string | null } = {
-      attempted: false,
-      succeeded: false,
-      error: null,
-    };
-    // RFC-0918: post-push divergence diagnostic — populated inside the git branch
-    let divergenceWarning: {
-      cacheCloneHead: string;
-      originHead: string;
-      diverged: boolean;
-    } | null = null;
-
-    if (!existsSync(path.join(workpieceDir, ".git"))) {
-      throw new Error(
-        `[mission.reconcile] workpiece is not a git repository — run mission.materialize first`,
-      );
-    }
-
-    const workpieceCommit = commitWorkpieceIfDirty(workpieceDir, missionId);
-    if (workpieceCommit.committed) {
-      logger.info(
-        `  Auto-committed dirty workpiece (${workpieceCommit.commitSha?.slice(0, 8)}) before reconcile`,
-      );
-    }
-
-    if (existsSync(gitDir)) {
-      // RFC-0797: Auto-commit known generated files in cache clone before dirty guard.
-      // The cache clone is entirely generated — no operator edits.
-      const cacheCommit = commitCacheCloneIfDirty(systemDir, manifest.systemId);
-      if (cacheCommit.committed) {
-        logger.info(
-          `  Auto-committed cache clone (${cacheCommit.commitSha?.slice(0, 8)}) before reconcile`,
-        );
-      }
-
-      // RFC-0522/RFC-0568: dirty cache clone guard with untracked file investigation
-      const cacheDirtyCheck = isWorkpieceDirty(systemDir);
-      if (cacheDirtyCheck.dirty) {
-        // RFC-0568: investigate origin of untracked files and write report
-        const untrackedReport = await investigateUntrackedFiles(
-          workspaceRoot,
-          manifest.systemId,
-          systemDir,
-          cacheDirtyCheck.files,
-        );
-
-        await atomicWriteFile(
-          path.join(evidenceDir, "untracked-files-report.json"),
-          JSON.stringify(untrackedReport, null, 2) + "\n",
-        );
-
-        const reportSummary = untrackedReport
-          .map((r) => `  ${r.path} — ${r.likelyOrigin}${r.originHint ? ` (${r.originHint})` : ""}`)
-          .join("\n");
-
-        throw new Error(
-          `[mission.reconcile] cache clone for system '${manifest.systemId}' has ${cacheDirtyCheck.fileCount} uncommitted/untracked file(s):\n` +
-            reportSummary +
-            `\n\nEvidence written to evidence/untracked-files-report.json.\nResolve uncommitted changes in the cache clone before re-running reconcile.`,
-        );
-      }
-
-      // Record pre-reconcile SHA for idempotent re-run
-      try {
-        preReconcileSha = execSync("git rev-parse HEAD", {
-          cwd: systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
-      } catch {
-        preReconcileSha = null;
-      }
-
-      // Check for previous reconciliation report (idempotent re-run)
-      const prevReportPath = path.join(evidenceDir, "reconciliation-report.json");
-      if (existsSync(prevReportPath)) {
-        try {
-          const prevReport = JSON.parse(await fs.readFile(prevReportPath, "utf8")) as {
-            preReconcileSha?: string;
-          };
-          if (prevReport.preReconcileSha) {
-            // RFC-0568: Reset cache clone to pre-reconcile state before re-merging
-            try {
-              execSync(`git reset --hard ${prevReport.preReconcileSha}`, {
-                cwd: systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
-              logger.info(
-                `  Reset cache clone to pre-reconcile SHA ${prevReport.preReconcileSha.slice(0, 12)}`,
-              );
-            } catch {
-              // Previous SHA may not exist (e.g. history rewritten) — continue with current HEAD
-            }
-          }
-        } catch {
-          // Unparseable report — continue
-        }
-      }
-
-      // RFC-0568: Determine workpiece branch dynamically (not hardcoded "master")
-      const workpieceBranch = execSync("git rev-parse --abbrev-ref HEAD", {
-        cwd: workpieceDir,
-        stdio: "pipe",
-        encoding: "utf-8",
-      }).trim();
-
-      // Fetch workpiece commits into cache clone's object database
-      execSync(`git fetch ${JSON.stringify(workpieceDir)} ${JSON.stringify(workpieceBranch)}`, {
-        cwd: systemDir,
-        stdio: "pipe",
-        encoding: "utf-8",
-      });
-
-      // Merge with --no-ff to preserve all individual commits and create an explicit merge commit
-      const mergeMessage = `reconcile mission ${missionId}`;
-      // RFC-0584, RFC-0614: auto-resolve bordbuch/ and public/.well-known/bordbuch* delete-modify conflicts by keeping cache clone version
-      try {
-        execSync(`git merge --no-ff FETCH_HEAD -m ${JSON.stringify(mergeMessage)}`, {
-          cwd: systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        });
-      } catch (err) {
-        // Check if all conflicts are bordbuch-only (delete/modify)
-        const isAutoResolvablePath = (p: string) =>
-          CACHE_CLONE_ONLY_PATHS.some((pattern) => p.startsWith(pattern));
-        const conflictedPaths: string[] = [];
-        const bordbuchDeletedPaths: string[] = [];
-        try {
-          const statusOutput = execSync("git status --porcelain", {
-            cwd: systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          });
-          for (const line of statusOutput.split("\n")) {
-            if (!line) continue;
-            const status = line.slice(0, 2);
-            const filePath = line.slice(3).trim();
-            if (!filePath) continue;
-            if (
-              status.startsWith("DU") ||
-              status.startsWith("UD") ||
-              status.startsWith("AA") ||
-              status.startsWith("UU")
-            ) {
-              conflictedPaths.push(filePath);
-            } else if (status === "D ") {
-              if (isAutoResolvablePath(filePath)) bordbuchDeletedPaths.push(filePath);
-            }
-          }
-        } catch {
-          // git status failed — fall through to existing error
-        }
-
-        const allAutoResolvable =
-          conflictedPaths.length > 0 && conflictedPaths.every(isAutoResolvablePath);
-
-        if (allAutoResolvable) {
-          // Auto-resolve: keep cache clone version (ours) for cache-clone-only files
-          try {
-            // Restore bordbuch files that git auto-resolved as deletions (RFC-0658 guard blocks deletion)
-            if (bordbuchDeletedPaths.length > 0) {
-              const delPathArgs = bordbuchDeletedPaths.map((p) => JSON.stringify(p)).join(" ");
-              execSync(`git checkout HEAD -- ${delPathArgs}`, {
-                cwd: systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
-              execSync(`git add -- ${delPathArgs}`, {
-                cwd: systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
-            }
-            // ADR-0060: Split conflicted paths into tracked (checkout HEAD) and
-            // untracked generated files (just git add to clear conflict marker).
-            // CACHE_CLONE_GENERATED_PATTERNS files are gitignored in the cache clone
-            // and not in HEAD — git checkout HEAD -- fails for them. The .gitignore
-            // restoration step later will untrack them anyway.
-            const isGeneratedUntracked = (p: string) =>
-              CACHE_CLONE_GENERATED_PATTERNS.some(
-                (pattern) => p === pattern || p.startsWith(pattern.replace(/\.[^.]+$/, "")),
-              );
-            const trackedConflicted = conflictedPaths.filter((p) => !isGeneratedUntracked(p));
-            const generatedConflicted = conflictedPaths.filter((p) => isGeneratedUntracked(p));
-
-            if (trackedConflicted.length > 0) {
-              const trackedArgs = trackedConflicted.map((p) => JSON.stringify(p)).join(" ");
-              execSync(`git checkout HEAD -- ${trackedArgs}`, {
-                cwd: systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
-              execSync(`git add -- ${trackedArgs}`, {
-                cwd: systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
-            }
-            if (generatedConflicted.length > 0) {
-              const generatedArgs = generatedConflicted.map((p) => JSON.stringify(p)).join(" ");
-              execSync(`git add -- ${generatedArgs}`, {
-                cwd: systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
-            }
-            cacheCloneCommit(systemDir, "", { noEdit: true });
-            autoResolvedPaths = conflictedPaths;
-            logger.info(
-              `  Auto-resolved ${autoResolvedPaths.length} cache-clone-only conflict(s) (kept cache clone version)`,
-            );
-          } catch (resolveErr) {
-            // Auto-resolution failed — abort merge and throw
-            abortMerge(systemDir);
-            throw new Error(
-              `[mission.reconcile] bordbuch auto-resolution failed: ${(resolveErr as Error).message}.\n` +
-                `Merge has been aborted. Inspect the cache clone state manually.\n` +
-                `Reconcile is idempotent — it will reset the cache clone to preReconcileSha and re-merge.`,
-            );
-          }
-        } else {
-          // Abort merge and throw existing error
-          abortMerge(systemDir);
-          throw new Error(
-            `[mission.reconcile] git merge --no-ff failed: ${(err as Error).message}.\n` +
-              `Resolve conflicts in the workpiece (not the cache clone), commit via mission.git.commit, then re-run reconcile.\n` +
-              `Reconcile is idempotent — it will reset the cache clone to preReconcileSha and re-merge.`,
-          );
-        }
-      }
-
-      // RFC-0913: Capture workpiece HEAD at reconcile time for freshness gate in mission.close
-      try {
-        workpieceHeadAtReconcile = execSync("git rev-parse HEAD", {
-          cwd: workpieceDir,
-          stdio: ["pipe", "pipe", "pipe"],
-          encoding: "utf-8",
-        }).trim();
-      } catch {
-        workpieceHeadAtReconcile = null;
-      }
-
-      commitSha = execSync("git rev-parse HEAD", {
-        cwd: systemDir,
-        stdio: "pipe",
-        encoding: "utf-8",
-      }).trim();
-
-      // Post-merge guard: verify critical config files still exist in cache clone.
-      // The merge can silently remove system-config.yaml / system-state.yaml if the
-      // workpiece branch doesn't track them. Restore from preReconcileSha if missing.
-      const criticalFiles = ["system-config.yaml", "system-state.yaml"];
-      const restoredFiles: string[] = [];
-      for (const cf of criticalFiles) {
-        if (!existsSync(path.join(systemDir, cf)) && preReconcileSha) {
-          try {
-            execSync(`git checkout ${preReconcileSha} -- ${JSON.stringify(cf)}`, {
-              cwd: systemDir,
-              stdio: "pipe",
-              encoding: "utf-8",
-            });
-            restoredFiles.push(cf);
-            logger.info(`  Restored ${cf} after merge (was missing)`);
-          } catch {
-            // File may not exist in preReconcileSha either — skip
-          }
-        }
-      }
-      // Commit restored files so they are included in the subsequent git push
-      if (restoredFiles.length > 0) {
-        const addArgs = restoredFiles.map((f) => JSON.stringify(f)).join(" ");
-        execSync(`git add -- ${addArgs}`, {
-          cwd: systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        });
-        cacheCloneCommit(systemDir, "restore critical config files after merge");
-        logger.info(`  Committed ${restoredFiles.length} restored config file(s)`);
-      }
-
-      // RFC-0913: Restore cache-clone-only .gitignore patterns after merge.
-      // The merge may overwrite .gitignore with the workpiece version, removing
-      // cache-clone-only entries that exclude forbidden/generated files.
-      try {
-        gitignoreRestored = await restoreCacheCloneGitignore(systemDir);
-        if (gitignoreRestored) {
-          logger.info(`  Restored cache-clone-only .gitignore patterns after merge`);
-          execSync("git add .gitignore", {
-            cwd: systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          });
-        }
-        forbiddenFilesUntracked = untrackForbiddenGeneratedFiles(systemDir);
-        if (forbiddenFilesUntracked.length > 0) {
-          logger.info(`  Untracked ${forbiddenFilesUntracked.length} forbidden/generated file(s)`);
-        }
-        if (gitignoreRestored || forbiddenFilesUntracked.length > 0) {
-          cacheCloneCommit(
-            systemDir,
-            "restore cache-clone .gitignore and untrack forbidden files (RFC-0913)",
-          );
-        }
-      } catch (restoreErr) {
-        logger.warn(
-          `  .gitignore restoration failed (non-fatal): ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
-        );
-      }
-
-      mergeCommitSha = execSync("git rev-parse HEAD^1", {
-        cwd: systemDir,
-        stdio: "pipe",
-        encoding: "utf-8",
-      }).trim();
-
-      // Count transferred commits (commits in FETCH_HEAD not in preReconcileSha)
-      if (preReconcileSha) {
-        try {
-          const countOutput = execSync(`git rev-list --count ${preReconcileSha}..FETCH_HEAD`, {
-            cwd: systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          }).trim();
-          transferredCommits = parseInt(countOutput, 10);
-        } catch {
-          transferredCommits = 0;
-        }
-      }
-
-      logger.info(
-        `  Merged ${transferredCommits} commit(s) from workpiece to cache clone (${commitSha.slice(0, 8)})`,
-      );
-
-      // RFC-0820 Level 3: Warn when zero commits were transferred.
-      // This is non-blocking (reconcile may legitimately transfer zero on re-runs)
-      // but makes the condition visible to the operator.
-      if (transferredCommits === 0) {
-        logger.warn(
-          `[mission.reconcile] WARNING: Zero commits transferred from workpiece to cache clone.\n` +
-            `  Brief: "${manifest.brief}"\n` +
-            `  If you expected changes, the workpiece may have no operator commits — check mission.git.commit output.\n`,
-        );
-      }
-
-      // RFC-0568: Push to origin with retry (non-fatal, 3 attempts, exponential backoff)
-      const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-        cwd: systemDir,
-        stdio: "pipe",
-        encoding: "utf-8",
-      }).trim();
-
-      const pushBackoffMs = [1000, 2000, 4000];
-      let pushSucceeded = false;
-      for (let attempt = 0; attempt < pushBackoffMs.length; attempt++) {
-        try {
-          execSync(`git push origin ${JSON.stringify(branch)}`, {
-            cwd: systemDir,
-            stdio: "pipe",
-            timeout: 30_000,
-          });
-          pushSucceeded = true;
-          break;
-        } catch {
-          if (attempt < pushBackoffMs.length - 1) {
-            logger.info(
-              `  Push attempt ${attempt + 1} failed — retrying in ${pushBackoffMs[attempt]}ms…`,
-            );
-            await new Promise((resolve) => setTimeout(resolve, pushBackoffMs[attempt]));
-          }
-        }
-      }
-      if (!pushSucceeded) {
-        logger.info(
-          `  Push failed after ${pushBackoffMs.length} attempts (non-fatal) — next sync will catch up`,
-        );
-      }
-
-      // RFC-0918: Post-push divergence check — compare cache clone HEAD against
-      // origin/main to detect diverged history from multiple reconcile runs.
-      // Non-fatal diagnostic: logs a warning if SHAs differ, does not auto-fix.
-      try {
-        const cacheCloneHead = execSync("git rev-parse HEAD", {
-          cwd: systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
-        const originHead = execSync("git rev-parse origin/main", {
-          cwd: systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
-        if (cacheCloneHead !== originHead) {
-          divergenceWarning = { cacheCloneHead, originHead, diverged: true };
-          logger.warn(
-            `[mission.reconcile] WARNING: Cache clone HEAD (${cacheCloneHead.slice(0, 8)}) diverged from origin/main (${originHead.slice(0, 8)}).\n` +
-              `  Run \`git reset --hard origin/main\` in the cache clone to resolve.`,
-          );
-        }
-      } catch {
-        // Non-fatal — origin/main may not exist yet or git command failed
-      }
-
-      // RFC-0705: Best-effort sternsystem.sync to push from bare to external mirrors.
-      // Only called when external mirrors are configured (mirrors.length > 2).
-      // Non-fatal: sync failure logs a warning but does not block reconcile.
-      try {
-        const config = await readSystemConfig(workspaceRoot, manifest.systemId);
-        if (config && config.mirrors.length > 2) {
-          mirrorSync.attempted = true;
-          logger.info(`  Syncing external mirrors via sternsystem.sync…`);
-          try {
-            const syncResult = (await executeKernelCommand({
-              workspaceRoot,
-              commandName: "sternsystem.sync",
-              argv: [`--id=${manifest.systemId}`],
-            })) as { exitCode?: number; summary?: string };
-            const syncExitCode = syncResult.exitCode ?? 0;
-            if (syncExitCode !== 0) {
-              mirrorSync.succeeded = false;
-              mirrorSync.error =
-                syncResult.summary ?? `sternsystem.sync exited with code ${syncExitCode}`;
-              logger.warn(`  External mirror sync failed (non-fatal): ${mirrorSync.error}`);
-            } else {
-              mirrorSync.succeeded = true;
-              logger.info(`  External mirrors synced`);
-            }
-          } catch (syncError) {
-            mirrorSync.succeeded = false;
-            mirrorSync.error = syncError instanceof Error ? syncError.message : String(syncError);
-            logger.warn(`  External mirror sync failed (non-fatal): ${mirrorSync.error}`);
-          }
-        }
-      } catch (registryError) {
-        // Registry read failed — skip sync, non-fatal
-        logger.warn(
-          `  Could not read registry for mirror sync: ${registryError instanceof Error ? registryError.message : String(registryError)}`,
-        );
-      }
-    } else {
-      // No git in system dir — fall back to copyDir for non-git Sternsystems
-      for (const dataPath of STERNSYSTEM_DATA_PATHS) {
-        const src = path.join(workpieceDir, dataPath);
-        const dest = path.join(systemDir, dataPath);
-        if (existsSync(src)) {
-          if (existsSync(dest)) {
-            await fs.rm(dest, { recursive: true, force: true });
-          }
-          await copyDir(src, dest);
-          copiedPaths.push(dataPath);
-          logger.info(`  Reconciled ${dataPath}`);
-        }
-      }
-    }
-
-    const report = {
-      schemaVersion: "1.0.0",
-      missionId,
-      systemId: manifest.systemId,
-      commitSha,
-      preReconcileSha,
-      reconciledAt: now,
-      mergeCommitSha,
-      transferredCommits,
-      zeroTransferWarning: transferredCommits === 0,
-      message,
-      copiedPaths,
-      autoResolvedPaths,
-      // RFC-0913: workpiece HEAD at reconcile time for freshness gate in mission.close
-      workpieceHeadAtReconcile,
-      // RFC-0913: .gitignore restoration and forbidden file untracking results
-      gitignoreRestored,
-      forbiddenFilesUntracked,
-      mirrorSync: mirrorSync.attempted ? mirrorSync : undefined,
-      // RFC-0918: post-push divergence diagnostic
-      divergenceWarning,
-    };
-
-    await atomicWriteFile(
-      path.join(evidenceDir, "reconciliation-report.json"),
-      JSON.stringify(report, null, 2) + "\n",
-    );
-
-    manifest.reconciledAt = now;
-    await writeMissionManifest(workspaceRoot, manifest);
-
-    // RFC-0580: auto-commit werkstatt side-effects
-    await commitWerkstattSideEffects(
+    const reconcileCtx: ReconcileStepCtx = {
       workspaceRoot,
-      [path.join("missions", missionId, "mission.yaml")],
-      `werkstatt: mission.reconcile ${missionId}`,
-    );
+      missionId,
+      missionDir,
+      workpieceDir,
+      evidenceDir,
+      systemDir,
+      manifest,
+      actor,
+      message,
+      now,
+      context,
+      commitSha: null,
+      preReconcileSha: null,
+      mergeCommitSha: null,
+      transferredCommits: 0,
+      copiedPaths: [],
+      autoResolvedPaths: [],
+      workpieceHeadAtReconcile: null,
+      gitignoreRestored: false,
+      forbiddenFilesUntracked: [],
+      mirrorSync: { attempted: false, succeeded: false, error: null },
+      divergenceWarning: null,
+      workpieceCommit: { committed: false, commitSha: null },
+    };
 
+    const steps = await buildReconcileSteps(workspaceRoot, missionId, reconcileCtx);
+    const journalPath = path.join(missionDir, "journal.jsonl");
+    const def: OperationDefinition<unknown> = { op: "mission.reconcile", steps };
+    const opResult = await runOperation(journalPath, def, reconcileCtx, {
+      missionId,
+      platformVersion: "",
+    });
+
+    if (!opResult.completed) {
+      const detail = opResult.failedStepError ?? "unknown error";
+      throw new Error(
+        `[mission.reconcile] step "${opResult.failedStep}" failed: ${detail} — run mission.resume --mission ${missionId} to retry`,
+      );
+    }
+
+    const cc = reconcileCtx;
     const autoResolveSuffix =
-      autoResolvedPaths.length > 0
-        ? `, ${autoResolvedPaths.length} bordbuch conflict${autoResolvedPaths.length > 1 ? "s" : ""} auto-resolved`
+      cc.autoResolvedPaths.length > 0
+        ? `, ${cc.autoResolvedPaths.length} bordbuch conflict${cc.autoResolvedPaths.length > 1 ? "s" : ""} auto-resolved`
         : "";
 
-    const mirrorSyncSuffix = mirrorSync.attempted
-      ? mirrorSync.succeeded
+    const mirrorSyncSuffix = cc.mirrorSync.attempted
+      ? cc.mirrorSync.succeeded
         ? ", mirrors synced"
         : ", mirror sync failed — non-fatal"
       : "";
@@ -1759,16 +1299,16 @@ export async function runMissionReconcile(
       data: {
         missionId,
         systemId: manifest.systemId,
-        commitSha,
-        preReconcileSha,
+        commitSha: cc.commitSha,
+        preReconcileSha: cc.preReconcileSha,
         reconciledAt: now,
-        ...(autoResolvedPaths.length > 0 ? { autoResolvedPaths } : {}),
-        workpieceAutoCommitted: workpieceCommit.committed,
-        workpieceCommitSha: workpieceCommit.commitSha,
-        ...(mirrorSync.attempted ? { mirrorSync } : {}),
-        divergenceWarning,
+        ...(cc.autoResolvedPaths.length > 0 ? { autoResolvedPaths: cc.autoResolvedPaths } : {}),
+        workpieceAutoCommitted: cc.workpieceCommit.committed,
+        workpieceCommitSha: cc.workpieceCommit.commitSha,
+        ...(cc.mirrorSync.attempted ? { mirrorSync: cc.mirrorSync } : {}),
+        divergenceWarning: cc.divergenceWarning,
       },
-      summary: `[mission.reconcile] ${missionId} reconciled (${commitSha ? `${commitSha.slice(0, 8)}, ${transferredCommits} commits merged` : "no git"}${autoResolveSuffix}${workpieceCommit.committed ? `, workpiece auto-committed ${workpieceCommit.commitSha?.slice(0, 8)}` : ""}${mirrorSyncSuffix})`,
+      summary: `[mission.reconcile] ${missionId} reconciled (${cc.commitSha ? `${cc.commitSha.slice(0, 8)}, ${cc.transferredCommits} commits merged` : "no git"}${autoResolveSuffix}${cc.workpieceCommit.committed ? `, workpiece auto-committed ${cc.workpieceCommit.commitSha?.slice(0, 8)}` : ""}${mirrorSyncSuffix})`,
       nextSteps: [
         {
           action: `Close the mission: pnpm exec werkstatt run mission.close --mission ${missionId}`,
@@ -1780,4 +1320,577 @@ export async function runMissionReconcile(
     await releaseLock(workspaceRoot, `mission:${missionId}`);
     await releaseLock(workspaceRoot, `system:${manifest.systemId}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// RFC-0958: Journal-integrated reconcile steps
+// ---------------------------------------------------------------------------
+
+export interface ReconcileStepCtx {
+  workspaceRoot: string;
+  missionId: string;
+  missionDir: string;
+  workpieceDir: string;
+  evidenceDir: string;
+  systemDir: string;
+  manifest: MissionManifest;
+  actor: ReturnType<typeof resolveActor>;
+  message: string;
+  now: string;
+  context: KernelRuntimeContext;
+  commitSha: string | null;
+  preReconcileSha: string | null;
+  mergeCommitSha: string | null;
+  transferredCommits: number;
+  copiedPaths: string[];
+  autoResolvedPaths: string[];
+  workpieceHeadAtReconcile: string | null;
+  gitignoreRestored: boolean;
+  forbiddenFilesUntracked: string[];
+  mirrorSync: { attempted: boolean; succeeded: boolean; error: string | null };
+  divergenceWarning: { cacheCloneHead: string; originHead: string; diverged: boolean } | null;
+  workpieceCommit: { committed: boolean; commitSha: string | null };
+}
+
+export async function buildReconcileSteps(
+  _workspaceRoot: string,
+  _missionId: string,
+  ctx: unknown,
+): Promise<OperationStep<unknown>[]> {
+  const steps: OperationStep<unknown>[] = [
+    {
+      name: "workpiece-git-check",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        if (!existsSync(path.join(cc.workpieceDir, ".git"))) {
+          throw new Error(
+            `[mission.reconcile] workpiece is not a git repository — run mission.materialize first`,
+          );
+        }
+      },
+    },
+    {
+      name: "auto-commit-workpiece",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const result = commitWorkpieceIfDirty(cc.workpieceDir, cc.missionId);
+        cc.workpieceCommit = result;
+        if (result.committed) {
+          cc.context.logger.info(
+            `  Auto-committed dirty workpiece (${result.commitSha?.slice(0, 8)}) before reconcile`,
+          );
+        }
+      },
+    },
+    {
+      name: "auto-commit-cache-clone",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        const cacheCommit = commitCacheCloneIfDirty(cc.systemDir, cc.manifest.systemId);
+        if (cacheCommit.committed) {
+          cc.context.logger.info(
+            `  Auto-committed cache clone (${cacheCommit.commitSha?.slice(0, 8)}) before reconcile`,
+          );
+        }
+      },
+    },
+    {
+      name: "dirty-cache-clone-guard",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        const cacheDirtyCheck = isWorkpieceDirty(cc.systemDir);
+        if (cacheDirtyCheck.dirty) {
+          const untrackedReport = await investigateUntrackedFiles(
+            cc.workspaceRoot,
+            cc.manifest.systemId,
+            cc.systemDir,
+            cacheDirtyCheck.files,
+          );
+          await atomicWriteFile(
+            path.join(cc.evidenceDir, "untracked-files-report.json"),
+            JSON.stringify(untrackedReport, null, 2) + "\n",
+          );
+          const reportSummary = untrackedReport
+            .map(
+              (r) => `  ${r.path} — ${r.likelyOrigin}${r.originHint ? ` (${r.originHint})` : ""}`,
+            )
+            .join("\n");
+          throw new Error(
+            `[mission.reconcile] cache clone for system '${cc.manifest.systemId}' has ${cacheDirtyCheck.fileCount} uncommitted/untracked file(s):\n` +
+              reportSummary +
+              `\n\nEvidence written to evidence/untracked-files-report.json.\nResolve uncommitted changes in the cache clone before re-running reconcile.`,
+          );
+        }
+      },
+    },
+    {
+      name: "record-pre-reconcile-sha",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        try {
+          cc.preReconcileSha = execSync("git rev-parse HEAD", {
+            cwd: cc.systemDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          cc.preReconcileSha = null;
+        }
+        const prevReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
+        if (existsSync(prevReportPath)) {
+          try {
+            const prevReport = JSON.parse(await fs.readFile(prevReportPath, "utf8")) as {
+              preReconcileSha?: string;
+            };
+            if (prevReport.preReconcileSha) {
+              try {
+                execSync(`git reset --hard ${prevReport.preReconcileSha}`, {
+                  cwd: cc.systemDir,
+                  stdio: "pipe",
+                  encoding: "utf-8",
+                });
+                cc.context.logger.info(
+                  `  Reset cache clone to pre-reconcile SHA ${prevReport.preReconcileSha.slice(0, 12)}`,
+                );
+              } catch {
+                // Previous SHA may not exist — continue with current HEAD
+              }
+            }
+          } catch {
+            // Unparseable report — continue
+          }
+        }
+      },
+    },
+    {
+      name: "fetch-and-merge",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) {
+          for (const dataPath of STERNSYSTEM_DATA_PATHS) {
+            const src = path.join(cc.workpieceDir, dataPath);
+            const dest = path.join(cc.systemDir, dataPath);
+            if (existsSync(src)) {
+              if (existsSync(dest)) {
+                await fs.rm(dest, { recursive: true, force: true });
+              }
+              await copyDir(src, dest);
+              cc.copiedPaths.push(dataPath);
+              cc.context.logger.info(`  Reconciled ${dataPath}`);
+            }
+          }
+          return;
+        }
+        const workpieceBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+          cwd: cc.workpieceDir,
+          stdio: "pipe",
+          encoding: "utf-8",
+        }).trim();
+        execSync(
+          `git fetch ${JSON.stringify(cc.workpieceDir)} ${JSON.stringify(workpieceBranch)}`,
+          {
+            cwd: cc.systemDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          },
+        );
+        const mergeMessage = `reconcile mission ${cc.missionId}`;
+        try {
+          execSync(`git merge --no-ff FETCH_HEAD -m ${JSON.stringify(mergeMessage)}`, {
+            cwd: cc.systemDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          });
+        } catch (err) {
+          const isAutoResolvablePath = (p: string) =>
+            CACHE_CLONE_ONLY_PATHS.some((pattern) => p.startsWith(pattern));
+          const conflictedPaths: string[] = [];
+          const bordbuchDeletedPaths: string[] = [];
+          try {
+            const statusOutput = execSync("git status --porcelain", {
+              cwd: cc.systemDir,
+              stdio: "pipe",
+              encoding: "utf-8",
+            });
+            for (const line of statusOutput.split("\n")) {
+              if (!line) continue;
+              const status = line.slice(0, 2);
+              const filePath = line.slice(3).trim();
+              if (!filePath) continue;
+              if (
+                status.startsWith("DU") ||
+                status.startsWith("UD") ||
+                status.startsWith("AA") ||
+                status.startsWith("UU")
+              ) {
+                conflictedPaths.push(filePath);
+              } else if (status === "D ") {
+                if (isAutoResolvablePath(filePath)) bordbuchDeletedPaths.push(filePath);
+              }
+            }
+          } catch {
+            // git status failed
+          }
+          const allAutoResolvable =
+            conflictedPaths.length > 0 && conflictedPaths.every(isAutoResolvablePath);
+          if (allAutoResolvable) {
+            try {
+              if (bordbuchDeletedPaths.length > 0) {
+                const delPathArgs = bordbuchDeletedPaths.map((p) => JSON.stringify(p)).join(" ");
+                execSync(`git checkout HEAD -- ${delPathArgs}`, {
+                  cwd: cc.systemDir,
+                  stdio: "pipe",
+                  encoding: "utf-8",
+                });
+                execSync(`git add -- ${delPathArgs}`, {
+                  cwd: cc.systemDir,
+                  stdio: "pipe",
+                  encoding: "utf-8",
+                });
+              }
+              const isGeneratedUntracked = (p: string) =>
+                CACHE_CLONE_GENERATED_PATTERNS.some(
+                  (pattern) => p === pattern || p.startsWith(pattern.replace(/\.[^.]+$/, "")),
+                );
+              const trackedConflicted = conflictedPaths.filter((p) => !isGeneratedUntracked(p));
+              const generatedConflicted = conflictedPaths.filter((p) => isGeneratedUntracked(p));
+              if (trackedConflicted.length > 0) {
+                const trackedArgs = trackedConflicted.map((p) => JSON.stringify(p)).join(" ");
+                execSync(`git checkout HEAD -- ${trackedArgs}`, {
+                  cwd: cc.systemDir,
+                  stdio: "pipe",
+                  encoding: "utf-8",
+                });
+                execSync(`git add -- ${trackedArgs}`, {
+                  cwd: cc.systemDir,
+                  stdio: "pipe",
+                  encoding: "utf-8",
+                });
+              }
+              if (generatedConflicted.length > 0) {
+                const generatedArgs = generatedConflicted.map((p) => JSON.stringify(p)).join(" ");
+                execSync(`git add -- ${generatedArgs}`, {
+                  cwd: cc.systemDir,
+                  stdio: "pipe",
+                  encoding: "utf-8",
+                });
+              }
+              cacheCloneCommit(cc.systemDir, "", { noEdit: true });
+              cc.autoResolvedPaths = conflictedPaths;
+              cc.context.logger.info(
+                `  Auto-resolved ${cc.autoResolvedPaths.length} cache-clone-only conflict(s)`,
+              );
+            } catch (resolveErr) {
+              abortMerge(cc.systemDir);
+              throw new Error(
+                `[mission.reconcile] bordbuch auto-resolution failed: ${(resolveErr as Error).message}.\n` +
+                  `Merge has been aborted. Inspect the cache clone state manually.\n` +
+                  `Reconcile is idempotent — it will reset the cache clone to preReconcileSha and re-merge.`,
+              );
+            }
+          } else {
+            abortMerge(cc.systemDir);
+            throw new Error(
+              `[mission.reconcile] git merge --no-ff failed: ${(err as Error).message}.\n` +
+                `Resolve conflicts in the workpiece (not the cache clone), commit via mission.git.commit, then re-run reconcile.\n` +
+                `Reconcile is idempotent — it will reset the cache clone to preReconcileSha and re-merge.`,
+            );
+          }
+        }
+      },
+    },
+    {
+      name: "capture-workpiece-head",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        try {
+          cc.workpieceHeadAtReconcile = execSync("git rev-parse HEAD", {
+            cwd: cc.workpieceDir,
+            stdio: ["pipe", "pipe", "pipe"],
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          cc.workpieceHeadAtReconcile = null;
+        }
+        cc.commitSha = execSync("git rev-parse HEAD", {
+          cwd: cc.systemDir,
+          stdio: "pipe",
+          encoding: "utf-8",
+        }).trim();
+      },
+    },
+    {
+      name: "post-merge-guard",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        const criticalFiles = ["system-config.yaml", "system-state.yaml"];
+        const restoredFiles: string[] = [];
+        for (const cf of criticalFiles) {
+          if (!existsSync(path.join(cc.systemDir, cf)) && cc.preReconcileSha) {
+            try {
+              execSync(`git checkout ${cc.preReconcileSha} -- ${JSON.stringify(cf)}`, {
+                cwd: cc.systemDir,
+                stdio: "pipe",
+                encoding: "utf-8",
+              });
+              restoredFiles.push(cf);
+              cc.context.logger.info(`  Restored ${cf} after merge (was missing)`);
+            } catch {
+              // File may not exist in preReconcileSha either — skip
+            }
+          }
+        }
+        if (restoredFiles.length > 0) {
+          const addArgs = restoredFiles.map((f) => JSON.stringify(f)).join(" ");
+          execSync(`git add -- ${addArgs}`, {
+            cwd: cc.systemDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          });
+          cacheCloneCommit(cc.systemDir, "restore critical config files after merge");
+        }
+      },
+    },
+    {
+      name: "gitignore-restoration",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        try {
+          cc.gitignoreRestored = await restoreCacheCloneGitignore(cc.systemDir);
+          if (cc.gitignoreRestored) {
+            cc.context.logger.info(`  Restored cache-clone-only .gitignore patterns after merge`);
+            execSync("git add .gitignore", { cwd: cc.systemDir, stdio: "pipe", encoding: "utf-8" });
+          }
+          cc.forbiddenFilesUntracked = untrackForbiddenGeneratedFiles(cc.systemDir);
+          if (cc.forbiddenFilesUntracked.length > 0) {
+            cc.context.logger.info(
+              `  Untracked ${cc.forbiddenFilesUntracked.length} forbidden/generated file(s)`,
+            );
+          }
+          if (cc.gitignoreRestored || cc.forbiddenFilesUntracked.length > 0) {
+            cacheCloneCommit(
+              cc.systemDir,
+              "restore cache-clone .gitignore and untrack forbidden files (RFC-0913)",
+            );
+          }
+        } catch (restoreErr) {
+          cc.context.logger.warn(
+            `  .gitignore restoration failed (non-fatal): ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
+          );
+        }
+      },
+    },
+    {
+      name: "count-transferred-commits",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        cc.mergeCommitSha = execSync("git rev-parse HEAD^1", {
+          cwd: cc.systemDir,
+          stdio: "pipe",
+          encoding: "utf-8",
+        }).trim();
+        if (cc.preReconcileSha) {
+          try {
+            const countOutput = execSync(`git rev-list --count ${cc.preReconcileSha}..FETCH_HEAD`, {
+              cwd: cc.systemDir,
+              stdio: "pipe",
+              encoding: "utf-8",
+            }).trim();
+            cc.transferredCommits = parseInt(countOutput, 10);
+          } catch {
+            cc.transferredCommits = 0;
+          }
+        }
+        cc.context.logger.info(
+          `  Merged ${cc.transferredCommits} commit(s) from workpiece to cache clone (${cc.commitSha?.slice(0, 8)})`,
+        );
+        if (cc.transferredCommits === 0) {
+          cc.context.logger.warn(
+            `[mission.reconcile] WARNING: Zero commits transferred from workpiece to cache clone.\n` +
+              `  Brief: "${cc.manifest.brief}"\n` +
+              `  If you expected changes, the workpiece may have no operator commits — check mission.git.commit output.\n`,
+          );
+        }
+      },
+    },
+    {
+      name: "push-to-origin",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+          cwd: cc.systemDir,
+          stdio: "pipe",
+          encoding: "utf-8",
+        }).trim();
+        const pushBackoffMs = [1000, 2000, 4000];
+        let pushSucceeded = false;
+        for (let attempt = 0; attempt < pushBackoffMs.length; attempt++) {
+          try {
+            execSync(`git push origin ${JSON.stringify(branch)}`, {
+              cwd: cc.systemDir,
+              stdio: "pipe",
+              timeout: 30_000,
+            });
+            pushSucceeded = true;
+            break;
+          } catch {
+            if (attempt < pushBackoffMs.length - 1) {
+              cc.context.logger.info(`  Push attempt ${attempt + 1} failed — retrying…`);
+              await new Promise((resolve) => setTimeout(resolve, pushBackoffMs[attempt]));
+            }
+          }
+        }
+        if (!pushSucceeded) {
+          cc.context.logger.info(
+            `  Push failed after ${pushBackoffMs.length} attempts (non-fatal)`,
+          );
+        }
+      },
+    },
+    {
+      name: "divergence-check",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        try {
+          const cacheCloneHead = execSync("git rev-parse HEAD", {
+            cwd: cc.systemDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          }).trim();
+          const originHead = execSync("git rev-parse origin/main", {
+            cwd: cc.systemDir,
+            stdio: "pipe",
+            encoding: "utf-8",
+          }).trim();
+          if (cacheCloneHead !== originHead) {
+            cc.divergenceWarning = { cacheCloneHead, originHead, diverged: true };
+            cc.context.logger.warn(
+              `[mission.reconcile] WARNING: Cache clone HEAD (${cacheCloneHead.slice(0, 8)}) diverged from origin/main (${originHead.slice(0, 8)}).\n` +
+                `  Run \`git reset --hard origin/main\` in the cache clone to resolve.`,
+            );
+          }
+        } catch {
+          // Non-fatal — origin/main may not exist yet
+        }
+      },
+    },
+    {
+      name: "mirror-sync",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const gitDir = path.join(cc.systemDir, ".git");
+        if (!existsSync(gitDir)) return;
+        try {
+          const config = await readSystemConfig(cc.workspaceRoot, cc.manifest.systemId);
+          if (config && config.mirrors.length > 2) {
+            cc.mirrorSync.attempted = true;
+            cc.context.logger.info(`  Syncing external mirrors via sternsystem.sync…`);
+            try {
+              const syncResult = (await executeKernelCommand({
+                workspaceRoot: cc.workspaceRoot,
+                commandName: "sternsystem.sync",
+                argv: [`--id=${cc.manifest.systemId}`],
+              })) as { exitCode?: number; summary?: string };
+              const syncExitCode = syncResult.exitCode ?? 0;
+              if (syncExitCode !== 0) {
+                cc.mirrorSync.succeeded = false;
+                cc.mirrorSync.error =
+                  syncResult.summary ?? `sternsystem.sync exited with code ${syncExitCode}`;
+                cc.context.logger.warn(
+                  `  External mirror sync failed (non-fatal): ${cc.mirrorSync.error}`,
+                );
+              } else {
+                cc.mirrorSync.succeeded = true;
+                cc.context.logger.info(`  External mirrors synced`);
+              }
+            } catch (syncError) {
+              cc.mirrorSync.succeeded = false;
+              cc.mirrorSync.error =
+                syncError instanceof Error ? syncError.message : String(syncError);
+              cc.context.logger.warn(
+                `  External mirror sync failed (non-fatal): ${cc.mirrorSync.error}`,
+              );
+            }
+          }
+        } catch (registryError) {
+          cc.context.logger.warn(
+            `  Could not read registry for mirror sync: ${registryError instanceof Error ? registryError.message : String(registryError)}`,
+          );
+        }
+      },
+    },
+    {
+      name: "write-reconciliation-report",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const report = {
+          schemaVersion: "1.0.0",
+          missionId: cc.missionId,
+          systemId: cc.manifest.systemId,
+          commitSha: cc.commitSha,
+          preReconcileSha: cc.preReconcileSha,
+          reconciledAt: cc.now,
+          mergeCommitSha: cc.mergeCommitSha,
+          transferredCommits: cc.transferredCommits,
+          zeroTransferWarning: cc.transferredCommits === 0,
+          message: cc.message,
+          copiedPaths: cc.copiedPaths,
+          autoResolvedPaths: cc.autoResolvedPaths,
+          workpieceHeadAtReconcile: cc.workpieceHeadAtReconcile,
+          gitignoreRestored: cc.gitignoreRestored,
+          forbiddenFilesUntracked: cc.forbiddenFilesUntracked,
+          mirrorSync: cc.mirrorSync.attempted ? cc.mirrorSync : undefined,
+          divergenceWarning: cc.divergenceWarning,
+        };
+        await atomicWriteFile(
+          path.join(cc.evidenceDir, "reconciliation-report.json"),
+          JSON.stringify(report, null, 2) + "\n",
+        );
+      },
+    },
+    {
+      name: "update-manifest",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        cc.manifest.reconciledAt = cc.now;
+        await writeMissionManifest(cc.workspaceRoot, cc.manifest);
+      },
+      verify: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        const reRead = await readMissionManifest(cc.workspaceRoot, cc.missionId);
+        return reRead.reconciledAt === cc.now;
+      },
+    },
+    {
+      name: "commit-werkstatt-side-effects",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        await commitWerkstattSideEffects(
+          cc.workspaceRoot,
+          [path.join("missions", cc.missionId, "mission.yaml")],
+          `werkstatt: mission.reconcile ${cc.missionId}`,
+        );
+      },
+    },
+  ];
+  return steps;
 }
