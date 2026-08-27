@@ -121,6 +121,7 @@ export default {
     register(registry) {
       registry.registerCommand({
         name: "workspace.ok",
+        modulePath: "test",
         description: "fixture",
         scope: "workspace",
         expectedDurationMs: 1,
@@ -131,6 +132,7 @@ export default {
       });
       registry.registerCommand({
         name: "workspace.fail",
+        modulePath: "test",
         description: "fixture",
         scope: "workspace",
         execute() {
@@ -139,6 +141,7 @@ export default {
       });
       registry.registerCommand({
         name: "workspace.timeout",
+        modulePath: "test",
         description: "fixture",
         scope: "workspace",
         timeoutMs: 10,
@@ -148,6 +151,7 @@ export default {
       });
       registry.registerCommand({
         name: "app.only",
+        modulePath: "test",
         description: "fixture",
         scope: "app",
         execute() {

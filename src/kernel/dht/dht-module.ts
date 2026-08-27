@@ -31,6 +31,8 @@ export const dhtModule: KernelModule = {
 
     registry.registerCommand({
       name: "dht.node.init",
+      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+      generates: [],
       description:
         "RFC-0565: initialize DHT configuration. Creates werkstatt.dht.json with " +
         "bind address, bootstrap nodes, replication factor, and timeout parameters. " +
@@ -45,6 +47,8 @@ export const dhtModule: KernelModule = {
 
     registry.registerCommand({
       name: "dht.lookup",
+      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+      generates: [],
       description:
         "RFC-0565: resolve a site id to its DHT entry. Queries the DHT (or local " +
         "cache if fresh) and validates the entry signature. Routes around dead " +
@@ -65,6 +69,8 @@ export const dhtModule: KernelModule = {
 
     registry.registerCommand({
       name: "dht.register",
+      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+      generates: [],
       description:
         "RFC-0565: publish a local registry entry to the DHT. Signs the entry with " +
         "the operator's Ed25519 keypair. Uses LWW on lastUpdated for conflict resolution. " +
@@ -79,6 +85,8 @@ export const dhtModule: KernelModule = {
 
     registry.registerCommand({
       name: "dht.capacity.publish",
+      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+      generates: [],
       description:
         "RFC-0565: publish workshop capacity to the DHT for placement decisions. " +
         "Signs the capacity entry with the operator's Ed25519 keypair. " +
@@ -93,6 +101,8 @@ export const dhtModule: KernelModule = {
 
     registry.registerCommand({
       name: "dht.placement",
+      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+      generates: [],
       description:
         "RFC-0565: determine the best workshop for placing a site by querying DHT " +
         "capacity entries. Uses least-loaded strategy by default. " +
@@ -107,6 +117,8 @@ export const dhtModule: KernelModule = {
 
     registry.registerCommand({
       name: "dht.status",
+      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+      generates: [],
       description:
         "RFC-0565: report local DHT node status including config, cache entries, " +
         "identity bootstrap state, and SWIM configuration. Local-only query — no network I/O. " +

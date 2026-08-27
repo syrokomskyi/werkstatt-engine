@@ -26,6 +26,7 @@ export function createSubdomainModule(): KernelModule {
 
       registry.registerCommand({
         name: "subdomain.register",
+        modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
           "Register DNS CNAME and Workers route for a service subdomain (RFC-0752). Idempotent. Flags: --service.",
         scope: "workspace",
@@ -45,6 +46,7 @@ export function createSubdomainModule(): KernelModule {
 
       registry.registerCommand({
         name: "subdomain.validate",
+        modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
           "Validate DNS CNAME and Workers route for a service subdomain (RFC-0752). Flags: --service.",
         scope: "workspace",
@@ -63,6 +65,7 @@ export function createSubdomainModule(): KernelModule {
 
       registry.registerCommand({
         name: "subdomain.list",
+        modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
           "List all subdomains in a zone by cross-referencing DNS records with Workers routes (RFC-0752). Flags: --zone.",
         scope: "workspace",

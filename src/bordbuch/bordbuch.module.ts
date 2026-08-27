@@ -28,6 +28,8 @@ export function createBordbuchModule(): KernelModule {
       const { runBordbuchCommit } = await import("./bordbuch-commit.ts");
       registry.registerCommand({
         name: "bordbuch.append",
+        modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
+        generates: [],
         description:
           "Append a single entry to the Bordbuch through the controlled writer-role surface (RFC-0355).",
         scope: "workspace",
@@ -54,6 +56,7 @@ export function createBordbuchModule(): KernelModule {
       });
       registry.registerCommand({
         name: "bordbuch.validate",
+        modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
           "Validate the Bordbuch hash-chain, lifecycle pairs, and sensitive payload guards (RFC-0355).",
         scope: "workspace",
@@ -70,6 +73,7 @@ export function createBordbuchModule(): KernelModule {
       });
       registry.registerCommand({
         name: "bordbuch.status",
+        modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
           "Read-only Bordbuch status projection: ledger hash, event count, latest event, open escalations (RFC-0473).",
         scope: "workspace",
@@ -86,6 +90,7 @@ export function createBordbuchModule(): KernelModule {
       });
       registry.registerCommand({
         name: "bordbuch.generate",
+        modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
           "Generate rich public Bordbuch projections (JSON + HTML + YAML) from the unified ledger (RFC-0473).",
         scope: "workspace",
@@ -109,6 +114,8 @@ export function createBordbuchModule(): KernelModule {
       });
       registry.registerCommand({
         name: "bordbuch.repair",
+        modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
+        generates: [],
         description:
           "Repair orphan-mission-close violations by inserting missing mission-open events and recomputing the hash chain (RFC-0583).",
         scope: "workspace",
@@ -131,6 +138,7 @@ export function createBordbuchModule(): KernelModule {
       });
       registry.registerCommand({
         name: "bordbuch.commit",
+        modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
           "Auto-commit dirty bordbuch projection files in the cache clone (RFC-0626). Internal pipeline step.",
         scope: "workspace",

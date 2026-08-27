@@ -47,6 +47,7 @@ function makeContext(workspaceRoot: string): KernelRuntimeContext {
     dryRun: false,
     siteExplicit: false,
     outputFormat: "json",
+    registry: undefined as never,
   };
 }
 

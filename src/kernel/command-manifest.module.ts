@@ -20,6 +20,7 @@ export const commandManifestModule: KernelModule = {
     const { runCommandManifestGenerate } = await import("./command-manifest.ts");
     registry.registerCommand({
       name: "command.manifest.generate",
+      modulePath: "packages/werkstatt-engine/src/kernel/command-manifest.module.ts",
       description:
         "Aggregate every registered command's metadata (flags, IO globs, mutability, timeouts, pipeline " +
         "membership) into docs/command-manifest.generated.yaml — the single machine-readable command " +

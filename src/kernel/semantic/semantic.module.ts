@@ -22,6 +22,7 @@ export const semanticModule: KernelModule = {
     // ── semantic.page.validate ─────────────────────────────────────────────────
     registry.registerCommand({
       name: "semantic.page.validate",
+      modulePath: "packages/werkstatt-engine/src/kernel/semantic/semantic.module.ts",
       description:
         "[RFC-0042] Validate that semantic outputs (llms.txt, pages) do not contain " +
         "NEED_THIS_* markers indicating missing required content. " +

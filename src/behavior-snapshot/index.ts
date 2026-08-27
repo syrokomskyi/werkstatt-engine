@@ -30,6 +30,7 @@ export function createBehaviorSnapshotModule(): KernelModule {
     register(registry) {
       registry.registerCommand({
         name: "behavior.snapshot.capture",
+        modulePath: "packages/werkstatt-engine/src/behavior-snapshot/index.ts",
         description:
           "Capture a behavior snapshot from a build output directory (RFC-0357). Flags: --dist, --system, --build-kind, [--release].",
         scope: "workspace",
@@ -48,6 +49,7 @@ export function createBehaviorSnapshotModule(): KernelModule {
       });
       registry.registerCommand({
         name: "behavior.snapshot.diff",
+        modulePath: "packages/werkstatt-engine/src/behavior-snapshot/index.ts",
         description:
           "Compare two behavior snapshots and report structural differences (RFC-0357). Flags: --baseline, --candidate.",
         scope: "workspace",

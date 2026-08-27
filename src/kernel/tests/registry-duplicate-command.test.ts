@@ -30,6 +30,7 @@ function makeCmd(
 ): KernelCommandDefinition {
   return {
     name,
+    modulePath: "test",
     description: `Test command ${name}`,
     scope: "workspace",
     flags: {},

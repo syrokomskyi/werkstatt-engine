@@ -41,6 +41,8 @@ export function createLeitstandModule(): KernelModule {
       const { runLeitstandCertify } = await import("./certify.ts");
       registry.registerCommand({
         name: "leitstand.dev-deploy",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Deploy workpiece to dev channel with Axiom verification gate (RFC-0628). Flags: --site, [--release].",
         scope: "workspace",
@@ -96,6 +98,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.propagate",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Deploy a published release with verified Axiom evidence to the alt channel (RFC-0628). Flags: --site, --release.",
         scope: "workspace",
@@ -147,6 +151,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.promote",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Promote a verified alt-deployed release to the main channel with live build-identity verification (RFC-0608). Flags: --site, --release.",
         scope: "workspace",
@@ -202,6 +208,7 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.status",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Print deployment state for all channels (RFC-0627). Flags: --site, [--channel dev|alt|main].",
         scope: "workspace",
@@ -224,6 +231,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.rollback",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Rollback a site or service to a previous Cloudflare Worker deployment via native wrangler rollback (RFC-0895, RFC-0926). Flags: --site OR --service (mutually exclusive), [--channel dev|alt|main], [--to-release <releaseId>].",
         scope: "workspace",
@@ -261,6 +270,7 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.health",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Run health checks against a deployed channel (RFC-0379). Flags: --site, [--channel dev|alt|main].",
         scope: "workspace",
@@ -278,6 +288,7 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.verify",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Verify live deployment across channels by fetching build-identity.json (RFC-0930, RFC-0931). Flags: --site, [--channel dev|alt|main], [--no-compare-local], [--timeout-ms N], [--verify-signature].",
         scope: "workspace",
@@ -314,6 +325,7 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.pipeline.check",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Inspect deployment pipeline state for a release (RFC-0842). Flags: --release.",
         scope: "workspace",
@@ -337,6 +349,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.certify",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Produce a GateDecisionV1 JSON file via certification orchestration (RFC-0866). Flags: --site, --gate, --release, --artifact-hash.",
         scope: "workspace",
@@ -400,6 +414,8 @@ export function createLeitstandModule(): KernelModule {
       const { runLeitstandServicePromote } = await import("./service-promote.ts");
       registry.registerCommand({
         name: "leitstand.service.dev-deploy",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Deploy a shared Cloudflare Worker service to the dev channel with pre-deploy gates, lock, and health check (RFC-0806). Flags: --service.",
         scope: "workspace",
@@ -422,6 +438,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.service.promote",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Promote a shared Cloudflare Worker service to production with pre-deploy gates, subdomain validation, lock, and health check (RFC-0806). Flags: --service.",
         scope: "workspace",
@@ -447,6 +465,8 @@ export function createLeitstandModule(): KernelModule {
         await import("./access-commands.ts");
       registry.registerCommand({
         name: "leitstand.access.protect",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "RFC-0899: Set ACCESS_PIN secret on dev and alt channel Workers for Basic Auth access protection. Flags: --site, [--pin].",
         scope: "workspace",
@@ -476,6 +496,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.access.unprotect",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "RFC-0899: Remove ACCESS_PIN secret from dev and alt channel Workers. Flags: --site.",
         scope: "workspace",
@@ -501,6 +523,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.hotfix.dev-deploy",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
         description:
           "Hotfix dev deploy: chain commit → validate.postbuild → reconcile → close → release → certify → deploy (RFC-0927). Flags: --site, --mission, [--message], [--force-build].",
         scope: "workspace",
@@ -545,6 +569,7 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.access.status",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "RFC-0899: Report access protection status (PIN set or not) for a Sternsystem. Flags: --site.",
         scope: "workspace",

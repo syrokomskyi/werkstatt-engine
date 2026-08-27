@@ -23,6 +23,8 @@ export const iconsModule: KernelModule = {
     // ── icons.generate ─────────────────────────────────────────────────────────
     registry.registerCommand({
       name: "icons.generate",
+      modulePath: "packages/werkstatt-site/src/codegen/service.ts",
+      generates: [{ path: "src/components/icons/gen/{id}/{name}.astro", conditional: true, phase: "build.post" }, { path: "src/components/icons/gen/index.ts", conditional: true, phase: "build.post" }],
       description:
         "Generate Astro icon components for @warpgogol/werkstatt-site/ui package. " +
         "Reads JSON files from packages/ui/src/assets/icons/lordicon/ " +

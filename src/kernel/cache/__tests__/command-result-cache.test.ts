@@ -23,6 +23,7 @@ function makeReport(overrides: Partial<KernelExecutionReport> = {}): KernelExecu
     ok: true,
     metadata: {
       name: "test.command",
+      modulePath: "test",
       description: "test",
       scope: "workspace",
       execute: () => undefined,

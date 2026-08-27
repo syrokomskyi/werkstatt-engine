@@ -64,6 +64,8 @@ export function createSternsystemModule(): KernelModule {
     register(registry) {
       registry.registerCommand({
         name: "sternsystem.register",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
         description:
           "Register a new Sternsystem — creates cache clone directory and system-config.yaml (RFC-0790). Flags: --id, --cosmicStar, --mirrors, [--platform], [--owner], [--amend], [--amend-id].",
         scope: "workspace",
@@ -89,6 +91,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.list",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
         description:
           "List all registered Sternsystems with their id, cosmicStar, pinned platform, status (RFC-0354).",
         scope: "workspace",
@@ -98,6 +101,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.validate",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
         description:
           "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",
         scope: "workspace",
@@ -109,6 +113,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.pin",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
         description:
           "Write or update system.pin.json for a Sternsystem (RFC-0354). Flags: --id, [--platform].",
         scope: "workspace",
@@ -126,6 +132,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.extract",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
         description:
           "Extract an apps/<site>/ site into a Sternsystem git repo (RFC-0356, RFC-0574). Flags: --site, [--mirrors].",
         scope: "workspace",
@@ -143,6 +151,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.sync",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
         description:
           "Synchronize a Sternsystem's local bare repo with an external mirror (RFC-0472). Flags: --id, [--direction push|pull|both], [--all].",
         scope: "workspace",
@@ -164,6 +174,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.status",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
         description:
           "Read-only synchronization state inspection for a Sternsystem (RFC-0477). Flags: --id, [--all].",
         scope: "workspace",
@@ -182,6 +193,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.discover",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
         description:
           "Scan ../systems-cache/ for system-config.yaml files and list all discovered systems (RFC-0790).",
         scope: "workspace",

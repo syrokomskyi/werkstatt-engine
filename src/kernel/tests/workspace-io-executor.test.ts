@@ -34,6 +34,7 @@ export default {
     register(registry) {
       registry.registerCommand({
         name: "fixture.mislabeled.command",
+        modulePath: "test",
         description: "declares mutatesState: false but actually writes — the bug this test finds",
         scope: "workspace",
         mutatesState: false,
@@ -44,6 +45,7 @@ export default {
       });
       registry.registerCommand({
         name: "fixture.honest.readonly.command",
+        modulePath: "test",
         description: "correctly declares mutatesState: false and never writes",
         scope: "workspace",
         mutatesState: false,
@@ -54,6 +56,7 @@ export default {
       });
       registry.registerCommand({
         name: "fixture.writes.file.command",
+        modulePath: "test",
         description: "mutating command that writes via context.io, for RFC-0326 filesModified tests",
         scope: "workspace",
         mutatesState: true,

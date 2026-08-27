@@ -30,6 +30,8 @@ export function createNotausgangModule(): KernelModule {
     register(registry) {
       registry.registerCommand({
         name: "notausgang.export",
+        modulePath: "packages/werkstatt-engine/src/notausgang/index.ts",
+        generates: [],
         description:
           "Export a full site package with dist artifacts, history, and nulled integrations (RFC-0359, RFC-0380). Writes YAML manifests and uses @warpgogol/fingerprint for hashing. Flags: --system, --release, --output, [--keep-integration, --reason].",
         scope: "workspace",
@@ -53,6 +55,7 @@ export function createNotausgangModule(): KernelModule {
       });
       registry.registerCommand({
         name: "notausgang.validate",
+        modulePath: "packages/werkstatt-engine/src/notausgang/index.ts",
         description:
           "Deep integrity verification of a Notausgang export package (RFC-0359, RFC-0380). Re-computes hashes, validates manifest schema, Bordbuch NDJSON, pin content, behavior snapshots, and scans for secrets. Flags: --path.",
         scope: "workspace",

@@ -24,6 +24,7 @@ import type { KernelCommandDefinition } from "../types.ts";
 function makeCommand(overrides: Partial<KernelCommandDefinition> = {}): KernelCommandDefinition {
   return {
     name: "test.validate",
+    modulePath: "test",
     description: "Test validator",
     scope: "workspace",
     execute: () => undefined,

@@ -28,6 +28,8 @@ export function createEvidenceModule(): KernelModule {
 
       registry.registerCommand({
         name: "evidence.sync",
+        modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
+        generates: [],
         description:
           "RFC-0651: upload all evidence artifacts from missions/{mission}/evidence/axiom/ to R2 " +
           "under {systemId}/{missionId}/{runTimestamp}/ key prefix. Reads runTimestamp from " +
@@ -65,6 +67,8 @@ export function createEvidenceModule(): KernelModule {
 
       registry.registerCommand({
         name: "evidence.fetch",
+        modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
+        generates: [],
         description:
           "RFC-0651: download a historical evidence run from R2 to a local directory, " +
           "or list available runs via ListObjectsV2. Uses --run-timestamp to select a run, " +

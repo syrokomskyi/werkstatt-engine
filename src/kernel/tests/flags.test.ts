@@ -31,6 +31,7 @@ import { executeKernelCommand, parseKernelArgv, resolveCommandFlags } from "../i
 function fixtureCommand(flags: KernelCommandDefinition["flags"]): KernelCommandDefinition {
   return {
     name: "fixture.command",
+    modulePath: "test",
     description: "fixture",
     scope: "workspace",
     flags,

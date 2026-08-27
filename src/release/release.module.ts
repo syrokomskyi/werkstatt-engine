@@ -32,6 +32,8 @@ export function createReleaseModule(): KernelModule {
       } = await import("./release-commands.ts");
       registry.registerCommand({
         name: "release.prepare",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
+        generates: [],
         description:
           "Prepare a release candidate from a validated mission (RFC-0357). Flags: --mission, [--semver].",
         scope: "workspace",
@@ -48,6 +50,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.ready",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
+        generates: [],
         description:
           "Mark a prepared release as ready with discipline gates and artifact storage (RFC-0357, RFC-0724). Flags: --release.",
         scope: "workspace",
@@ -71,6 +75,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.validate",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "Validate a release artifact (RFC-0357). Flags: --release.",
         scope: "workspace",
         supportsAllSites: false,
@@ -82,6 +87,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.list",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "List releases, optionally filtered by site (RFC-0357). Flags: [--site].",
         scope: "workspace",
         supportsAllSites: false,
@@ -93,6 +99,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.state.validate",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description:
           "Validate release pipeline consistency between mission.yaml, close-report.json, release.yaml, bordbuch, and registry.yaml (RFC-0655). Flags: --mission, --release, --site.",
         scope: "workspace",
@@ -117,6 +124,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "dist.determinism.validate",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description:
           "Report non-deterministic files in a dist directory by comparing stable vs byte hashes (RFC-0656). Flags: --release, --mission.",
         scope: "workspace",
@@ -138,6 +146,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.sign",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
+        generates: [],
         description:
           "Sign build-identity.json and produce signed-manifest.json for a release using Ed25519 (RFC-0931). Flags: --release.",
         scope: "workspace",

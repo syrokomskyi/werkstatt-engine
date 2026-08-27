@@ -26,6 +26,7 @@ export function createCustomdomainModule(): KernelModule {
 
       registry.registerCommand({
         name: "customdomain.register",
+        modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
           "Register proxied A record and Workers route for a site apex domain (RFC-0896). Idempotent. Flags: --site.",
         scope: "workspace",
@@ -45,6 +46,7 @@ export function createCustomdomainModule(): KernelModule {
 
       registry.registerCommand({
         name: "redirect.register",
+        modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
           "Register proxied CNAME and Redirect Rule (301) for www.{apex} → apex (RFC-0896). Idempotent. Flags: --site.",
         scope: "workspace",

@@ -74,6 +74,7 @@ function makeContext(): KernelRuntimeContext {
     dryRun: false,
     outputFormat: "json",
     io: {} as never,
+    registry: undefined as never,
   };
 }
 

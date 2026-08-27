@@ -25,6 +25,7 @@ export function createHandoffModule(): KernelModule {
       const { runMigratorRegistryValidate } = await import("./migrator-registry-validate.ts");
       registry.registerCommand({
         name: "handoff.validate",
+        modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         description:
           "Validate an internal site handoff bundle lock, manifest, and file hashes without absorbing it (RFC-0221).",
         scope: "workspace",
@@ -37,6 +38,7 @@ export function createHandoffModule(): KernelModule {
       });
       registry.registerCommand({
         name: "migrator.registry.validate",
+        modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         description:
           "Validate the RFC-0479 migrator registry (id uniqueness, ordering, test coverage).",
         scope: "workspace",
@@ -47,6 +49,8 @@ export function createHandoffModule(): KernelModule {
       });
       registry.registerCommand({
         name: "handoff.pack",
+        modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
+        generates: [],
         description:
           "Pack a thin, version-stamped internal handoff bundle: `handoff.pack --site <app>` (RFC-0221).",
         scope: "workspace",
@@ -61,6 +65,8 @@ export function createHandoffModule(): KernelModule {
       });
       registry.registerCommand({
         name: "handoff.absorb",
+        modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
+        generates: [],
         description:
           "Ingest a handoff bundle: report (version compare + capability diff), refuse downgrades, then materialize (inject authored + delegate regen). Flags: --report-only, --as <name>, --regen, --force (RFC-0221).",
         scope: "workspace",

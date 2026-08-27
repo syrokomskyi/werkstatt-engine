@@ -1,5 +1,9 @@
 import { test, expect } from "vitest";
-import type { KernelLogger, KernelRuntimeContext, WorkspaceIO } from "@warpgogol/werkstatt-engine/kernel";
+import type {
+  KernelLogger,
+  KernelRuntimeContext,
+  WorkspaceIO,
+} from "@warpgogol/werkstatt-engine/kernel";
 import { runObservabilityWorkersValidate } from "../commands/workers-validate.ts";
 
 /*
@@ -85,6 +89,7 @@ function contextFor(files: Record<string, string>): KernelRuntimeContext {
     dryRun: false,
     outputFormat: "json",
     io,
+    registry: undefined as never,
   };
 }
 

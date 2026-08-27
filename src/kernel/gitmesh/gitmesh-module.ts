@@ -28,6 +28,8 @@ export const gitmeshModule: KernelModule = {
 
     registry.registerCommand({
       name: "gitmesh.sync",
+      modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
+      generates: [],
       description:
         "RFC-0563: sync platform code from all configured remotes. Fetches from each " +
         "remote in werkstatt.gitmesh.json, converges on the latest signed commit by " +
@@ -43,6 +45,7 @@ export const gitmeshModule: KernelModule = {
 
     registry.registerCommand({
       name: "gitmesh.status",
+      modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
       description:
         "RFC-0563: check sync status (am I up-to-date?). Local-only query — no network " +
         "I/O. Reports local SHA, remote SHA, behind/ahead counts, and last sync time. " +
@@ -55,6 +58,8 @@ export const gitmeshModule: KernelModule = {
 
     registry.registerCommand({
       name: "gitmesh.verify",
+      modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
+      generates: [],
       description:
         "RFC-0563: verify all commit signatures in the local clone against the operator's " +
         "public key from werkstatt.identity.json. Incremental — only new commits since " +

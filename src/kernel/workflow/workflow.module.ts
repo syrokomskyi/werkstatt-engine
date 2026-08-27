@@ -20,6 +20,7 @@ export const workflowModule: KernelModule = {
       await import("./handlers.ts");
     registry.registerCommand({
       name: "workflow.lint",
+      modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
       description:
         "Validate .agents/workflows AND .agents/workflows-amend markdown frontmatter, command references, " +
         "and per-chain phase links (RFC-0075 + RFC-0136).",
@@ -31,6 +32,7 @@ export const workflowModule: KernelModule = {
     });
     registry.registerCommand({
       name: "workflow.list",
+      modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
       description:
         "List .agents/workflows entries with phase, IO summary, and next workflow (RFC-0075).",
       scope: "workspace",
@@ -41,6 +43,7 @@ export const workflowModule: KernelModule = {
     });
     registry.registerCommand({
       name: "workflow-amend.list",
+      modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
       description:
         "List .agents/workflows-amend entries with phase, IO summary, and next workflow (RFC-0136).",
       scope: "workspace",

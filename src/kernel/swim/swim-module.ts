@@ -28,6 +28,8 @@ export const swimModule: KernelModule = {
 
     registry.registerCommand({
       name: "swim.join",
+      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
+      generates: [],
       description:
         "RFC-0564: join a SWIM workshop network. Probes the seed node via UDP, " +
         "creates werkstatt.swim.json if missing (generating UUID v7 for workshopId), " +
@@ -44,6 +46,8 @@ export const swimModule: KernelModule = {
 
     registry.registerCommand({
       name: "swim.leave",
+      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
+      generates: [],
       description:
         "RFC-0564: leave a SWIM workshop network. Records left event to the CRDT " +
         "genome log with Ed25519 signature. Ephemeral — no long-running daemon to shut down. " +
@@ -57,6 +61,7 @@ export const swimModule: KernelModule = {
 
     registry.registerCommand({
       name: "swim.members",
+      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
       description:
         "RFC-0564: list workshop members from the CRDT genome log. Local-only query — " +
         "no network I/O. Reads werkstatt.genome.log, verifies signatures, derives membership " +
@@ -69,6 +74,7 @@ export const swimModule: KernelModule = {
 
     registry.registerCommand({
       name: "swim.status",
+      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
       description:
         "RFC-0564: check local SWIM status. Reports configuration state, workshopId, " +
         "genome log size (warns at 10MB), membership view, and any skipped entries. " +

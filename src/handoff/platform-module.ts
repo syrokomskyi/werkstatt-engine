@@ -20,6 +20,8 @@ export function createPlatformModule(): KernelModule {
       const { runPlatformConsistencyValidate } = await import("./platform-consistency.ts");
       registry.registerCommand({
         name: "platform.consistency.validate",
+        modulePath: "packages/werkstatt-engine/src/handoff/platform-module.ts",
+        generates: [],
         description:
           "Validate that platformSemanticHash drift is accompanied by a version bump, and that versionBump RFCs correspond to actual version changes (RFC-0478).",
         scope: "workspace",

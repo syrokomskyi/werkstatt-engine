@@ -41,6 +41,8 @@ export function createReleaseModule(): KernelModule {
     register(registry) {
       registry.registerCommand({
         name: "release.prepare",
+        modulePath: "packages/werkstatt-engine/src/release/index.ts",
+        generates: [],
         description:
           "Prepare a release candidate from a validated mission (RFC-0357). Flags: --mission, [--semver].",
         scope: "workspace",
@@ -55,6 +57,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.ready",
+        modulePath: "packages/werkstatt-engine/src/release/index.ts",
+        generates: [],
         description:
           "Mark a prepared release as ready with discipline gates and artifact storage (RFC-0357, RFC-0724). Flags: --release.",
         scope: "workspace",
@@ -72,6 +76,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.validate",
+        modulePath: "packages/werkstatt-engine/src/release/index.ts",
         description: "Validate a release artifact (RFC-0357). Flags: --release.",
         scope: "workspace",
         supportsAllSites: false,
@@ -82,6 +87,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.list",
+        modulePath: "packages/werkstatt-engine/src/release/index.ts",
         description: "List releases, optionally filtered by site (RFC-0357). Flags: [--site].",
         scope: "workspace",
         supportsAllSites: false,
@@ -92,6 +98,7 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.state.validate",
+        modulePath: "packages/werkstatt-engine/src/release/index.ts",
         description:
           "Validate release pipeline consistency between mission.yaml, close-report.json, release.yaml, bordbuch, and registry.yaml (RFC-0655). Flags: --mission, --release, --site.",
         scope: "workspace",

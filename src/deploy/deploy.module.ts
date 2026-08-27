@@ -29,6 +29,8 @@ export function createDeployModule(): KernelModule {
 
       registry.registerCommand({
         name: "deploy.artifact.build",
+        modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
+        generates: [],
         description:
           "Build an immutable platform artifact from the local git clone (RFC-0566). Flags: [--skip-build], [--skip-sign].",
         scope: "workspace",
@@ -52,6 +54,7 @@ export function createDeployModule(): KernelModule {
 
       registry.registerCommand({
         name: "deploy.artifact.verify",
+        modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description: "Verify an artifact's content hash and signature (RFC-0566). Flags: --hash.",
         scope: "workspace",
         supportsAllSites: false,
@@ -65,6 +68,8 @@ export function createDeployModule(): KernelModule {
 
       registry.registerCommand({
         name: "deploy.atomic.swap",
+        modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
+        generates: [],
         description: "Atomic symlink swap to deploy a new artifact (RFC-0566). Flags: --hash.",
         scope: "workspace",
         supportsAllSites: false,
@@ -80,6 +85,8 @@ export function createDeployModule(): KernelModule {
 
       registry.registerCommand({
         name: "deploy.atomic.rollback",
+        modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
+        generates: [],
         description:
           "Atomic rollback to the previous artifact via symlink swap (RFC-0566). No flags.",
         scope: "workspace",
@@ -96,6 +103,8 @@ export function createDeployModule(): KernelModule {
 
       registry.registerCommand({
         name: "deploy.artifact.gc",
+        modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
+        generates: [],
         description:
           "Garbage-collect unreferenced platform artifacts (RFC-0566). Flags: [--dry-run], [--retain N].",
         scope: "workspace",
@@ -113,6 +122,7 @@ export function createDeployModule(): KernelModule {
 
       registry.registerCommand({
         name: "deploy.status",
+        modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description:
           "Report current and previous platform artifact hashes, git SHA, and deployment time (RFC-0566).",
         scope: "workspace",

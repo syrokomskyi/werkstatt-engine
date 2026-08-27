@@ -30,6 +30,8 @@ export function createIdentityModule(): KernelModule {
 
       registry.registerCommand({
         name: "identity.bootstrap",
+        modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
+        generates: [],
         description:
           "Generate operator keypair, write werkstatt.identity.json, issue self-ownership VC (RFC-0558).",
         scope: "workspace",
@@ -54,6 +56,8 @@ export function createIdentityModule(): KernelModule {
 
       registry.registerCommand({
         name: "identity.credential.issue",
+        modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
+        generates: [],
         description: "Issue a SiteOwnershipCredential or ActorDelegationCredential (RFC-0558).",
         scope: "workspace",
         supportsAllSites: false,
@@ -91,6 +95,7 @@ export function createIdentityModule(): KernelModule {
 
       registry.registerCommand({
         name: "identity.credential.verify",
+        modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         description: "Verify a credential's signature, revocation status, and expiry (RFC-0558).",
         scope: "workspace",
         supportsAllSites: false,
@@ -108,6 +113,8 @@ export function createIdentityModule(): KernelModule {
 
       registry.registerCommand({
         name: "identity.credential.revoke",
+        modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
+        generates: [],
         description: "Revoke a credential by adding it to the revocation list (RFC-0558).",
         scope: "workspace",
         supportsAllSites: false,

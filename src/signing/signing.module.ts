@@ -27,6 +27,7 @@ export function createSigningModule(): KernelModule {
 
       registry.registerCommand({
         name: "signing.key.generate",
+        modulePath: "packages/werkstatt-engine/src/signing/signing.module.ts",
         description:
           "RFC-0921: Generate an Ed25519 keypair and save to disk. Supports hex and PEM encodings.",
         scope: "workspace",

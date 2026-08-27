@@ -30,6 +30,7 @@ export const lagebildModule: KernelModule = {
     } = await import("./handlers.ts");
     registry.registerCommand({
       name: "lagebild.tenant.add",
+      modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description:
         "RFC-0186: Add a tenant to sync_tenants registry (disabled by default). Generates secret reference names and emits setup commands.",
       scope: "workspace",
@@ -55,6 +56,7 @@ export const lagebildModule: KernelModule = {
 
     registry.registerCommand({
       name: "lagebild.tenant.enable",
+      modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description: "RFC-0186: Enable a tenant after secrets are present.",
       scope: "workspace",
       flags: {
@@ -71,6 +73,7 @@ export const lagebildModule: KernelModule = {
 
     registry.registerCommand({
       name: "lagebild.tenant.disable",
+      modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description: "RFC-0186: Disable a tenant without deleting history.",
       scope: "workspace",
       flags: {
@@ -87,6 +90,7 @@ export const lagebildModule: KernelModule = {
 
     registry.registerCommand({
       name: "lagebild.tenant.status",
+      modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description: "RFC-0186: Inspect tenant health, outbox counts, and missing secrets.",
       scope: "workspace",
       flags: {
@@ -102,6 +106,7 @@ export const lagebildModule: KernelModule = {
 
     registry.registerCommand({
       name: "lagebild.tenant.rotate-secret",
+      modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description: "RFC-0186: Rotate a tenant secret reference.",
       scope: "workspace",
       flags: {
@@ -129,6 +134,7 @@ export const lagebildModule: KernelModule = {
 
     registry.registerCommand({
       name: "lagebild.validate",
+      modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description:
         "RFC-0186: Validate Lagebild configuration (no per-site Workers, migrations present).",
       scope: "workspace",

@@ -22,6 +22,7 @@ export function createBehaviorSnapshotModule(): KernelModule {
         await import("./behavior-snapshot-commands.ts");
       registry.registerCommand({
         name: "behavior.snapshot.capture",
+        modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
           "Capture a behavior snapshot from a build output directory (RFC-0357). Flags: --dist, --system, --build-kind, [--release].",
         scope: "workspace",
@@ -42,6 +43,7 @@ export function createBehaviorSnapshotModule(): KernelModule {
       });
       registry.registerCommand({
         name: "behavior.snapshot.diff",
+        modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
           "Compare two behavior snapshots and report structural differences (RFC-0357). Flags: --baseline, --candidate.",
         scope: "workspace",

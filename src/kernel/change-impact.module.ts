@@ -20,6 +20,7 @@ export const changeImpactModule: KernelModule = {
     const { runChangeImpactDerive } = await import("./change-impact.ts");
     registry.registerCommand({
       name: "change.impact.derive",
+      modulePath: "packages/werkstatt-engine/src/kernel/change-impact.module.ts",
       description:
         "RFC-0332: classify changed paths into none/low/medium/high impact, derive impacted " +
         "apps, and recommend a proportionate check profile. Advisory only — DNA-35 remains " +

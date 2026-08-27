@@ -25,6 +25,7 @@ const mockModule: KernelModule = {
   register(registry) {
     registry.registerCommand({
       name: "test.ping",
+      modulePath: "test",
       description: "Test command",
       scope: "workspace",
       execute: async () => ({ exitCode: 0, ok: true, summary: "pong" }),

@@ -29,6 +29,7 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.record.upsert",
+        modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Synchronize DNS records from declaration file to Cloudflare (RFC-0753). Idempotent. Flags: --system, --dry-run.",
         scope: "workspace",
@@ -56,6 +57,7 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.record.validate",
+        modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Validate live Cloudflare DNS records against declaration file (RFC-0753). Flags: --system.",
         scope: "workspace",
@@ -77,6 +79,7 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.record.list",
+        modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "List all live DNS records in a zone from Cloudflare (RFC-0753). Flags: --system, --name.",
         scope: "workspace",
@@ -99,6 +102,7 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.record.delete",
+        modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Delete a DNS record from Cloudflare by ID or name+type (RFC-0753). Flags: --system, --record-id, --name, --type, --dry-run.",
         scope: "workspace",
@@ -134,6 +138,7 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.records.schema.validate",
+        modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Schema-only validation of DNS record declaration files (RFC-0753). No API calls. Flags: --system.",
         scope: "workspace",

@@ -61,6 +61,7 @@ export default {
     register(registry) {
       registry.registerCommand({
         name: "fixture.generate",
+        modulePath: "test",
         description: "fixture generator",
         scope: "workspace",
         mutatesState: true,
@@ -69,6 +70,7 @@ export default {
       });
       registry.registerCommand({
         name: "fixture.validate",
+        modulePath: "test",
         description: "fixture validator",
         scope: "workspace",
         execute() { return { exitCode: 0 }; },
@@ -158,6 +160,7 @@ export default {
     register(registry) {
       registry.registerCommand({
         name: "fixture.nowrites.generate",
+        modulePath: "test",
         description: "fixture generator missing writes",
         scope: "workspace",
         mutatesState: true,

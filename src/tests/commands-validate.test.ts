@@ -353,6 +353,7 @@ export function createModule() {
     async register(registry) {
       registry.registerCommand({
         name: "test.cmd",
+        modulePath: "test",
         description: "test",
         scope: "workspace",
         flags: {},

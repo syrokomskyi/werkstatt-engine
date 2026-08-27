@@ -25,6 +25,7 @@ export const werkstattSharedValidateModule: KernelModule = {
   register(registry) {
     registry.registerCommand({
       name: "werkstatt.shared.validate",
+      modulePath: "packages/werkstatt-engine/os/werkstatt-shared-validate.module.ts",
       description:
         "Check SHARED-01 (werkstatt-shared dep declared), SHARED-02 (no site exemptions in autonomy-validate), SHARED-03 (no site imports in engine src). Enforces RFC-0868.",
       scope: "workspace",

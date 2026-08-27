@@ -25,6 +25,7 @@ export const cacheModule: KernelModule = {
 
     registry.registerCommand({
       name: "kernel.cache.status",
+      modulePath: "packages/werkstatt-engine/src/kernel/cache/cache-module.ts",
       description:
         "RFC-0382: report the kernel cache state — availability, DB path, DB size, " +
         "namespace entry counts, and hit ratios. Use --json for machine-readable output.",
@@ -36,6 +37,8 @@ export const cacheModule: KernelModule = {
 
     registry.registerCommand({
       name: "kernel.cache.clear",
+      modulePath: "packages/werkstatt-engine/src/kernel/cache/cache-module.ts",
+      generates: [],
       description:
         "RFC-0382: clear the kernel cache. Pass --namespace to clear only one namespace " +
         "(e.g. rfc_entries); without --namespace, clears all namespaces.",

@@ -18,6 +18,7 @@ import type { KernelCommandDefinition } from "../types.ts";
 function makeCmd(supportsAllSites?: boolean): KernelCommandDefinition {
   return {
     name: "test.command",
+    modulePath: "test",
     description: "Test command",
     scope: "workspace",
     flags: {},

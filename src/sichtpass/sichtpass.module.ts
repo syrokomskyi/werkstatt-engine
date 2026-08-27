@@ -26,6 +26,7 @@ export function createSichtpassModule(): KernelModule {
 
       registry.registerCommand({
         name: "sichtpass.generate",
+        modulePath: "packages/werkstatt-engine/src/sichtpass/sichtpass.module.ts",
         description:
           "RFC-0947: Generate a site-wide visibility snapshot with composite hash and deduplication. Appends sichtpass __site__ Bordbuch entry when composite hash changes.",
         scope: "workspace",

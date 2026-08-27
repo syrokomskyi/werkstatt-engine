@@ -29,6 +29,8 @@ export function createSternsystemModule(): KernelModule {
       const { runSurfaceContractValidate } = await import("../handoff/surface-contract.ts");
       registry.registerCommand({
         name: "sternsystem.register",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
         description:
           "Register a new Sternsystem: create system-config.yaml, system-state.yaml, pin, content stubs, open first mission, and trigger materialization (RFC-0354, RFC-0532, RFC-0790). Flags: --id, --cosmicStar, --repo, [--platform], [--mirror], [--owner], [--amend], [--amend-id].",
         scope: "workspace",
@@ -74,6 +76,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.list",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "List all registered Sternsystems with their id, cosmicStar, pinned platform, status (RFC-0354).",
         scope: "workspace",
@@ -84,6 +87,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.validate",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",
         scope: "workspace",
@@ -101,6 +105,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.pin",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
         description:
           "Write or update system.pin.json for a Sternsystem (RFC-0354). Flags: --id, [--platform].",
         scope: "workspace",
@@ -117,6 +123,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.extract",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
         description:
           "Extract an apps/<site>/ site into a Sternsystem git repo (RFC-0356). Flags: --site, [--repo].",
         scope: "workspace",
@@ -133,6 +141,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.sync",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
         description:
           "Push a Sternsystem's local bare repo to an external mirror (RFC-0472, RFC-0480). Push-only — pull and both are removed. Flags: --id, [--all].",
         scope: "workspace",
@@ -156,6 +166,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.status",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Read-only synchronization state inspection for a Sternsystem (RFC-0477). Flags: --id, [--all].",
         scope: "workspace",
@@ -174,6 +185,7 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "surface.contract.validate",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Validate generated C-surfaces (URL schema, JSON-LD types, sitemap shape) against declarative contract (RFC-0480). Flags: --app.",
         scope: "workspace",

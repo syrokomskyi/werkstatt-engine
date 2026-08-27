@@ -42,6 +42,8 @@ export function createMissionModule(): KernelModule {
         await import("./workpiece-config-presence-check.ts");
       registry.registerCommand({
         name: "mission.open",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description: "Open a new mission for a Sternsystem (RFC-0355).",
         scope: "workspace",
         supportsAllSites: false,
@@ -74,6 +76,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.status",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Print mission manifest and Bordbuch entries (RFC-0355).",
         scope: "workspace",
         supportsAllSites: false,
@@ -85,6 +88,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.close",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description: "Close an open mission (RFC-0355).",
         scope: "workspace",
         supportsAllSites: false,
@@ -147,6 +152,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.abort",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description: "Abort an open mission and discard Werkstück/Distribution (RFC-0355).",
         scope: "workspace",
         supportsAllSites: false,
@@ -182,6 +189,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.list",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "List missions, optionally filtered by system (RFC-0355).",
         scope: "workspace",
         supportsAllSites: false,
@@ -193,6 +201,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.materialize",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description:
           "Populate the mission Werkstück from the pinned Sternsystem bundle (RFC-0356).",
         scope: "workspace",
@@ -215,6 +225,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.migrate",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description:
           "Apply pending migrators from the RFC-id-keyed registry to the workpiece (RFC-0479).",
         scope: "workspace",
@@ -239,6 +251,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.validate",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Validate the materialized Werkstück (RFC-0356).",
         scope: "workspace",
         supportsAllSites: false,
@@ -270,6 +283,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.preview",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description:
           "Start a blocking dev server for the mission workpiece (RFC-0480). Works for open, closed, and aborted missions.",
         scope: "workspace",
@@ -286,6 +301,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.build",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description: "Build the Werkstück into a local Distribution (RFC-0356).",
         scope: "workspace",
         supportsAllSites: false,
@@ -303,6 +320,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.diff",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Compute the data-set diff between Werkstück and pinned state (RFC-0356).",
         scope: "workspace",
         supportsAllSites: false,
@@ -314,6 +332,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.reconcile",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description:
           "Reconcile validated Werkstück data changes to the Sternsystem repo (RFC-0356).",
         scope: "workspace",
@@ -343,6 +363,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.git.commit",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description: "Commit operator edits to the mission workpiece git repository (RFC-0480).",
         scope: "workspace",
         supportsAllSites: false,
@@ -358,6 +380,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.cleanup",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description:
           "Remove workpiece/distribution for a closed or aborted mission, or clean old missions by age (RFC-0480).",
         scope: "workspace",
@@ -386,6 +410,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "workpiece.read",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Read a file from a mission workpiece with DNA-22 path validation (RFC-0555).",
         scope: "workspace",
         supportsAllSites: false,
@@ -399,6 +424,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "workpiece.write",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description:
           "Write a file to a mission workpiece with DNA-22 path validation. Content via stdin. No auto-commit (RFC-0555).",
         scope: "workspace",
@@ -416,6 +443,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "materialize.config.validate",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
           "Validate OPERATOR_CONFIG_FILES list is in sync with actual workpiece/cache clone files (RFC-0840).",
         scope: "workspace",
@@ -426,6 +454,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "workpiece.config.presence.check",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
           "Verify OPERATOR_CONFIG_FILES are present in the active workpiece before build (RFC-0844).",
         scope: "workspace",
@@ -439,6 +468,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "validate.postbuild",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
           "Run post-build validators on existing dist/ without a full rebuild (RFC-0883).",
         scope: "workspace",
@@ -457,6 +487,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.resume",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
         description: "Resume the last incomplete lifecycle operation for a mission (RFC-0958).",
         scope: "workspace",
         supportsAllSites: false,
@@ -479,6 +511,7 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.journal.show",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Show the operation journal for a mission (RFC-0958).",
         scope: "workspace",
         supportsAllSites: false,

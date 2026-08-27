@@ -80,6 +80,7 @@ test("mission.resume with no incomplete operation returns nothing to resume", as
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -149,6 +150,7 @@ test("mission.resume with incomplete operation calls resolveOperationSteps and r
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -175,6 +177,7 @@ test("mission.resume --abandon without --force returns error", async () => {
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -209,6 +212,7 @@ test("mission.resume --abandon --force appends op-abandoned", async () => {
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -234,6 +238,7 @@ test("mission.resume without --mission returns error", async () => {
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -275,6 +280,7 @@ test("mission.journal.show returns records and incomplete operation info", async
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -322,6 +328,7 @@ test("mission.journal.show with --op filter returns only matching records", asyn
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 
@@ -347,6 +354,7 @@ test("mission.journal.show with no journal returns empty records", async () => {
       siteExplicit: false,
       outputFormat: "pretty",
       io: {} as any,
+      registry: undefined as never,
     },
   );
 

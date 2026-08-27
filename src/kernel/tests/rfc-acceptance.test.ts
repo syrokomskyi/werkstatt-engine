@@ -100,6 +100,7 @@ export default {
     register(registry) {
       registry.registerCommand({
         name: "fixture.command",
+        modulePath: "test",
         description: "fixture",
         scope: "workspace",
         execute() { return { exitCode: 0 }; },
@@ -116,6 +117,7 @@ export default {
       listCommands: () => [
         {
           name: "fixture.command",
+          modulePath: "test",
           description: "fixture",
           scope: "workspace",
           provider: "workspace",

@@ -20,6 +20,7 @@ export const pipelineBudgetModule: KernelModule = {
     const { runPipelineBudgetGenerate } = await import("./pipeline-budgets.ts");
     registry.registerCommand({
       name: "pipeline.budget.generate",
+      modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
       description:
         "Aggregate the local pipeline step telemetry history into docs/pipeline-budgets.generated.yaml " +
         "(p50/p95/expectedDurationMs per pipeline+command+app). Use --dry-run to preview without writing (RFC-0270).",

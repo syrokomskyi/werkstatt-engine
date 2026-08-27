@@ -41,6 +41,8 @@ export function createArtifactStoreModule(): KernelModule {
     register(registry) {
       registry.registerCommand({
         name: "artifact.store.put",
+        modulePath: "packages/werkstatt-engine/src/artifact-store/index.ts",
+        generates: [],
         description:
           "Store a release dist artifact in the content-addressed artifact store (RFC-0363). Flags: --release, --dist, [--site].",
         scope: "workspace",
@@ -56,6 +58,8 @@ export function createArtifactStoreModule(): KernelModule {
       });
       registry.registerCommand({
         name: "artifact.store.get",
+        modulePath: "packages/werkstatt-engine/src/artifact-store/index.ts",
+        generates: [],
         description:
           "Rehydrate a release dist artifact from the store (RFC-0363). Flags: --release, --output.",
         scope: "workspace",
@@ -70,6 +74,7 @@ export function createArtifactStoreModule(): KernelModule {
       });
       registry.registerCommand({
         name: "artifact.store.validate",
+        modulePath: "packages/werkstatt-engine/src/artifact-store/index.ts",
         description: "Validate a release artifact in the store (RFC-0363). Flags: --release.",
         scope: "workspace",
         supportsAllSites: false,
@@ -80,6 +85,8 @@ export function createArtifactStoreModule(): KernelModule {
       });
       registry.registerCommand({
         name: "artifact.store.gc",
+        modulePath: "packages/werkstatt-engine/src/artifact-store/index.ts",
+        generates: [],
         description:
           "Garbage-collect unreferenced release artifacts per retention policy (RFC-0363). Flags: [--system], [--dry-run].",
         scope: "workspace",

@@ -62,6 +62,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.ingest",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0707: Ingest a PDF evidence document — compute SHA-256, upload to R2, append Bordbuch entry.",
         scope: "workspace",
@@ -91,6 +93,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.validate",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0707/RFC-0872: Validate PBP trust entities and enforce policy-driven publication gate V2 conditions (attestation-v1, operational-measurement-v1, technical-assessment-v1).",
         scope: "workspace",
@@ -108,6 +112,7 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.manifest.generate",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         description:
           "RFC-0707: Generate public/nachweise/manifest.json from published records (generatedAt: null per RFC-0602).",
         scope: "workspace",
@@ -133,6 +138,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.consent.update",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0707/RFC-0886: Update PBP Consent entity's consentScope[scope] and append nachweis-consent Bordbuch entry. Granular per-aspect consent via --scope flag.",
         scope: "workspace",
@@ -165,6 +172,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.publish",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0707/RFC-0872: Enforce policy-driven publication gate V2 and transition record to published. Gate policy resolved by evidence kind; technical-assessment does not require consent or public derivative.",
         scope: "workspace",
@@ -183,6 +192,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.withdraw",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0707/RFC-0872: Withdraw a published record — consent revocation is policy-driven (attestation only), set withdrawn status, regenerate manifest. Idempotent.",
         scope: "workspace",
@@ -202,6 +213,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.approve",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0714: Record human approval, verification level, and legal content check in a Bordbuch entry. Operator-invoked only.",
         scope: "workspace",
@@ -234,6 +247,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.public-derivative",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0714: Upload a public-derivative PDF to R2 and update evidence-source items.public.storage to public. Idempotent by SHA-256.",
         scope: "workspace",
@@ -262,6 +277,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.key.ensure",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0715: Generate an Ed25519 keypair for Nachweis operator signatures. Writes private key to file, publishes public key JSON.",
         scope: "workspace",
@@ -286,6 +303,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.sign",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0715: Sign a Nachweis record with an Ed25519 operator key. Appends nachweis-signed Bordbuch entry. Idempotent.",
         scope: "workspace",
@@ -310,6 +329,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.timestamp",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0715/RFC-0871: Obtain an RFC 3161 timestamp token for a signed Nachweis record. Requires nachweis.sign to have run first. Idempotent. RFC-0871: --timestamp-assurance distinguishes rfc3161 (default) from eidas-qualified (requires --qualification-evidence-ref).",
         scope: "workspace",
@@ -339,6 +360,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.assessment.ingest",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0873: Ingest a technical-assessment bundle (AssessmentBundleV1) — validate, hash artifacts, upload to R2, write PBP evidence-source, append Bordbuch entry.",
         scope: "workspace",
@@ -365,6 +388,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.measure.lighthouse",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0874: Run five sequential canonical Google Lighthouse runs, parse LHR JSON, aggregate categories, build AssessmentBundleV1, and delegate to nachweis.assessment.ingest.",
         scope: "workspace",
@@ -413,6 +438,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.measure.cloudflare-agent-readiness",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0875: Submit an Unlisted Cloudflare URL Scanner scan with Agent Readiness enabled, poll for completion, parse dimensions, build AssessmentBundleV1, and delegate to nachweis.assessment.ingest.",
         scope: "workspace",
@@ -457,6 +484,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.verify-signature",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0715: Verify the Ed25519 operator signature and RFC 3161 timestamp for a Nachweis record. Read-only.",
         scope: "workspace",
@@ -475,6 +504,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.screenshot.upload",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0886: Upload a website screenshot to R2 and update EvidenceSource.websiteScreenshot. Supports .webp, .png, .jpg, .jpeg.",
         scope: "workspace",
@@ -503,6 +534,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.screenshot.ingest",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0890: Ingest a raw full-page screenshot to R2 private storage and cache clone. Detects image metadata via sharp, parses CaptureX filename for capturedAt, idempotent by SHA-256.",
         scope: "workspace",
@@ -538,6 +571,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.screenshot.process",
+        modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
+        generates: [],
         description:
           "RFC-0891: Process a raw full-page screenshot into a 16:9 display variant (1280x720, WebP) and upload to R2 public. Reads rawArtifact from evidence-source, crops from top, resizes, converts.",
         scope: "workspace",
