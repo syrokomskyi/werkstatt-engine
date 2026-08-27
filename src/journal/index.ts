@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial barrel exports for journal module.</item>
+  <item>RFC-0962 fo-fix: export StepResult type from barrel.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -15,6 +16,7 @@ export type {
   OperationStep,
   OperationDefinition,
   RunOperationResult,
+  StepResult,
 } from "./types.ts";
 export { appendRecord, readJournal, findIncompleteOperation, TornLineError } from "./jsonl.ts";
 export { runOperation, abandonOperation } from "./runner.ts";

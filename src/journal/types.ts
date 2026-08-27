@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial journal type definitions — JournalRecord discriminated union, OperationStep, OperationDefinition.</item>
+  <item>RFC-0962 fo-fix: OperationStep.run returns optional metadata, StepResult interface added, RunOperationResult includes stepResults.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -43,13 +44,20 @@ export type JournalRecord =
 
 export interface OperationStep<C> {
   name: string;
-  run(ctx: C): Promise<void>;
+  run(ctx: C): Promise<void | Record<string, unknown>>;
   verify?(ctx: C): Promise<boolean>;
 }
 
 export interface OperationDefinition<C> {
   op: string;
   steps: OperationStep<C>[];
+}
+
+export interface StepResult {
+  step: string;
+  status: "done" | "skipped" | "failed";
+  durationMs: number;
+  meta?: Record<string, unknown>;
 }
 
 export interface RunOperationResult {
@@ -59,4 +67,5 @@ export interface RunOperationResult {
   failedStepError?: string;
   skipped: string[];
   executed: string[];
+  stepResults: StepResult[];
 }

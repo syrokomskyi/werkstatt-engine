@@ -8,11 +8,17 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial step runner — runOperation, readJournal, findIncompleteOperation.</item>
+  <item>RFC-0962 fo-fix: step metadata capture (run returns Record), per-step durationMs timing, StepResult[] in RunOperationResult, step-done meta field populated.</item>
 </CHANGE_SUMMARY>
 */
 
 import { appendRecord, readJournal, findIncompleteOperation } from "./jsonl.ts";
-import type { JournalRecord, OperationDefinition, RunOperationResult } from "./types.ts";
+import type {
+  JournalRecord,
+  OperationDefinition,
+  RunOperationResult,
+  StepResult,
+} from "./types.ts";
 
 export { readJournal, findIncompleteOperation };
 export { appendRecord };
@@ -98,12 +104,14 @@ export async function runOperation<C>(
 
   const skipped: string[] = [];
   const executed: string[] = [];
+  const stepResults: StepResult[] = [];
 
   for (let seq = 0; seq < def.steps.length; seq++) {
     const step = def.steps[seq];
 
     if (isResume && stepState.doneSteps.has(seq)) {
       skipped.push(step.name);
+      stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
       continue;
     }
 
@@ -120,6 +128,7 @@ export async function runOperation<C>(
             reason: "resume",
           });
           skipped.push(step.name);
+          stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
           continue;
         }
       }
@@ -135,6 +144,7 @@ export async function runOperation<C>(
           reason: "already-satisfied",
         });
         skipped.push(step.name);
+        stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
         continue;
       }
     }
@@ -147,10 +157,16 @@ export async function runOperation<C>(
       at: nowIso(),
     });
 
+    const stepStart = Date.now();
+    let stepMeta: Record<string, unknown> | undefined;
     try {
-      await step.run(ctx);
+      const runResult = await step.run(ctx);
+      if (runResult && typeof runResult === "object") {
+        stepMeta = runResult;
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      const durationMs = Date.now() - stepStart;
       await appendRecord(journalPath, {
         kind: "step-failed",
         opId,
@@ -159,6 +175,7 @@ export async function runOperation<C>(
         at: nowIso(),
         error: errorMsg,
       });
+      stepResults.push({ step: step.name, status: "failed", durationMs });
       return {
         opId,
         completed: false,
@@ -166,6 +183,7 @@ export async function runOperation<C>(
         failedStepError: errorMsg,
         skipped,
         executed,
+        stepResults,
       };
     }
 
@@ -180,6 +198,7 @@ export async function runOperation<C>(
           at: nowIso(),
           error: `verify returned false after run for step "${step.name}"`,
         });
+        stepResults.push({ step: step.name, status: "failed", durationMs: Date.now() - stepStart });
         return {
           opId,
           completed: false,
@@ -187,18 +206,27 @@ export async function runOperation<C>(
           failedStepError: `verify returned false after run for step "${step.name}"`,
           skipped,
           executed,
+          stepResults,
         };
       }
     }
 
+    const durationMs = Date.now() - stepStart;
     await appendRecord(journalPath, {
       kind: "step-done",
       opId,
       step: step.name,
       seq,
       at: nowIso(),
+      ...(stepMeta ? { meta: stepMeta } : {}),
     });
     executed.push(step.name);
+    stepResults.push({
+      step: step.name,
+      status: "done",
+      durationMs,
+      ...(stepMeta ? { meta: stepMeta } : {}),
+    });
   }
 
   await appendRecord(journalPath, {
@@ -212,6 +240,7 @@ export async function runOperation<C>(
     completed: true,
     skipped,
     executed,
+    stepResults,
   };
 }
 

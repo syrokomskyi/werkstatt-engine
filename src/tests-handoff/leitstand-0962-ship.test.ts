@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0962: initial test suite for ship composite command.</item>
+  <item>RFC-0962 fo-fix: added --until alt, --until main, invalid --until, releaseId restoration on resume tests; fixed resume test for stepResults including skipped steps.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -378,7 +379,7 @@ test("resume after failure skips completed steps", async () => {
 
   expect(result2.exitCode).toBe(0);
   expect(result2.data!.completed).toBe(true);
-  expect(result2.data!.steps.length).toBe(2);
+  expect(result2.data!.steps.length).toBe(4);
 
   const reconcileCalls = mockExecuteKernelCommand.mock.calls.filter(
     (c) => (c[0] as { commandName: string }).commandName === "mission.reconcile",
@@ -439,4 +440,113 @@ test("mission-archive step is non-fatal when mission.archive fails", async () =>
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
   expect(result.data!.steps.length).toBe(11);
+});
+
+test("--until alt stops after certify-alt + propagate (8 steps)", async () => {
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+  mockPhaseResult("mission.reconcile", 0);
+  mockPhaseResult("mission.close", 0);
+  mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000010" });
+  mockPhaseResult("release.ready", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
+  mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-alt" });
+  mockPhaseResult("leitstand.propagate", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "alt" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  expect(result.data!.steps.length).toBe(8);
+  expect(result.data!.reachedPhase).toBe("alt");
+  assertAllPhaseCallsValid();
+});
+
+test("--until main stops after certify-main + promote + verify (9 steps)", async () => {
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+  mockPhaseResult("mission.reconcile", 0);
+  mockPhaseResult("mission.close", 0);
+  mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000011" });
+  mockPhaseResult("release.ready", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
+  mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-alt" });
+  mockPhaseResult("leitstand.propagate", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-main" });
+  mockPhaseResult("leitstand.promote", 0);
+  mockPhaseResult("leitstand.verify", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "main" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  expect(result.data!.steps.length).toBe(9);
+  expect(result.data!.reachedPhase).toBe("main");
+  assertAllPhaseCallsValid();
+});
+
+test("invalid --until value throws", async () => {
+  await expect(
+    runLeitstandShip(makeInput({ site: "test-sys", mission: "m000001", until: "bogus" }), context),
+  ).rejects.toThrow('invalid --until value "bogus"');
+});
+
+test("resume restores releaseId from journal after release-prepare completed", async () => {
+  const journalPath = path.join(operationsDir, "ship-m000001.jsonl");
+
+  // First run: succeeds through release-prepare, fails at release-ready
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+  mockPhaseResult("mission.reconcile", 0);
+  mockPhaseResult("mission.close", 0);
+  mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000099" });
+  mockPhaseResult("release.ready", 1);
+
+  const result1 = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "dev" }),
+    context,
+  );
+  expect(result1.exitCode).toBe(1);
+  expect(result1.data!.failedStep).toBe("release-ready");
+  expect(result1.data!.releaseId).toBe("test-sys-r000099");
+
+  // Verify journal has releaseId in step-done meta
+  const journalContent = await fs.readFile(journalPath, "utf-8");
+  expect(journalContent).toContain("releaseId");
+
+  vi.clearAllMocks();
+  mockExecSync.mockReturnValue("");
+
+  // Resume: release-ready + certify-dev + dev-deploy
+  mockPhaseResult("release.ready", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
+  mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+
+  const result2 = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "dev", resume: true }),
+    context,
+  );
+
+  expect(result2.exitCode).toBe(0);
+  expect(result2.data!.completed).toBe(true);
+  expect(result2.data!.releaseId).toBe("test-sys-r000099");
+
+  // Verify certify-dev was called with the restored releaseId
+  const certifyCalls = mockExecuteKernelCommand.mock.calls.filter(
+    (c) => (c[0] as { commandName: string }).commandName === "leitstand.certify",
+  );
+  expect(certifyCalls.length).toBe(1);
+  const certifyArgv = (certifyCalls[0][0] as { argv: string[] }).argv;
+  expect(certifyArgv.some((a) => a === "--release=test-sys-r000099")).toBe(true);
 });

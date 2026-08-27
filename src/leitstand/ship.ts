@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0962: initial leitstand.ship composite command — buildShipPlan, runLeitstandShip, ShipContext/ShipResult types.</item>
+  <item>RFC-0962 fo-fix: --until validation, releaseId restoration from journal on resume, step metadata + durationMs tracking via StepResult, removed duplicate ShipStepResult type.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -24,7 +25,7 @@ import type {
 import { executeKernelCommand, KERNEL_UNIVERSAL_FLAGS } from "@warpgogol/werkstatt-engine/kernel";
 import { getOrBuildWorkspaceRegistry } from "../kernel/runtime/registry-cache.ts";
 import { runOperation, findIncompleteOperation } from "../journal/index.ts";
-import type { OperationDefinition, OperationStep } from "../journal/index.ts";
+import type { OperationDefinition, OperationStep, StepResult } from "../journal/index.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
 import { flagSite } from "./deploy-helpers.ts";
 
@@ -37,6 +38,15 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
 
 export type ShipPhase = "validated" | "closed" | "dev" | "alt" | "main" | "archived";
 
+const VALID_PHASES: readonly ShipPhase[] = [
+  "validated",
+  "closed",
+  "dev",
+  "alt",
+  "main",
+  "archived",
+];
+
 export interface ShipContext {
   workspaceRoot: string;
   systemId: string;
@@ -47,19 +57,12 @@ export interface ShipContext {
   logger: KernelRuntimeContext["logger"];
 }
 
-export interface ShipStepResult {
-  step: string;
-  status: "done" | "skipped" | "failed";
-  durationMs: number;
-  meta?: Record<string, unknown>;
-}
-
 export interface ShipResult {
   siteId: string;
   missionId: string;
   releaseId: string | null;
   reachedPhase: ShipPhase | "preflight";
-  steps: ShipStepResult[];
+  steps: StepResult[];
   completed: boolean;
   failedStep?: string;
 }
@@ -221,7 +224,7 @@ function buildSimpleStep(
 ): OperationStep<ShipContext> {
   return {
     name: stepName,
-    run: async (ctx: ShipContext) => {
+    run: async (ctx: ShipContext): Promise<Record<string, unknown> | void> => {
       const result = await runShipPhase(ctx, commandName, argvBuilder(ctx));
       if (result.exitCode !== 0) {
         throw new Error(`${commandName} failed: ${result.summary ?? ""}`);
@@ -229,6 +232,7 @@ function buildSimpleStep(
       if (postRun) {
         postRun(ctx, result.data);
       }
+      return result.data;
     },
   };
 }
@@ -241,7 +245,7 @@ function buildCertifyAndDeployStep(
 ): OperationStep<ShipContext> {
   return {
     name: stepName,
-    run: async (ctx: ShipContext) => {
+    run: async (ctx: ShipContext): Promise<Record<string, unknown> | void> => {
       const releaseId = ctx.releaseId ?? "";
       if (!releaseId) {
         throw new Error(`${stepName}: no releaseId in context — release-prepare must run first`);
@@ -266,6 +270,7 @@ function buildCertifyAndDeployStep(
       if (deployResult.exitCode !== 0) {
         throw new Error(`${deployCommand} failed: ${deployResult.summary ?? ""}`);
       }
+      return { gate, releaseId, ...(deployResult.data ?? {}) };
     },
   };
 }
@@ -371,6 +376,11 @@ export async function runLeitstandShip(
   if (!missionId) throw new Error("[leitstand.ship] --mission is required");
   const untilFlag = flagString(input, "until") as ShipPhase | undefined;
   const until = untilFlag ?? "archived";
+  if (!VALID_PHASES.includes(until)) {
+    throw new Error(
+      `[leitstand.ship] invalid --until value "${untilFlag}". Valid phases: ${VALID_PHASES.join(", ")}`,
+    );
+  }
   const isResume = input.flags["resume"] === true;
 
   const workpieceDir = path.join(workspaceRoot, "missions", missionId, "workpiece");
@@ -406,6 +416,21 @@ export async function runLeitstandShip(
   })();
   const incomplete = findIncompleteOperation(existingRecords);
 
+  // Restore releaseId from journal on resume
+  if (incomplete) {
+    for (const record of existingRecords) {
+      if (
+        record.kind === "step-done" &&
+        record.step === "release-prepare" &&
+        record.meta?.releaseId
+      ) {
+        ctx.releaseId = record.meta.releaseId as string;
+        logger.info(`  [ship] restored releaseId ${ctx.releaseId} from journal`);
+        break;
+      }
+    }
+  }
+
   if (isResume && !incomplete) {
     return {
       data: {
@@ -439,11 +464,7 @@ export async function runLeitstandShip(
         missionId,
         releaseId: ctx.releaseId,
         reachedPhase,
-        steps: opResult.executed.map((name) => ({
-          step: name,
-          status: "done" as const,
-          durationMs: 0,
-        })),
+        steps: opResult.stepResults,
         completed: true,
       },
       summary: `[leitstand.ship] ${missionId} shipped to ${reachedPhase}${ctx.releaseId ? ` (release ${ctx.releaseId})` : ""} — ${opResult.executed.length} steps executed, ${opResult.skipped.length} resumed`,
@@ -457,11 +478,7 @@ export async function runLeitstandShip(
       missionId,
       releaseId: ctx.releaseId,
       reachedPhase,
-      steps: opResult.executed.map((name) => ({
-        step: name,
-        status: "done" as const,
-        durationMs: 0,
-      })),
+      steps: opResult.stepResults,
       completed: false,
       failedStep: opResult.failedStep,
     },
