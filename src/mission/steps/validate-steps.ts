@@ -1,18 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0958: step definitions for mission.validate — stub, populated in step 6.</purpose>
+  <purpose>RFC-0958: step definitions for mission.validate — delegates to buildValidateSteps in mission-materialization-commands.ts.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial stub — populated in step 6.</item>
+  <item>RFC-0958: delegate to buildValidateSteps in mission-materialization-commands.ts.</item>
 </CHANGE_SUMMARY>
 */
 
-import type { OperationStep } from "../../journal/index.ts";
-
-export async function buildValidateSteps(
-  workspaceRoot: string,
-  missionId: string,
-  manifest: unknown,
-): Promise<OperationStep<unknown>[]> {
-  return [];
-}
+export { buildValidateSteps, type ValidateStepCtx } from "../mission-materialization-commands.ts";

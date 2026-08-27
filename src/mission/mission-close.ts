@@ -70,6 +70,7 @@ import { persistEnvFilesToCacheClone } from "./env-persist.ts";
 import { persistOperatorConfigFiles } from "./operator-config-files.ts";
 import { readFileSync } from "node:fs";
 import { runOperation } from "../journal/runner.ts";
+import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 
 // RFC-0597: Media cache directories to persist across missions
@@ -326,6 +327,27 @@ export async function runMissionClose(
 
     const steps = await buildCloseSteps(workspaceRoot, missionId, stepCtx);
     const journalPath = path.join(missionDir, "journal.jsonl");
+
+    // RFC-0958 Step 7: block if a different-kind operation is incomplete
+    const blockCheck = await checkDifferentKindOperation(journalPath, "mission.close");
+    if (blockCheck.blocked) {
+      return {
+        data: {
+          missionId,
+          closed: false,
+          blockedByOperation: blockCheck.incompleteOp,
+        } as unknown as MissionCloseData,
+        exitCode: 1,
+        summary: `[mission.close] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
+        nextSteps: [
+          {
+            action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
+            kind: "required",
+          },
+        ],
+      };
+    }
+
     const def: OperationDefinition<unknown> = { op: "mission.close", steps };
     const opResult = await runOperation(journalPath, def, stepCtx, {
       missionId,

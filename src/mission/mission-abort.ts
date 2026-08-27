@@ -33,6 +33,7 @@ import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { acquireLock, releaseLock, commitWerkstattSideEffects } from "../werkstatt/index.ts";
 import { resolveActor } from "./actor-identity.ts";
 import { runOperation } from "../journal/runner.ts";
+import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
 
@@ -106,6 +107,29 @@ export async function runMissionAbort(
 
     const steps = await buildAbortSteps(workspaceRoot, missionId, abortCtx);
     const journalPath = path.join(missionDir, "journal.jsonl");
+
+    // RFC-0958 Step 7: block if a different-kind operation is incomplete
+    const blockCheck = await checkDifferentKindOperation(journalPath, "mission.abort");
+    if (blockCheck.blocked) {
+      return {
+        data: {
+          missionId,
+          systemId: manifest.systemId,
+          state: "aborted" as const,
+          abortedAt: new Date().toISOString(),
+          blockedByOperation: blockCheck.incompleteOp,
+        } as unknown as MissionAbortData,
+        exitCode: 1,
+        summary: `[mission.abort] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
+        nextSteps: [
+          {
+            action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
+            kind: "required",
+          },
+        ],
+      };
+    }
+
     const def: OperationDefinition<unknown> = { op: "mission.abort", steps };
     const opResult = await runOperation(journalPath, def, abortCtx, {
       missionId,

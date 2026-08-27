@@ -57,6 +57,7 @@ import { trashPath } from "@warpgogol/forge/utils";
 import { gitExec } from "../werkstatt/git-exec.ts";
 import { runMissionMaterializeInternal } from "./mission-materialize.ts";
 import { runOperation } from "../journal/runner.ts";
+import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 
 export interface StaleEntryCheck {
@@ -305,6 +306,30 @@ export async function runMissionOpen(
 
     const steps = await buildOpenSteps(workspaceRoot, missionId, openCtx);
     const journalPath = path.join(workspaceRoot, "missions", missionId, "journal.jsonl");
+
+    // RFC-0958 Step 7: block if a different-kind operation is incomplete
+    const blockCheck = await checkDifferentKindOperation(journalPath, "mission.open");
+    if (blockCheck.blocked) {
+      return {
+        data: {
+          missionId,
+          systemId,
+          state: "open" as const,
+          openedAt: new Date().toISOString(),
+          materializedAt: null,
+          blockedByOperation: blockCheck.incompleteOp,
+        } as unknown as MissionOpenData,
+        exitCode: 1,
+        summary: `[mission.open] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
+        nextSteps: [
+          {
+            action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
+            kind: "required",
+          },
+        ],
+      };
+    }
+
     const def: OperationDefinition<unknown> = { op: "mission.open", steps };
     const opResult = await runOperation(journalPath, def, openCtx, {
       missionId,

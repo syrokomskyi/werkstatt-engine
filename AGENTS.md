@@ -58,6 +58,14 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - **Dynamic `import()` for stack-specific code**: When the engine needs to call stack-specific functions from a plugin (e.g. `werkstatt-site/codegen`, `werkstatt-site/onboarding`, `werkstatt-site/checks`), use dynamic `import()` at the call site, not static `import ... from`. The autonomy and shared guards scan only static import statements — dynamic `import()` is the sanctioned escape hatch for genuinely stack-specific runtime calls, same pattern used by `moduleLoaders` and `deployAdapters` in the plugin contract. Example: `const { runContentRefIndexGenerate } = await import("@warpgogol/werkstatt-site/codegen");`
 - RFC-0776 completed the migration: old packages (`packages/os/site-kernel*`, `packages/fingerprint`, `packages/agent-gate`) are deleted. All imports now go through `@warpgogol/werkstatt-engine` subpath exports.
 
+### Operation journal (RFC-0958)
+
+- `src/journal/` owns the JSONL-based operation journal: `jsonl.ts` (append/read/findIncompleteOperation), `runner.ts` (runOperation, abandonOperation), `check-blocking.ts` (different-kind operation blocking), `types.ts` (JournalRecord, OperationStep, OperationDefinition, RunOperationResult).
+- `src/mission/steps/` owns step definition modules for each lifecycle command: `close-steps.ts`, `open-steps.ts`, `abort-steps.ts`, `materialize-steps.ts`, `validate-steps.ts`, `reconcile-steps.ts`, `archive-steps.ts` (stub). Each delegates to the corresponding `build*Steps` function in the mission command module. `index.ts` provides `resolveOperationSteps` for `mission.resume`.
+- All lifecycle commands (`mission.open`, `mission.close`, `mission.abort`, `mission.materialize`, `mission.validate`, `mission.reconcile`) use `runOperation` with a journal at `missions/<missionId>/journal.jsonl` for crash-safe resumable execution.
+- `mission.resume` reads the journal, resolves steps via `resolveOperationSteps`, and calls `runOperation` with `resumeOpId` to skip completed steps.
+- Different-kind operation blocking: before calling `runOperation`, each lifecycle command calls `checkDifferentKindOperation` to block if a different-kind operation is incomplete.
+
 ### Agent Gate (RFC-0286, RFC-0954)
 
 - `packages/werkstatt-engine/src/agent-gate/astro.ts` owns the Astro API route factories for the agent surface: `createAgentMcpRoute` (MCP endpoint), `createAgentActionRoute` (action dispatch), and `createAgentSearchRoute` (semantic search).

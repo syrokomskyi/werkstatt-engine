@@ -37,7 +37,12 @@ export async function resolveOperationSteps(
     }
     case "mission.validate": {
       const mod = await import("./validate-steps.ts");
-      return mod.buildValidateSteps(workspaceRoot, missionId, manifest);
+      const ctx = {
+        workspaceRoot,
+        missionId,
+        manifest,
+      } as unknown as import("../mission-materialization-commands.ts").ValidateStepCtx;
+      return mod.buildValidateSteps(ctx) as unknown as OperationStep<unknown>[];
     }
     case "mission.archive": {
       const mod = await import("./archive-steps.ts");

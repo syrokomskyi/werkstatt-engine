@@ -16,13 +16,10 @@ export type {
   OperationDefinition,
   RunOperationResult,
 } from "./types.ts";
+export { appendRecord, readJournal, findIncompleteOperation, TornLineError } from "./jsonl.ts";
+export { runOperation, abandonOperation } from "./runner.ts";
 export {
-  appendRecord,
-  readJournal,
-  findIncompleteOperation,
-  TornLineError,
-} from "./jsonl.ts";
-export {
-  runOperation,
-  abandonOperation,
-} from "./runner.ts";
+  checkDifferentKindOperation,
+  type BlockedResult,
+  type NotBlockedResult,
+} from "./check-blocking.ts";

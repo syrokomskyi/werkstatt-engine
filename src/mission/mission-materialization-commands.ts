@@ -37,6 +37,7 @@
   <item>RFC-0918: add post-push divergence check in mission.reconcile comparing cache clone HEAD against origin/main; add divergenceWarning to reconciliation report.</item>
   <item>ADR-0060: split bordbuch auto-resolution conflicted paths into tracked (git checkout HEAD) and untracked generated (git add only) — CACHE_CLONE_GENERATED_PATTERNS files are not in HEAD, so git checkout HEAD fails for them.</item>
   <item>RFC-0958: wrap mission.reconcile post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
+  <item>RFC-0958: wrap mission.validate build cycle in runOperation with journal for crash-safe resume.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -82,6 +83,7 @@ import {
   CACHE_CLONE_GENERATED_PATTERNS,
 } from "./cache-clone-gitignore.ts";
 import { runOperation } from "../journal/runner.ts";
+import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
 
@@ -309,6 +311,308 @@ function buildValidateNextSteps(
           kind: "optional",
         },
       ];
+}
+
+// RFC-0958: ValidateStepCtx — mutable context for journaled validate steps
+export interface ValidateStepCtx {
+  workspaceRoot: string;
+  missionId: string;
+  manifest: MissionManifest;
+  logger: { info: (msg: string) => void; warn: (msg: string) => void };
+  evidenceDir: string;
+  missionDir: string;
+  workpieceDir: string;
+  collectErrors: boolean;
+  skipContentRegression: boolean;
+  autoAcceptRegression: boolean;
+  prepareReport: KernelPipelineReport | null;
+  pipelineReport: KernelPipelineReport | null;
+  staticPassed: boolean;
+  stepCount: number;
+  failedSteps: Array<{ name: string; exitCode: number }>;
+  buildSucceeded: boolean;
+  buildError: string | undefined;
+  routeCount: number;
+  sitemapHash: string;
+  postPipelineReport: KernelPipelineReport | undefined;
+  dirtyBeforeBuildPost: { dirty: boolean; fileCount: number };
+  preliminaryBuildIdentityPath: string | null;
+  now: string;
+}
+
+// RFC-0958: buildValidateSteps — journaled steps for mission.validate build cycle
+export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<ValidateStepCtx>[] {
+  return [
+    {
+      name: "build-prepare",
+      run: async (c: ValidateStepCtx) => {
+        c.logger.info(`  Running build.prepare pipeline for ${c.manifest.systemId}…`);
+        const prepareResult = await executeKernelPipeline({
+          workspaceRoot: c.workspaceRoot,
+          pipelineName: "build.prepare",
+          siteName: c.manifest.systemId,
+          outputFormat: "pretty",
+          ...(c.collectErrors ? { collectErrors: true } : {}),
+        });
+        c.prepareReport = Array.isArray(prepareResult) ? prepareResult[0] : prepareResult;
+        if (!c.prepareReport.ok) {
+          const failedPrepareSteps = c.prepareReport.steps
+            .filter((s) => !s.ok)
+            .map((s) => ({ name: s.commandName, exitCode: s.exitCode }));
+          const report = {
+            schemaVersion: "1.0.0",
+            missionId: c.missionId,
+            contractFull: {
+              passed: false,
+              validators: c.prepareReport.steps.map((s) => ({
+                name: s.commandName,
+                status: s.ok ? "pass" : "fail",
+                exitCode: s.exitCode,
+              })),
+            },
+            build: {
+              succeeded: false,
+              routeCount: 0,
+              sitemapHash: "sha256:failed",
+              failedSteps: failedPrepareSteps,
+            },
+            distributionReused: false,
+            buildInputHash: null,
+            fullBuildRan: true,
+            validatedAt: new Date().toISOString(),
+          };
+          await atomicWriteFile(
+            path.join(c.evidenceDir, "validation-report.json"),
+            JSON.stringify(report, null, 2) + "\n",
+          );
+          // RFC-0763: clean bordbuch projections on build.prepare failure path
+          await cleanupBordbuchOnFailure(
+            c.workspaceRoot,
+            c.manifest.systemId,
+            "build.prepare failure",
+            c.logger,
+          );
+          throw new Error(
+            `[mission.validate] ${c.missionId} build.prepare FAILED (${failedPrepareSteps.length} steps failed)`,
+          );
+        }
+      },
+      verify: async (c: ValidateStepCtx) => {
+        return c.prepareReport !== null && c.prepareReport.ok;
+      },
+    },
+    {
+      name: "build-check",
+      run: async (c: ValidateStepCtx) => {
+        c.logger.info(`  Running build.check pipeline for ${c.manifest.systemId}…`);
+        const pipelineFlags: Record<string, boolean> = {};
+        if (c.skipContentRegression) pipelineFlags["skip-content-regression"] = true;
+        if (c.autoAcceptRegression) pipelineFlags["auto-accept"] = true;
+        const pipelineResult = await executeKernelPipeline({
+          workspaceRoot: c.workspaceRoot,
+          pipelineName: "build.check",
+          siteName: c.manifest.systemId,
+          outputFormat: "pretty",
+          ...(Object.keys(pipelineFlags).length > 0 ? { flags: pipelineFlags } : {}),
+          ...(c.collectErrors ? { collectErrors: true } : {}),
+        });
+        c.pipelineReport = Array.isArray(pipelineResult) ? pipelineResult[0] : pipelineResult;
+        c.staticPassed = c.pipelineReport.ok;
+        c.stepCount = c.pipelineReport.steps.length;
+        c.failedSteps = c.pipelineReport.steps
+          .filter((s) => !s.ok)
+          .map((s) => ({ name: s.commandName, exitCode: s.exitCode }));
+      },
+      verify: async (c: ValidateStepCtx) => {
+        return c.pipelineReport !== null;
+      },
+    },
+    {
+      name: "astro-build",
+      run: async (c: ValidateStepCtx) => {
+        if (!c.staticPassed) return;
+
+        // RFC-0615: clean stale dist/ before build to prevent false positives
+        const distDir = path.join(c.workpieceDir, "dist");
+        if (existsSync(distDir)) {
+          c.logger.info(`  Cleaning stale dist/ before build…`);
+          await fs.rm(distDir, { recursive: true, force: true });
+        }
+
+        c.preliminaryBuildIdentityPath = await writePreliminaryBuildIdentity(
+          c.workpieceDir,
+          {
+            releaseId: `workpiece-${c.missionId}`,
+            systemId: c.manifest.systemId,
+            missionId: c.missionId,
+            semver: "0.0.0-workpiece",
+          },
+          c.logger,
+        );
+
+        c.logger.info(`  Running astro build in ${c.workpieceDir}…`);
+        try {
+          const buildOutput = execSync("pnpm exec astro build", {
+            cwd: c.workpieceDir,
+            stdio: "pipe",
+            timeout: 300_000,
+            encoding: "utf-8",
+          });
+          c.buildSucceeded = true;
+          const routeMatches = buildOutput.match(/\d+ page\(s\)/g);
+          if (routeMatches) {
+            const nums = routeMatches.map((m) => parseInt(m, 10));
+            c.routeCount = Math.max(...nums, 0);
+          }
+          const sitemapPath = path.join(c.workpieceDir, "dist", "sitemap-index.xml");
+          if (existsSync(sitemapPath)) {
+            const { byteHashFile } = await import("@warpgogol/werkstatt-engine/fingerprint");
+            c.sitemapHash = await byteHashFile(sitemapPath);
+          } else {
+            c.sitemapHash = "sha256:no-sitemap";
+          }
+        } catch (err) {
+          c.buildError = err instanceof Error ? err.message : String(err);
+          c.logger.info(`  Build failed: ${c.buildError}`);
+        }
+
+        // RFC-0615: check dirty state before build.post
+        c.dirtyBeforeBuildPost = isWorkpieceDirty(c.workpieceDir);
+        if (c.dirtyBeforeBuildPost.dirty) {
+          c.logger.info(
+            `  [warn] workpiece has ${c.dirtyBeforeBuildPost.fileCount} uncommitted file(s) — snapshot auto-regeneration will be skipped`,
+          );
+        }
+      },
+      verify: async (c: ValidateStepCtx) => {
+        // Step is done if static checks failed (skip path) or build was attempted
+        return c.buildSucceeded || c.buildError !== undefined || !c.staticPassed;
+      },
+    },
+    {
+      name: "build-post",
+      run: async (c: ValidateStepCtx) => {
+        // RFC-0356: run build.post after astro build — only when static checks passed
+        if (c.staticPassed) {
+          if (c.buildSucceeded) {
+            c.logger.info(`  Running build.post pipeline for ${c.manifest.systemId}…`);
+            try {
+              const postResult = await executeKernelPipeline({
+                workspaceRoot: c.workspaceRoot,
+                pipelineName: "build.post",
+                siteName: c.manifest.systemId,
+                outputFormat: "pretty",
+                ...(c.collectErrors ? { collectErrors: true } : {}),
+              });
+              c.postPipelineReport = Array.isArray(postResult) ? postResult[0] : postResult;
+              if (!c.postPipelineReport.ok) {
+                c.buildError = `build.post failed at step: ${c.postPipelineReport.timing.failedStep ?? "unknown"}`;
+                c.buildSucceeded = false;
+                c.logger.info(`  ${c.buildError}`);
+              }
+            } catch (err) {
+              c.buildError = err instanceof Error ? err.message : String(err);
+              c.buildSucceeded = false;
+              c.logger.info(`  build.post failed: ${c.buildError}`);
+            }
+          }
+
+          // RFC-0615/RFC-0697: auto-regenerate behavior snapshot on SNAP-01
+          if (
+            c.postPipelineReport &&
+            !c.postPipelineReport.ok &&
+            !c.dirtyBeforeBuildPost.dirty &&
+            !c.buildSucceeded
+          ) {
+            const snapshotStep = c.postPipelineReport.steps.find(
+              (s) => s.commandName === "behavior.snapshot.validate",
+            );
+
+            const snapResult = await orchestrateSnap01Recovery({
+              workspaceRoot: c.workspaceRoot,
+              systemId: c.manifest.systemId,
+              missionId: c.missionId,
+              logger: c.logger,
+              validateFn: async () => snapshotStep?.data,
+              rebuildFn: async () => {
+                c.logger.info(`  Re-running build.post after snapshot regeneration…`);
+                const revalidateResult = await executeKernelPipeline({
+                  workspaceRoot: c.workspaceRoot,
+                  pipelineName: "build.post",
+                  siteName: c.manifest.systemId,
+                  outputFormat: "pretty",
+                  ...(c.collectErrors ? { collectErrors: true } : {}),
+                });
+                const revalidateReport = Array.isArray(revalidateResult)
+                  ? revalidateResult[0]
+                  : revalidateResult;
+                if (!revalidateReport.ok) {
+                  throw new Error(
+                    `build.post still failing after snapshot regeneration: ${revalidateReport.timing.failedStep ?? "unknown"}`,
+                  );
+                }
+              },
+            });
+
+            if (snapResult.regenerated && snapResult.rebuildSucceeded) {
+              c.buildSucceeded = true;
+              c.buildError = undefined;
+              c.logger.info(`  build.post passed after snapshot regeneration`);
+            } else if (snapResult.regenerated && !snapResult.rebuildSucceeded) {
+              c.buildError =
+                snapResult.error ?? "build.post still failing after snapshot regeneration";
+              c.logger.info(`  ${c.buildError}`);
+            } else if (snapResult.error) {
+              c.buildError = snapResult.error;
+            }
+          }
+        }
+
+        // Cleanup preliminary build identity
+        if (c.preliminaryBuildIdentityPath) {
+          await cleanupPreliminaryBuildIdentity(c.preliminaryBuildIdentityPath);
+        }
+
+        // Write validation report
+        c.now = new Date().toISOString();
+        const passed = c.staticPassed && c.buildSucceeded;
+        const buildDiagnostics = c.buildError ? buildFailureDiagnostics(c.buildError) : [];
+        const report = {
+          schemaVersion: "1.0.0",
+          missionId: c.missionId,
+          contractFull: {
+            passed,
+            validators:
+              c.pipelineReport?.steps.map((s) => ({
+                name: s.commandName,
+                status: s.ok ? "pass" : "fail",
+                exitCode: s.exitCode,
+              })) ?? [],
+          },
+          build: {
+            succeeded: c.buildSucceeded,
+            routeCount: c.routeCount,
+            sitemapHash: c.sitemapHash,
+            ...(c.buildError ? { error: c.buildError } : {}),
+            failedSteps: c.failedSteps,
+          },
+          ...(buildDiagnostics.length > 0 ? { diagnostics: buildDiagnostics } : {}),
+          distributionReused: false,
+          buildInputHash: null,
+          fullBuildRan: true,
+          validatedAt: c.now,
+        };
+        await atomicWriteFile(
+          path.join(c.evidenceDir, "validation-report.json"),
+          JSON.stringify(report, null, 2) + "\n",
+        );
+      },
+      verify: async (c: ValidateStepCtx) => {
+        // Report is written — check file exists
+        return existsSync(path.join(c.evidenceDir, "validation-report.json"));
+      },
+    },
+  ];
 }
 
 export async function runMissionValidate(
@@ -559,271 +863,132 @@ export async function runMissionValidate(
     );
   }
 
-  // RFC-0356 §2: run build.prepare then build.check against the workpiece.
-  // build.prepare generates derived artifacts (surface.generated.yaml, etc.)
-  // that build.check validators like semantic.targets.validate depend on.
-  // The workpiece is discovered as a site workspace via tryResolveMissionWorkpiece
-  // when the registry entry has currentMission set.
-  logger.info(`  Running build.prepare pipeline for ${manifest.systemId}…`);
+  // RFC-0958: Wrap the build cycle in runOperation for crash-safe resumable execution.
+  // Pre-flight checks (distribution reuse, config presence, playwright) run outside the journal.
+  // The build cycle (build.prepare → build.check → astro build → build.post → report write) runs as journaled steps.
+  // Post-validation logic (dirty check, cache clone cleanup, stale entries, nextSteps) runs after runOperation.
   const collectErrors = input.flags["collect-errors"] === true;
-  const prepareResult = await executeKernelPipeline({
-    workspaceRoot,
-    pipelineName: "build.prepare",
-    siteName: manifest.systemId,
-    outputFormat: "pretty",
-    ...(collectErrors ? { collectErrors: true } : {}),
-  });
-  const prepareReport = Array.isArray(prepareResult) ? prepareResult[0] : prepareResult;
-  if (!prepareReport.ok) {
-    const failedPrepareSteps = prepareReport.steps
-      .filter((s) => !s.ok)
-      .map((s) => ({ name: s.commandName, exitCode: s.exitCode }));
-    const now = new Date().toISOString();
-    const report = {
-      schemaVersion: "1.0.0",
-      missionId,
-      contractFull: {
-        passed: false,
-        validators: prepareReport.steps.map((s) => ({
-          name: s.commandName,
-          status: s.ok ? "pass" : "fail",
-          exitCode: s.exitCode,
-        })),
-      },
-      build: {
-        succeeded: false,
-        routeCount: 0,
-        sitemapHash: "sha256:failed",
-        failedSteps: failedPrepareSteps,
-      },
-      distributionReused: false,
-      buildInputHash: null,
-      fullBuildRan: true,
-      validatedAt: now,
-    };
-    await atomicWriteFile(
-      path.join(evidenceDir, "validation-report.json"),
-      JSON.stringify(report, null, 2) + "\n",
-    );
-    // RFC-0763: clean bordbuch projections on build.prepare failure path
-    await cleanupBordbuchOnFailure(
-      workspaceRoot,
-      manifest.systemId,
-      "build.prepare failure",
-      logger,
-    );
-    return {
-      data: report as unknown as MissionValidateData,
-      exitCode: 1,
-      summary: `[mission.validate] ${missionId} build.prepare FAILED (${failedPrepareSteps.length} steps failed)`,
-    };
-  }
-
-  logger.info(`  Running build.check pipeline for ${manifest.systemId}…`);
   const skipContentRegression = input.flags["skip-content-regression"] === true;
   const autoAcceptRegression = input.flags["auto-accept-regression"] === true;
-  const pipelineFlags: Record<string, boolean> = {};
-  if (skipContentRegression) pipelineFlags["skip-content-regression"] = true;
-  if (autoAcceptRegression) pipelineFlags["auto-accept"] = true;
-  const pipelineResult = await executeKernelPipeline({
+
+  const validateCtx: ValidateStepCtx = {
     workspaceRoot,
-    pipelineName: "build.check",
-    siteName: manifest.systemId,
-    outputFormat: "pretty",
-    ...(Object.keys(pipelineFlags).length > 0 ? { flags: pipelineFlags } : {}),
-    ...(collectErrors ? { collectErrors: true } : {}),
-  });
+    missionId,
+    manifest,
+    logger,
+    evidenceDir,
+    missionDir,
+    workpieceDir,
+    collectErrors,
+    skipContentRegression,
+    autoAcceptRegression,
+    prepareReport: null,
+    pipelineReport: null,
+    staticPassed: false,
+    stepCount: 0,
+    failedSteps: [],
+    buildSucceeded: false,
+    buildError: undefined,
+    routeCount: 0,
+    sitemapHash: "sha256:not-built",
+    postPipelineReport: undefined,
+    dirtyBeforeBuildPost: { dirty: false, fileCount: 0 },
+    preliminaryBuildIdentityPath: null,
+    now: new Date().toISOString(),
+  };
 
-  const pipelineReport = Array.isArray(pipelineResult) ? pipelineResult[0] : pipelineResult;
-  const staticPassed = pipelineReport.ok;
-  const stepCount = pipelineReport.steps.length;
-  const failedSteps = pipelineReport.steps
-    .filter((s) => !s.ok)
-    .map((s) => ({ name: s.commandName, exitCode: s.exitCode }));
+  const journalPath = path.join(missionDir, "journal.jsonl");
 
-  // RFC-0480: run astro build after static checks pass — catches runtime errors
-  // (content references, missing collections, import failures) that static
-  // validators cannot detect.
-  let buildSucceeded = false;
-  let buildError: string | undefined;
-  let routeCount = 0;
-  let sitemapHash = "sha256:not-built";
-
-  if (staticPassed) {
-    const workpieceDir = path.join(missionDir, "workpiece");
-
-    // RFC-0615: clean stale dist/ before build to prevent false positives
-    const distDir = path.join(workpieceDir, "dist");
-    if (existsSync(distDir)) {
-      logger.info(`  Cleaning stale dist/ before build…`);
-      await fs.rm(distDir, { recursive: true, force: true });
-    }
-
-    const preliminaryBuildIdentityPath = await writePreliminaryBuildIdentity(
-      workpieceDir,
-      {
-        releaseId: `workpiece-${missionId}`,
-        systemId: manifest.systemId,
+  // RFC-0958 Step 7: block if a different-kind operation is incomplete
+  const blockCheck = await checkDifferentKindOperation(journalPath, "mission.validate");
+  if (blockCheck.blocked) {
+    return {
+      data: {
         missionId,
-        semver: "0.0.0-workpiece",
-      },
-      logger,
-    );
-
-    logger.info(`  Running astro build in ${workpieceDir}…`);
-    try {
-      const buildOutput = execSync("pnpm exec astro build", {
-        cwd: workpieceDir,
-        stdio: "pipe",
-        timeout: 300_000,
-        encoding: "utf-8",
-      });
-      buildSucceeded = true;
-      // Count generated routes from build output
-      const routeMatches = buildOutput.match(/\d+ page\(s\)/g);
-      if (routeMatches) {
-        const nums = routeMatches.map((m) => parseInt(m, 10));
-        routeCount = Math.max(...nums, 0);
-      }
-      // Compute sitemap hash if sitemap exists
-      const sitemapPath = path.join(workpieceDir, "dist", "sitemap-index.xml");
-      if (existsSync(sitemapPath)) {
-        const { byteHashFile } = await import("@warpgogol/werkstatt-engine/fingerprint");
-        sitemapHash = await byteHashFile(sitemapPath);
-      } else {
-        sitemapHash = "sha256:no-sitemap";
-      }
-    } catch (err) {
-      buildError = err instanceof Error ? err.message : String(err);
-      logger.info(`  Build failed: ${buildError}`);
-    }
-
-    // RFC-0615: check dirty state before build.post — auto-regeneration
-    // requires a clean workpiece because mission.git.commit stages all changes.
-    const dirtyBeforeBuildPost = isWorkpieceDirty(workpieceDir);
-    if (dirtyBeforeBuildPost.dirty) {
-      logger.info(
-        `  [warn] workpiece has ${dirtyBeforeBuildPost.fileCount} uncommitted file(s) — snapshot auto-regeneration will be skipped`,
-      );
-    }
-
-    // RFC-0356: run build.post after astro build — text.normalize.apply,
-    // passport.emit, etc. must all run before the validation verdict.
-    // RFC-0615: use executeKernelPipeline instead of runPipelinePhase so we
-    // can inspect step-level diagnostics for SNAP-01 detection.
-    let postPipelineReport: KernelPipelineReport | undefined;
-    if (buildSucceeded) {
-      logger.info(`  Running build.post pipeline for ${manifest.systemId}…`);
-      try {
-        const postResult = await executeKernelPipeline({
-          workspaceRoot,
-          pipelineName: "build.post",
-          siteName: manifest.systemId,
-          outputFormat: "pretty",
-          ...(collectErrors ? { collectErrors: true } : {}),
-        });
-        postPipelineReport = Array.isArray(postResult) ? postResult[0] : postResult;
-        if (!postPipelineReport.ok) {
-          buildError = `build.post failed at step: ${postPipelineReport.timing.failedStep ?? "unknown"}`;
-          buildSucceeded = false;
-          logger.info(`  ${buildError}`);
-        }
-      } catch (err) {
-        buildError = err instanceof Error ? err.message : String(err);
-        buildSucceeded = false;
-        logger.info(`  build.post failed: ${buildError}`);
-      }
-    }
-
-    // RFC-0615/RFC-0697: auto-regenerate behavior snapshot on SNAP-01 when workpiece was clean.
-    // The dirtyBeforeBuildPost check is caller-side (mission.validate-specific pre-condition).
-    if (
-      postPipelineReport &&
-      !postPipelineReport.ok &&
-      !dirtyBeforeBuildPost.dirty &&
-      !buildSucceeded
-    ) {
-      const snapshotStep = postPipelineReport.steps.find(
-        (s) => s.commandName === "behavior.snapshot.validate",
-      );
-
-      const snapResult = await orchestrateSnap01Recovery({
-        workspaceRoot,
-        systemId: manifest.systemId,
-        missionId,
-        logger,
-        validateFn: async () => snapshotStep?.data,
-        rebuildFn: async () => {
-          logger.info(`  Re-running build.post after snapshot regeneration…`);
-          const revalidateResult = await executeKernelPipeline({
-            workspaceRoot,
-            pipelineName: "build.post",
-            siteName: manifest.systemId,
-            outputFormat: "pretty",
-            ...(collectErrors ? { collectErrors: true } : {}),
-          });
-          const revalidateReport = Array.isArray(revalidateResult)
-            ? revalidateResult[0]
-            : revalidateResult;
-          if (!revalidateReport.ok) {
-            throw new Error(
-              `build.post still failing after snapshot regeneration: ${revalidateReport.timing.failedStep ?? "unknown"}`,
-            );
-          }
+        contractFull: { passed: false, validators: [] },
+        build: { succeeded: false, routeCount: 0, sitemapHash: "sha256:blocked" },
+        distributionReused: false,
+        buildInputHash: null,
+        fullBuildRan: false,
+        validatedAt: new Date().toISOString(),
+        blockedByOperation: blockCheck.incompleteOp,
+      } as unknown as MissionValidateData,
+      exitCode: 1,
+      summary: `[mission.validate] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
+      nextSteps: [
+        {
+          action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
+          kind: "required",
         },
-      });
-
-      if (snapResult.regenerated && snapResult.rebuildSucceeded) {
-        buildSucceeded = true;
-        buildError = undefined;
-        logger.info(`  build.post passed after snapshot regeneration`);
-      } else if (snapResult.regenerated && !snapResult.rebuildSucceeded) {
-        buildError = snapResult.error ?? "build.post still failing after snapshot regeneration";
-        logger.info(`  ${buildError}`);
-      } else if (snapResult.error) {
-        buildError = snapResult.error;
-      }
-    }
-
-    await cleanupPreliminaryBuildIdentity(preliminaryBuildIdentityPath);
+      ],
+    };
   }
 
-  const passed = staticPassed && buildSucceeded;
-  const now = new Date().toISOString();
-  const buildDiagnostics = buildError ? buildFailureDiagnostics(buildError) : [];
+  const opResult = await runOperation(
+    journalPath,
+    { op: "mission.validate", steps: buildValidateSteps(validateCtx) },
+    validateCtx,
+  );
+
+  if (!opResult.completed) {
+    const detail = opResult.failedStepError ?? "unknown error";
+    const failedStep = opResult.failedStep;
+    // build.prepare failure writes its own report before throwing
+    if (failedStep === "build-prepare") {
+      return {
+        data: {
+          schemaVersion: "1.0.0",
+          missionId,
+          contractFull: { passed: false, validators: [] },
+          build: { succeeded: false, routeCount: 0, sitemapHash: "sha256:failed" },
+          distributionReused: false,
+          buildInputHash: null,
+          fullBuildRan: true,
+          validatedAt: new Date().toISOString(),
+        } as unknown as MissionValidateData,
+        exitCode: 1,
+        summary: `[mission.validate] ${missionId} build.prepare FAILED: ${detail}`,
+      };
+    }
+    throw new Error(
+      `[mission.validate] step "${failedStep}" failed: ${detail} — run mission.resume --mission ${missionId} to retry`,
+    );
+  }
+
+  // Read report from context state after runOperation
+  const passed = validateCtx.staticPassed && validateCtx.buildSucceeded;
+  const buildDiagnostics = validateCtx.buildError
+    ? buildFailureDiagnostics(validateCtx.buildError)
+    : [];
   const report = {
     schemaVersion: "1.0.0",
     missionId,
     contractFull: {
       passed,
-      validators: pipelineReport.steps.map((s) => ({
-        name: s.commandName,
-        status: s.ok ? "pass" : "fail",
-        exitCode: s.exitCode,
-      })),
+      validators:
+        validateCtx.pipelineReport?.steps.map((s) => ({
+          name: s.commandName,
+          status: s.ok ? "pass" : "fail",
+          exitCode: s.exitCode,
+        })) ?? [],
     },
     build: {
-      succeeded: buildSucceeded,
-      routeCount,
-      sitemapHash,
-      ...(buildError ? { error: buildError } : {}),
-      failedSteps,
+      succeeded: validateCtx.buildSucceeded,
+      routeCount: validateCtx.routeCount,
+      sitemapHash: validateCtx.sitemapHash,
+      ...(validateCtx.buildError ? { error: validateCtx.buildError } : {}),
+      failedSteps: validateCtx.failedSteps,
     },
     ...(buildDiagnostics.length > 0 ? { diagnostics: buildDiagnostics } : {}),
     distributionReused: false,
     buildInputHash: null,
     fullBuildRan: true,
-    validatedAt: now,
+    validatedAt: validateCtx.now,
   };
 
-  await atomicWriteFile(
-    path.join(evidenceDir, "validation-report.json"),
-    JSON.stringify(report, null, 2) + "\n",
-  );
-
   if (!passed) {
-    const reason = !staticPassed
-      ? `${failedSteps.length}/${stepCount} steps failed`
+    const reason = !validateCtx.staticPassed
+      ? `${validateCtx.failedSteps.length}/${validateCtx.stepCount} steps failed`
       : "astro build failed";
     const failNextSteps: KernelNextStep[] = [
       {
@@ -889,7 +1054,7 @@ export async function runMissionValidate(
 
   return {
     data: { ...report, staleEntryWarnings } as unknown as MissionValidateData,
-    summary: `[mission.validate] ${missionId} validation passed (${stepCount} steps, ${routeCount} routes built)`,
+    summary: `[mission.validate] ${missionId} validation passed (${validateCtx.stepCount} steps, ${validateCtx.routeCount} routes built)`,
     nextSteps: passNextSteps,
   };
 }
@@ -1270,6 +1435,28 @@ export async function runMissionReconcile(
 
     const steps = await buildReconcileSteps(workspaceRoot, missionId, reconcileCtx);
     const journalPath = path.join(missionDir, "journal.jsonl");
+
+    // RFC-0958 Step 7: block if a different-kind operation is incomplete
+    const blockCheck = await checkDifferentKindOperation(journalPath, "mission.reconcile");
+    if (blockCheck.blocked) {
+      return {
+        data: {
+          missionId,
+          systemId: manifest.systemId,
+          commitSha: null,
+          blockedByOperation: blockCheck.incompleteOp,
+        } as unknown as MissionReconcileData,
+        exitCode: 1,
+        summary: `[mission.reconcile] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
+        nextSteps: [
+          {
+            action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
+            kind: "required",
+          },
+        ],
+      };
+    }
+
     const def: OperationDefinition<unknown> = { op: "mission.reconcile", steps };
     const opResult = await runOperation(journalPath, def, reconcileCtx, {
       missionId,
