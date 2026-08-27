@@ -67,7 +67,10 @@ export async function computeOwnershipMap(
       buildGeneratorOwnership?: (registry: KernelRegistry) => GeneratorOwnershipEntry[];
     };
     return mod.buildGeneratorOwnership?.(registry);
-  } catch {
+  } catch (err) {
+    console.warn(
+      `[RFC-0960] computeOwnershipMap: failed to import buildGeneratorOwnership from @warpgogol/werkstatt-site/checks — ownershipMap will be undefined. Validators will operate on an empty ownership list. Error: ${(err as Error).message}`,
+    );
     return undefined;
   }
 }

@@ -216,7 +216,7 @@ export interface GeneratedArtifactSpec {
  */
 export interface GeneratorOwnershipEntry {
   command: string;
-  modulePath: string;
+  modulePath?: string;
   artifact: GeneratedArtifactSpec;
   markerPolicy: "embedded" | "registry-only";
 }
@@ -300,10 +300,12 @@ export interface KernelCommandDefinition<TData = unknown> extends KernelCommandM
   validatesOutputs?: string[];
   /**
    * RFC-0960: repo-relative path to the implementing source file (e.g.
-   * "packages/werkstatt-site/src/checks/robots.ts"). Required on ALL commands.
+   * "packages/werkstatt-site/src/checks/robots.ts"). Required on ALL engine
+   * and site-plugin commands. Forge commands (portable governance package)
+   * do not declare modulePath — validateRegistration skips them.
    * Distinct from modulePaths (ADR-0024, relative to src/, for cache hashing).
    */
-  modulePath: string;
+  modulePath?: string;
   /**
    * RFC-0960: declared generated artifacts. Required on every `.generate`
    * command and every command with `writes`. Commands with `writes` but no
