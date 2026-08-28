@@ -339,6 +339,39 @@ export async function runColdE2e(
             "utf-8",
           );
 
+          // RFC-0073: pbp.content.validate requires src/content/business-profile/de/
+          // to exist. Commit it to the cache clone git repo so materialization
+          // copies it into the workpiece. The build.prepare.dev pipeline (run
+          // during mission.open inside sternsystem.register) validates before
+          // the content-edit step, so it must be present at materialization time.
+          await fs.mkdir(path.join(cachePath, "src", "content", "business-profile", "de"), {
+            recursive: true,
+          });
+          await fs.writeFile(
+            path.join(cachePath, "src", "content", "business-profile", "de", ".gitkeep"),
+            "",
+            "utf-8",
+          );
+          execFileSync("git", ["add", "-A"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          execFileSync(
+            "git",
+            ["commit", "-m", "add business-profile/de for pbp.content.validate"],
+            {
+              cwd: cachePath,
+              encoding: "utf-8",
+              stdio: ["pipe", "pipe", "pipe"],
+            },
+          );
+          execFileSync("git", ["push", "origin", "main"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+
           // Copy fixture brief into cold root
           const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
           await fs.mkdir(briefDir, { recursive: true });
@@ -398,16 +431,6 @@ legalJurisdiction: DE
             }
 
             const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
-
-            // RFC-0073: pbp.content.validate requires src/content/business-profile/de/
-            // to exist. The synthetic cold-run site has no PBP content — create a
-            // minimal directory with a placeholder file so the validator passes.
-            const bpDir = path.join(workpieceDir, "src", "content", "business-profile", "de");
-            await fs.mkdir(bpDir, { recursive: true });
-            const bpPlaceholder = path.join(bpDir, ".gitkeep");
-            if (!existsSync(bpPlaceholder)) {
-              await fs.writeFile(bpPlaceholder, "", "utf-8");
-            }
 
             const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
             if (existsSync(systemMdPath)) {
