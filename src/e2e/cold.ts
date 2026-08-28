@@ -356,6 +356,19 @@ export async function runColdE2e(
             await fs.mkdir(path.join(pbpDeDir, sub), { recursive: true });
             await fs.writeFile(path.join(pbpDeDir, sub, ".gitkeep"), "", "utf-8");
           }
+          // RFC-0468: pbp.migration.validate requires owner-decision-register.yaml
+          // and migration-coverage-report.yaml in src/content/business-profile/.
+          const pbpRoot = path.join(cachePath, "src", "content", "business-profile");
+          await fs.writeFile(
+            path.join(pbpRoot, "owner-decision-register.yaml"),
+            "schemaVersion: '1.0.0'\nitems:\n  - id: 1\n    topic: setup\n    question: Initial setup\n    status: open\n    blocks: []\n",
+            "utf-8",
+          );
+          await fs.writeFile(
+            path.join(pbpRoot, "migration-coverage-report.yaml"),
+            "schemaVersion: '1.0.0'\ncoveragePercentage: 100\nmappedEntities: 1\ntotalLegacyEntities: 1\nverifiedEntities: 1\nunmappedEntities: []\nlegacySourceMappings:\n  - legacyFile: legacy/business.md\n    targetEntities: [business]\n    category: business\nvalidation:\n  errors: []\n",
+            "utf-8",
+          );
           execFileSync("git", ["add", "-A"], {
             cwd: cachePath,
             encoding: "utf-8",
