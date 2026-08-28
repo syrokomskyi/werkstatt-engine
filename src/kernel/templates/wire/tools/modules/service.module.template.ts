@@ -32,6 +32,7 @@ export const serviceModule: KernelModule = {
   register(registry) {
     registry.registerCommand({
       name: "icons.generate",
+      modulePath: "tools/modules/service.module.ts",
       description: "Generate Astro icon wrappers from icon JSON assets.",
       scope: "app",
       mutatesState: true,
@@ -55,6 +56,7 @@ export const serviceModule: KernelModule = {
     });
     registry.registerCommand({
       name: "open-source.generate",
+      modulePath: "tools/modules/service.module.ts",
       description: "Generate the open-source disclosure page from production dependencies.",
       scope: "app",
       mutatesState: true,
@@ -108,6 +110,7 @@ export const serviceModule: KernelModule = {
     });
     registry.registerCommand({
       name: "content.ref-index.generate",
+      modulePath: "tools/modules/service.module.ts",
       description:
         "Scan src/content/ for .md files, parse frontmatter, and write src/content-ref-index.generated.yaml (RFC-0527).",
       scope: "app",

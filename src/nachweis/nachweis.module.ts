@@ -135,6 +135,7 @@ export function createNachweisModule(): KernelModule {
         },
         reads: [],
         writes: ["<cache>/public/nachweise/manifest.json"],
+        generates: [],
         execute: runNachweisManifestGenerate,
       });
 

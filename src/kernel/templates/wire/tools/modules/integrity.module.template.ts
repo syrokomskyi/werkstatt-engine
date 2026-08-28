@@ -73,6 +73,7 @@ export const integrityModule: KernelModule = {
     registry.registerCommand({ name: "integrity.verify-release", description: "Verify release signatures.", scope: "app", requiresNetwork: true, flags: {}, reads: ["<app>/.integrity/**"], cacheable: false, execute: runIntegrityVerifyRelease });
     registry.registerCommand({
       name: "integrity.keys.generate",
+      modulePath: "tools/modules/integrity.module.ts",
       description: "Generate integrity signing keys.",
       scope: "app",
       mutatesState: true,

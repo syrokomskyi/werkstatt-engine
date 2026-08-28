@@ -39,6 +39,7 @@ export function createSichtpassModule(): KernelModule {
         },
         reads: [],
         writes: [],
+        generates: [],
         execute: runSichtpassGenerate,
       });
     },

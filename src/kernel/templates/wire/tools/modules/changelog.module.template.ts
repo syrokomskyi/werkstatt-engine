@@ -45,6 +45,7 @@ export const changelogModule: KernelModule = {
   register(registry) {
     registry.registerCommand({
       name: "changelog.generate",
+      modulePath: "tools/modules/changelog.module.ts",
       description: "Generate the changelog.",
       scope: "app",
       mutatesState: true,

@@ -34,6 +34,7 @@ export function createSigningModule(): KernelModule {
         mutatesState: true,
         cacheable: false,
         writes: ["<output-dir>/**"],
+        generates: [],
         flags: {
           "output-dir": {
             kind: "string",

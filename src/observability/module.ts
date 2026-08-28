@@ -105,6 +105,9 @@ export const observabilityModule: KernelModule = {
       scope: "workspace",
       mutatesState: true,
       writes: ["services/fleet-probe-runner/targets.generated.yaml"],
+      generates: [
+        { path: "services/fleet-probe-runner/targets.generated.yaml", phase: "build.prepare" },
+      ],
       reads: ["apps/*/astro.config.mjs", "services/fleet-probe-runner/targets.overrides.yaml"],
       cacheable: false,
       flags: {},
@@ -135,6 +138,7 @@ export const observabilityModule: KernelModule = {
       scope: "workspace",
       mutatesState: true,
       writes: ["docs/observability/alerts.generated.yaml"],
+      generates: [{ path: "docs/observability/alerts.generated.yaml", phase: "build.prepare" }],
       reads: ["packages/os/site-kernel-observability/src/alert-rules.ts"],
       cacheable: false,
       flags: {},
