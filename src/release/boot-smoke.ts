@@ -166,16 +166,13 @@ export function simulateBindings(wranglerConfig: Record<string, unknown>): Simul
     bindings[db.binding] = { __type: "d1" };
   }
 
-  // Vectorize indexes → recorded stub returning empty results
+  // Vectorize indexes → JSON-compatible placeholder (miniflare bindings only
+  // accept JSON values; the worker checks for binding existence at runtime)
   const vectorize = (wranglerConfig["vectorize"] ?? []) as Array<{
     binding: string;
   }>;
   for (const idx of vectorize) {
-    bindings[idx.binding] = {
-      query: () => Promise.resolve({ matches: [], count: 0 }),
-      upsert: () => Promise.resolve(),
-      insert: () => Promise.resolve(),
-    };
+    bindings[idx.binding] = { __type: "vectorize" };
   }
 
   // Vars / env → placeholder strings
