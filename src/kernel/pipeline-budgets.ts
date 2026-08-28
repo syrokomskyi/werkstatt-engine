@@ -18,6 +18,7 @@ prefers a budget-file entry over the inline expectedDurationMs when both exist.
 <CHANGE_SUMMARY>
   <item>RFC-0270: initial implementation.</item>
   <item>ADR-0023: add batchAppendStepTelemetry for batched telemetry writes at pipeline completion.</item>
+  <item>RFC-0963: filter telemetry by registered sites from fleet/fleet.sites.yaml — removes stale entries for retired apps.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -28,6 +29,8 @@ import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
 import { writeFileAtomic } from "./fs-atomic.ts";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "./types.ts";
+
+const FLEET_SITES_RELATIVE_PATH = join("fleet", "fleet.sites.yaml");
 
 export interface StepTelemetryRecord {
   pipeline: string;
@@ -301,6 +304,22 @@ export interface PipelineBudgetGenerateResult {
   skippedLines: number;
 }
 
+/**
+ * RFC-0963: Read the fleet site registry and return the set of registered site ids.
+ * Returns null when the file is absent or unparseable — in that case, no filtering
+ * is applied (backward compatible with pre-RFC-0963 behavior).
+ */
+async function loadRegisteredSiteIds(workspaceRoot: string): Promise<Set<string> | null> {
+  try {
+    const raw = await readFile(join(workspaceRoot, FLEET_SITES_RELATIVE_PATH), "utf8");
+    const parsed = yamlParse(raw) as { sites?: Array<{ id: string }> };
+    if (!Array.isArray(parsed.sites)) return null;
+    return new Set(parsed.sites.map((s) => s.id));
+  } catch {
+    return null;
+  }
+}
+
 export async function runPipelineBudgetGenerate(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
@@ -324,8 +343,8 @@ export async function runPipelineBudgetGenerate(
     };
   }
 
-  const { records, skipped } = parseTelemetryHistory(raw);
-  if (records.length === 0) {
+  const { records: allRecords, skipped } = parseTelemetryHistory(raw);
+  if (allRecords.length === 0) {
     return {
       data: {
         command: "pipeline.budget.generate",
@@ -336,6 +355,50 @@ export async function runPipelineBudgetGenerate(
       },
       exitCode: 0,
       summary: "[pipeline.budget.generate] telemetry history is empty — nothing to aggregate",
+    };
+  }
+
+  // RFC-0963: filter telemetry by registered sites to remove stale entries for retired apps.
+  const registeredSites = await loadRegisteredSiteIds(context.workspaceRoot);
+  let records = allRecords;
+  let filteredCount = 0;
+  if (registeredSites !== null) {
+    records = allRecords.filter((r) => {
+      // Keep workspace-scoped records (app === null) and records for registered sites.
+      if (r.app === null) return true;
+      const keep = registeredSites.has(r.app);
+      if (!keep) filteredCount++;
+      return keep;
+    });
+  }
+
+  if (records.length === 0 && filteredCount > 0) {
+    // RFC-0963: write an empty budgets file to overwrite stale entries from retired apps.
+    const emptyFile: PipelineBudgetsFile = {
+      meta: {
+        schemaVersion: 1,
+        deterministic: true,
+        generatedAt: null,
+        historyHash: historyHash(raw),
+      },
+      budgets: [],
+    };
+    const emptyContent = `${buildGeneratedHeader({ filePath: BUDGETS_RELATIVE_PATH, ownerCommand: "pipeline.budget.generate" })}${yamlStringify(emptyFile)}\n`;
+    if (!dryRun) {
+      const outputPath = budgetsFilePath(context.workspaceRoot);
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFileAtomic(outputPath, emptyContent);
+    }
+    return {
+      data: {
+        command: "pipeline.budget.generate",
+        written: !dryRun,
+        budgetCount: 0,
+        sampleCount: 0,
+        skippedLines: skipped,
+      },
+      exitCode: 0,
+      summary: `[pipeline.budget.generate] all telemetry records filtered out (${filteredCount} retired app(s) removed) — wrote empty budgets file`,
     };
   }
 
@@ -357,9 +420,10 @@ export async function runPipelineBudgetGenerate(
     await writeFileAtomic(outputPath, content);
   }
 
+  const filterNote = filteredCount > 0 ? ` (${filteredCount} retired app record(s) filtered)` : "";
   const summaryText = dryRun
-    ? `[pipeline.budget.generate] dry-run — ${budgets.length} budget(s) from ${records.length} sample(s)`
-    : `[pipeline.budget.generate] wrote ${budgets.length} budget(s) from ${records.length} sample(s)${skipped > 0 ? ` (${skipped} unparseable line(s) skipped)` : ""}`;
+    ? `[pipeline.budget.generate] dry-run — ${budgets.length} budget(s) from ${records.length} sample(s)${filterNote}`
+    : `[pipeline.budget.generate] wrote ${budgets.length} budget(s) from ${records.length} sample(s)${filterNote}${skipped > 0 ? ` (${skipped} unparseable line(s) skipped)` : ""}`;
 
   return {
     data: {
