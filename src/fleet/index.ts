@@ -7,9 +7,25 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0964: initial barrel — runFleetSitesGenerate, validateFleetSitesDrift, FleetSiteRecord, createFleetModule.</item>
+  <item>RFC-0967: add registerOwnership, verifyOwnership, transferOwnership, deriveInstanceId, OwnershipError, OwnershipClaim, RegisterResult, VerifyResult, TransferResult.</item>
 </CHANGE_SUMMARY>
 */
 
-export { runFleetSitesGenerate, validateFleetSitesDrift, type FleetSiteRecord } from "./fleet-sites-generate.ts";
+export {
+  runFleetSitesGenerate,
+  validateFleetSitesDrift,
+  type FleetSiteRecord,
+} from "./fleet-sites-generate.ts";
 export { runFleetApply, type FleetApplyResult, type FleetApplyReportEntry } from "./apply.ts";
+export {
+  registerOwnership,
+  verifyOwnership,
+  transferOwnership,
+  deriveInstanceId,
+  OwnershipError,
+  type OwnershipClaim,
+  type RegisterResult,
+  type VerifyResult,
+  type TransferResult,
+} from "./ownership-registry.ts";
 export { createFleetModule } from "./fleet.module.ts";
