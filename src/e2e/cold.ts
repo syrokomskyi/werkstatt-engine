@@ -480,7 +480,7 @@ legalJurisdiction: DE
                   }
                   if (!fm.includes("pages:")) {
                     fm +=
-                      "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - Hyperion\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - Hyperion\n    routes:\n      de: leistungen";
+                      "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
                   }
                   return `---\n${fm}\n---`;
                 },
