@@ -446,13 +446,9 @@ legalJurisdiction: DE
                     fm +=
                       "\nverification:\n  google:\n    method: dns-txt\n    token: google-site-verification=e2e-cold-test-token";
                   }
-                  if (!fm.includes("surface:")) {
-                    fm +=
-                      "\nsurface:\n  blueprints:\n    - ratgeber\n    - website-local\n    - website-service";
-                  }
                   if (!fm.includes("pages:")) {
                     fm +=
-                      "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    routes:\n      de: preise";
+                      "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    routes:\n      de: leistungen";
                   }
                   return `---\n${fm}\n---`;
                 },
@@ -467,7 +463,7 @@ legalJurisdiction: DE
               // (no markdown body) with title, description, and lang fields.
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
-              for (const slug of ["digitales-fundament", "contact", "pricing"]) {
+              for (const slug of ["digitales-fundament", "contact", "pricing", "leistungen"]) {
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
