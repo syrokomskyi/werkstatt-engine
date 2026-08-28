@@ -311,6 +311,26 @@ export async function runSternsystemRegister(
     // RFC-0574: mirror hook removed — star topology uses explicit sternsystem.sync
     void workspaceRoot;
 
+    // RFC-0966: Generate initial passport at site birth (non-fatal if no signing key)
+    try {
+      const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
+      const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
+      if (privateKeyEnv || privateKeyPath) {
+        const { runSternsystemPassportGenerate } =
+          await import("./sternsystem-passport-generate.ts");
+        await runSternsystemPassportGenerate(makeInput({ id, actor: "human:operator" }), context);
+        logger.info(`  [sternsystem.register] Initial passport generated for ${id}`);
+      } else {
+        logger.info(
+          `  [sternsystem.register] No signing key configured — passport generation skipped (run sternsystem.passport.generate later)`,
+        );
+      }
+    } catch (passportErr) {
+      logger.warn(
+        `  [sternsystem.register] Passport generation failed (non-fatal): ${passportErr instanceof Error ? passportErr.message : String(passportErr)}`,
+      );
+    }
+
     logger.success(
       `[sternsystem.register] registered '${id}' (cosmicStar: ${cosmicStar}) — mission ${missionId} opened and materialized`,
     );

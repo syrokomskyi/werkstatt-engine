@@ -50,6 +50,8 @@ import {
   writeSystemState,
   resolveCacheClonePath,
   resolveMirrorPath,
+  readPassport,
+  writePassport,
 } from "../sternsystem/registry-io.ts";
 import { readMissionManifest, writeMissionManifest, resolveMissionDir } from "./mission-io.ts";
 import {
@@ -730,6 +732,78 @@ export async function buildCloseSteps(
         } else if (existsSync(axiomEvidenceDir)) {
           logger.warn(
             `  Evidence directory exists but evidence-metadata.json is missing — skipping sync`,
+          );
+        }
+      },
+    },
+    {
+      name: "passport-refresh",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const logger = cc.context.logger;
+        try {
+          const existingPassport = await readPassport(cc.workspaceRoot, cc.manifest.systemId);
+          if (!existingPassport) {
+            logger.info(
+              `  [passport-refresh] No existing passport — skipping (run sternsystem.passport.generate to create)`,
+            );
+            return;
+          }
+
+          const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
+          const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
+          if (!privateKeyEnv && !privateKeyPath) {
+            logger.info(
+              `  [passport-refresh] No signing key configured — skipping passport refresh`,
+            );
+            return;
+          }
+
+          const { loadPrivateKey } = await import("@warpgogol/werkstatt-engine/signing");
+          const { buildPassportPayload, signPassport, derivePublicKey } =
+            await import("../sternsystem/passport.ts");
+
+          let privateKeyBytes: Uint8Array;
+          try {
+            if (privateKeyEnv) {
+              privateKeyBytes = await loadPrivateKey({ pem: privateKeyEnv });
+            } else {
+              privateKeyBytes = await loadPrivateKey({
+                filePath: privateKeyPath!,
+                encoding: "pem",
+              });
+            }
+          } catch {
+            logger.info(
+              `  [passport-refresh] Failed to load signing key — skipping passport refresh`,
+            );
+            return;
+          }
+
+          const creatorPublicKey = await derivePublicKey(privateKeyBytes);
+          const payload = await buildPassportPayload({
+            systemId: cc.manifest.systemId,
+            werkstattRoot: cc.workspaceRoot,
+            creatorIdentity: existingPassport.payload.creator.identity,
+            creatorPublicKey,
+          });
+          payload.provenance.createdAt = existingPassport.payload.provenance.createdAt;
+          const { passportHash, signature } = await signPassport(payload, privateKeyBytes);
+
+          if (passportHash === existingPassport.passportHash) {
+            logger.info(`  [passport-refresh] Passport unchanged — no write needed`);
+            return;
+          }
+
+          await writePassport(cc.workspaceRoot, cc.manifest.systemId, {
+            payload,
+            passportHash,
+            signature,
+          });
+          logger.success(`  [passport-refresh] Passport refreshed (hash: ${passportHash})`);
+        } catch (err) {
+          logger.warn(
+            `  [passport-refresh] Non-fatal error: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       },
