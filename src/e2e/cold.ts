@@ -340,18 +340,22 @@ export async function runColdE2e(
           );
 
           // RFC-0073: pbp.content.validate requires src/content/business-profile/de/
-          // to exist. Commit it to the cache clone git repo so materialization
-          // copies it into the workpiece. The build.prepare.dev pipeline (run
-          // during mission.open inside sternsystem.register) validates before
-          // the content-edit step, so it must be present at materialization time.
-          await fs.mkdir(path.join(cachePath, "src", "content", "business-profile", "de"), {
-            recursive: true,
-          });
+          // to exist. pbp.profile.validate requires business.md, web/, contact/, places/.
+          // Commit them to the cache clone git repo so materialization copies them
+          // into the workpiece. The build.prepare.dev pipeline (run during
+          // mission.open inside sternsystem.register) validates before the
+          // content-edit step, so they must be present at materialization time.
+          const pbpDeDir = path.join(cachePath, "src", "content", "business-profile", "de");
+          await fs.mkdir(pbpDeDir, { recursive: true });
           await fs.writeFile(
-            path.join(cachePath, "src", "content", "business-profile", "de", ".gitkeep"),
-            "",
+            path.join(pbpDeDir, "business.md"),
+            "---\ncosmicStar: Polaris\ntitle: E2E Cold Test Business\ndescription: Synthetic business profile for cold E2E\nlang: de\n---\n",
             "utf-8",
           );
+          for (const sub of ["web", "contact", "places"]) {
+            await fs.mkdir(path.join(pbpDeDir, sub), { recursive: true });
+            await fs.writeFile(path.join(pbpDeDir, sub, ".gitkeep"), "", "utf-8");
+          }
           execFileSync("git", ["add", "-A"], {
             cwd: cachePath,
             encoding: "utf-8",
