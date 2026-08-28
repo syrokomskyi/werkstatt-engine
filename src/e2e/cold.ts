@@ -554,6 +554,15 @@ legalJurisdiction: DE
               "utf-8",
             );
 
+            // RFC-0721: behavior.snapshot.validate requires a committed
+            // behavior.snapshot.generated.yaml. Generate and commit it.
+            await runSubCommand(
+              stepCtx.workspaceRoot,
+              "behavior.snapshot.generate",
+              [`--site=e2e-cold`],
+              logger,
+            );
+
             // Commit the edit
             await runSubCommand(
               stepCtx.workspaceRoot,
