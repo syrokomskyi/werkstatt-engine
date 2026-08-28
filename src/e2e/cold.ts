@@ -378,6 +378,12 @@ export async function runColdE2e(
             "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\n---\n",
             "utf-8",
           );
+          // RFC-0074: infra.brief.validate checks for wrangler.jsonc existence.
+          await fs.writeFile(
+            path.join(cachePath, "wrangler.jsonc"),
+            '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01"\n}\n',
+            "utf-8",
+          );
           execFileSync("git", ["add", "-A"], {
             cwd: cachePath,
             encoding: "utf-8",
