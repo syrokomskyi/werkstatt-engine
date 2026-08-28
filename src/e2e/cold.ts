@@ -480,7 +480,7 @@ legalJurisdiction: DE
                   }
                   if (!fm.includes("pages:")) {
                     fm +=
-                      "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
+                      "\npages:\n  - pageId: home\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: ''\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
                   }
                   // Fix i18n config: scaffold creates supported.de without hreflang,
                   // which causes validateI18nConfig to reject it and i18n.middleware.generate
@@ -505,6 +505,11 @@ legalJurisdiction: DE
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
               const pageStubs: Record<string, { title: string; description: string }> = {
+                index: {
+                  title: "Startseite",
+                  description:
+                    "Willkommen bei E2E Cold Test — digitale Souveränität und Stabilität.",
+                },
                 "digitales-fundament": {
                   title: "Digitales Fundament",
                   description:
@@ -527,7 +532,12 @@ legalJurisdiction: DE
                 },
               };
               for (const [slug, meta] of Object.entries(pageStubs)) {
-                const pageId = slug === "digitales-fundament" ? "digitalesFundament" : slug;
+                const pageId =
+                  slug === "digitales-fundament"
+                    ? "digitalesFundament"
+                    : slug === "index"
+                      ? "home"
+                      : slug;
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
