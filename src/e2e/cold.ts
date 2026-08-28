@@ -384,10 +384,6 @@ i18n:
   supported:
     - de
 legalJurisdiction: DE
-verification:
-  google:
-    method: dns-txt
-    token: google-site-verification=e2e-cold-test-token
 ---
 `;
           await fs.writeFile(path.join(briefDir, "00-brief.md"), fixtureBrief, "utf-8");
@@ -439,9 +435,18 @@ verification:
             const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
             if (existsSync(systemMdPath)) {
               const content = await fs.readFile(systemMdPath, "utf-8");
+              // Inject verification.google block into frontmatter for
+              // search.verification.validate (SEARCH-VERIFY-01).
+              const updatedContent = content.replace(
+                /^---\n([\s\S]*?)\n---/,
+                (match, frontmatter: string) => {
+                  if (frontmatter.includes("verification:")) return match;
+                  return `---\n${frontmatter}\nverification:\n  google:\n    method: dns-txt\n    token: google-site-verification=e2e-cold-test-token\n---`;
+                },
+              );
               // Append a deterministic cold-run marker
               const marker = `\n\n<!-- e2e-cold: ${platformCommit} -->\n`;
-              await fs.writeFile(systemMdPath, content + marker);
+              await fs.writeFile(systemMdPath, updatedContent + marker);
             }
 
             // Commit the edit
