@@ -25,6 +25,7 @@ RFC-0790: add systemConfigSchema, systemStateSchema, servicesRegistrySchema for 
   <item>RFC-0790: add systemConfigSchema, systemStateSchema, servicesRegistrySchema for convention-based discovery.</item>
   <item>RFC-0806: add lastDevDeployed to serviceEntrySchema, add cloudflare-worker to kind enum.</item>
   <item>RFC-0902: update kebabRe error messages to mention "no TLD suffix".</item>
+  <item>RFC-0964: add fleet.canary field to systemConfigSchema for wave orchestration.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -131,6 +132,12 @@ export const systemConfigSchema = z.object({
     .optional()
     .describe("VC subject id of the site owner (RFC-0558, RFC-0561)"),
   notes: z.string().default(""),
+  fleet: z
+    .object({
+      canary: z.boolean().default(false),
+    })
+    .optional()
+    .describe("RFC-0964: fleet wave orchestration config"),
 });
 
 export const systemStateSchema = z.object({
