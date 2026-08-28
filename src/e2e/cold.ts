@@ -384,19 +384,6 @@ export async function runColdE2e(
             '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01"\n}\n',
             "utf-8",
           );
-          // Fix i18n config: scaffold creates supported.de without hreflang,
-          // which causes validateI18nConfig to reject it and i18n.middleware.generate
-          // to skip generating language-redirect.ts.
-          const systemMdCachePath = path.join(cachePath, "src", "content", "system.md");
-          if (existsSync(systemMdCachePath)) {
-            const sysContent = await fs.readFile(systemMdCachePath, "utf-8");
-            const fixedSysContent = sysContent.replace(
-              /(\ni18n:\n  default: (\w+)\n  supported:\n    \2:\n      name: \w+\n)/,
-              (match) =>
-                match.replace("      name: de\n", "      name: de\n      hreflang: de-DE\n"),
-            );
-            await fs.writeFile(systemMdCachePath, fixedSysContent, "utf-8");
-          }
           execFileSync("git", ["add", "-A"], {
             cwd: cachePath,
             encoding: "utf-8",
@@ -494,6 +481,15 @@ legalJurisdiction: DE
                   if (!fm.includes("pages:")) {
                     fm +=
                       "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
+                  }
+                  // Fix i18n config: scaffold creates supported.de without hreflang,
+                  // which causes validateI18nConfig to reject it and i18n.middleware.generate
+                  // to skip generating language-redirect.ts.
+                  if (fm.includes("i18n:") && !fm.includes("hreflang:")) {
+                    fm = fm.replace(
+                      /(i18n:\n  default: \w+\n  supported:\n    \w+:\n      name: \w+)\n/,
+                      "$1\n      hreflang: de-DE\n",
+                    );
                   }
                   return `---\n${fm}\n---`;
                 },
