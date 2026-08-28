@@ -550,7 +550,7 @@ legalJurisdiction: DE
             await fs.mkdir(middlewareDir, { recursive: true });
             await fs.writeFile(
               path.join(middlewareDir, "host-canonical-redirect.ts"),
-              '// RFC-0908: www → apex canonical redirect stub\n// host.canonical.config.validate scans for Response.redirect patterns\nexport function redirectWwwToApex(host: string): Response | null {\n  if (host === "www.e2e-cold.test") {\n    return Response.redirect("https://e2e-cold.test", 301);\n  }\n  return null;\n}\n',
+              '// RFC-0908: www → apex canonical redirect stub\n/*\n<MODULE_CONTRACT>\n<purpose>Stub for host.canonical.config.validate pattern detection.</purpose>\n<non-goals>\n  <item>Does not perform actual redirects — exists for validator scan satisfaction only.</item>\n</non-goals>\n</MODULE_CONTRACT>\n<CHANGE_SUMMARY>\n  <item>RFC-0965: cold E2E host canonical redirect stub.</item>\n</CHANGE_SUMMARY>\n*/\n// @ai-invariant: Stub file for validator pattern detection only.\nexport function redirectWwwToApex(host: string): Response | null {\n  if (host === "www.e2e-cold.test") {\n    return Response.redirect("https://e2e-cold.test", 301);\n  }\n  return null;\n}\n',
               "utf-8",
             );
 
