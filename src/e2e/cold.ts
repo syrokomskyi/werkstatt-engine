@@ -448,7 +448,7 @@ legalJurisdiction: DE
                   }
                   if (!fm.includes("pages:")) {
                     fm +=
-                      "\npages:\n  - pageId: digitalesFundament\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    routes:\n      de: kontakt\n  - pageId: pricing\n    routes:\n      de: preise";
+                      "\npages:\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    routes:\n      de: preise";
                   }
                   return `---\n${fm}\n---`;
                 },
