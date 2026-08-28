@@ -154,6 +154,8 @@ export type { CommitRecord, CommitMessageFinding } from "./commit-message-lint.t
 
 // RFC-0270: pipeline timing budgets derived from telemetry
 export { pipelineBudgetModule } from "./pipeline-budget.module.ts";
+// RFC-0963: validator inventory and consolidation
+export { validatorInventoryModule } from "./validator-inventory.module.ts";
 // RFC-0332: change impact classifier and advisory check profiles
 export { changeImpactModule } from "./change-impact.module.ts";
 export * from "./change-impact.ts";

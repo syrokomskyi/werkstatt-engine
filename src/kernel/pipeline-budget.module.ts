@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0270: initial implementation.</item>
+  <item>RFC-0963: register pipeline.budget.validate command.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -18,6 +19,7 @@ export const pipelineBudgetModule: KernelModule = {
 
   async register(registry) {
     const { runPipelineBudgetGenerate } = await import("./pipeline-budgets.ts");
+    const { runPipelineBudgetValidate } = await import("./pipeline-budget-validate.ts");
     registry.registerCommand({
       name: "pipeline.budget.generate",
       modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
@@ -35,6 +37,28 @@ export const pipelineBudgetModule: KernelModule = {
         },
       },
       execute: runPipelineBudgetGenerate,
+    });
+    registry.registerCommand({
+      name: "pipeline.budget.validate",
+      modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
+      description:
+        "Compare fresh telemetry p95 against committed budgets in docs/pipeline-budgets.generated.yaml (RFC-0963). " +
+        "Returns BUDGET-01 for breaches, BUDGET-02 for steps with no telemetry. Supports --site and --tolerance flags.",
+      scope: "workspace",
+      mutatesState: false,
+      cacheable: false,
+      flags: {
+        site: {
+          kind: "string",
+          description: "Filter validation to a specific site id.",
+        },
+        tolerance: {
+          kind: "string",
+          description:
+            "Multiplier applied to expectedDurationMs to compute the breach threshold (default: 1.5).",
+        },
+      },
+      execute: runPipelineBudgetValidate,
     });
   },
 };
