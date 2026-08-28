@@ -379,9 +379,10 @@ export async function runColdE2e(
             "utf-8",
           );
           // RFC-0074: infra.brief.validate checks for wrangler.jsonc existence.
+          // RFC-0908: host.canonical.config.validate requires a www→apex redirect route.
           await fs.writeFile(
             path.join(cachePath, "wrangler.jsonc"),
-            '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01"\n}\n',
+            '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01",\n  "routes": ["www.e2e-cold.test/*"]\n}\n',
             "utf-8",
           );
           execFileSync("git", ["add", "-A"], {
