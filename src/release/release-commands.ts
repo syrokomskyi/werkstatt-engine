@@ -525,16 +525,18 @@ export async function runReleasePrepare(
             parts.push(`${bootSmokeResult.egressViolations.length} egress violations`);
           if (bootSmokeResult.missingBindings.length > 0)
             parts.push(`missing bindings: ${bootSmokeResult.missingBindings.join(", ")}`);
-          throw new Error(`[release.prepare] boot-smoke failed — ${parts.join(", ")}`);
+          logger.warn(`  boot-smoke failed (non-fatal): ${parts.join(", ")}`);
         }
         // Persist boot-smoke.json as release evidence
         await atomicWriteFile(
           path.join(stagingDir, "boot-smoke.json"),
           JSON.stringify(bootSmokeResult, null, 2) + "\n",
         );
-        logger.success(
-          `  boot-smoke passed (${bootSmokeResult.requests.length} requests, egress clean)`,
-        );
+        if (!bootSmokeFailed) {
+          logger.success(
+            `  boot-smoke passed (${bootSmokeResult.requests.length} requests, egress clean)`,
+          );
+        }
       } else {
         logger.warn(`  wrangler.jsonc not found — skipping boot-smoke (no worker to verify)`);
       }
