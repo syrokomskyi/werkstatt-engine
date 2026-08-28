@@ -463,7 +463,7 @@ legalJurisdiction: DE
               // (no markdown body) with title, description, and lang fields.
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
-              for (const slug of ["digitales-fundament", "contact", "pricing", "leistungen"]) {
+              for (const slug of ["digitales-fundament", "contact", "pricing", "services"]) {
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(

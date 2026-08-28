@@ -68,7 +68,8 @@ function setupSystem(systemId: string): string {
     JSON.stringify({
       platform: {
         version: "6.0.0",
-        semanticHash: "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        platformSemanticHash:
+          "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
       },
     }),
   );

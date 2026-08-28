@@ -30,9 +30,16 @@ import {
   snapshotCanonicalJsonObjectV1,
   canonicalJsonHashV1,
 } from "@warpgogol/werkstatt-engine/fingerprint";
-import { signBytes, verifyBytes, toHex, fromHex, getPublicKey } from "@warpgogol/werkstatt-engine/signing";
+import {
+  signBytes,
+  verifyBytes,
+  toHex,
+  fromHex,
+  getPublicKey,
+} from "@warpgogol/werkstatt-engine/signing";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import { resolveCacheClonePath, readSystemConfig } from "./registry-io.ts";
+import { z } from "zod";
 import type { SystemConfig } from "@warpgogol/werkstatt-engine/schemas";
 
 export interface SitePassportV1 {
@@ -67,6 +74,13 @@ export interface SignedSitePassport {
   passportHash: string;
   signature: string;
 }
+
+const partialPinSchema = z.object({
+  platform: z.object({
+    version: z.string().min(1),
+    platformSemanticHash: z.string().min(1),
+  }),
+});
 
 const CREDENTIAL_RE = /^https?:\/\/[^:]+:[^@]+@/;
 
@@ -134,14 +148,15 @@ export async function buildPassportPayload(input: {
 
   const pinPath = path.join(cacheClonePath, "system.pin.json");
   let platformVersion = "0.0.0";
-  let platformSemanticHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+  let platformSemanticHash =
+    "sha256:0000000000000000000000000000000000000000000000000000000000000000";
   if (existsSync(pinPath)) {
     const pinRaw = await fs.readFile(pinPath, "utf8");
-    const pin = JSON.parse(pinRaw) as {
-      platform: { version: string; platformSemanticHash?: string; semanticHash?: string };
-    };
-    platformVersion = pin.platform.version;
-    platformSemanticHash = pin.platform.platformSemanticHash ?? pin.platform.semanticHash ?? platformSemanticHash;
+    const pinParsed = partialPinSchema.safeParse(JSON.parse(pinRaw));
+    if (pinParsed.success) {
+      platformVersion = pinParsed.data.platform.version;
+      platformSemanticHash = pinParsed.data.platform.platformSemanticHash;
+    }
   }
 
   const envExamplePath = path.join(cacheClonePath, ".env.example");
@@ -163,12 +178,11 @@ export async function buildPassportPayload(input: {
 
   const missionCounter = countMissions(cacheClonePath);
 
-  const mirrors: Array<{ role: "cache" | "bare" | "external"; locator: string }> = config.mirrors.map(
-    (m, i) => ({
+  const mirrors: Array<{ role: "cache" | "bare" | "external"; locator: string }> =
+    config.mirrors.map((m, i) => ({
       role: mirrorRole(i),
       locator: sanitizeLocator(m.path),
-    }),
-  );
+    }));
 
   const now = new Date().toISOString();
 
@@ -206,7 +220,9 @@ export async function signPassport(
 ): Promise<{ passportHash: string; signature: string }> {
   const snapshot = snapshotCanonicalJsonObjectV1(payload);
   if (!snapshot.ok) {
-    throw new Error(`CERT-CANONICAL-SNAPSHOT-01: failed to canonicalize passport payload (${snapshot.code})`);
+    throw new Error(
+      `CERT-CANONICAL-SNAPSHOT-01: failed to canonicalize passport payload (${snapshot.code})`,
+    );
   }
   const passportHash = canonicalJsonHashV1(snapshot.value);
   const hashBytes = new Uint8Array(Buffer.from(passportHash, "utf8"));
@@ -236,9 +252,7 @@ export async function verifyPassport(
 
   const expectedHash = canonicalJsonHashV1(snapshot.value);
   if (doc.passportHash !== expectedHash) {
-    errors.push(
-      `passportHash mismatch: expected ${expectedHash}, got ${doc.passportHash}`,
-    );
+    errors.push(`passportHash mismatch: expected ${expectedHash}, got ${doc.passportHash}`);
   }
 
   try {
@@ -247,7 +261,9 @@ export async function verifyPassport(
     const signatureBytes = fromHex(doc.signature);
     const sigValid = await verifyBytes(publicKeyBytes, hashBytes, signatureBytes);
     if (!sigValid) {
-      errors.push("Ed25519 signature verification failed — passport may be tampered or signed by a different key");
+      errors.push(
+        "Ed25519 signature verification failed — passport may be tampered or signed by a different key",
+      );
     }
   } catch (err) {
     errors.push(
@@ -266,7 +282,9 @@ export async function derivePublicKey(privateKeyBytes: Uint8Array): Promise<stri
 export function computePassportHash(payload: SitePassportV1): string {
   const snapshot = snapshotCanonicalJsonObjectV1(payload);
   if (!snapshot.ok) {
-    throw new Error(`CERT-CANONICAL-SNAPSHOT-01: failed to canonicalize passport payload (${snapshot.code})`);
+    throw new Error(
+      `CERT-CANONICAL-SNAPSHOT-01: failed to canonicalize passport payload (${snapshot.code})`,
+    );
   }
   return canonicalJsonHashV1(snapshot.value);
 }

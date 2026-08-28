@@ -759,11 +759,11 @@ export async function buildCloseSteps(
             return;
           }
 
+          let privateKeyBytes: Uint8Array;
+          // Dynamic import avoids circular dependency at module load time
           const { loadPrivateKey } = await import("@warpgogol/werkstatt-engine/signing");
           const { buildPassportPayload, signPassport, derivePublicKey } =
             await import("../sternsystem/passport.ts");
-
-          let privateKeyBytes: Uint8Array;
           try {
             if (privateKeyEnv) {
               privateKeyBytes = await loadPrivateKey({ pem: privateKeyEnv });
@@ -800,6 +800,10 @@ export async function buildCloseSteps(
             passportHash,
             signature,
           });
+          // Stage passport.json so subsequent commit steps include it
+          const { execFileSync } = await import("node:child_process");
+          const cacheClonePath = resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
+          execFileSync("git", ["-C", cacheClonePath, "add", "passport.json"], { stdio: "pipe" });
           logger.success(`  [passport-refresh] Passport refreshed (hash: ${passportHash})`);
         } catch (err) {
           logger.warn(
