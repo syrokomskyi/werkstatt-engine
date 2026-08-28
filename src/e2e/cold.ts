@@ -459,13 +459,17 @@ legalJurisdiction: DE
 
               // Create minimal content page files for the pageIds declared in
               // system.md pages[] so that generated.stale.validate can resolve
-              // preview images back to content pages.
+              // preview images back to content pages. Pages must be frontmatter-only
+              // (no markdown body) with title, description, and lang fields.
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
               for (const slug of ["digitales-fundament", "contact", "pricing"]) {
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
-                  await fs.writeFile(pageFile, `---\ncosmicStar: Polaris\n---\n\n# ${slug}\n`);
+                  await fs.writeFile(
+                    pageFile,
+                    `---\ncosmicStar: Polaris\ntitle: ${slug}\ndescription: ${slug}\nlang: de\n---\n`,
+                  );
                 }
               }
             }
