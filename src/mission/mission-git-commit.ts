@@ -317,6 +317,7 @@ function commitDirIfDirty(dir: string, commitMessage: string): WorkpieceCommitRe
 export function commitWorkpieceIfDirty(
   workpieceDir: string,
   missionId: string,
+  message?: string,
 ): WorkpieceCommitResult {
   // RFC-0878: Defence-in-depth — refuse to commit if .closed sentinel exists.
   // commitDirIfDirty uses --no-verify which bypasses the pre-commit hook.
@@ -325,7 +326,8 @@ export function commitWorkpieceIfDirty(
       `[commitWorkpieceIfDirty] workpiece is closed (RFC-0878) — mission '${missionId}' has a .closed sentinel file. No commits are allowed in a closed workpiece.`,
     );
   }
-  return commitDirIfDirty(workpieceDir, `workpiece: auto-commit before reconcile ${missionId}`);
+  const commitMessage = message ?? `workpiece: auto-commit before reconcile ${missionId}`;
+  return commitDirIfDirty(workpieceDir, commitMessage);
 }
 
 export function commitCacheCloneIfDirty(

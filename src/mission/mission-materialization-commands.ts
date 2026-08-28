@@ -737,7 +737,28 @@ export async function runMissionValidate(
           JSON.stringify(reusedReport, null, 2) + "\n",
         );
 
-        const dirtyCheck = isWorkpieceDirty(workpieceDir);
+        // RFC-0976: auto-commit generated artifacts after successful validation (reuse path).
+        const skipAutoCommitReuse = input.flags["skip-auto-commit"] === true;
+        let dirtyCheck = isWorkpieceDirty(workpieceDir);
+        if (dirtyCheck.dirty && !skipAutoCommitReuse) {
+          try {
+            const autoCommit = commitWorkpieceIfDirty(
+              workpieceDir,
+              missionId,
+              "chore: post-validation artifacts (mission.validate)",
+            );
+            if (autoCommit.committed) {
+              logger.info(
+                `[mission.validate] auto-committed ${dirtyCheck.fileCount} generated artifact(s) (${autoCommit.commitSha?.slice(0, 8)})`,
+              );
+            }
+            dirtyCheck = isWorkpieceDirty(workpieceDir);
+          } catch (err) {
+            logger.warn(
+              `[mission.validate] auto-commit failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
         if (dirtyCheck.dirty) {
           logger.warn(
             `[mission.validate] workpiece has ${dirtyCheck.fileCount} uncommitted file(s) — reconcile will auto-commit these before merge. Run \`git status\` to review.`,
@@ -1048,7 +1069,29 @@ export async function runMissionValidate(
     };
   }
 
-  const dirtyCheck = isWorkpieceDirty(workpieceDir);
+  // RFC-0976: auto-commit generated artifacts after successful validation.
+  const skipAutoCommit = input.flags["skip-auto-commit"] === true;
+  let dirtyCheck = isWorkpieceDirty(workpieceDir);
+  if (dirtyCheck.dirty && !skipAutoCommit) {
+    try {
+      const autoCommit = commitWorkpieceIfDirty(
+        workpieceDir,
+        missionId,
+        "chore: post-validation artifacts (mission.validate)",
+      );
+      if (autoCommit.committed) {
+        logger.info(
+          `[mission.validate] auto-committed ${dirtyCheck.fileCount} generated artifact(s) (${autoCommit.commitSha?.slice(0, 8)})`,
+        );
+      }
+      // Re-check dirty state after auto-commit
+      dirtyCheck = isWorkpieceDirty(workpieceDir);
+    } catch (err) {
+      logger.warn(
+        `[mission.validate] auto-commit failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
   if (dirtyCheck.dirty) {
     logger.warn(
       `[mission.validate] workpiece has ${dirtyCheck.fileCount} uncommitted file(s) — reconcile will auto-commit these before merge. Run \`git status\` to review.`,

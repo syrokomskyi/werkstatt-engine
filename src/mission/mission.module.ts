@@ -278,6 +278,11 @@ export function createMissionModule(): KernelModule {
             kind: "boolean",
             description: "RFC-0973: Clear all caches and stale artifacts before validation.",
           },
+          "skip-auto-commit": {
+            kind: "boolean",
+            description:
+              "RFC-0976: Skip auto-commit of generated artifacts after successful validation.",
+          },
         },
         reads: ["missions/{mission}/**"],
         cacheable: false,
