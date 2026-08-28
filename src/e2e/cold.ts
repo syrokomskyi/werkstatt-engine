@@ -496,11 +496,12 @@ legalJurisdiction: DE
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
               for (const slug of ["digitales-fundament", "contact", "pricing", "services"]) {
+                const pageId = slug === "digitales-fundament" ? "digitalesFundament" : slug;
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
                     pageFile,
-                    `---\ncosmicStar: Polaris\npageId: ${slug}\ntitle: ${slug}\ndescription: ${slug}\nlang: de\nblocks:\n  - id: main\n    type: markdown\n---\n`,
+                    `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${slug}\ndescription: ${slug}\nlang: de\nblocks:\n  - id: main\n    type: markdown\n---\n`,
                   );
                 }
               }
