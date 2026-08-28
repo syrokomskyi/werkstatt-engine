@@ -218,6 +218,14 @@
       "types": "./src/leitstand/leitstand.module.ts",
       "default": "./src/leitstand/leitstand.module.ts"
     },
+    "./fleet": {
+      "types": "./src/fleet/index.ts",
+      "default": "./src/fleet/index.ts"
+    },
+    "./fleet-module": {
+      "types": "./src/fleet/fleet.module.ts",
+      "default": "./src/fleet/fleet.module.ts"
+    },
     "./subdomain-module": {
       "types": "./src/subdomain/subdomain.module.ts",
       "default": "./src/subdomain/subdomain.module.ts"
