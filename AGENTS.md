@@ -73,6 +73,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - All lifecycle commands (`mission.open`, `mission.close`, `mission.abort`, `mission.materialize`, `mission.validate`, `mission.reconcile`) use `runOperation` with a journal at `missions/<missionId>/journal.jsonl` for crash-safe resumable execution.
 - `mission.resume` reads the journal, resolves steps via `resolveOperationSteps`, and calls `runOperation` with `resumeOpId` to skip completed steps.
 - Different-kind operation blocking: before calling `runOperation`, each lifecycle command calls `checkDifferentKindOperation` to block if a different-kind operation is incomplete.
+- `mission.preflight` (RFC-0971) runs `ownership.sync.validate` and `generated.stale.validate` against the cache clone before mission open. Read-only per K-0004. Dispatches via `executeRegisteredCommand` with a custom `site.directory` pointing to the cache clone path.
 
 ### Agent Gate (RFC-0286, RFC-0954)
 
