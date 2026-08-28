@@ -305,6 +305,24 @@ export async function runColdE2e(
             stdio: ["pipe", "pipe", "pipe"],
           });
 
+          // Initial commit + push to create main branch in bare repo
+          await fs.writeFile(path.join(cachePath, "README.md"), "# e2e-cold\n", "utf-8");
+          execFileSync("git", ["add", "-A"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          execFileSync("git", ["commit", "-m", "initial"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          execFileSync("git", ["push", "origin", "main"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+
           // Copy fixture brief into cold root
           const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
           await fs.mkdir(briefDir, { recursive: true });
