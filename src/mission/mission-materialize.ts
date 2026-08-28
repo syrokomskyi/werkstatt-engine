@@ -190,6 +190,7 @@ const STERNSYSTEM_DATA_PATHS = [
   "src/content",
   "public",
   "provenance",
+  "bordbuch",
   "behavior.snapshot.generated.yaml",
   "system-config.yaml",
   "system-state.yaml",
@@ -1649,11 +1650,11 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         if (existsSync(path.join(cc.workpieceDir, ".git"))) {
-          const dataPathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json"];
-          for (const dataPath of dataPathsToAdd) {
-            const fullPath = path.join(cc.workpieceDir, dataPath);
+          const pathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json", ...cc.regeneratedFiles];
+          for (const addPath of pathsToAdd) {
+            const fullPath = path.join(cc.workpieceDir, addPath);
             if (existsSync(fullPath)) {
-              execSync(`git add -- ${JSON.stringify(dataPath)}`, {
+              execSync(`git add -- ${JSON.stringify(addPath)}`, {
                 cwd: cc.workpieceDir,
                 stdio: ["pipe", "pipe", "pipe"],
               });
@@ -1672,14 +1673,16 @@ export async function buildMaterializeSteps(
             },
           });
           await installWorkpieceCommitHook(cc.workpieceDir);
-          cc.logger.info(`  Git commit created in workpiece (data-only, on top of cloned history)`);
+          cc.logger.info(
+            `  Git commit created in workpiece (data + template files, on top of cloned history)`,
+          );
         } else {
           execSync("git init -b main", { cwd: cc.workpieceDir, stdio: ["pipe", "pipe", "pipe"] });
-          const dataPathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json"];
-          for (const dataPath of dataPathsToAdd) {
-            const fullPath = path.join(cc.workpieceDir, dataPath);
+          const pathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json", ...cc.regeneratedFiles];
+          for (const addPath of pathsToAdd) {
+            const fullPath = path.join(cc.workpieceDir, addPath);
             if (existsSync(fullPath)) {
-              execSync(`git add -- ${JSON.stringify(dataPath)}`, {
+              execSync(`git add -- ${JSON.stringify(addPath)}`, {
                 cwd: cc.workpieceDir,
                 stdio: ["pipe", "pipe", "pipe"],
               });

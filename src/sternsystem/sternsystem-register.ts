@@ -20,6 +20,7 @@ import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
+import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -282,11 +283,7 @@ export async function runSternsystemRegister(
     if (existsSync(join(systemDir, ".git"))) {
       try {
         execSync("git add -A", { cwd: systemDir, stdio: "pipe", timeout: 10_000 });
-        execSync(`git commit -m "sternsystem.register: scaffold ${id}"`, {
-          cwd: systemDir,
-          stdio: "pipe",
-          timeout: 10_000,
-        });
+        cacheCloneCommit(systemDir, `sternsystem.register: scaffold ${id}`);
         // Push to bare repo so syncCacheClone can fetch
         try {
           execSync("git push origin main", { cwd: systemDir, stdio: "pipe", timeout: 10_000 });
