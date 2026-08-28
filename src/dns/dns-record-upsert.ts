@@ -90,7 +90,28 @@ export async function runDnsRecordUpsert(
   }
 
   const { systems } = await discoverSystems(workspaceRoot);
-  const zoneId = resolveDnsZoneId(systems, declaration.zone);
+  let zoneId: string;
+  try {
+    zoneId = resolveDnsZoneId(systems, declaration.zone);
+  } catch {
+    return {
+      data: {
+        command: "dns.record.upsert",
+        systemId,
+        zone: declaration.zone,
+        dryRun,
+        results: [],
+        summary: { created: 0, updated: 0, skipped: 0, total: 0, errors: 0 },
+      },
+      summary: `[dns.record.upsert] ${systemId}: skipped — zone '${declaration.zone}' not found in system-config.yaml`,
+      nextSteps: [
+        {
+          action: `Add a system with deployment channel matching '${declaration.zone}' to system-config.yaml, or remove dns-records.yaml if DNS management is not needed.`,
+          kind: "optional",
+        },
+      ],
+    };
+  }
 
   const env = await resolveDnsEnv();
   const apiToken = env["CLOUDFLARE_API_TOKEN"];
