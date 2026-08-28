@@ -435,13 +435,22 @@ legalJurisdiction: DE
             const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
             if (existsSync(systemMdPath)) {
               const content = await fs.readFile(systemMdPath, "utf-8");
-              // Inject verification.google block into frontmatter for
-              // search.verification.validate (SEARCH-VERIFY-01).
+              // Inject verification.google block and pages[] array into
+              // frontmatter for search.verification.validate (SEARCH-VERIFY-01)
+              // and semantic.targets.validate (SEM-TARGET-04).
               const updatedContent = content.replace(
                 /^---\n([\s\S]*?)\n---/,
                 (match, frontmatter: string) => {
-                  if (frontmatter.includes("verification:")) return match;
-                  return `---\n${frontmatter}\nverification:\n  google:\n    method: dns-txt\n    token: google-site-verification=e2e-cold-test-token\n---`;
+                  let fm = frontmatter;
+                  if (!fm.includes("verification:")) {
+                    fm +=
+                      "\nverification:\n  google:\n    method: dns-txt\n    token: google-site-verification=e2e-cold-test-token";
+                  }
+                  if (!fm.includes("pages:")) {
+                    fm +=
+                      "\npages:\n  - pageId: digitalesFundament\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    routes:\n      de: kontakt\n  - pageId: pricing\n    routes:\n      de: preise";
+                  }
+                  return `---\n${fm}\n---`;
                 },
               );
               // Append a deterministic cold-run marker
