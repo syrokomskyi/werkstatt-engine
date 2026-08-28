@@ -40,6 +40,7 @@ export function createMissionModule(): KernelModule {
       const { runMaterializeConfigValidate } = await import("./materialize-config-validate.ts");
       const { runWorkpieceConfigPresenceCheck } =
         await import("./workpiece-config-presence-check.ts");
+      const { runMissionPreflight } = await import("./mission-preflight.ts");
       registry.registerCommand({
         name: "mission.open",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
@@ -529,6 +530,23 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/journal.jsonl"],
         cacheable: false,
         execute: runMissionJournalShow,
+      });
+      registry.registerCommand({
+        name: "mission.preflight",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
+        description:
+          "Run ownership.sync.validate and generated.stale.validate against the cache clone before opening a mission (RFC-0971).",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: false,
+        flags: {
+          system: { kind: "string", required: true, description: "Sternsystem id." },
+        },
+        writes: [],
+        reads: ["systems-cache/{system}/public/**"],
+        cacheable: false,
+        execute: runMissionPreflight,
       });
     },
   };

@@ -71,3 +71,9 @@ export {
 } from "./workpiece-config-presence-check.ts";
 export { runMissionResume, type MissionResumeData } from "./mission-resume.ts";
 export { runMissionJournalShow, type MissionJournalShowData } from "./mission-journal-show.ts";
+export {
+  runMissionPreflight,
+  type MissionPreflightInput,
+  type PreflightCheckResult,
+  type MissionPreflightData,
+} from "./mission-preflight.ts";
