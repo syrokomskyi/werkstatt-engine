@@ -50,6 +50,11 @@ export function createSternsystemModule(): KernelModule {
           },
           platform: { kind: "string", description: "Pinned platform version." },
           mirror: { kind: "string", description: "External mirror repository URL (optional)." },
+          mirrors: {
+            kind: "string",
+            description:
+              "Comma-separated mirror paths with storage type (e.g. /path:non-bare,/path:bare). Required for new registration.",
+          },
           owner: {
             kind: "string",
             description:
