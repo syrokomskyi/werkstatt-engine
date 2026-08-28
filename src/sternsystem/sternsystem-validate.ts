@@ -15,6 +15,7 @@
   <item>RFC-0822: add ENV-PERSIST-01 warning when cache clone lacks .env* but active workpiece has them.</item>
   <item>RFC-0870: add STERN-MANIFEST-01 check for missing committed generated manifests in cache clone HEAD.</item>
   <item>RFC-0902: add STERN-ID-TLD rule rejecting IDs ending in a known TLD suffix.</item>
+  <item>RFC-0966: add PASSPORT-01 (missing passport), PASSPORT-02 (invalid signature), PASSPORT-03 (resource drift) rules.</item>
   <item>Fix: checkBundleContract uses git ls-files instead of filesystem scan, excludes COMMITTED_MANIFEST_PATHS from generated file check.</item>
 </CHANGE_SUMMARY>
 */
@@ -48,6 +49,8 @@ import {
 } from "./external-edit-collector.ts";
 import { collectEnvFiles } from "../mission/env-persist.ts";
 import { hasTldSuffix } from "../schemas/naming-policy.ts";
+import { readPassport } from "./registry-io.ts";
+import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
 
 export interface SternsystemValidateData {
   validated: number;
@@ -520,6 +523,61 @@ export async function runSternsystemValidate(
       }
     } catch {
       // Non-fatal — env check skipped
+    }
+
+    // RFC-0966: PASSPORT-01/02/03 — signed site passport checks
+    try {
+      const passportDoc = await readPassport(workspaceRoot, entry.id);
+      if (!passportDoc) {
+        const state = await readSystemState(workspaceRoot, entry.id);
+        if (state.passportRequired) {
+          violations.push({
+            systemId: entry.id,
+            rule: "PASSPORT-01",
+            message: `passport.json missing but passportRequired is true — run: pnpm exec werkstatt run sternsystem.passport.generate --id ${entry.id}`,
+          });
+        } else {
+          warnings.push({
+            systemId: entry.id,
+            field: "PASSPORT-01",
+            message: `passport.json not found — run: pnpm exec werkstatt run sternsystem.passport.generate --id ${entry.id}`,
+          });
+        }
+      } else {
+        const { valid, errors } = await verifyPassport(passportDoc);
+        if (!valid) {
+          for (const err of errors) {
+            violations.push({
+              systemId: entry.id,
+              rule: "PASSPORT-02",
+              message: err,
+            });
+          }
+        }
+
+        // PASSPORT-03: resource drift check (non-fatal warning)
+        try {
+          const freshPayload = await buildPassportPayload({
+            systemId: entry.id,
+            werkstattRoot: workspaceRoot,
+            creatorIdentity: passportDoc.payload.creator.identity,
+            creatorPublicKey: passportDoc.payload.creator.publicKey,
+          });
+          freshPayload.provenance.createdAt = passportDoc.payload.provenance.createdAt;
+          const freshHash = computePassportHash(freshPayload);
+          if (freshHash !== passportDoc.passportHash) {
+            warnings.push({
+              systemId: entry.id,
+              field: "PASSPORT-03",
+              message: `passport content drift detected — bordbuchHead or resources changed since last generation. Run: pnpm exec werkstatt run sternsystem.passport.generate --id ${entry.id}`,
+            });
+          }
+        } catch {
+          // Non-fatal — drift check skipped
+        }
+      }
+    } catch {
+      // Non-fatal — passport check skipped
     }
   }
 

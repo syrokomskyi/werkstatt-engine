@@ -28,6 +28,23 @@ export { runSternsystemExtract, type SternsystemExtractData } from "./sternsyste
 export { runSternsystemSync, type SternsystemSyncData } from "./sternsystem-sync.ts";
 export { runSternsystemStatus, type SternsystemStatusData } from "./sternsystem-status.ts";
 export { runSternsystemDiscover, type SternsystemDiscoverData } from "./sternsystem-discover.ts";
+export {
+  runSternsystemPassportGenerate,
+  type SternsystemPassportGenerateData,
+} from "./sternsystem-passport-generate.ts";
+export {
+  runSternsystemPassportVerify,
+  type SternsystemPassportVerifyData,
+} from "./sternsystem-passport-verify.ts";
+export {
+  buildPassportPayload,
+  signPassport,
+  verifyPassport,
+  derivePublicKey,
+  computePassportHash,
+  type SitePassportV1,
+  type SignedSitePassport,
+} from "./passport.ts";
 
 // RFC-0790: Convention-based discovery IO helpers
 export {
@@ -55,6 +72,9 @@ export {
   resolveMirrorPath,
   type MirrorResolution,
   resolveMirrors,
+  readPassport,
+  writePassport,
+  resolvePassportPath,
 } from "./registry-io.ts";
 
 export function createSternsystemModule(): KernelModule {

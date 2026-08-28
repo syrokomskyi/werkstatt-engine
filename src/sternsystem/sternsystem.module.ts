@@ -26,6 +26,8 @@ export function createSternsystemModule(): KernelModule {
       const { runSternsystemExtract } = await import("./sternsystem-extract.ts");
       const { runSternsystemSync } = await import("./sternsystem-sync.ts");
       const { runSternsystemStatus } = await import("./sternsystem-status.ts");
+      const { runSternsystemPassportGenerate } = await import("./sternsystem-passport-generate.ts");
+      const { runSternsystemPassportVerify } = await import("./sternsystem-passport-verify.ts");
       const { runSurfaceContractValidate } = await import("../handoff/surface-contract.ts");
       registry.registerCommand({
         name: "sternsystem.register",
@@ -189,6 +191,56 @@ export function createSternsystemModule(): KernelModule {
           "missions/*/mission.yaml",
         ],
         execute: runSternsystemStatus,
+      });
+      registry.registerCommand({
+        name: "sternsystem.passport.generate",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
+        description:
+          "Build, sign, and write the site passport for a Sternsystem (RFC-0966). Reads system-config.yaml, pin, .env.example, bordbuch. Signs with SIGNING_PRIVATE_KEY. Flags: --id, [--actor].",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+          actor: {
+            kind: "string",
+            description: "Creator identity handle (e.g. human:andrii-syrokomskyi).",
+          },
+        },
+        writes: ["systems-cache/{id}/passport.json", "systems-cache/{id}/system-state.yaml"],
+        reads: [
+          "systems-cache/{id}/system-config.yaml",
+          "systems-cache/{id}/system.pin.json",
+          "systems-cache/{id}/.env.example",
+          "systems-cache/{id}/bordbuch/events.ndjson",
+        ],
+        cacheable: false,
+        execute: runSternsystemPassportGenerate,
+      });
+      registry.registerCommand({
+        name: "sternsystem.passport.verify",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        description:
+          "Verify the signature and content-freshness of a Sternsystem's passport.json (RFC-0966). Flags: --id, [--offline].",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: false,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+          offline: {
+            kind: "boolean",
+            description: "Check structure + signature only (skip resource drift check).",
+          },
+        },
+        reads: [
+          "systems-cache/{id}/passport.json",
+          "systems-cache/{id}/system-config.yaml",
+          "systems-cache/{id}/system.pin.json",
+          "systems-cache/{id}/.env.example",
+          "systems-cache/{id}/bordbuch/events.ndjson",
+        ],
+        execute: runSternsystemPassportVerify,
       });
       registry.registerCommand({
         name: "surface.contract.validate",

@@ -17,6 +17,7 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
   <item>RFC-0790: replace registry IO with convention-based discovery. Add resolveCacheClonePath, readSystemConfig, readSystemState, writeSystemState, discoverSystems, readServicesRegistry. Remove readRegistry, writeRegistry, findEntry, findEntryByStar, resolveCachePath, registryExists, resolveRegistryPath. Change resolveMirrors to accept SystemConfig.</item>
   <item>ADR-0040: add JSDoc return-type contracts to path-returning functions (resolveCacheClonePath, resolveWorkpiecePath, resolveMirrorPath).</item>
   <item>RFC-0794: push system-state.yaml commit to bare repo in writeSystemState to survive syncCacheClone resets.</item>
+  <item>RFC-0966: add readPassport, writePassport, resolvePassportPath helpers and passportRequired to default state.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -38,6 +39,7 @@ import {
   type ServiceEntry,
 } from "@warpgogol/werkstatt-engine/schemas";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
+import type { SignedSitePassport } from "./passport.ts";
 
 // --- RFC-0790: Convention-based path resolution ---
 
@@ -112,6 +114,7 @@ export async function readSystemState(
       lastRelease: null,
       lastPropagated: {},
       accessPin: null,
+      passportRequired: false,
     };
   }
   const raw = await readFile(filePath, "utf8");
@@ -390,4 +393,32 @@ export function resolveMirrors(workspaceRoot: string, config: SystemConfig): Mir
   }
 
   return { cachePath, gitMirrors, backupMirrors };
+}
+
+// --- RFC-0966: Passport IO helpers ---
+
+export function resolvePassportPath(workspaceRoot: string, systemId: string): string {
+  const cachePath = resolveCacheClonePath(workspaceRoot, systemId);
+  return path.join(cachePath, "passport.json");
+}
+
+export async function readPassport(
+  workspaceRoot: string,
+  systemId: string,
+): Promise<SignedSitePassport | null> {
+  const filePath = resolvePassportPath(workspaceRoot, systemId);
+  if (!existsSync(filePath)) return null;
+  const raw = await readFile(filePath, "utf8");
+  return JSON.parse(raw) as SignedSitePassport;
+}
+
+export async function writePassport(
+  workspaceRoot: string,
+  systemId: string,
+  doc: SignedSitePassport,
+): Promise<string> {
+  const filePath = resolvePassportPath(workspaceRoot, systemId);
+  const content = JSON.stringify(doc, null, 2) + "\n";
+  await atomicWriteFile(filePath, content);
+  return filePath;
 }

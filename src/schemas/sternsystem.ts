@@ -26,6 +26,7 @@ RFC-0790: add systemConfigSchema, systemStateSchema, servicesRegistrySchema for 
   <item>RFC-0806: add lastDevDeployed to serviceEntrySchema, add cloudflare-worker to kind enum.</item>
   <item>RFC-0902: update kebabRe error messages to mention "no TLD suffix".</item>
   <item>RFC-0964: add fleet.canary field to systemConfigSchema for wave orchestration.</item>
+  <item>RFC-0966: add passportRequired to systemStateSchema for passport enforcement gating.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -160,6 +161,9 @@ export const systemStateSchema = z.object({
     .regex(/^\d{4}$/, "accessPin must be a 4-digit numeric string")
     .nullable()
     .default(null),
+  // RFC-0966: Controls PASSPORT-01 warning vs blocking. false during rollout,
+  // set to true by sternsystem.passport.generate after first successful generation.
+  passportRequired: z.boolean().default(false),
 });
 
 export const servicesRegistrySchema = z.object({

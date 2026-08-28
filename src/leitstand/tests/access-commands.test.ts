@@ -37,6 +37,7 @@ describe("RFC-0899: leitstand.access.status", () => {
       lastRelease: null,
       lastPropagated: {},
       accessPin: "1234",
+      passportRequired: false,
     });
     const result = await runLeitstandAccessStatus(
       makeInput({ site: "test-bundle" }),
@@ -55,6 +56,7 @@ describe("RFC-0899: leitstand.access.status", () => {
       lastRelease: null,
       lastPropagated: {},
       accessPin: null,
+      passportRequired: false,
     });
     const result = await runLeitstandAccessStatus(
       makeInput({ site: "test-bundle" }),
@@ -79,6 +81,7 @@ describe("RFC-0899: leitstand.access.status", () => {
       lastRelease: null,
       lastPropagated: {},
       accessPin: "9999",
+      passportRequired: false,
     });
     const result = await runLeitstandAccessStatus(
       makeInput({ system: "alias-site" }),
