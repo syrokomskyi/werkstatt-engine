@@ -375,7 +375,7 @@ export async function runColdE2e(
           await fs.mkdir(siteLabelsDir, { recursive: true });
           await fs.writeFile(
             path.join(siteLabelsDir, "labels.md"),
-            "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\n---\n",
+            "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\ncopyright:\n  symbol: ©\n  yearFirst: 2024\nbrandTagline: E2E Cold Test\nskipLinkLabel: Skip to main content\n---\n",
             "utf-8",
           );
           // RFC-0074: infra.brief.validate checks for wrangler.jsonc existence.
