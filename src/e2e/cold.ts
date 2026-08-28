@@ -505,7 +505,7 @@ legalJurisdiction: DE
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
               const pageStubs: Record<string, { title: string; description: string }> = {
-                index: {
+                home: {
                   title: "Startseite",
                   description:
                     "Willkommen bei E2E Cold Test — digitale Souveränität und Stabilität.",
@@ -532,12 +532,7 @@ legalJurisdiction: DE
                 },
               };
               for (const [slug, meta] of Object.entries(pageStubs)) {
-                const pageId =
-                  slug === "digitales-fundament"
-                    ? "digitalesFundament"
-                    : slug === "index"
-                      ? "home"
-                      : slug;
+                const pageId = slug === "digitales-fundament" ? "digitalesFundament" : slug;
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
