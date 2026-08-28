@@ -18,6 +18,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0971: initial implementation.</item>
+  <item>RFC-0972: removed handler-local isJson exit code workaround — CLI layer now handles --json exit code globally.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -105,7 +106,10 @@ export async function runMissionPreflight(
       exitCode: 1,
       summary: `[mission.preflight] Cache clone not found at ${cacheClonePath}. Run sternsystem.register first.`,
       nextSteps: [
-        { action: `Run: pnpm exec werkstatt run sternsystem.register --id ${systemId}`, kind: "required" },
+        {
+          action: `Run: pnpm exec werkstatt run sternsystem.register --id ${systemId}`,
+          kind: "required",
+        },
       ],
     };
   }
@@ -141,8 +145,7 @@ export async function runMissionPreflight(
   }
 
   const overallStatus = totalViolations > 0 ? "fail" : "pass";
-  const isJson = context.outputFormat === "json";
-  const exitCode = totalViolations > 0 && !isJson ? 1 : 0;
+  const exitCode = totalViolations > 0 ? 1 : 0;
 
   const data: MissionPreflightData = {
     command: "mission.preflight",

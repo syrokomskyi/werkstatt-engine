@@ -12,6 +12,7 @@
   <item>RFC-0686: add --concurrency flag for pipeline execution.</item>
   <item>ADR-0022: add --no-registry-cache flag to disable process-lifetime registry cache.</item>
   <item>RFC-0870: add pipeline hint to Unknown command and not-registered error messages.</item>
+  <item>RFC-0972: global --json exit code policy — always exit 0 when outputFormat is json.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -209,7 +210,7 @@ function printTopLevelError(error: unknown): void {
   console.error(error instanceof Error ? (error.stack ?? error.message) : error);
 }
 
-async function main() {
+export async function main() {
   const workspaceRoot = await findWorkspaceRoot();
   const [subcommand, ...rest] = process.argv.slice(2);
 
@@ -291,7 +292,7 @@ async function main() {
 
     const allReports = Array.isArray(result) ? result : [result];
     const failed = allReports.find((report) => !report.ok);
-    process.exitCode = failed?.exitCode ?? 0;
+    process.exitCode = outputFormat === "json" ? 0 : (failed?.exitCode ?? 0);
     return;
   }
 
@@ -336,7 +337,7 @@ async function main() {
 
     const allReports = Array.isArray(result) ? result : [result];
     const failed = allReports.find((report) => !report.ok);
-    process.exitCode = failed?.exitCode ?? 0;
+    process.exitCode = outputFormat === "json" ? 0 : (failed?.exitCode ?? 0);
     return;
   }
 

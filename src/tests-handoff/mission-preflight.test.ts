@@ -50,11 +50,7 @@ function makeDiagnostic(ruleId: string, severity: "error" | "warning" | "info"):
   };
 }
 
-function makeCheckResult(
-  command: string,
-  errorCount: number,
-  warningCount = 0,
-): CheckResult {
+function makeCheckResult(command: string, errorCount: number, warningCount = 0): CheckResult {
   const diagnostics: Diagnostic[] = [];
   for (let i = 0; i < errorCount; i++) {
     diagnostics.push(makeDiagnostic(`TEST-ERR-${i + 1}`, "error"));
@@ -86,9 +82,7 @@ function makeMockCheckCommand(name: string): KernelCommandDefinition {
   };
 }
 
-function makeContext(
-  outputFormat: "pretty" | "json" = "pretty",
-): KernelRuntimeContext {
+function makeContext(outputFormat: "pretty" | "json" = "pretty"): KernelRuntimeContext {
   const logger = createKernelLogger(outputFormat);
   const { io } = createDefaultIO();
   const registry = new KernelRegistry();
@@ -178,7 +172,7 @@ test("empty cache clone: no public/ directory → pass with 0 violations", async
   expect(result.exitCode).toBe(0);
 });
 
-test("--json exit code: violations present but outputFormat json → exitCode 0, status fail in payload", async () => {
+test("--json handler returns exitCode 1 (CLI layer suppresses to 0 per RFC-0972)", async () => {
   mkdirSync(join(cacheClonePath, "public"), { recursive: true });
   mockCheckState.ownershipViolations = 5;
   const { runMissionPreflight } = await import("../mission/mission-preflight.ts");
@@ -186,5 +180,5 @@ test("--json exit code: violations present but outputFormat json → exitCode 0,
   const result = await runMissionPreflight(input, makeContext("json"));
   expect(result.data?.status).toBe("fail");
   expect(result.data?.totalViolations).toBe(5);
-  expect(result.exitCode).toBe(0);
+  expect(result.exitCode).toBe(1);
 });
