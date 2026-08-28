@@ -308,19 +308,6 @@ export async function runBootSmoke(input: {
     };
   }
 
-  // Remove any wrangler.json/wrangler.jsonc in the dist directory to prevent
-  // workerd from auto-discovering it and failing on relative path resolution.
-  for (const wranglerName of ["wrangler.json", "wrangler.jsonc", "wrangler.toml"]) {
-    const wranglerPath = path.resolve(input.distDir, wranglerName);
-    if (existsSync(wranglerPath)) {
-      try {
-        await fs.unlink(wranglerPath);
-      } catch {
-        // Best-effort — continue if we can't remove it
-      }
-    }
-  }
-
   // Boot miniflare
   let mf: InstanceType<typeof import("miniflare").Miniflare> | undefined;
   let booted = false;

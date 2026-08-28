@@ -81,16 +81,11 @@ describe("simulateBindings", () => {
     expect(result.missingBindings).toEqual([]);
   });
 
-  it("simulates Vectorize indexes with stub query/upsert", () => {
+  it("simulates Vectorize indexes with JSON-compatible placeholder", () => {
     const result = simulateBindings({
       vectorize: [{ binding: "MY_INDEX" }],
     });
-    const idx = result.bindings["MY_INDEX"] as {
-      query: () => Promise<unknown>;
-      upsert: () => Promise<void>;
-    };
-    expect(typeof idx.query).toBe("function");
-    expect(typeof idx.upsert).toBe("function");
+    expect(result.bindings["MY_INDEX"]).toEqual({ __type: "vectorize" });
     expect(result.missingBindings).toEqual([]);
   });
 
