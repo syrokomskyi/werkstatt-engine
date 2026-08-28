@@ -275,6 +275,36 @@ export async function runColdE2e(
           const barePath = path.join(coldRoot, "systems-git", systemId);
           const mirrorsFlag = `${cachePath}:non-bare,${barePath}:bare`;
 
+          // Initialize bare repo
+          await fs.mkdir(barePath, { recursive: true });
+          execFileSync("git", ["init", "--bare", "-b", "main", barePath], {
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+
+          // Initialize cache clone as a git repo
+          await fs.mkdir(cachePath, { recursive: true });
+          execFileSync("git", ["init", "-b", "main", cachePath], {
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          execFileSync("git", ["config", "user.email", "e2e-cold@warpgogol.local"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          execFileSync("git", ["config", "user.name", "e2e-cold"], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          // Add bare repo as origin
+          execFileSync("git", ["remote", "add", "origin", barePath], {
+            cwd: cachePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+
           // Copy fixture brief into cold root
           const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
           await fs.mkdir(briefDir, { recursive: true });
