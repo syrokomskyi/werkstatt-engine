@@ -384,6 +384,19 @@ export async function runColdE2e(
             '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01"\n}\n',
             "utf-8",
           );
+          // Seed middleware files (scaffolded by onboarding.scaffold in real sites)
+          const middlewareDir = path.join(cachePath, "src", "middleware");
+          await fs.mkdir(middlewareDir, { recursive: true });
+          await fs.writeFile(
+            path.join(cachePath, "src", "middleware.ts"),
+            'import { sequence } from "astro:middleware";\nimport languageRedirectMiddleware from "./middleware/language-redirect.js";\n\nexport const onRequest = sequence(\n  languageRedirectMiddleware,\n);\n',
+            "utf-8",
+          );
+          await fs.writeFile(
+            path.join(middlewareDir, "language-redirect.ts"),
+            'import { createLanguageRedirectMiddleware } from "@warpgogol/werkstatt-shared/share/middleware";\n\nexport default createLanguageRedirectMiddleware({\n  supportedLangs: ["de"],\n  defaultLang: "de",\n});\n',
+            "utf-8",
+          );
           execFileSync("git", ["add", "-A"], {
             cwd: cachePath,
             encoding: "utf-8",
