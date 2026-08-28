@@ -112,8 +112,16 @@ export function createBordbuchModule(): KernelModule {
           "systems/{system}/bordbuch/status.generated.yaml",
         ],
         generates: [
-          { path: "systems/{system}/public/.well-known/bordbuch.json", phase: "build.post" },
-          { path: "systems/{system}/public/.well-known/bordbuch/index.html", phase: "build.post" },
+          {
+            path: "systems/{system}/public/.well-known/bordbuch.json",
+            phase: "build.post",
+            conditional: true,
+          },
+          {
+            path: "systems/{system}/public/.well-known/bordbuch/index.html",
+            phase: "build.post",
+            conditional: true,
+          },
         ],
         cacheable: false,
         execute: runBordbuchGenerate,
