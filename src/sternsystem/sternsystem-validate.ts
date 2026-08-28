@@ -579,6 +579,56 @@ export async function runSternsystemValidate(
     } catch {
       // Non-fatal — passport check skipped
     }
+
+    // RFC-0967: OWNERSHIP-01 — fleet ownership registry check
+    try {
+      const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
+      if (!registryUrl) {
+        // Registry not configured — skip
+      } else {
+        const { verifyOwnership, OwnershipError } = await import("../fleet/ownership-registry.ts");
+        try {
+          const result = await verifyOwnership({
+            systemId: entry.id,
+            werkstattRoot: workspaceRoot,
+            registryUrl,
+          });
+
+          if (!result.registered) {
+            const state = await readSystemState(workspaceRoot, entry.id);
+            if (state.ownershipRequired) {
+              violations.push({
+                systemId: entry.id,
+                rule: "OWNERSHIP-01",
+                message: `Site not registered in fleet ownership registry but ownershipRequired is true — run: pnpm exec werkstatt run fleet.ownership.register --id ${entry.id}`,
+              });
+            } else {
+              warnings.push({
+                systemId: entry.id,
+                field: "OWNERSHIP-01",
+                message: `Site not registered in fleet ownership registry — run: pnpm exec werkstatt run fleet.ownership.register --id ${entry.id}`,
+              });
+            }
+          } else if (result.conflictsWith) {
+            warnings.push({
+              systemId: entry.id,
+              field: "OWNERSHIP-01",
+              message: `Ownership conflict: site registered to instance ${result.conflictsWith}, not this instance (OWNERSHIP-03)`,
+            });
+          }
+        } catch (err) {
+          if (err instanceof OwnershipError) {
+            warnings.push({
+              systemId: entry.id,
+              field: "OWNERSHIP-01",
+              message: `Registry check skipped (${err.code}): ${err.message}`,
+            });
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — ownership check skipped
+    }
   }
 
   const validated = systems.length;

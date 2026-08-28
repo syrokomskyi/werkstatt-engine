@@ -18,6 +18,7 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
   <item>ADR-0040: add JSDoc return-type contracts to path-returning functions (resolveCacheClonePath, resolveWorkpiecePath, resolveMirrorPath).</item>
   <item>RFC-0794: push system-state.yaml commit to bare repo in writeSystemState to survive syncCacheClone resets.</item>
   <item>RFC-0966: add readPassport, writePassport, resolvePassportPath helpers and passportRequired to default state.</item>
+  <item>RFC-0967: add ownershipRequired to default state.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -115,6 +116,7 @@ export async function readSystemState(
       lastPropagated: {},
       accessPin: null,
       passportRequired: false,
+      ownershipRequired: false,
     };
   }
   const raw = await readFile(filePath, "utf8");

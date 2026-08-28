@@ -93,6 +93,7 @@ async function buildFleetSiteRecord(
       lastPropagated: {},
       accessPin: null,
       passportRequired: false,
+      ownershipRequired: false,
     };
   }
 
