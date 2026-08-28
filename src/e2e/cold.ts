@@ -500,7 +500,7 @@ legalJurisdiction: DE
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
                     pageFile,
-                    `---\ncosmicStar: Polaris\ntitle: ${slug}\ndescription: ${slug}\nlang: de\nblocks:\n  - id: main\n    type: markdown\n---\n`,
+                    `---\ncosmicStar: Polaris\npageId: ${slug}\ntitle: ${slug}\ndescription: ${slug}\nlang: de\nblocks:\n  - id: main\n    type: markdown\n---\n`,
                   );
                 }
               }
