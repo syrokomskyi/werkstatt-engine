@@ -29,6 +29,7 @@ export const pipelineBudgetModule: KernelModule = {
       scope: "workspace",
       mutatesState: true,
       writes: ["docs/pipeline-budgets.generated.yaml"],
+      generates: [{ path: "docs/pipeline-budgets.generated.yaml", phase: "build.prepare" }],
       cacheable: false,
       flags: {
         "dry-run": {

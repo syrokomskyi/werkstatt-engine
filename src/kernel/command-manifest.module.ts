@@ -28,6 +28,7 @@ export const commandManifestModule: KernelModule = {
       scope: "workspace",
       mutatesState: true,
       writes: ["docs/command-manifest.generated.yaml"],
+      generates: [{ path: "docs/command-manifest.generated.yaml", phase: "build.prepare" }],
       cacheable: false,
       flags: {
         "dry-run": {
