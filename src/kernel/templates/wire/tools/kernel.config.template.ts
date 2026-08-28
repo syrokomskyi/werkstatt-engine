@@ -50,6 +50,8 @@ export default defineKernelConfig({
     dns: async () => (await import("@warpgogol/werkstatt-engine/dns-module")).createDnsModule(),
     onboarding: async () =>
       (await import("@warpgogol/werkstatt-site/onboarding")).createOnboardingModule(),
+    testing: async () =>
+      (await import("@warpgogol/werkstatt-site/testing/module")).createTestingModule(),
   },
   pipelines: {
     "build.prepare": [...SITES_BUILD_PREPARE_PIPELINE],
