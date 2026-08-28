@@ -6,6 +6,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0972: initial tests — command/pipeline paths, json/pretty modes, success/failure.</item>
+  <item>RFC-0972 fix: added pretty-mode success tests, wrapped runMain in try/finally for process.exitCode isolation.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -75,50 +76,78 @@ async function runMain() {
   await main();
 }
 
+async function runMainSafe(): Promise<number | string | null | undefined> {
+  let capturedExitCode: number | string | null | undefined;
+  try {
+    await runMain();
+    capturedExitCode = process.exitCode;
+  } finally {
+    process.argv = originalArgv;
+    process.exitCode = originalExitCode;
+  }
+  return capturedExitCode;
+}
+
 test("--json command failure → process.exitCode 0", async () => {
   mockState.commandOk = false;
   mockState.commandExitCode = 1;
   process.argv = ["node", "werkstatt", "run", "some.command", "--json"];
-  await runMain();
-  expect(process.exitCode).toBe(0);
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(0);
 });
 
 test("--json pipeline failure → process.exitCode 0", async () => {
   mockState.pipelineOk = false;
   mockState.pipelineExitCode = 1;
   process.argv = ["node", "werkstatt", "pipeline", "some.pipeline", "--json"];
-  await runMain();
-  expect(process.exitCode).toBe(0);
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(0);
 });
 
 test("pretty mode command failure → process.exitCode 1", async () => {
   mockState.commandOk = false;
   mockState.commandExitCode = 1;
   process.argv = ["node", "werkstatt", "run", "some.command"];
-  await runMain();
-  expect(process.exitCode).toBe(1);
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(1);
 });
 
 test("pretty mode pipeline failure → process.exitCode 1", async () => {
   mockState.pipelineOk = false;
   mockState.pipelineExitCode = 1;
   process.argv = ["node", "werkstatt", "pipeline", "some.pipeline"];
-  await runMain();
-  expect(process.exitCode).toBe(1);
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(1);
 });
 
 test("--json command success → process.exitCode 0", async () => {
   mockState.commandOk = true;
   mockState.commandExitCode = 0;
   process.argv = ["node", "werkstatt", "run", "some.command", "--json"];
-  await runMain();
-  expect(process.exitCode).toBe(0);
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(0);
 });
 
 test("--json pipeline success → process.exitCode 0", async () => {
   mockState.pipelineOk = true;
   mockState.pipelineExitCode = 0;
   process.argv = ["node", "werkstatt", "pipeline", "some.pipeline", "--json"];
-  await runMain();
-  expect(process.exitCode).toBe(0);
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(0);
+});
+
+test("pretty mode command success → process.exitCode 0", async () => {
+  mockState.commandOk = true;
+  mockState.commandExitCode = 0;
+  process.argv = ["node", "werkstatt", "run", "some.command"];
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(0);
+});
+
+test("pretty mode pipeline success → process.exitCode 0", async () => {
+  mockState.pipelineOk = true;
+  mockState.pipelineExitCode = 0;
+  process.argv = ["node", "werkstatt", "pipeline", "some.pipeline"];
+  const exitCode = await runMainSafe();
+  expect(exitCode).toBe(0);
 });
