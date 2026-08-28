@@ -38,6 +38,10 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/os/werkstatt-e2e-module` | `./os/werkstatt-e2e-module.ts` |
 | `@warpgogol/werkstatt-engine/*-module` | `./src/*/*.module.ts` (all module entry points) |
 
+## Command registration discipline
+
+- **Kernel commands MUST be registered in `*.module.ts` files, not in `index.ts` barrels.** The kernel loads modules via the `*-module` subpath export (e.g. `@warpgogol/werkstatt-engine/sternsystem-module` resolves to `sternsystem.module.ts`). A `createSternsystemModule` (or any `create*Module`) function in an `index.ts` barrel is dead code — the runtime never calls it. Commands registered there are invisible to `command.manifest.generate` and cause `RFC-CMD-02` validation errors. Discovered during RFC-0968: handover commands were added to `sternsystem/index.ts` instead of `sternsystem.module.ts`, making them invisible to the manifest generator.
+
 ## Scripts
 
 | Script        | Command                                       |
