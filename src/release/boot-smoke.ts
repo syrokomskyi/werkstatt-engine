@@ -313,15 +313,33 @@ export async function runBootSmoke(input: {
   let booted = false;
   let bootError: string | null = null;
 
+  // Resolve assets directory to absolute path — workerd rejects relative paths
+  // containing ".." (e.g. "../client" in Astro-generated wrangler.json).
+  const mfOptions: Record<string, unknown> = {
+    modules: [{ type: "ESModule", path: resolvedWorkerPath }],
+    compatibilityDate: (wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
+    bindings,
+    // Egress: override fetch to block external requests
+    fetch: egressInterceptor.fetch as unknown as typeof fetch,
+  };
+  const assetsConfig = wranglerConfig["assets"] as
+    { directory?: string; binding?: string; run_worker_first?: boolean } | undefined;
+  if (assetsConfig?.directory) {
+    const assetsDir = path.resolve(input.distDir, assetsConfig.directory);
+    if (existsSync(assetsDir)) {
+      mfOptions["assets"] = {
+        directory: assetsDir,
+        binding: assetsConfig.binding ?? "ASSETS",
+        ...(assetsConfig.run_worker_first !== undefined
+          ? { invoke_user_worker_ahead_of_assets: assetsConfig.run_worker_first }
+          : {}),
+      };
+    }
+  }
+
   try {
     const { Miniflare } = await import("miniflare");
-    mf = new Miniflare({
-      modules: [{ type: "ESModule", path: resolvedWorkerPath }],
-      compatibilityDate: (wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
-      bindings,
-      // Egress: override fetch to block external requests
-      fetch: egressInterceptor.fetch as unknown as typeof fetch,
-    } as ConstructorParameters<typeof Miniflare>[0]);
+    mf = new Miniflare(mfOptions as ConstructorParameters<typeof Miniflare>[0]);
 
     // Test boot by dispatching a single request
     try {
