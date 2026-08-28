@@ -91,7 +91,10 @@ async function runStep(
   attempts = 1;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`step "${stepName}" timed out after ${timeoutMs}ms`)), timeoutMs);
+    timer = setTimeout(
+      () => reject(new Error(`step "${stepName}" timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
   });
 
   try {
@@ -171,7 +174,8 @@ export async function runColdE2e(
           reachedPhase: until,
           timedOut: false,
           withDeploy,
-          summary: "[werkstatt.e2e.cold] preflight failed: working tree is dirty — commit or stash changes before running",
+          summary:
+            "[werkstatt.e2e.cold] preflight failed: working tree is dirty — commit or stash changes before running",
         },
         summary: "[werkstatt.e2e.cold] preflight failed: dirty working tree",
       };
@@ -271,32 +275,36 @@ export async function runColdE2e(
           const barePath = path.join(coldRoot, "systems-git", systemId);
           const mirrorsFlag = `${cachePath}:non-bare,${barePath}:bare`;
 
-          const result = await runSubCommand(
-            stepCtx.workspaceRoot,
-            "sternsystem.register",
-            [
-              `--id=${systemId}`,
-              "--cosmicStar=Orion",
-              `--mirrors=${mirrorsFlag}`,
-            ],
-            logger,
-          );
+          // Copy fixture brief into cold root
+          const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
+          await fs.mkdir(briefDir, { recursive: true });
+          const fixtureBrief = `---
+client:
+  id: e2e-cold-site
+  domain: e2e-cold.test
+i18n:
+  default: de
+  supported:
+    - de
+legalJurisdiction: DE
+---
+`;
+          await fs.writeFile(path.join(briefDir, "00-brief.md"), fixtureBrief, "utf-8");
 
-          // Extract missionId from result data
-          const fullResult = (await executeKernelCommand({
+          const result = (await executeKernelCommand({
             workspaceRoot: stepCtx.workspaceRoot,
             commandName: "sternsystem.register",
-            argv: [
-              `--id=${systemId}`,
-              "--cosmicStar=Orion",
-              `--mirrors=${mirrorsFlag}`,
-            ],
+            argv: [`--id=${systemId}`, "--cosmicStar=Polaris", `--mirrors=${mirrorsFlag}`],
             outputFormat: "json",
-          })) as { data?: { firstMissionId?: string } };
+          })) as { exitCode?: number; summary?: string; data?: { firstMissionId?: string } };
 
-          missionId = fullResult.data?.firstMissionId ?? null;
+          const exitCode = result.exitCode ?? 0;
+          if (exitCode !== 0) {
+            throw new Error(`sternsystem.register failed: ${result.summary ?? "unknown error"}`);
+          }
+
+          missionId = result.data?.firstMissionId ?? null;
           stepCtx.missionId = missionId;
-          void result;
         },
         logger,
         perStepTimeout,
@@ -353,11 +361,7 @@ export async function runColdE2e(
           await runSubCommand(
             stepCtx.workspaceRoot,
             "leitstand.ship",
-            [
-              `--site=${systemId}`,
-              `--mission=${missionId}`,
-              "--until=closed",
-            ],
+            [`--site=${systemId}`, `--mission=${missionId}`, "--until=closed"],
             logger,
           );
 
@@ -386,12 +390,7 @@ export async function runColdE2e(
             await runSubCommand(
               stepCtx.workspaceRoot,
               "leitstand.ship",
-              [
-                `--site=${systemId}`,
-                `--mission=${missionId}`,
-                "--until=dev",
-                "--resume",
-              ],
+              [`--site=${systemId}`, `--mission=${missionId}`, "--until=dev", "--resume"],
               logger,
             );
           },
@@ -418,7 +417,10 @@ export async function runColdE2e(
       summary:
         allOk && interventions === 0
           ? `[werkstatt.e2e.cold] cold run green: scaffold→validate→release with 0 interventions (${Math.round(steps.reduce((s, st) => s + st.durationMs, 0) / 60000)}m)`
-          : `[werkstatt.e2e.cold] cold run failed: ${steps.filter((s) => !s.ok).map((s) => s.step).join(", ")} (${interventions} interventions)`,
+          : `[werkstatt.e2e.cold] cold run failed: ${steps
+              .filter((s) => !s.ok)
+              .map((s) => s.step)
+              .join(", ")} (${interventions} interventions)`,
     };
 
     if (!allOk || interventions > 0) {
