@@ -375,7 +375,7 @@ export async function runColdE2e(
           await fs.mkdir(siteLabelsDir, { recursive: true });
           await fs.writeFile(
             path.join(siteLabelsDir, "labels.md"),
-            "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\ncopyright:\n  symbol: ©\n  yearFirst: 2024\nbrandTagline: E2E Cold Test\nskipLinkLabel: Skip to main content\n---\n",
+            "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\ncopyright:\n  symbol: ©\n  yearFirst: 2024\nbrandTagline: E2E Cold Test\nskipLinkLabel: Skip to main content\nmaterialCredits:\n  summaryLabel: Credits\n  pageTitle: Material Credits\n  pageDescription: Credits for materials used on this site\n  emptyMessage: No credits available\n  detailsLabel: Details\n  createdBy: Created by\n  createdWith: Created with\n  promptBy: Prompt by\n  reviewedBy: Reviewed by\n  license: License\n  copyrightLabel: Copyright\n  rightsHolder: Rights holder\n  sourceType: Source type\n  sourceTypeLabels: {}\n  statusLabels: {}\n  usageBasisLabels: {}\n  aiUsageLabels:\n    aiGenerated: AI generated\n    aiAssisted: AI assisted\n    humanContribution: Human contribution\n    copyrightClaimed: Copyright claimed\n    copyrightNotClaimed: Copyright not claimed\n  usedOnLabel: Used on\n  verifiedAtLabel: Verified at\n  noPreviewLabel: No preview available\n  copyrightExplanation: Copyright explanation\n---\n",
             "utf-8",
           );
           // RFC-0074: infra.brief.validate checks for wrangler.jsonc existence.
