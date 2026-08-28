@@ -428,7 +428,7 @@ async function generateFullBoilerplate(
     const result = await fn(generatorInput, appContext);
     if ((result.exitCode ?? 0) !== 0) {
       throw new Error(
-        `[mission.materialize] codegen generator '${name}' failed: ${result.summary}`,
+        `[mission.materialize] codegen generator '${name}' failed: ${result.summary ?? `exitCode=${result.exitCode}, data=${JSON.stringify(result.data)}`}`,
       );
     }
     // Collect generated files from the result
