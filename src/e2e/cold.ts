@@ -349,7 +349,7 @@ export async function runColdE2e(
           await fs.mkdir(pbpDeDir, { recursive: true });
           await fs.writeFile(
             path.join(pbpDeDir, "business.md"),
-            "---\nschema: pbp/business@1\nid: https://e2e-cold.test/business\ntype: business\nstatus: published\ncosmicStar: Polaris\nname: E2E Cold Test Business\nsummary: Synthetic business profile for cold E2E validation\ndescription: Synthetic business profile for cold E2E validation\nlang: de\n---\n",
+            "---\nschema: pbp/business@1\nid: https://e2e-cold.test/business\ntype: business\nstatus: published\nname: E2E Cold Test Business\nsummary: Synthetic business profile for cold E2E validation\ndescription: Synthetic business profile for cold E2E validation\n---\n",
             "utf-8",
           );
           for (const sub of ["web", "contact", "places"]) {
