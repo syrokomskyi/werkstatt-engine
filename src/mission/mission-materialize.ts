@@ -301,9 +301,6 @@ async function generateFullBoilerplate(
 
   // Resolve domain from system.md in the staging directory
   const systemMdPath = path.join(stagingDir, "src", "content", "system.md");
-  logger.info(
-    `  [debug] checking system.md at ${systemMdPath}: exists=${existsSync(systemMdPath)}`,
-  );
   let domain = "";
   if (existsSync(systemMdPath)) {
     try {

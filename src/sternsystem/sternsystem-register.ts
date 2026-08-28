@@ -95,7 +95,7 @@ export async function createContentStub(
   const contentDir = join(systemDir, "src", "content");
   await mkdir(contentDir, { recursive: true });
 
-  const supported = brief.i18n.supported.map((l) => `  - ${l}`).join("\n");
+  const supported = brief.i18n.supported.map((l) => `    ${l}:\n      name: ${l}`).join("\n");
   const systemMd = `---
 app: ${id}
 version: 1.0.0
