@@ -210,7 +210,7 @@ export async function runColdE2e(
   logger.info(`[werkstatt.e2e.cold] cold root: ${coldRoot}`);
 
   const steps: ColdRunStep[] = [];
-  const systemId = "e2e-cold-site";
+  const systemId = "e2e-cold";
   let missionId: string | null = null;
 
   const stepCtx: StepContext = {
@@ -280,7 +280,7 @@ export async function runColdE2e(
           await fs.mkdir(briefDir, { recursive: true });
           const fixtureBrief = `---
 client:
-  id: e2e-cold-site
+  id: e2e-cold
   domain: e2e-cold.test
 i18n:
   default: de
