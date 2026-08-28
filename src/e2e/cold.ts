@@ -369,6 +369,15 @@ export async function runColdE2e(
             "schemaVersion: '1.0.0'\ncoveragePercentage: 100\nmappedEntities: 1\ntotalLegacyEntities: 1\nverifiedEntities: 1\nunmappedEntities: []\nlegacySourceMappings:\n  - legacyFile: legacy/business.md\n    targetEntities: [business]\n    category: business\nvalidation:\n  errors: []\n",
             "utf-8",
           );
+          // RFC-0095: footer.legal.validate requires site/de/labels.md with
+          // footer.legalIds for DE-locale apps.
+          const siteLabelsDir = path.join(cachePath, "src", "content", "site", "de");
+          await fs.mkdir(siteLabelsDir, { recursive: true });
+          await fs.writeFile(
+            path.join(siteLabelsDir, "labels.md"),
+            "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\n---\n",
+            "utf-8",
+          );
           execFileSync("git", ["add", "-A"], {
             cwd: cachePath,
             encoding: "utf-8",
