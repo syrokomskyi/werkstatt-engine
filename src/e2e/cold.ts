@@ -544,6 +544,16 @@ legalJurisdiction: DE
               }
             }
 
+            // RFC-0908: host.canonical.config.validate scans middleware source
+            // for host redirect patterns. Add a stub that satisfies the scan.
+            const middlewareDir = path.join(workpieceDir, "src", "middleware");
+            await fs.mkdir(middlewareDir, { recursive: true });
+            await fs.writeFile(
+              path.join(middlewareDir, "host-canonical-redirect.ts"),
+              '// RFC-0908: www → apex canonical redirect stub\n// host.canonical.config.validate scans for Response.redirect patterns\nexport function redirectWwwToApex(host: string): Response | null {\n  if (host === "www.e2e-cold.test") {\n    return Response.redirect("https://e2e-cold.test", 301);\n  }\n  return null;\n}\n',
+              "utf-8",
+            );
+
             // Commit the edit
             await runSubCommand(
               stepCtx.workspaceRoot,
