@@ -34,6 +34,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` |
 | `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` |
 | `@warpgogol/werkstatt-engine/handoff` | `./src/handoff/index.ts` |
+| `@warpgogol/werkstatt-engine/e2e` | `./src/e2e/index.ts` |
+| `@warpgogol/werkstatt-engine/os/werkstatt-e2e-module` | `./os/werkstatt-e2e-module.ts` |
 | `@warpgogol/werkstatt-engine/*-module` | `./src/*/*.module.ts` (all module entry points) |
 
 ## Scripts

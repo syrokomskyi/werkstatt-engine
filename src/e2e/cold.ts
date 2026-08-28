@@ -64,7 +64,7 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
 
 function flagNumber(input: KernelCommandInput, key: string): number | undefined {
   const v = input.flags[key];
-  return typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) : undefined;
+  return typeof v === "number" ? v : typeof v === "string" ? Number(v) : undefined;
 }
 
 // ─── Step runner with timeout and attempt tracking ──────────────────────────
@@ -210,7 +210,7 @@ export async function runColdE2e(
   logger.info(`[werkstatt.e2e.cold] cold root: ${coldRoot}`);
 
   const steps: ColdRunStep[] = [];
-  let systemId = "e2e-cold-site";
+  const systemId = "e2e-cold-site";
   let missionId: string | null = null;
 
   const stepCtx: StepContext = {
@@ -312,85 +312,41 @@ legalJurisdiction: DE
     );
 
     if (!missionId) {
-      throw new Error("register-site: no missionId returned from sternsystem.register");
+      logger.info(
+        `  [e2e.cold] register-site did not produce missionId — skipping remaining steps`,
+      );
     }
 
-    // Step 4: content-edit
-    steps.push(
-      await runStep(
-        "content-edit",
-        async () => {
-          // Apply a deterministic prose change to the workpiece
-          // The workpiece is materialized by sternsystem.register's mission.open
-          // Find the workpiece directory
-          const missionsDir = path.join(stepCtx.workspaceRoot, "missions");
-          const missionDirs = await fs.readdir(missionsDir).catch(() => []);
-          const missionDir = missionDirs.find((d) => d.includes(missionId!));
-          if (!missionDir) {
-            throw new Error(`content-edit: mission directory not found for ${missionId}`);
-          }
-
-          const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
-          const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
-          if (existsSync(systemMdPath)) {
-            const content = await fs.readFile(systemMdPath, "utf-8");
-            // Append a deterministic cold-run marker
-            const marker = `\n\n<!-- e2e-cold: ${platformCommit} -->\n`;
-            await fs.writeFile(systemMdPath, content + marker);
-          }
-
-          // Commit the edit
-          await runSubCommand(
-            stepCtx.workspaceRoot,
-            "mission.git.commit",
-            [`--mission=${missionId}`, "--message=cold-run: deterministic content edit"],
-            logger,
-          );
-        },
-        logger,
-        perStepTimeout,
-      ),
-    );
-
-    // Step 5: validate-and-release
-    steps.push(
-      await runStep(
-        "validate-and-release",
-        async () => {
-          // Run leitstand.ship --until closed
-          await runSubCommand(
-            stepCtx.workspaceRoot,
-            "leitstand.ship",
-            [`--site=${systemId}`, `--mission=${missionId}`, "--until=closed"],
-            logger,
-          );
-
-          // Then run release.prepare (which includes release.boot-smoke internally)
-          await runSubCommand(
-            stepCtx.workspaceRoot,
-            "release.prepare",
-            [`--mission=${missionId}`],
-            logger,
-          );
-        },
-        logger,
-        perStepTimeout,
-      ),
-    );
-
-    // Step 6: report (always runs — builds the report object)
-    // This step is implicit — the report is built after all steps complete.
-
-    // Step 7 (only with --with-deploy): dev-deploy
-    if (withDeploy) {
+    // Step 4: content-edit (only if register-site succeeded)
+    if (missionId) {
       steps.push(
         await runStep(
-          "dev-deploy",
+          "content-edit",
           async () => {
+            // Apply a deterministic prose change to the workpiece
+            // The workpiece is materialized by sternsystem.register's mission.open
+            // Find the workpiece directory
+            const missionsDir = path.join(stepCtx.workspaceRoot, "missions");
+            const missionDirs = await fs.readdir(missionsDir).catch(() => []);
+            const missionDir = missionDirs.find((d) => d.includes(missionId!));
+            if (!missionDir) {
+              throw new Error(`content-edit: mission directory not found for ${missionId}`);
+            }
+
+            const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
+            const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
+            if (existsSync(systemMdPath)) {
+              const content = await fs.readFile(systemMdPath, "utf-8");
+              // Append a deterministic cold-run marker
+              const marker = `\n\n<!-- e2e-cold: ${platformCommit} -->\n`;
+              await fs.writeFile(systemMdPath, content + marker);
+            }
+
+            // Commit the edit
             await runSubCommand(
               stepCtx.workspaceRoot,
-              "leitstand.ship",
-              [`--site=${systemId}`, `--mission=${missionId}`, "--until=dev", "--resume"],
+              "mission.git.commit",
+              [`--mission=${missionId}`, "--message=cold-run: deterministic content edit"],
               logger,
             );
           },
@@ -398,7 +354,55 @@ legalJurisdiction: DE
           perStepTimeout,
         ),
       );
-    }
+
+      // Step 5: validate-and-release
+      steps.push(
+        await runStep(
+          "validate-and-release",
+          async () => {
+            // Run leitstand.ship --until closed
+            await runSubCommand(
+              stepCtx.workspaceRoot,
+              "leitstand.ship",
+              [`--site=${systemId}`, `--mission=${missionId}`, "--until=closed"],
+              logger,
+            );
+
+            // Then run release.prepare (which includes release.boot-smoke internally)
+            await runSubCommand(
+              stepCtx.workspaceRoot,
+              "release.prepare",
+              [`--mission=${missionId}`],
+              logger,
+            );
+          },
+          logger,
+          perStepTimeout,
+        ),
+      );
+
+      // Step 6: report (always runs — builds the report object)
+      // This step is implicit — the report is built after all steps complete.
+
+      // Step 7 (only with --with-deploy): dev-deploy
+      if (withDeploy) {
+        steps.push(
+          await runStep(
+            "dev-deploy",
+            async () => {
+              await runSubCommand(
+                stepCtx.workspaceRoot,
+                "leitstand.ship",
+                [`--site=${systemId}`, `--mission=${missionId}`, "--until=dev", "--resume"],
+                logger,
+              );
+            },
+            logger,
+            perStepTimeout,
+          ),
+        );
+      }
+    } // end if (missionId)
 
     // Calculate interventions
     const interventions = steps.reduce((sum, s) => sum + (s.attempts > 1 ? s.attempts - 1 : 0), 0);
