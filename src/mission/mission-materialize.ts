@@ -831,6 +831,7 @@ export interface MissionMaterializeInternalOptions {
   reportOnly: boolean;
   skipPreflight: boolean;
   force: boolean;
+  skipOperationBlockCheck?: boolean;
 }
 
 export async function runMissionMaterializeInternal(
@@ -842,7 +843,7 @@ export async function runMissionMaterializeInternal(
   const { logger } = context;
   const missionId = manifest.missionId;
   const operationId = manifest.operationId;
-  const { reportOnly, skipPreflight, force } = options;
+  const { reportOnly, skipPreflight, force, skipOperationBlockCheck } = options;
 
   // RFC-0480: refuse materialization on paused Sternsystem (external edit detection)
   const config = await readSystemConfig(workspaceRoot, manifest.systemId);
@@ -1084,23 +1085,27 @@ export async function runMissionMaterializeInternal(
   const journalPath = path.join(missionDir, "journal.jsonl");
 
   // RFC-0958 Step 7: block if a different-kind operation is incomplete
-  const blockCheck = await checkDifferentKindOperation(journalPath, "mission.materialize");
-  if (blockCheck.blocked) {
-    return {
-      data: {
-        missionId,
-        systemId: manifest.systemId,
-        blockedByOperation: blockCheck.incompleteOp,
-      } as unknown as MissionMaterializeData,
-      exitCode: 1,
-      summary: `[mission.materialize] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
-      nextSteps: [
-        {
-          action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
-          kind: "required",
-        },
-      ],
-    };
+  // (skipped when called from mission.open's auto-materialize step, since
+  // mission.open is the calling operation and is still in progress)
+  if (!skipOperationBlockCheck) {
+    const blockCheck = await checkDifferentKindOperation(journalPath, "mission.materialize");
+    if (blockCheck.blocked) {
+      return {
+        data: {
+          missionId,
+          systemId: manifest.systemId,
+          blockedByOperation: blockCheck.incompleteOp,
+        } as unknown as MissionMaterializeData,
+        exitCode: 1,
+        summary: `[mission.materialize] ${missionId} blocked: incomplete '${blockCheck.incompleteOp}' operation found in journal`,
+        nextSteps: [
+          {
+            action: `Run: pnpm exec werkstatt run mission.resume --mission ${missionId} to resume or abandon the incomplete operation`,
+            kind: "required",
+          },
+        ],
+      };
+    }
   }
 
   const opResult = await runOperation(

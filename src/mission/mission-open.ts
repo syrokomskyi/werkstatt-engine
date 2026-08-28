@@ -506,7 +506,7 @@ export async function buildOpenSteps(
           cc.workspaceRoot,
           cc.manifest,
           cc.context,
-          { reportOnly: false, skipPreflight: false, force: false },
+          { reportOnly: false, skipPreflight: false, force: false, skipOperationBlockCheck: true },
         );
         cc.materializedAt = materializeResult.data?.materializedAt ?? null;
       },
