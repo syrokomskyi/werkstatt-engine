@@ -18,6 +18,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/sternsystem` | `./src/sternsystem/index.ts` |
 | `@warpgogol/werkstatt-engine/release` | `./src/release/index.ts` |
 | `@warpgogol/werkstatt-engine/leitstand` | `./src/leitstand/index.ts` |
+| `@warpgogol/werkstatt-engine/fleet` | `./src/fleet/index.ts` |
+| `@warpgogol/werkstatt-engine/fleet-module` | `./src/fleet/fleet.module.ts` |
 | `@warpgogol/werkstatt-engine/bordbuch` | `./src/bordbuch/index.ts` |
 | `@warpgogol/werkstatt-engine/notausgang` | `./src/notausgang/index.ts` |
 | `@warpgogol/werkstatt-engine/artifact-store` | `./src/artifact-store/index.ts` |
