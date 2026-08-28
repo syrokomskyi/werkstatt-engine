@@ -252,6 +252,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `KernelRuntimeContext` carries `registry: KernelRegistry` and `ownershipMap?: GeneratorOwnershipEntry[]` (pre-computed via `buildGeneratorOwnership`). Validators consume `context.ownershipMap` instead of a static constant.
 - The static `GENERATOR_OWNERSHIP_MAP` is deleted. Ownership is derived by `buildGeneratorOwnership(registry)` from `generates[]` declarations. The derivation function lives in the site plugin (`@warpgogol/werkstatt-site/checks`).
 - `KernelAppConfig` has an optional `postBuildValidation?: (registry: KernelRegistry) => void` callback. The workspace `tools/kernel.config.ts` wires `validateRegistration` from the site plugin.
+- **RFC-0963 (DNA-91):** Every validator command (name ending in `.validate`, `.check`, or `.lint`) MUST declare `contract: string` (validation domain) and `rules: string[]` (rule IDs it can emit, empty if non-emitting). `validateRegistration` emits warnings for missing fields. `validator.inventory.generate` fails closed if any validator lacks these fields (unless `--dry-run`).
 
 ## Mission git helpers
 
