@@ -78,6 +78,10 @@ export const integrityModule: KernelModule = {
       mutatesState: true,
       cacheable: false,
       writes: ["<app>/.integrity/keys/**", "<app>/public/studio.public.pem"],
+      generates: [
+        { path: ".integrity/keys/private.pem", phase: "build.prepare", conditional: true },
+        { path: "public/studio.public.pem", phase: "build.prepare", conditional: true },
+      ],
       flags: {},
       execute: runIntegrityGenerateSigningKeypair,
     });

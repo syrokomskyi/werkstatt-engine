@@ -39,6 +39,7 @@ export const serviceModule: KernelModule = {
       writes: ["<app>/src/components/icons/generated/**"],
       reads: ["<app>/src/content/system.md"],
       flags: {},
+      generates: [{ path: "src/components/icons/generated/**", phase: "build.prepare", conditional: true }],
       execute: runGenerateIcons,
     });
     registry.registerCommand({
@@ -63,6 +64,7 @@ export const serviceModule: KernelModule = {
         "<app>/.cache/open-source.fingerprint",
       ],
       reads: ["<app>/package.json"],
+      generates: [{ path: "src/content/pages/{lang}/open-source.md", phase: "build.prepare", conditional: true }],
       flags: {
         "show-versions": {
           kind: "boolean",
@@ -114,6 +116,7 @@ export const serviceModule: KernelModule = {
       writes: ["<app>/src/content-ref-index.generated.yaml"],
       reads: ["<app>/src/content/**/*.md"],
       flags: {},
+      generates: [{ path: "src/content-ref-index.generated.yaml", phase: "build.prepare" }],
       execute: runContentRefIndexGenerate,
     });
     registry.registerCommand({

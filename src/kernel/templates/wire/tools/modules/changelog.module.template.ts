@@ -50,6 +50,7 @@ export const changelogModule: KernelModule = {
       mutatesState: true,
       supportsAllSites: true,
       cacheable: false,
+      generates: [{ path: "CHANGELOG.md", phase: "build.prepare", conditional: true }],
       writes: [
         "<app>/CHANGELOG.md",
         "<app>/changelogs/**",

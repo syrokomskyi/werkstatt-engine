@@ -194,6 +194,7 @@ function commandInfo(
     ...(command.cacheable !== undefined ? { cacheable: command.cacheable } : {}),
     ...(command.gate ? { gate: command.gate } : {}),
     ...(command.validatesOutputs ? { validatesOutputs: command.validatesOutputs } : {}),
+    ...(command.generates ? { generates: command.generates } : {}),
     provider,
     siteName,
   };

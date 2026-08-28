@@ -150,6 +150,8 @@ export interface KernelRegisteredCommandInfo extends KernelCommandMetadata {
   writes?: string[];
   /** RFC-0687: propagated from KernelCommandDefinition for manifest and registry. */
   validatesOutputs?: string[];
+  /** RFC-0960: declared generated artifacts, propagated from KernelCommandDefinition. */
+  generates?: GeneratedArtifactSpec[];
 }
 
 export interface KernelNextStep {
