@@ -33,6 +33,10 @@
       "types": "./os/werkstatt-commands-validate.module.ts",
       "default": "./os/werkstatt-commands-validate.module.ts"
     },
+    "./os/werkstatt-e2e-module": {
+      "types": "./os/werkstatt-e2e-module.ts",
+      "default": "./os/werkstatt-e2e-module.ts"
+    },
     "./package.json": "./package.json",
     "./kernel": {
       "types": "./src/kernel/index.ts",
@@ -325,6 +329,10 @@
     "./testing/e2e": {
       "types": "./src/testing/e2e/index.ts",
       "default": "./src/testing/e2e/index.ts"
+    },
+    "./e2e": {
+      "types": "./src/e2e/index.ts",
+      "default": "./src/e2e/index.ts"
     },
     "./component-runtime/reflection": {
       "types": "./src/component-runtime/reflection.ts",
