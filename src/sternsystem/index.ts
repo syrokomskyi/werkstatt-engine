@@ -19,6 +19,9 @@ import { runSternsystemExtract } from "./sternsystem-extract.ts";
 import { runSternsystemSync } from "./sternsystem-sync.ts";
 import { runSternsystemStatus } from "./sternsystem-status.ts";
 import { runSternsystemDiscover } from "./sternsystem-discover.ts";
+import { runSternsystemHandoverPrepare } from "./sternsystem-handover-prepare.ts";
+import { runSternsystemHandoverComplete } from "./sternsystem-handover-complete.ts";
+import { runSternsystemHandoverCancel } from "./sternsystem-handover-cancel.ts";
 
 export { runSternsystemRegister, type SternsystemRegisterData } from "./sternsystem-register.ts";
 export { runSternsystemList, type SternsystemListData } from "./sternsystem-list.ts";
@@ -36,6 +39,18 @@ export {
   runSternsystemPassportVerify,
   type SternsystemPassportVerifyData,
 } from "./sternsystem-passport-verify.ts";
+export {
+  runSternsystemHandoverPrepare,
+  type SternsystemHandoverPrepareData,
+} from "./sternsystem-handover-prepare.ts";
+export {
+  runSternsystemHandoverComplete,
+  type SternsystemHandoverCompleteData,
+} from "./sternsystem-handover-complete.ts";
+export {
+  runSternsystemHandoverCancel,
+  type SternsystemHandoverCancelData,
+} from "./sternsystem-handover-cancel.ts";
 export {
   buildPassportPayload,
   signPassport,
@@ -238,6 +253,68 @@ export function createSternsystemModule(): KernelModule {
         flags: {},
         reads: ["../systems-cache/*/system-config.yaml"],
         execute: runSternsystemDiscover,
+      });
+      registry.registerCommand({
+        name: "sternsystem.handover.prepare",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
+        description:
+          "RFC-0968: Generate a signed handover authorization to transfer a Sternsystem to a recipient identity. Flags: --id, --recipient-identity, --recipient-public-key.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+          "recipient-identity": {
+            kind: "string",
+            required: true,
+            description: "Recipient creator identity handle.",
+          },
+          "recipient-public-key": {
+            kind: "string",
+            required: true,
+            description: "Recipient Ed25519 public key (hex).",
+          },
+        },
+        writes: ["../systems-cache/{id}/handover-authorization.json"],
+        execute: runSternsystemHandoverPrepare,
+      });
+      registry.registerCommand({
+        name: "sternsystem.handover.complete",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
+        description:
+          "RFC-0968: Complete a handover — verify authorization, regenerate passport, append bordbuch event, update ownership registry. Flags: --id.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+          "source-locator": {
+            kind: "string",
+            description: "Git remote or bundle path to fetch authorization from (optional).",
+          },
+        },
+        writes: [
+          "../systems-cache/{id}/passport.json",
+          "../systems-cache/{id}/bordbuch/events.ndjson",
+        ],
+        execute: runSternsystemHandoverComplete,
+      });
+      registry.registerCommand({
+        name: "sternsystem.handover.cancel",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
+        generates: [],
+        description:
+          "RFC-0968: Cancel a pending handover by removing the authorization file. Flags: --id.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+        },
+        writes: ["../systems-cache/{id}/handover-authorization.json"],
+        execute: runSternsystemHandoverCancel,
       });
     },
   };
