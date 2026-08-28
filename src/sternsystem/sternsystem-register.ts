@@ -90,7 +90,7 @@ export async function createContentStub(
     return;
   }
 
-  const contentDir = join(systemDir, "content");
+  const contentDir = join(systemDir, "src", "content");
   await mkdir(contentDir, { recursive: true });
 
   const supported = brief.i18n.supported.map((l) => `  - ${l}`).join("\n");
@@ -123,7 +123,7 @@ async function rollbackPin(systemDir: string): Promise<void> {
 }
 
 async function rollbackContent(systemDir: string): Promise<void> {
-  const contentPath = join(systemDir, "content");
+  const contentPath = join(systemDir, "src", "content");
   if (existsSync(contentPath)) {
     await rm(contentPath, { recursive: true, force: true });
   }
