@@ -328,27 +328,13 @@ export async function runBootSmoke(input: {
 
   try {
     const { Miniflare } = await import("miniflare");
-    // Resolve assets directory to an absolute path if declared in wrangler config.
-    // workerd fails on relative paths containing ".." — miniflare needs absolute paths.
-    const mfOptions: Record<string, unknown> = {
+    mf = new Miniflare({
       modules: [{ type: "ESModule", path: resolvedWorkerPath }],
       compatibilityDate: (wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
       bindings,
       // Egress: override fetch to block external requests
       fetch: egressInterceptor.fetch as unknown as typeof fetch,
-    };
-    const assetsConfig = wranglerConfig["assets"] as
-      { directory?: string; binding?: string; run_worker_first?: boolean } | undefined;
-    if (assetsConfig?.directory) {
-      mfOptions["assets"] = {
-        directory: path.resolve(input.distDir, assetsConfig.directory),
-        binding: assetsConfig.binding ?? "ASSETS",
-        ...(assetsConfig.run_worker_first !== undefined
-          ? { invoke_user_worker_ahead_of_assets: assetsConfig.run_worker_first }
-          : {}),
-      };
-    }
-    mf = new Miniflare(mfOptions as ConstructorParameters<typeof Miniflare>[0]);
+    } as ConstructorParameters<typeof Miniflare>[0]);
 
     // Test boot by dispatching a single request
     try {
