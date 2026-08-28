@@ -316,7 +316,7 @@ export async function runBootSmoke(input: {
       bindings,
       // Egress: override fetch to block external requests
       fetch: egressInterceptor.fetch as unknown as typeof fetch,
-    });
+    } as ConstructorParameters<typeof Miniflare>[0]);
 
     // Test boot by dispatching a single request
     try {
