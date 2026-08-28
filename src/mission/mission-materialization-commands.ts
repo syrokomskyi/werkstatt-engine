@@ -155,6 +155,43 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
   return typeof v === "string" ? v : undefined;
 }
 
+// RFC-0976: Shared auto-commit logic for both distribution-reuse and full-build success paths.
+// Commits generated artifacts via commitWorkpieceIfDirty, then re-checks dirty state.
+// Returns the post-commit dirty check so the caller can warn if files remain uncommitted.
+function autoCommitAfterValidation(
+  workpieceDir: string,
+  missionId: string,
+  skipAutoCommit: boolean,
+  logger: { info: (msg: string) => void; warn: (msg: string) => void },
+): { dirty: boolean; fileCount: number; files?: string[] } {
+  let dirtyCheck = isWorkpieceDirty(workpieceDir);
+  if (dirtyCheck.dirty && !skipAutoCommit) {
+    try {
+      const autoCommit = commitWorkpieceIfDirty(
+        workpieceDir,
+        missionId,
+        "chore: post-validation artifacts (mission.validate)",
+      );
+      if (autoCommit.committed) {
+        logger.info(
+          `[mission.validate] auto-committed ${dirtyCheck.fileCount} generated artifact(s) (${autoCommit.commitSha?.slice(0, 8)})`,
+        );
+      }
+      dirtyCheck = isWorkpieceDirty(workpieceDir);
+    } catch (err) {
+      logger.warn(
+        `[mission.validate] auto-commit failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  if (dirtyCheck.dirty) {
+    logger.warn(
+      `[mission.validate] workpiece has ${dirtyCheck.fileCount} uncommitted file(s) — reconcile will auto-commit these before merge. Run \`git status\` to review.`,
+    );
+  }
+  return dirtyCheck;
+}
+
 // RFC-0796: Workspace-level advisory check for stale entries in missions/ root.
 // Warns about stale symlinks or terminal-state directories. Non-blocking.
 export function validateNoStaleMissionEntries(workspaceRoot: string): StaleEntryViolation[] {
@@ -738,32 +775,12 @@ export async function runMissionValidate(
         );
 
         // RFC-0976: auto-commit generated artifacts after successful validation (reuse path).
-        const skipAutoCommitReuse = input.flags["skip-auto-commit"] === true;
-        let dirtyCheck = isWorkpieceDirty(workpieceDir);
-        if (dirtyCheck.dirty && !skipAutoCommitReuse) {
-          try {
-            const autoCommit = commitWorkpieceIfDirty(
-              workpieceDir,
-              missionId,
-              "chore: post-validation artifacts (mission.validate)",
-            );
-            if (autoCommit.committed) {
-              logger.info(
-                `[mission.validate] auto-committed ${dirtyCheck.fileCount} generated artifact(s) (${autoCommit.commitSha?.slice(0, 8)})`,
-              );
-            }
-            dirtyCheck = isWorkpieceDirty(workpieceDir);
-          } catch (err) {
-            logger.warn(
-              `[mission.validate] auto-commit failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        }
-        if (dirtyCheck.dirty) {
-          logger.warn(
-            `[mission.validate] workpiece has ${dirtyCheck.fileCount} uncommitted file(s) — reconcile will auto-commit these before merge. Run \`git status\` to review.`,
-          );
-        }
+        const dirtyCheck = autoCommitAfterValidation(
+          workpieceDir,
+          missionId,
+          input.flags["skip-auto-commit"] === true,
+          logger,
+        );
 
         // RFC-0724: bordbuch auto-commit is now done at the top of mission.validate (covers all paths).
         // The reuse path no longer needs its own cleanup call.
@@ -1070,33 +1087,12 @@ export async function runMissionValidate(
   }
 
   // RFC-0976: auto-commit generated artifacts after successful validation.
-  const skipAutoCommit = input.flags["skip-auto-commit"] === true;
-  let dirtyCheck = isWorkpieceDirty(workpieceDir);
-  if (dirtyCheck.dirty && !skipAutoCommit) {
-    try {
-      const autoCommit = commitWorkpieceIfDirty(
-        workpieceDir,
-        missionId,
-        "chore: post-validation artifacts (mission.validate)",
-      );
-      if (autoCommit.committed) {
-        logger.info(
-          `[mission.validate] auto-committed ${dirtyCheck.fileCount} generated artifact(s) (${autoCommit.commitSha?.slice(0, 8)})`,
-        );
-      }
-      // Re-check dirty state after auto-commit
-      dirtyCheck = isWorkpieceDirty(workpieceDir);
-    } catch (err) {
-      logger.warn(
-        `[mission.validate] auto-commit failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
-  if (dirtyCheck.dirty) {
-    logger.warn(
-      `[mission.validate] workpiece has ${dirtyCheck.fileCount} uncommitted file(s) — reconcile will auto-commit these before merge. Run \`git status\` to review.`,
-    );
-  }
+  const dirtyCheck = autoCommitAfterValidation(
+    workpieceDir,
+    missionId,
+    input.flags["skip-auto-commit"] === true,
+    logger,
+  );
 
   // RFC-0797: post-validation cache clone cleanup — commit ALL generated files
   // (superset of bordbuch projections). This prevents the RFC-0522 dirty cache clone
