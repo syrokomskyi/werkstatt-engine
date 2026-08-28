@@ -74,6 +74,8 @@ export function createArtifactStoreModule(): KernelModule {
       });
       registry.registerCommand({
         name: "artifact.store.validate",
+        contract: "artifact",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/artifact-store/index.ts",
         description: "Validate a release artifact in the store (RFC-0363). Flags: --release.",
         scope: "workspace",

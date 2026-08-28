@@ -22,6 +22,8 @@ export const checkModule: KernelModule = createStandardCheckModule({
   extraCommands: [
     {
       name: "semantic.mirror.validate",
+      contract: "semantic",
+      rules: [],
       description: "Validate semantic layer mirror integrity.",
       scope: "app",
       supportsAllSites: true,

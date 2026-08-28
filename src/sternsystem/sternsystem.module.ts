@@ -87,6 +87,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.validate",
+        contract: "sternsystem",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",
@@ -185,6 +187,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "surface.contract.validate",
+        contract: "surface",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Validate generated C-surfaces (URL schema, JSON-LD types, sitemap shape) against declarative contract (RFC-0480). Flags: --app.",

@@ -75,6 +75,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.validate",
+        contract: "release",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "Validate a release artifact (RFC-0357). Flags: --release.",
         scope: "workspace",
@@ -99,6 +101,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.state.validate",
+        contract: "release",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description:
           "Validate release pipeline consistency between mission.yaml, close-report.json, release.yaml, bordbuch, and registry.yaml (RFC-0655). Flags: --mission, --release, --site.",
@@ -124,6 +128,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "dist.determinism.validate",
+        contract: "dist",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description:
           "Report non-deterministic files in a dist directory by comparing stable vs byte hashes (RFC-0656). Flags: --release, --mission.",

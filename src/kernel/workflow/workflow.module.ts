@@ -20,6 +20,8 @@ export const workflowModule: KernelModule = {
       await import("./handlers.ts");
     registry.registerCommand({
       name: "workflow.lint",
+      contract: "workflow",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
       description:
         "Validate .agents/workflows AND .agents/workflows-amend markdown frontmatter, command references, " +

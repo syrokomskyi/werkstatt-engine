@@ -46,6 +46,8 @@ export function createSubdomainModule(): KernelModule {
 
       registry.registerCommand({
         name: "subdomain.validate",
+        contract: "subdomain",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
           "Validate DNS CNAME and Workers route for a service subdomain (RFC-0752). Flags: --service.",

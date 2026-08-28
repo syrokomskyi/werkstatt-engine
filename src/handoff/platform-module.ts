@@ -20,6 +20,8 @@ export function createPlatformModule(): KernelModule {
       const { runPlatformConsistencyValidate } = await import("./platform-consistency.ts");
       registry.registerCommand({
         name: "platform.consistency.validate",
+        contract: "platform",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/handoff/platform-module.ts",
         generates: [],
         description:

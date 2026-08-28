@@ -154,6 +154,8 @@ export function createHandoffModule(): KernelModule {
     register(registry) {
       registry.registerCommand({
         name: "handoff.validate",
+        contract: "handoff",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/handoff/index.ts",
         description:
           "Validate an internal site handoff bundle lock, manifest, and file hashes without absorbing it (RFC-0221).",
@@ -166,6 +168,8 @@ export function createHandoffModule(): KernelModule {
       });
       registry.registerCommand({
         name: "migrator.registry.validate",
+        contract: "migrator",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/handoff/index.ts",
         description:
           "Validate the RFC-0479 migrator registry (id uniqueness, ordering, test coverage).",

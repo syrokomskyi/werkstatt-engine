@@ -87,6 +87,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.validate",
+        contract: "release",
+        rules: ["CERT-LEGACY-STATE-01"],
         modulePath: "packages/werkstatt-engine/src/release/index.ts",
         description: "Validate a release artifact (RFC-0357). Flags: --release.",
         scope: "workspace",
@@ -109,6 +111,8 @@ export function createReleaseModule(): KernelModule {
       });
       registry.registerCommand({
         name: "release.state.validate",
+        contract: "release",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/release/index.ts",
         description:
           "Validate release pipeline consistency between mission.yaml, close-report.json, release.yaml, bordbuch, and registry.yaml (RFC-0655). Flags: --mission, --release, --site.",

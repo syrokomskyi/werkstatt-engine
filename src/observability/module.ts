@@ -31,6 +31,8 @@ export const observabilityModule: KernelModule = {
     const { runObservabilityMcpValidate } = await import("./commands/mcp-validate.ts");
     registry.registerCommand({
       name: "observability.conventions.validate",
+      contract: "observability",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         "Offline lint: every metric name/label key is declared in WARPGOGOL_METRIC_REGISTRY, naming grammar is valid, no forbidden label keys, no duplicate names, no direct OTLP env reads outside @warpgogol/werkstatt-shared/observability (RFC-0337).",
@@ -45,6 +47,8 @@ export const observabilityModule: KernelModule = {
     });
     registry.registerCommand({
       name: "observability.stack.validate",
+      contract: "observability",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         "Offline config lint for the SigNoz observability stack: required files, casting.yaml, Caddyfile auth, collector patch, .env.example, README runbook (RFC-0338).",
@@ -67,6 +71,8 @@ export const observabilityModule: KernelModule = {
     });
     registry.registerCommand({
       name: "observability.workers.validate",
+      contract: "observability",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         'Offline lint: every wrangler config with a main entry has observability.traces.enabled: true with destinations exactly ["signoz"] (RFC-0339).',
@@ -106,6 +112,8 @@ export const observabilityModule: KernelModule = {
     });
     registry.registerCommand({
       name: "fleet.probe.validate",
+      contract: "fleet",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         "Offline lint: probe target list is fresh, schema-valid, fleet-only, and runner boundaries are clean (FLEET-PRB-01..05, RFC-0341).",
@@ -134,6 +142,8 @@ export const observabilityModule: KernelModule = {
     });
     registry.registerCommand({
       name: "observability.alerts.validate",
+      contract: "observability",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         "Offline lint: alert projection is fresh, schema-valid, metrics declared, channels valid (OBS-ALR-01..05, RFC-0342).",
@@ -159,6 +169,8 @@ export const observabilityModule: KernelModule = {
     });
     registry.registerCommand({
       name: "observability.delivery.validate",
+      contract: "observability",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         "Offline lint: CF analytics poller zone map schema, siteId matching, boundary, and missing zone entries (OBS-DLV-01..04, RFC-0343).",
@@ -172,6 +184,8 @@ export const observabilityModule: KernelModule = {
     });
     registry.registerCommand({
       name: "observability.mcp.validate",
+      contract: "observability",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
         "Offline lint: .mcp.json signoz entry, no committed secrets, incidents template present (OBS-MCP-01..03, RFC-0344).",

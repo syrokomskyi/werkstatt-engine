@@ -20,6 +20,8 @@ export const commitMessageModule: KernelModule = {
     const { runCommitMessageLint } = await import("./commit-message-lint.ts");
     registry.registerCommand({
       name: "commit.message.lint",
+      contract: "commit",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/kernel/commit-message.module.ts",
       description:
         "Validate commit message hygiene for a git range (default: origin/main..HEAD): " +

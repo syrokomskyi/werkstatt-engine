@@ -101,6 +101,8 @@ export function createSternsystemModule(): KernelModule {
       });
       registry.registerCommand({
         name: "sternsystem.validate",
+        contract: "sternsystem",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/sternsystem/index.ts",
         description:
           "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",

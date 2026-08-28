@@ -134,6 +134,8 @@ export const lagebildModule: KernelModule = {
 
     registry.registerCommand({
       name: "lagebild.validate",
+      contract: "lagebild",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/kernel/lagebild/lagebild.module.ts",
       description:
         "RFC-0186: Validate Lagebild configuration (no per-site Workers, migrations present).",

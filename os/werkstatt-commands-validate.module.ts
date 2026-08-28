@@ -29,6 +29,8 @@ export const werkstattCommandsValidateModule: KernelModule = {
   register(registry) {
     registry.registerCommand({
       name: "werkstatt.commands.validate",
+      contract: "werkstatt",
+      rules: [],
       modulePath: "packages/werkstatt-engine/os/werkstatt-commands-validate.module.ts",
       description:
         "Statically analyze kernel command handler return statements for DNA-82 compliance: explicit exitCode, [command.name]-prefixed summary, nextSteps on failure. Enforces RFC-0903.",

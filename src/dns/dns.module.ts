@@ -57,6 +57,8 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.record.validate",
+        contract: "dns",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Validate live Cloudflare DNS records against declaration file (RFC-0753). Flags: --system.",
@@ -138,6 +140,8 @@ export function createDnsModule(): KernelModule {
 
       registry.registerCommand({
         name: "dns.records.schema.validate",
+        contract: "dns",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Schema-only validation of DNS record declaration files (RFC-0753). No API calls. Flags: --system.",

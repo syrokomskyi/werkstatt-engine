@@ -251,6 +251,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "mission.validate",
+        contract: "mission",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Validate the materialized Werkstück (RFC-0356).",
         scope: "workspace",
@@ -443,6 +445,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "materialize.config.validate",
+        contract: "materialize",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
           "Validate OPERATOR_CONFIG_FILES list is in sync with actual workpiece/cache clone files (RFC-0840).",
@@ -454,6 +458,8 @@ export function createMissionModule(): KernelModule {
       });
       registry.registerCommand({
         name: "workpiece.config.presence.check",
+        contract: "workpiece",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
           "Verify OPERATOR_CONFIG_FILES are present in the active workpiece before build (RFC-0844).",

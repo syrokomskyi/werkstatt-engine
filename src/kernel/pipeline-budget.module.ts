@@ -40,6 +40,8 @@ export const pipelineBudgetModule: KernelModule = {
     });
     registry.registerCommand({
       name: "pipeline.budget.validate",
+      contract: "pipeline",
+      rules: [],
       modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
       description:
         "Compare fresh telemetry p95 against committed budgets in docs/pipeline-budgets.generated.yaml (RFC-0963). " +

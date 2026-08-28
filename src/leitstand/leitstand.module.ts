@@ -327,6 +327,8 @@ export function createLeitstandModule(): KernelModule {
       });
       registry.registerCommand({
         name: "leitstand.pipeline.check",
+        contract: "leitstand",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Inspect deployment pipeline state for a release (RFC-0842). Flags: --release.",

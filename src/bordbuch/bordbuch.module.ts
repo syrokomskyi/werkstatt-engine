@@ -56,6 +56,8 @@ export function createBordbuchModule(): KernelModule {
       });
       registry.registerCommand({
         name: "bordbuch.validate",
+        contract: "bordbuch",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
           "Validate the Bordbuch hash-chain, lifecycle pairs, and sensitive payload guards (RFC-0355).",

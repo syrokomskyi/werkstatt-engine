@@ -93,6 +93,8 @@ export function createNachweisModule(): KernelModule {
 
       registry.registerCommand({
         name: "nachweis.validate",
+        contract: "nachweis",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
         description:

@@ -28,6 +28,8 @@ export const werkstattAutonomyModule: KernelModule = {
   register(registry) {
     registry.registerCommand({
       name: "werkstatt.autonomy.validate",
+      contract: "werkstatt",
+      rules: [],
       modulePath: "packages/werkstatt-engine/os/werkstatt-autonomy.module.ts",
       description:
         "Scan packages/werkstatt/src/** for forbidden @warpgogol/* imports (excluding self-imports and shared schema packages). Enforces DNA-64 engine/plugin boundary (RFC-0772).",

@@ -55,6 +55,8 @@ export function createNotausgangModule(): KernelModule {
       });
       registry.registerCommand({
         name: "notausgang.validate",
+        contract: "notausgang",
+        rules: [],
         modulePath: "packages/werkstatt-engine/src/notausgang/index.ts",
         description:
           "Deep integrity verification of a Notausgang export package (RFC-0359, RFC-0380). Re-computes hashes, validates manifest schema, Bordbuch NDJSON, pin content, behavior snapshots, and scans for secrets. Flags: --path.",
