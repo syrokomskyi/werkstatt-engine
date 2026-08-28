@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0221: add package entrypoint and command module for the first read-only handoff commands.</item>
   <item>RFC-0221: register thin handoff.pack and report-gated handoff.absorb handlers.</item>
+  <item>RFC-0968: remove dead sternsystem re-exports — the kernel loads sternsystem.module.ts directly.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -77,18 +78,6 @@ export {
   extractTrailer,
   hasTrailer,
 } from "./platform-scope.ts";
-
-export {
-  createSternsystemModule,
-  runSternsystemRegister,
-  runSternsystemList,
-  runSternsystemValidate,
-  runSternsystemPin,
-  type SternsystemRegisterData,
-  type SternsystemListData,
-  type SternsystemValidateData,
-  type SternsystemPinData,
-} from "../sternsystem/index.ts";
 
 // createWerkstattModule migrated to @warpgogol/forge — see packages/forge/os/werkstatt/
 export {
