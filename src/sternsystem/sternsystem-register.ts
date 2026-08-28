@@ -78,6 +78,7 @@ export async function createContentStub(
   workspaceRoot: string,
   id: string,
   systemDir: string,
+  cosmicStar?: string,
 ): Promise<void> {
   const briefPath = join(workspaceRoot, "onboarding", id, ".input", "00-brief.md");
   if (!existsSync(briefPath)) return;
@@ -95,7 +96,11 @@ export async function createContentStub(
 
   const supported = brief.i18n.supported.map((l) => `  - ${l}`).join("\n");
   const systemMd = `---
+app: ${id}
+version: 1.0.0
 identity:
+  systemStar: ${cosmicStar ?? "Polaris"}
+  biome: handwerk-material-warm
   domain: ${brief.client.domain}
 i18n:
   default: ${brief.i18n.default}
@@ -268,7 +273,7 @@ export async function runSternsystemRegister(
     const pinPath = pinResult.data!.pinPath;
     pinCreated = true;
 
-    await createContentStub(workspaceRoot, id, systemDir);
+    await createContentStub(workspaceRoot, id, systemDir, cosmicStar);
     contentCreated = true;
 
     const missionResult = await runMissionOpen(
