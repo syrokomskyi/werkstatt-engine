@@ -293,7 +293,15 @@ export async function runBootSmoke(input: {
   // Resolve worker entry point
   const workerMain = (wranglerConfig["main"] as string) ?? "./dist/_worker.js/index.js";
   const workerPath = path.resolve(input.distDir, workerMain.replace(/^\.\/dist\//, ""));
-  if (!existsSync(workerPath)) {
+  // Fallback: when main points to a source file (e.g. src/worker.ts) that
+  // doesn't exist in the release dist, use the Astro Cloudflare adapter output.
+  const astroEntry = path.resolve(input.distDir, "server", "entry.mjs");
+  const resolvedWorkerPath = existsSync(workerPath)
+    ? workerPath
+    : existsSync(astroEntry)
+      ? astroEntry
+      : workerPath;
+  if (!existsSync(resolvedWorkerPath)) {
     return {
       booted: false,
       bootError: `Worker entry point not found: ${workerPath}`,
@@ -311,7 +319,7 @@ export async function runBootSmoke(input: {
   try {
     const { Miniflare } = await import("miniflare");
     mf = new Miniflare({
-      modules: [{ type: "ESModule", path: workerPath }],
+      modules: [{ type: "ESModule", path: resolvedWorkerPath }],
       compatibilityDate: (wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
       bindings,
       // Egress: override fetch to block external requests
