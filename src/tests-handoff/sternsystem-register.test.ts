@@ -128,7 +128,7 @@ test("createContentStub creates system.md from brief", async () => {
     join(workspaceRoot, "systems", "test-client"),
   );
 
-  const systemMdPath = join(workspaceRoot, "systems", "test-client", "content", "system.md");
+  const systemMdPath = join(workspaceRoot, "systems", "test-client", "src", "content", "system.md");
   expect(existsSync(systemMdPath)).toBe(true);
 
   const systemMd = await readFile(systemMdPath, "utf8");
@@ -146,7 +146,7 @@ test("createContentStub is a no-op when brief does not exist", async () => {
     join(workspaceRoot, "systems", "test-client"),
   );
 
-  const systemMdPath = join(workspaceRoot, "systems", "test-client", "content", "system.md");
+  const systemMdPath = join(workspaceRoot, "systems", "test-client", "src", "content", "system.md");
   expect(existsSync(systemMdPath)).toBe(false);
 });
 
