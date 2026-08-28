@@ -38,6 +38,7 @@
   <item>ADR-0060: split bordbuch auto-resolution conflicted paths into tracked (git checkout HEAD) and untracked generated (git add only) — CACHE_CLONE_GENERATED_PATTERNS files are not in HEAD, so git checkout HEAD fails for them.</item>
   <item>RFC-0958: wrap mission.reconcile post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-0958: wrap mission.validate build cycle in runOperation with journal for crash-safe resume.</item>
+  <item>RFC-0973: --force auto-clears kernel cache DB, pipeline cache hits, journal, and validation report before pipeline execution.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -55,6 +56,8 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand, executeKernelPipeline } from "@warpgogol/werkstatt-engine/kernel";
+import { createCacheLayer } from "../kernel/cache/cache-layer.ts";
+import { clearPipelineCacheHits } from "../kernel/runtime/execute-pipeline.ts";
 import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
 import {
   runPipelinePhase,
@@ -327,6 +330,7 @@ export interface ValidateStepCtx {
   collectErrors: boolean;
   skipContentRegression: boolean;
   autoAcceptRegression: boolean;
+  force: boolean;
   prepareReport: KernelPipelineReport | null;
   pipelineReport: KernelPipelineReport | null;
   staticPassed: boolean;
@@ -354,6 +358,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
           pipelineName: "build.prepare",
           siteName: c.manifest.systemId,
           outputFormat: "pretty",
+          ...(c.force ? { force: true } : {}),
           ...(c.collectErrors ? { collectErrors: true } : {}),
         });
         c.prepareReport = Array.isArray(prepareResult) ? prepareResult[0] : prepareResult;
@@ -415,6 +420,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
           pipelineName: "build.check",
           siteName: c.manifest.systemId,
           outputFormat: "pretty",
+          ...(c.force ? { force: true } : {}),
           ...(Object.keys(pipelineFlags).length > 0 ? { flags: pipelineFlags } : {}),
           ...(c.collectErrors ? { collectErrors: true } : {}),
         });
@@ -504,6 +510,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
                 pipelineName: "build.post",
                 siteName: c.manifest.systemId,
                 outputFormat: "pretty",
+                ...(c.force ? { force: true } : {}),
                 ...(c.collectErrors ? { collectErrors: true } : {}),
               });
               c.postPipelineReport = Array.isArray(postResult) ? postResult[0] : postResult;
@@ -543,6 +550,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
                   pipelineName: "build.post",
                   siteName: c.manifest.systemId,
                   outputFormat: "pretty",
+                  ...(c.force ? { force: true } : {}),
                   ...(c.collectErrors ? { collectErrors: true } : {}),
                 });
                 const revalidateReport = Array.isArray(revalidateResult)
@@ -884,6 +892,7 @@ export async function runMissionValidate(
     collectErrors,
     skipContentRegression,
     autoAcceptRegression,
+    force,
     prepareReport: null,
     pipelineReport: null,
     staticPassed: false,
@@ -924,6 +933,37 @@ export async function runMissionValidate(
         },
       ],
     };
+  }
+
+  // RFC-0973: --force auto-clears all caches and stale artifacts before pipeline execution.
+  // Must happen AFTER checkDifferentKindOperation passes to preserve incomplete-operation detection.
+  if (force) {
+    logger.info("  Clearing all caches and stale artifacts (--force)…");
+    // 1. Clear kernel cache DB (all namespaces)
+    try {
+      const cache = await createCacheLayer(workspaceRoot);
+      try {
+        await cache.clear();
+      } finally {
+        await cache.close();
+      }
+    } catch (err) {
+      logger.warn(
+        `  Kernel cache clear failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    // 2. Clear pipeline cache hits
+    try {
+      await clearPipelineCacheHits(workspaceRoot);
+    } catch (err) {
+      logger.warn(
+        `  Pipeline cache hits clear failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    // 3. Delete stale journal (safe — checkDifferentKindOperation already passed)
+    await fs.unlink(path.join(missionDir, "journal.jsonl")).catch(() => {});
+    // 4. Delete stale validation report
+    await fs.unlink(path.join(evidenceDir, "validation-report.json")).catch(() => {});
   }
 
   const opResult = await runOperation(

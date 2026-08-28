@@ -274,6 +274,10 @@ export function createMissionModule(): KernelModule {
             description:
               "RFC-0809: Continue executing independent steps after a failure and aggregate all errors in the final report.",
           },
+          force: {
+            kind: "boolean",
+            description: "RFC-0973: Clear all caches and stale artifacts before validation.",
+          },
         },
         reads: ["missions/{mission}/**"],
         cacheable: false,
