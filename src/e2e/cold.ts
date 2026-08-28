@@ -384,6 +384,10 @@ i18n:
   supported:
     - de
 legalJurisdiction: DE
+verification:
+  google:
+    method: dns-txt
+    token: google-site-verification=e2e-cold-test-token
 ---
 `;
           await fs.writeFile(path.join(briefDir, "00-brief.md"), fixtureBrief, "utf-8");
