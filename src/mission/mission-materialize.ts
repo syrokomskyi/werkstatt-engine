@@ -196,6 +196,21 @@ const STERNSYSTEM_DATA_PATHS = [
   "system-state.yaml",
 ];
 
+function filterGitignoredPaths(paths: string[], cwd: string): string[] {
+  const result: string[] = [];
+  for (const p of paths) {
+    try {
+      execSync(`git check-ignore --quiet -- ${JSON.stringify(p)}`, {
+        cwd,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch {
+      result.push(p);
+    }
+  }
+  return result;
+}
+
 // RFC-0597: Materialization state file interface
 interface MaterializationState {
   systemId: string;
@@ -1650,7 +1665,8 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         if (existsSync(path.join(cc.workpieceDir, ".git"))) {
-          const pathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json", ...cc.regeneratedFiles];
+          const safeRegenerated = filterGitignoredPaths(cc.regeneratedFiles, cc.workpieceDir);
+          const pathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json", ...safeRegenerated];
           for (const addPath of pathsToAdd) {
             const fullPath = path.join(cc.workpieceDir, addPath);
             if (existsSync(fullPath)) {
@@ -1678,7 +1694,8 @@ export async function buildMaterializeSteps(
           );
         } else {
           execSync("git init -b main", { cwd: cc.workpieceDir, stdio: ["pipe", "pipe", "pipe"] });
-          const pathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json", ...cc.regeneratedFiles];
+          const safeRegenerated = filterGitignoredPaths(cc.regeneratedFiles, cc.workpieceDir);
+          const pathsToAdd = [...STERNSYSTEM_DATA_PATHS, "system.pin.json", ...safeRegenerated];
           for (const addPath of pathsToAdd) {
             const fullPath = path.join(cc.workpieceDir, addPath);
             if (existsSync(fullPath)) {
