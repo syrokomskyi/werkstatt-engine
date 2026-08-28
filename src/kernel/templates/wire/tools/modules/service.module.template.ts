@@ -66,7 +66,12 @@ export const serviceModule: KernelModule = {
         "<app>/.cache/open-source.fingerprint",
       ],
       reads: ["<app>/package.json"],
-      generates: [{ path: "src/content/pages/{lang}/open-source.md", phase: "build.prepare", conditional: true }],
+      generates: [
+        { path: "src/content/pages/{lang}/open-source.md", phase: "build.prepare", conditional: true },
+        { path: "public/open-source/THIRD_PARTY_NOTICES.txt", phase: "build.prepare", conditional: true },
+        { path: "public/open-source/THIRD_PARTY_LICENSES.txt", phase: "build.prepare", conditional: true },
+        { path: "public/open-source/sbom.cdx.json", phase: "build.prepare", conditional: true },
+      ],
       flags: {
         "show-versions": {
           kind: "boolean",

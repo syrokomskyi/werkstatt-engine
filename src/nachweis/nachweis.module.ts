@@ -135,7 +135,9 @@ export function createNachweisModule(): KernelModule {
         },
         reads: [],
         writes: ["<cache>/public/nachweise/manifest.json"],
-        generates: [],
+        generates: [
+          { path: "public/nachweise/manifest.json", phase: "build.post", conditional: true },
+        ],
         execute: runNachweisManifestGenerate,
       });
 
@@ -281,7 +283,13 @@ export function createNachweisModule(): KernelModule {
       registry.registerCommand({
         name: "nachweis.key.ensure",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
-        generates: [],
+        generates: [
+          {
+            path: "public/.well-known/nachweis-pubkey.json",
+            phase: "build.post",
+            conditional: true,
+          },
+        ],
         description:
           "RFC-0715: Generate an Ed25519 keypair for Nachweis operator signatures. Writes private key to file, publishes public key JSON.",
         scope: "workspace",
@@ -575,7 +583,9 @@ export function createNachweisModule(): KernelModule {
       registry.registerCommand({
         name: "nachweis.screenshot.process",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
-        generates: [],
+        generates: [
+          { path: "public/nachweis-screenshots/*.webp", phase: "build.post", conditional: true },
+        ],
         description:
           "RFC-0891: Process a raw full-page screenshot into a 16:9 display variant (1280x720, WebP) and upload to R2 public. Reads rawArtifact from evidence-source, crops from top, resizes, converts.",
         scope: "workspace",

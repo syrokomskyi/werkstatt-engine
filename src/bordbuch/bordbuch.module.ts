@@ -128,6 +128,16 @@ export function createBordbuchModule(): KernelModule {
             phase: "build.post",
             conditional: true,
           },
+          {
+            path: "public/.well-known/bordbuch/events.ndjson",
+            phase: "build.post",
+            conditional: true,
+          },
+          {
+            path: "public/.well-known/bordbuch/status.generated.yaml",
+            phase: "build.post",
+            conditional: true,
+          },
         ],
         cacheable: false,
         execute: runBordbuchGenerate,

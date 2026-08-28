@@ -452,7 +452,7 @@ async function generateFullBoilerplate(
   if (existsSync(envExamplePath)) {
     const envExampleContent = await fs.readFile(envExamplePath, "utf8");
     await atomicWriteFile(path.join(stagingDir, ".env"), envExampleContent);
-    regeneratedFiles.push(".env.example", ".env");
+    regeneratedFiles.push(".env.example");
     logger.info(`  .env.example, .env written`);
   }
 
