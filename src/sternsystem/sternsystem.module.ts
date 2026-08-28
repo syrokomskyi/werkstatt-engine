@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Lazy-loading kernel module for RFC-0354/0480 Sternsystem commands: register, list, validate, pin, extract, sync, status, and surface.contract.validate.</purpose>
+  <purpose>Lazy-loading kernel module for RFC-0354/0480/0968 Sternsystem commands: register, list, validate, pin, extract, sync, status, passport, handover, and surface.contract.validate.</purpose>
   <non-goals>
     <item>Do not re-export types or utilities — the barrel sternsystem/index.ts remains the public API surface.</item>
     <item>Do not register mission, release, or deployment commands here.</item>
@@ -9,6 +9,8 @@
 <CHANGE_SUMMARY>
   <item>Lazy loading refactor: extracted from sternsystem/index.ts to use dynamic imports inside async register().</item>
   <item>RFC-0477: add sternsystem.status command registration.</item>
+  <item>RFC-0966: add sternsystem.passport.generate and sternsystem.passport.verify command registrations.</item>
+  <item>RFC-0968: add sternsystem.handover.prepare/complete/cancel command registrations and HANDOVER-01 rule declaration.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,6 +31,9 @@ export function createSternsystemModule(): KernelModule {
       const { runSternsystemPassportGenerate } = await import("./sternsystem-passport-generate.ts");
       const { runSternsystemPassportVerify } = await import("./sternsystem-passport-verify.ts");
       const { runSurfaceContractValidate } = await import("../handoff/surface-contract.ts");
+      const { runSternsystemHandoverPrepare } = await import("./sternsystem-handover-prepare.ts");
+      const { runSternsystemHandoverComplete } = await import("./sternsystem-handover-complete.ts");
+      const { runSternsystemHandoverCancel } = await import("./sternsystem-handover-cancel.ts");
       registry.registerCommand({
         name: "sternsystem.register",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
@@ -95,7 +100,7 @@ export function createSternsystemModule(): KernelModule {
       registry.registerCommand({
         name: "sternsystem.validate",
         contract: "sternsystem",
-        rules: [],
+        rules: ["HANDOVER-01"],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",
@@ -270,6 +275,71 @@ export function createSternsystemModule(): KernelModule {
           surfaces: ["url-schema", "jsonld-types", "sitemap-shape"],
           blocks: ["release.prepare"],
         },
+      });
+      registry.registerCommand({
+        name: "sternsystem.handover.prepare",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
+        description:
+          "RFC-0968: Generate a signed handover authorization to transfer a Sternsystem to a recipient identity. Flags: --id, --recipient-identity, --recipient-public-key.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+          "recipient-identity": {
+            kind: "string",
+            required: true,
+            description: "Recipient creator identity handle.",
+          },
+          "recipient-public-key": {
+            kind: "string",
+            required: true,
+            description: "Recipient Ed25519 public key (hex).",
+          },
+        },
+        writes: ["../systems-cache/{id}/handover-authorization.json"],
+        cacheable: false,
+        execute: runSternsystemHandoverPrepare,
+      });
+      registry.registerCommand({
+        name: "sternsystem.handover.complete",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
+        description:
+          "RFC-0968: Complete a handover — verify authorization, regenerate passport, append bordbuch event, update ownership registry. Flags: --id.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+          "source-locator": {
+            kind: "string",
+            description: "Git remote or bundle path to fetch authorization from (optional).",
+          },
+        },
+        writes: [
+          "../systems-cache/{id}/passport.json",
+          "../systems-cache/{id}/bordbuch/events.ndjson",
+        ],
+        cacheable: false,
+        execute: runSternsystemHandoverComplete,
+      });
+      registry.registerCommand({
+        name: "sternsystem.handover.cancel",
+        modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
+        generates: [],
+        description:
+          "RFC-0968: Cancel a pending handover by removing the authorization file. Flags: --id.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          id: { kind: "string", required: true, description: "Sternsystem id." },
+        },
+        writes: ["../systems-cache/{id}/handover-authorization.json"],
+        cacheable: false,
+        execute: runSternsystemHandoverCancel,
       });
     },
   };
