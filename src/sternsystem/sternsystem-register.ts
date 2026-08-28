@@ -19,6 +19,7 @@ With --amend: update pin and open amend mission without creating a new registry 
 import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -275,6 +276,27 @@ export async function runSternsystemRegister(
 
     await createContentStub(workspaceRoot, id, systemDir, cosmicStar);
     contentCreated = true;
+
+    // Commit config, pin, and content to cache clone before mission.open
+    // so syncCacheClone's git reset --hard doesn't wipe uncommitted files
+    if (existsSync(join(systemDir, ".git"))) {
+      try {
+        execSync("git add -A", { cwd: systemDir, stdio: "pipe", timeout: 10_000 });
+        execSync(`git commit -m "sternsystem.register: scaffold ${id}"`, {
+          cwd: systemDir,
+          stdio: "pipe",
+          timeout: 10_000,
+        });
+        // Push to bare repo so syncCacheClone can fetch
+        try {
+          execSync("git push origin main", { cwd: systemDir, stdio: "pipe", timeout: 10_000 });
+        } catch {
+          // push failure non-fatal
+        }
+      } catch {
+        // commit failure non-fatal (nothing to commit)
+      }
+    }
 
     const missionResult = await runMissionOpen(
       makeInput({ system: id, brief: `Initial onboarding for ${id}` }),
