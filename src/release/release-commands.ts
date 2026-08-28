@@ -485,16 +485,26 @@ export async function runReleasePrepare(
 
       // RFC-0961: Boot-smoke — boot built worker in miniflare and execute representative requests
       const { runBootSmoke, planBootSmokeRequests } = await import("./boot-smoke.ts");
-      const wranglerConfigPath = path.join(workpieceDir, "wrangler.jsonc");
+      // Prefer the Astro-generated wrangler.json in dist/server/ which has
+      // correct paths relative to the dist directory. Fall back to workpiece
+      // wrangler.jsonc if the Astro output doesn't exist.
+      const astroWranglerPath = path.join(distDest, "server", "wrangler.json");
+      const wranglerConfigPath = existsSync(astroWranglerPath)
+        ? astroWranglerPath
+        : path.join(workpieceDir, "wrangler.jsonc");
       let bootSmokeVerdict: "pass" | "fail" = "pass";
       if (existsSync(wranglerConfigPath)) {
+        // When using the Astro-generated wrangler.json, the base directory is
+        // dist/server/ (entry.mjs and assets.directory are relative to it).
+        const bootSmokeDistDir =
+          wranglerConfigPath === astroWranglerPath ? path.join(distDest, "server") : distDest;
         const bootSmokeRequests = planBootSmokeRequests({
           distDir: distDest,
           languages: ["de", "en", "uk"],
         });
         logger.info(`  Running boot-smoke (${bootSmokeRequests.length} representative requests)…`);
         const bootSmokeResult = await runBootSmoke({
-          distDir: distDest,
+          distDir: bootSmokeDistDir,
           wranglerConfigPath,
           requests: bootSmokeRequests,
         });
