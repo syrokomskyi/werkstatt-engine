@@ -16,6 +16,7 @@
   <item>RFC-0870: add STERN-MANIFEST-01 check for missing committed generated manifests in cache clone HEAD.</item>
   <item>RFC-0902: add STERN-ID-TLD rule rejecting IDs ending in a known TLD suffix.</item>
   <item>RFC-0966: add PASSPORT-01 (missing passport), PASSPORT-02 (invalid signature), PASSPORT-03 (resource drift) rules.</item>
+  <item>RFC-0968: add HANDOVER-01/02/03/04/05 rules for sternsystem handover protocol.</item>
   <item>Fix: checkBundleContract uses git ls-files instead of filesystem scan, excludes COMMITTED_MANIFEST_PATHS from generated file check.</item>
 </CHANGE_SUMMARY>
 */
@@ -51,6 +52,8 @@ import { collectEnvFiles } from "../mission/env-persist.ts";
 import { hasTldSuffix } from "../schemas/naming-policy.ts";
 import { readPassport } from "./registry-io.ts";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
+import { readAuthorization, isAuthorizationExpired } from "./handover.ts";
+import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 
 export interface SternsystemValidateData {
   validated: number;
@@ -628,6 +631,98 @@ export async function runSternsystemValidate(
       }
     } catch {
       // Non-fatal — ownership check skipped
+    }
+
+    // RFC-0968: HANDOVER-01/02/03/04/05 — sternsystem handover protocol
+    try {
+      const authorization = await readAuthorization(workspaceRoot, entry.id);
+
+      if (authorization) {
+        // HANDOVER-01: pending handover blocks missions
+        violations.push({
+          systemId: entry.id,
+          rule: "HANDOVER-01",
+          message: `pending handover — missions blocked; run sternsystem.handover.complete or sternsystem.handover.cancel`,
+        });
+
+        // HANDOVER-02: authorization expired
+        if (isAuthorizationExpired(authorization.payload.expiresAt)) {
+          violations.push({
+            systemId: entry.id,
+            rule: "HANDOVER-02",
+            message: `authorization expired at ${authorization.payload.expiresAt} — sender must re-issue`,
+          });
+        }
+
+        // HANDOVER-03: passport hash mismatch
+        const currentPassport = await readPassport(workspaceRoot, entry.id);
+        if (currentPassport) {
+          if (authorization.payload.passportHash !== currentPassport.passportHash) {
+            violations.push({
+              systemId: entry.id,
+              rule: "HANDOVER-03",
+              message: `passport changed after authorization — sender must re-issue`,
+            });
+          }
+        }
+
+        // HANDOVER-04: recipient key mismatch (warning, not blocking)
+        const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
+        const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
+        if (privateKeyEnv || privateKeyPath) {
+          try {
+            const { loadPrivateKey } = await import("@warpgogol/werkstatt-engine/signing");
+            const { derivePublicKey } = await import("./passport.ts");
+            let privateKeyBytes: Uint8Array;
+            if (privateKeyEnv) {
+              privateKeyBytes = await loadPrivateKey({ pem: privateKeyEnv });
+            } else {
+              privateKeyBytes = await loadPrivateKey({
+                filePath: privateKeyPath!,
+                encoding: "pem",
+              });
+            }
+            const derivedPubKey = await derivePublicKey(privateKeyBytes);
+            if (authorization.payload.recipient.publicKey !== derivedPubKey) {
+              warnings.push({
+                systemId: entry.id,
+                field: "HANDOVER-04",
+                message: `recipient key mismatch — this instance is not the authorized recipient`,
+              });
+            }
+          } catch {
+            // Non-fatal — key derivation failed
+          }
+        }
+      } else {
+        // HANDOVER-05: no authorization file but passport creator doesn't match bordbuch's latest handover event
+        try {
+          const entries = await readBordbuch(workspaceRoot, entry.id);
+          const handoverEntries = entries.filter((e) => e.kind === "handover");
+          if (handoverEntries.length > 0) {
+            const latestHandover = handoverEntries[handoverEntries.length - 1];
+            const currentPassport = await readPassport(workspaceRoot, entry.id);
+            if (currentPassport) {
+              const metadata = latestHandover.metadata as Record<string, unknown> | undefined;
+              const expectedNewPassportHash = metadata?.newPassportHash as string | undefined;
+              if (
+                expectedNewPassportHash &&
+                expectedNewPassportHash !== currentPassport.passportHash
+              ) {
+                violations.push({
+                  systemId: entry.id,
+                  rule: "HANDOVER-05",
+                  message: `incomplete handover — passport regenerated but bordbuch event references a different passport hash; re-run sternsystem.handover.complete`,
+                });
+              }
+            }
+          }
+        } catch {
+          // Non-fatal — bordbuch read failed
+        }
+      }
+    } catch {
+      // Non-fatal — handover check skipped
     }
   }
 

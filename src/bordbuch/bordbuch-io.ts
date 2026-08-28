@@ -206,6 +206,24 @@ export async function appendBordbuchEntry(
     }
   }
 
+  // RFC-0968: duplicate handover rejection by authorizationHash
+  if (kind === "handover" && options?.metadata) {
+    const newAuthHash = (options.metadata as Record<string, unknown>).authorizationHash as
+      string | undefined;
+    if (newAuthHash) {
+      const existing = entries.find(
+        (e) =>
+          e.kind === "handover" &&
+          (e.metadata as Record<string, unknown> | undefined)?.authorizationHash === newAuthHash,
+      );
+      if (existing) {
+        throw new Error(
+          `[bordbuch.append] handover already exists for authorizationHash '${newAuthHash}' (event ${existing.id}) — duplicate handover is not allowed`,
+        );
+      }
+    }
+  }
+
   const previousHash = entries.length > 0 ? entries[entries.length - 1].hash : null;
   const id = nextEventId(entries);
 
