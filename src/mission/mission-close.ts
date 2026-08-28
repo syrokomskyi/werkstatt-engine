@@ -813,6 +813,53 @@ export async function buildCloseSteps(
       },
     },
     {
+      name: "ownership-register",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        const logger = cc.context.logger;
+        try {
+          const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
+          if (!registryUrl) {
+            logger.info(
+              `  [ownership-register] FLEET_OWNERSHIP_REGISTRY_URL not set — skipping ownership registration`,
+            );
+            return;
+          }
+
+          const { registerOwnership, OwnershipError } =
+            await import("../fleet/ownership-registry.ts");
+          try {
+            const result = await registerOwnership({
+              systemId: cc.manifest.systemId,
+              werkstattRoot: cc.workspaceRoot,
+              registryUrl,
+            });
+
+            if (!result.registered && result.conflict) {
+              logger.warn(
+                `  [ownership-register] Conflict: site already claimed by ${result.conflict.existingClaim?.instanceId ?? "unknown"} (OWNERSHIP-03)`,
+              );
+              return;
+            }
+
+            logger.success(
+              `  [ownership-register] Site registered (hash: ${result.claim.passportHash})`,
+            );
+          } catch (err) {
+            if (err instanceof OwnershipError) {
+              logger.warn(`  [ownership-register] Non-fatal error (${err.code}): ${err.message}`);
+            } else {
+              throw err;
+            }
+          }
+        } catch (err) {
+          logger.warn(
+            `  [ownership-register] Non-fatal error: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      },
+    },
+    {
       name: "write-close-report",
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
