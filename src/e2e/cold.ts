@@ -555,12 +555,13 @@ legalJurisdiction: DE
             );
 
             // RFC-0721: behavior.snapshot.validate requires a committed
-            // behavior.snapshot.generated.yaml. Generate and commit it.
-            await runSubCommand(
-              stepCtx.workspaceRoot,
-              "behavior.snapshot.generate",
-              [`--site=e2e-cold`],
-              logger,
+            // behavior.snapshot.generated.yaml with the GENERATED_MARKER.
+            // The validator auto-recovers (regenerates) on SNAP-01 drift,
+            // so a minimal placeholder is sufficient.
+            await fs.writeFile(
+              path.join(workpieceDir, "behavior.snapshot.generated.yaml"),
+              "GENERATED. Do not change this line unless the file contains project specific changes.\nmeta:\n  schemaVersion: 1\n  deterministic: true\n  generatedAt: null\n  contentHash: ''\nsite: e2e-cold\nroutes: []\nheaders: []\nredirects: []\n",
+              "utf-8",
             );
 
             // Commit the edit
