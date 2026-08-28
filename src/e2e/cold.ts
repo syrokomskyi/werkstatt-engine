@@ -323,6 +323,22 @@ export async function runColdE2e(
             stdio: ["pipe", "pipe", "pipe"],
           });
 
+          // RFC-0840: Write operator config files to cache clone (untracked,
+          // not git-committed) so restoreOperatorConfigFiles finds them during
+          // mission.materialize. A fresh Sternsystem has no previous mission to
+          // persist these from — the cold run must seed them.
+          await fs.writeFile(
+            path.join(cachePath, ".lighthouse-budget-ignore"),
+            "# e2e-cold: lighthouse budget ignore\n",
+            "utf-8",
+          );
+          await fs.mkdir(path.join(cachePath, "src"), { recursive: true });
+          await fs.writeFile(
+            path.join(cachePath, "src", "image-delivery.config.yaml"),
+            "# e2e-cold: image delivery config\nprovider: build-portable\n",
+            "utf-8",
+          );
+
           // Copy fixture brief into cold root
           const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
           await fs.mkdir(briefDir, { recursive: true });
@@ -382,6 +398,17 @@ legalJurisdiction: DE
             }
 
             const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
+
+            // RFC-0073: pbp.content.validate requires src/content/business-profile/de/
+            // to exist. The synthetic cold-run site has no PBP content — create a
+            // minimal directory with a placeholder file so the validator passes.
+            const bpDir = path.join(workpieceDir, "src", "content", "business-profile", "de");
+            await fs.mkdir(bpDir, { recursive: true });
+            const bpPlaceholder = path.join(bpDir, ".gitkeep");
+            if (!existsSync(bpPlaceholder)) {
+              await fs.writeFile(bpPlaceholder, "", "utf-8");
+            }
+
             const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
             if (existsSync(systemMdPath)) {
               const content = await fs.readFile(systemMdPath, "utf-8");
