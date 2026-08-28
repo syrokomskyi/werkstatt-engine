@@ -1583,13 +1583,14 @@ export async function buildMaterializeSteps(
             const failedSteps = cc.prepareReport.steps
               .filter((s) => !s.ok)
               .map((s) => `${s.commandName} (exit ${s.exitCode})`);
-            // Debug: log diagnostics from failed steps
+            // Capture diagnostics from failed steps for error message
+            const debugParts: string[] = [];
             for (const step of cc.prepareReport.steps.filter((s) => !s.ok)) {
               const stepData = step as unknown as Record<string, unknown>;
               const data = stepData?.data as Record<string, unknown> | undefined;
               const diagnostics = data?.diagnostics as Array<Record<string, unknown>> | undefined;
               if (diagnostics) {
-                cc.logger.info(
+                debugParts.push(
                   `  [debug] ${step.commandName} diagnostics: ${JSON.stringify(diagnostics.map((d) => ({ ruleId: d.ruleId, file: d.file, message: d.message })))}`,
                 );
               }
@@ -1597,6 +1598,7 @@ export async function buildMaterializeSteps(
             throw new Error(
               `[mission.materialize] build.prepare pipeline FAILED — ${failedSteps.length} step(s) failed:\n` +
                 failedSteps.map((s) => `  - ${s}`).join("\n") +
+                (debugParts.length > 0 ? "\n" + debugParts.join("\n") : "") +
                 `\n\nWorkpiece preserved at ${cc.workpieceDir} (no git init).`,
             );
           }
