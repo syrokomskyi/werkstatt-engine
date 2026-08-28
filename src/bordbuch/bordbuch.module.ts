@@ -122,6 +122,12 @@ export function createBordbuchModule(): KernelModule {
             phase: "build.post",
             conditional: true,
           },
+          { path: "public/.well-known/bordbuch.json", phase: "build.post", conditional: true },
+          {
+            path: "public/.well-known/bordbuch/index.html",
+            phase: "build.post",
+            conditional: true,
+          },
         ],
         cacheable: false,
         execute: runBordbuchGenerate,
