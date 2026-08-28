@@ -107,6 +107,7 @@ const CACHE_CLONE_ONLY_PATHS: readonly string[] = [
   "dns-records.yaml",
   ".materialization-state.json",
   "behavior.snapshot.generated.yaml",
+  ".gitignore",
 ];
 
 // RFC-0763: shared helper for bordbuch cleanup on failure paths.
