@@ -495,13 +495,35 @@ legalJurisdiction: DE
               // (no markdown body) with title, description, and lang fields.
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
               await fs.mkdir(pagesDir, { recursive: true });
-              for (const slug of ["digitales-fundament", "contact", "pricing", "services"]) {
+              const pageStubs: Record<string, { title: string; description: string }> = {
+                "digitales-fundament": {
+                  title: "Digitales Fundament",
+                  description:
+                    "Stabile digitale Basis für nachhaltiges Wachstum und Klarheit im Betrieb.",
+                },
+                contact: {
+                  title: "Kontakt",
+                  description:
+                    "Erreichen Sie uns für Fragen, Beratung und Partnerschaften jeder Art.",
+                },
+                pricing: {
+                  title: "Preise",
+                  description:
+                    "Transparente Preisgestaltung für verschiedene Betriebsgrößen und Bedarfe.",
+                },
+                services: {
+                  title: "Leistungen",
+                  description:
+                    "Umfassende Dienstleistungen für digitale Souveränität und Stabilität.",
+                },
+              };
+              for (const [slug, meta] of Object.entries(pageStubs)) {
                 const pageId = slug === "digitales-fundament" ? "digitalesFundament" : slug;
                 const pageFile = path.join(pagesDir, `${slug}.md`);
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
                     pageFile,
-                    `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${slug}\ndescription: ${slug}\nlang: de\nblocks:\n  - id: ${slug}-main\n    type: markdown\n---\n`,
+                    `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${meta.title}\ndescription: ${meta.description}\nlang: de\nblocks:\n  - id: ${slug}-main\n    type: markdown\n---\n`,
                   );
                 }
               }
