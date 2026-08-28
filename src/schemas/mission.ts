@@ -72,6 +72,8 @@ export const bordbuchEntryKindSchema = z.enum([
   "nachweis-timestamped",
   // RFC-0888: Sichtpass lifecycle audit trail
   "sichtpass",
+  // RFC-0968: Sternsystem handover protocol
+  "handover",
 ]);
 
 export const bordbuchEntryStatusSchema = z.enum(["done", "failed", "waiting", "escalated"]);

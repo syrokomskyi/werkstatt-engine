@@ -45,6 +45,20 @@ export {
   type SitePassportV1,
   type SignedSitePassport,
 } from "./passport.ts";
+export {
+  computeAuthorizationHash,
+  signAuthorization,
+  verifyAuthorization,
+  resolveAuthorizationPath,
+  readAuthorization,
+  writeAuthorization,
+  removeAuthorization,
+  isAuthorizationExpired,
+  type HandoverAuthorizationV1,
+  type SignedHandoverAuthorization,
+  type HandoverCompleteResult,
+  type HandoverEventMetadata,
+} from "./handover.ts";
 
 // RFC-0790: Convention-based discovery IO helpers
 export {
