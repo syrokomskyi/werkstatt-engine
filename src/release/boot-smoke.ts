@@ -11,6 +11,7 @@
   <item>RFC-0961: initial release.boot-smoke command handler, binding simulator, egress interceptor, and route planner.</item>
   <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
   <item>RFC-0979: add --wrangler-config and --languages flags to runBootSmokeCommand, implement wrangler config fallback resolution, write boot-smoke.json to dist directory.</item>
+  <item>ADR-0067: extract buildMiniflareOptions from runBootSmoke for unit testability of Miniflare options construction without a real runtime.</item>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
@@ -302,6 +303,80 @@ function createEgressInterceptor(): {
   return { fetch: interceptedFetch, violations };
 }
 
+// ─── Miniflare options builder (ADR-0067) ────────────────────────────
+
+export interface MiniflareOptionsInput {
+  distDir: string;
+  wranglerConfig: Record<string, unknown>;
+  bindings: Record<string, unknown>;
+  egressFetch: typeof fetch;
+}
+
+export interface MiniflareOptionsResult {
+  options: Record<string, unknown>;
+  resolvedWorkerPath: string;
+  workerPath: string;
+}
+
+export async function buildMiniflareOptions(
+  input: MiniflareOptionsInput,
+): Promise<MiniflareOptionsResult | null> {
+  const workerMain = (input.wranglerConfig["main"] as string) ?? "./dist/_worker.js/index.js";
+  const workerPath = path.resolve(input.distDir, workerMain.replace(/^\.\/dist\//, ""));
+  const astroEntry = path.resolve(input.distDir, "server", "entry.mjs");
+  const resolvedWorkerPath = existsSync(workerPath)
+    ? workerPath
+    : existsSync(astroEntry)
+      ? astroEntry
+      : workerPath;
+  if (!existsSync(resolvedWorkerPath)) {
+    return null;
+  }
+
+  const entryDir = path.dirname(resolvedWorkerPath);
+  const moduleEntries: Array<{ type: string; path: string }> = [
+    { type: "ESModule", path: resolvedWorkerPath },
+  ];
+  const walkDir = async (dir: string): Promise<void> => {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walkDir(fullPath);
+      } else if (entry.name.endsWith(".mjs") && fullPath !== resolvedWorkerPath) {
+        moduleEntries.push({ type: "ESModule", path: fullPath });
+      }
+    }
+  };
+  await walkDir(entryDir);
+
+  const mfOptions: Record<string, unknown> = {
+    modules: moduleEntries,
+    modulesRoot: entryDir,
+    compatibilityDate: (input.wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
+    compatibilityFlags: (input.wranglerConfig["compatibility_flags"] as string[]) ?? [],
+    bindings: input.bindings,
+    fetch: input.egressFetch,
+  };
+
+  const assetsConfig = input.wranglerConfig["assets"] as
+    { directory?: string; binding?: string; run_worker_first?: boolean } | undefined;
+  if (assetsConfig?.directory) {
+    const assetsDir = path.resolve(input.distDir, assetsConfig.directory);
+    if (existsSync(assetsDir)) {
+      mfOptions["assets"] = {
+        directory: assetsDir,
+        binding: assetsConfig.binding ?? "ASSETS",
+        ...(assetsConfig.run_worker_first !== undefined
+          ? { invoke_user_worker_ahead_of_assets: assetsConfig.run_worker_first }
+          : {}),
+      };
+    }
+  }
+
+  return { options: mfOptions, resolvedWorkerPath, workerPath };
+}
+
 // ─── Boot-smoke runner ───────────────────────────────────────────────
 
 export async function runBootSmoke(input: {
@@ -344,76 +419,28 @@ export async function runBootSmoke(input: {
     };
   }
 
-  // Resolve worker entry point
-  const workerMain = (wranglerConfig["main"] as string) ?? "./dist/_worker.js/index.js";
-  const workerPath = path.resolve(input.distDir, workerMain.replace(/^\.\/dist\//, ""));
-  // Fallback: when main points to a source file (e.g. src/worker.ts) that
-  // doesn't exist in the release dist, use the Astro Cloudflare adapter output.
-  const astroEntry = path.resolve(input.distDir, "server", "entry.mjs");
-  const resolvedWorkerPath = existsSync(workerPath)
-    ? workerPath
-    : existsSync(astroEntry)
-      ? astroEntry
-      : workerPath;
-  if (!existsSync(resolvedWorkerPath)) {
+  // Build Miniflare options (ADR-0067: extracted for unit testability)
+  const mfOptionsResult = await buildMiniflareOptions({
+    distDir: input.distDir,
+    wranglerConfig,
+    bindings,
+    egressFetch: egressInterceptor.fetch as unknown as typeof fetch,
+  });
+  if (!mfOptionsResult) {
     return {
       booted: false,
-      bootError: `Worker entry point not found: ${workerPath}`,
+      bootError: `Worker entry point not found in ${input.distDir}`,
       requests: [],
-      egressViolations: [],
+      egressViolations: egressInterceptor.violations,
       missingBindings: [],
     };
   }
+  const { options: mfOptions } = mfOptionsResult;
 
   // Boot miniflare
   let mf: InstanceType<typeof import("miniflare").Miniflare> | undefined;
   let booted = false;
   let bootError: string | null = null;
-
-  // Enumerate all ES modules in the entry's directory tree so workerd can
-  // resolve chunk imports (Astro Cloudflare adapter outputs entry.mjs + chunks/).
-  const entryDir = path.dirname(resolvedWorkerPath);
-  const moduleEntries: Array<{ type: string; path: string }> = [
-    { type: "ESModule", path: resolvedWorkerPath },
-  ];
-  const walkDir = async (dir: string): Promise<void> => {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walkDir(fullPath);
-      } else if (entry.name.endsWith(".mjs") && fullPath !== resolvedWorkerPath) {
-        moduleEntries.push({ type: "ESModule", path: fullPath });
-      }
-    }
-  };
-  await walkDir(entryDir);
-
-  // Resolve assets directory to absolute path — workerd rejects relative paths
-  // containing ".." (e.g. "../client" in Astro-generated wrangler.json).
-  const mfOptions: Record<string, unknown> = {
-    modules: moduleEntries,
-    modulesRoot: entryDir,
-    compatibilityDate: (wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
-    compatibilityFlags: (wranglerConfig["compatibility_flags"] as string[]) ?? [],
-    bindings,
-    // Egress: override fetch to block external requests
-    fetch: egressInterceptor.fetch as unknown as typeof fetch,
-  };
-  const assetsConfig = wranglerConfig["assets"] as
-    { directory?: string; binding?: string; run_worker_first?: boolean } | undefined;
-  if (assetsConfig?.directory) {
-    const assetsDir = path.resolve(input.distDir, assetsConfig.directory);
-    if (existsSync(assetsDir)) {
-      mfOptions["assets"] = {
-        directory: assetsDir,
-        binding: assetsConfig.binding ?? "ASSETS",
-        ...(assetsConfig.run_worker_first !== undefined
-          ? { invoke_user_worker_ahead_of_assets: assetsConfig.run_worker_first }
-          : {}),
-      };
-    }
-  }
 
   try {
     const { Miniflare } = await import("miniflare");
