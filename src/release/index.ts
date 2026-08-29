@@ -19,7 +19,6 @@ import {
   runReleaseList,
   runReleaseStateValidate,
 } from "./release-commands.ts";
-import { runBootSmokeCommand } from "./boot-smoke.ts";
 
 export {
   runReleasePrepare,
@@ -135,28 +134,6 @@ export function createReleaseModule(): KernelModule {
           "systems-cache/{system}/bordbuch/events.ndjson",
         ],
         execute: runReleaseStateValidate,
-      });
-      registry.registerCommand({
-        name: "release.boot-smoke",
-        modulePath: "packages/werkstatt-engine/src/release/index.ts",
-        description:
-          "Boot built worker in miniflare/workerd and execute representative requests to catch runtime crashes before deploy (RFC-0961). Flags: --site, [--dist], [--diagnose].",
-        scope: "workspace",
-        supportsAllSites: false,
-        flags: {
-          site: { kind: "string", required: true, description: "Sternsystem id." },
-          dist: {
-            kind: "string",
-            description: "Path to dist directory (defaults to workpiece or release dist).",
-          },
-          diagnose: {
-            kind: "boolean",
-            default: false,
-            description: "Print resolved binding map and planned requests for debugging.",
-          },
-        },
-        writes: ["releases/{release}/boot-smoke.json"],
-        execute: runBootSmokeCommand,
       });
     },
   };

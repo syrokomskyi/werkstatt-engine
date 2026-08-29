@@ -171,6 +171,42 @@ export function createReleaseModule(): KernelModule {
         cacheable: false,
         execute: runReleaseSign,
       });
+      const { runBootSmokeCommand } = await import("./boot-smoke.ts");
+      registry.registerCommand({
+        name: "release.boot-smoke",
+        modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
+        generates: [],
+        description:
+          "Boot built worker in miniflare/workerd and execute representative requests to catch runtime crashes before deploy (RFC-0961, RFC-0979). Flags: --site, [--dist], [--wrangler-config], [--languages], [--diagnose].",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: false,
+        flags: {
+          site: { kind: "string", required: true, description: "Sternsystem id." },
+          dist: {
+            kind: "string",
+            description: "Path to dist directory (defaults to workpiece or release dist).",
+          },
+          "wrangler-config": {
+            kind: "string",
+            description:
+              "Path to wrangler config. Defaults to dist/server/wrangler.json, falling back to dist/../wrangler.jsonc.",
+          },
+          languages: {
+            kind: "string",
+            description:
+              "Comma-separated language codes. If omitted, auto-detected from dist/client/ per RFC-0978.",
+          },
+          diagnose: {
+            kind: "boolean",
+            default: false,
+            description: "Print resolved binding map and planned requests for debugging.",
+          },
+        },
+        writes: ["boot-smoke.json"],
+        reads: ["dist/**"],
+        execute: runBootSmokeCommand,
+      });
     },
   };
 }

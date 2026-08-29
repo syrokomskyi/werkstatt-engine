@@ -10,6 +10,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0961: initial release.boot-smoke command handler, binding simulator, egress interceptor, and route planner.</item>
   <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
+  <item>RFC-0979: add --wrangler-config and --languages flags to runBootSmokeCommand, implement wrangler config fallback resolution, write boot-smoke.json to dist directory.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -497,6 +498,8 @@ export async function runBootSmokeCommand(
   const { workspaceRoot, logger } = context;
   const siteId = flagString(input, "site");
   const distFlag = flagString(input, "dist");
+  const wranglerConfigFlag = flagString(input, "wrangler-config");
+  const languagesFlag = flagString(input, "languages");
   const diagnose = Boolean(input.flags["diagnose"]);
 
   if (!siteId) {
@@ -543,25 +546,52 @@ export async function runBootSmokeCommand(
     };
   }
 
-  // Resolve wrangler config
-  const wranglerConfigPath = path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc");
-  if (!existsSync(wranglerConfigPath)) {
-    return {
-      data: {
-        booted: false,
-        requests: 0,
-        failed: 0,
-        egressViolations: [],
-        missingBindings: [],
-        bootError: `wrangler.jsonc not found: ${wranglerConfigPath}`,
-      },
-      exitCode: 1,
-      summary: `[release.boot-smoke] wrangler.jsonc not found`,
-    };
+  // Resolve wrangler config (RFC-0979): --wrangler-config flag → Astro-generated → fallback
+  let wranglerConfigPath: string;
+  let bootSmokeDistDir = distDir;
+  if (wranglerConfigFlag) {
+    wranglerConfigPath = path.resolve(wranglerConfigFlag);
+  } else {
+    const astroWranglerPath = path.join(distDir, "server", "wrangler.json");
+    if (existsSync(astroWranglerPath)) {
+      wranglerConfigPath = astroWranglerPath;
+      bootSmokeDistDir = path.join(distDir, "server");
+    } else {
+      const fallbackPath = path.join(distDir, "..", "wrangler.jsonc");
+      if (existsSync(fallbackPath)) {
+        wranglerConfigPath = fallbackPath;
+      } else {
+        const workpiecePath = path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc");
+        if (existsSync(workpiecePath)) {
+          wranglerConfigPath = workpiecePath;
+        } else {
+          return {
+            data: {
+              booted: false,
+              requests: 0,
+              failed: 0,
+              egressViolations: [],
+              missingBindings: [],
+              bootError: `wrangler config not found — tried ${astroWranglerPath}, ${fallbackPath}, ${workpiecePath}`,
+            },
+            exitCode: 1,
+            summary: `[release.boot-smoke] wrangler config not found`,
+          };
+        }
+      }
+    }
   }
 
-  // Plan requests — detect languages from dist/client/ (RFC-0978)
-  const languages = await detectBootSmokeLanguages(distDir);
+  // Plan requests — use --languages flag or auto-detect from dist/client/ (RFC-0978)
+  let languages: string[];
+  if (languagesFlag) {
+    languages = languagesFlag
+      .split(",")
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } else {
+    languages = await detectBootSmokeLanguages(distDir);
+  }
   const requests = planBootSmokeRequests({ distDir, languages });
 
   if (diagnose) {
@@ -573,10 +603,20 @@ export async function runBootSmokeCommand(
 
   // Run boot-smoke
   const result = await runBootSmoke({
-    distDir,
+    distDir: bootSmokeDistDir,
     wranglerConfigPath,
     requests,
   });
+
+  // Write boot-smoke.json to dist directory (RFC-0979)
+  try {
+    await fs.writeFile(
+      path.join(distDir, "boot-smoke.json"),
+      JSON.stringify(result, null, 2) + "\n",
+    );
+  } catch {
+    // Best-effort — don't fail the command if evidence write fails
+  }
 
   const failed = result.requests.filter((r) => !r.ok).length;
   const hasFailures =
