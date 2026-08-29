@@ -118,6 +118,7 @@ const PHASE_FLAGS: Record<string, string[]> = {
     "verify-signature",
   ],
   "mission.archive": ["mission", "status"],
+  "sternsystem.sync": ["id", "direction", "all"],
 };
 
 function assertAllPhaseCallsValid(): void {
@@ -181,17 +182,21 @@ function setupFullSuccessMocks(releaseId: string = "test-sys-r000001"): void {
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
   mockPhaseResult("release.prepare", 0, { releaseId });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("release.ready", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
   mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-alt" });
   mockPhaseResult("leitstand.propagate", 0);
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-main" });
   mockPhaseResult("leitstand.promote", 0);
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.verify", 0);
 }
 
-test("full pipeline success — all 11 steps complete, exitCode 0", async () => {
+test("full pipeline success — all 15 steps complete, exitCode 0", async () => {
   setupFullSuccessMocks();
 
   const result = await runLeitstandShip(
@@ -203,7 +208,7 @@ test("full pipeline success — all 11 steps complete, exitCode 0", async () => 
   expect(result.data!.completed).toBe(true);
   expect(result.data!.failedStep).toBeUndefined();
   expect(result.data!.releaseId).toBe("test-sys-r000001");
-  expect(result.data!.steps.length).toBe(11);
+  expect(result.data!.steps.length).toBe(15);
   assertAllPhaseCallsValid();
 });
 
@@ -243,16 +248,18 @@ test("--until closed stops after mission-close (4 steps)", async () => {
   assertAllPhaseCallsValid();
 });
 
-test("--until dev stops after certify-dev + dev-deploy (7 steps)", async () => {
+test("--until dev stops after certify-dev + dev-deploy + sync (9 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000002" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("release.ready", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
   mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
 
   const result = await runLeitstandShip(
     makeInput({ site: "test-sys", mission: "m000001", until: "dev" }),
@@ -261,7 +268,7 @@ test("--until dev stops after certify-dev + dev-deploy (7 steps)", async () => {
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(7);
+  expect(result.data!.steps.length).toBe(9);
   expect(result.data!.reachedPhase).toBe("dev");
   assertAllPhaseCallsValid();
 });
@@ -306,6 +313,7 @@ test("certify-dev fails — exitCode 1, deploy not called", async () => {
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000003" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("release.ready", 0);
   mockPhaseResult("leitstand.certify", 1);
 
@@ -439,21 +447,24 @@ test("mission-archive step is non-fatal when mission.archive fails", async () =>
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(11);
+  expect(result.data!.steps.length).toBe(15);
 });
 
-test("--until alt stops after certify-alt + propagate (8 steps)", async () => {
+test("--until alt stops after certify-alt + propagate + sync (11 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000010" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("release.ready", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
   mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-alt" });
   mockPhaseResult("leitstand.propagate", 0);
+  mockPhaseResult("sternsystem.sync", 0);
 
   const result = await runLeitstandShip(
     makeInput({ site: "test-sys", mission: "m000001", until: "alt" }),
@@ -462,25 +473,29 @@ test("--until alt stops after certify-alt + propagate (8 steps)", async () => {
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(8);
+  expect(result.data!.steps.length).toBe(11);
   expect(result.data!.reachedPhase).toBe("alt");
   assertAllPhaseCallsValid();
 });
 
-test("--until main stops after certify-main + promote + verify (9 steps)", async () => {
+test("--until main stops after certify-main + promote + verify + sync (13 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000011" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("release.ready", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
   mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-alt" });
   mockPhaseResult("leitstand.propagate", 0);
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-main" });
   mockPhaseResult("leitstand.promote", 0);
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("leitstand.verify", 0);
 
   const result = await runLeitstandShip(
@@ -490,7 +505,7 @@ test("--until main stops after certify-main + promote + verify (9 steps)", async
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(9);
+  expect(result.data!.steps.length).toBe(13);
   expect(result.data!.reachedPhase).toBe("main");
   assertAllPhaseCallsValid();
 });
@@ -511,6 +526,7 @@ test("resume restores releaseId from journal after release-prepare completed", a
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000099" });
+  mockPhaseResult("sternsystem.sync", 0);
   mockPhaseResult("release.ready", 1);
 
   const result1 = await runLeitstandShip(

@@ -103,7 +103,11 @@ export async function runSternsystemSync(
   if (existsSync(path.join(cachePath, ".git"))) {
     logger.info(`[sternsystem.sync] pushing cache clone to bare repo…`);
     try {
-      git(cachePath, `push origin ${branchName}`);
+      // RFC-0986: Use --force-with-lease — cache clone is the source of truth.
+      // If the bare repo received unexpected commits after the last fetch,
+      // --force-with-lease rejects the push (safe). This fixes non-fast-forward
+      // errors caused by divergent histories between cache and bare.
+      git(cachePath, `push --force-with-lease origin ${branchName}`);
     } catch (err) {
       logger.warn(
         `[sternsystem.sync] cache-to-bare push failed (non-fatal): ${(err as Error).message}`,

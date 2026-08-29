@@ -186,7 +186,9 @@ export async function writeSystemState(
       } catch {
         // No remote HEAD set — default to main
       }
-      gitExec(cacheClone, `push origin HEAD:refs/heads/${branch}`);
+      // RFC-0986: Use --force-with-lease — cache clone is the source of truth.
+      // Fixes non-fast-forward errors when bare repo diverged after last fetch.
+      gitExec(cacheClone, `push --force-with-lease origin HEAD:refs/heads/${branch}`);
     } catch (err) {
       // Push may fail if no bare repo is configured or branch diverged — non-fatal
       const msg = err instanceof Error ? err.message : String(err);

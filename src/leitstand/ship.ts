@@ -10,7 +10,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0962: initial leitstand.ship composite command — buildShipPlan, runLeitstandShip, ShipContext/ShipResult types.</item>
   <item>RFC-0962 fo-fix: --until validation, releaseId restoration from journal on resume, step metadata + durationMs tracking via StepResult, removed duplicate ShipStepResult type.</item>
-  <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check.</item>
+  <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check; auto-sync after release-prepare and certify-* steps; --force-with-lease in cache-to-bare push.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -74,10 +74,10 @@ export interface ShipResult {
 const PHASE_STEP_COUNT: Record<ShipPhase, number> = {
   validated: 2,
   closed: 4,
-  dev: 7,
-  alt: 8,
-  main: 9,
-  archived: 11,
+  dev: 9,
+  alt: 11,
+  main: 13,
+  archived: 15,
 };
 
 const STEP_NAMES = [
@@ -86,10 +86,14 @@ const STEP_NAMES = [
   "mission-reconcile",
   "mission-close",
   "release-prepare",
+  "sync-after-prepare",
   "release-ready",
   "certify-dev",
+  "sync-after-dev",
   "certify-alt",
+  "sync-after-alt",
   "certify-main",
+  "sync-after-main",
   "verify",
   "mission-archive",
 ] as const;
@@ -318,6 +322,31 @@ function buildCertifyAndDeployStep(
 
 // ─── buildShipPlan ───────────────────────────────────────────────────────────
 
+function buildSyncStep(stepName: string): OperationStep<ShipContext> {
+  return {
+    name: stepName,
+    run: async (ctx: ShipContext) => {
+      // RFC-0986: Auto-sync cache clone to bare repo after deployment phases
+      // that create commits. Non-fatal — sync failure is logged but does not
+      // block the deployment pipeline.
+      try {
+        const result = await runShipPhase(ctx, "sternsystem.sync", [`--id=${ctx.systemId}`]);
+        if (result.exitCode !== 0) {
+          ctx.logger.info(
+            `  [ship] ${stepName}: sternsystem.sync failed (non-fatal): ${result.summary ?? ""}`,
+          );
+        } else {
+          ctx.logger.info(`  [ship] ${stepName}: sternsystem.sync ok`);
+        }
+      } catch (err) {
+        ctx.logger.info(
+          `  [ship] ${stepName}: sternsystem.sync skipped (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+    },
+  };
+}
+
 export function buildShipPlan(input: {
   until: ShipPhase;
   missionClosed?: boolean;
@@ -343,6 +372,10 @@ export function buildShipPlan(input: {
         }
       },
     ),
+    // RFC-0986: Auto-sync after release-prepare — release.prepare creates commits
+    // in the cache clone (release tag, system-state update). Sync to bare repo
+    // immediately so subsequent steps don't encounter a diverged bare repo.
+    buildSyncStep("sync-after-prepare"),
     buildSimpleStep("release-ready", "release.ready", (ctx) => [
       `--release=${ctx.releaseId ?? ""}`,
     ]),
@@ -350,14 +383,21 @@ export function buildShipPlan(input: {
       `--site=${ctx.systemId}`,
       `--release=${releaseId}`,
     ]),
+    // RFC-0986: Auto-sync after certify-dev — certification may create evidence
+    // commits in the cache clone.
+    buildSyncStep("sync-after-dev"),
     buildCertifyAndDeployStep("certify-alt", "alt", "leitstand.propagate", (ctx, releaseId) => [
       `--site=${ctx.systemId}`,
       `--release=${releaseId}`,
     ]),
+    // RFC-0986: Auto-sync after certify-alt.
+    buildSyncStep("sync-after-alt"),
     buildCertifyAndDeployStep("certify-main", "main", "leitstand.promote", (ctx, releaseId) => [
       `--site=${ctx.systemId}`,
       `--release=${releaseId}`,
     ]),
+    // RFC-0986: Auto-sync after certify-main.
+    buildSyncStep("sync-after-main"),
     buildSimpleStep("verify", "leitstand.verify", (ctx) => [`--site=${ctx.systemId}`]),
     {
       name: "mission-archive",
@@ -421,13 +461,13 @@ function phaseFromStepCount(stepCount: number): ShipPhase | "preflight" {
       return "validated";
     case 4:
       return "closed";
-    case 7:
-      return "dev";
-    case 8:
-      return "alt";
     case 9:
-      return "main";
+      return "dev";
     case 11:
+      return "alt";
+    case 13:
+      return "main";
+    case 15:
       return "archived";
     default:
       return "preflight";

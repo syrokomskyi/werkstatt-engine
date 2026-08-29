@@ -59,7 +59,7 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
       if (args === "symbolic-ref --short refs/remotes/origin/HEAD") {
         return "origin/main";
       }
-      if (args.startsWith("push origin ")) {
+      if (args.startsWith("push --force-with-lease origin ")) {
         return "";
       }
       throw new Error(`Unexpected git args: ${args}`);
@@ -68,10 +68,10 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
     await writeSystemState(tmpDir, "test-sys", makeState());
 
     const pushCall = gitExecMock.mock.calls.find((c) =>
-      (c[1] as string).startsWith("push origin "),
+      (c[1] as string).startsWith("push --force-with-lease origin "),
     );
     expect(pushCall).toBeDefined();
-    expect(pushCall![1]).toBe("push origin HEAD:refs/heads/main");
+    expect(pushCall![1]).toBe("push --force-with-lease origin HEAD:refs/heads/main");
   });
 
   it("falls back to main when symbolic-ref fails (no remote HEAD)", async () => {
@@ -81,7 +81,7 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
           if (opts?.allowNonZero) return "";
           throw new Error("not a symbolic ref");
         }
-        if (args.startsWith("push origin ")) {
+        if (args.startsWith("push --force-with-lease origin ")) {
           return "";
         }
         throw new Error(`Unexpected git args: ${args}`);
@@ -91,10 +91,10 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
     await writeSystemState(tmpDir, "test-sys", makeState());
 
     const pushCall = gitExecMock.mock.calls.find((c) =>
-      (c[1] as string).startsWith("push origin "),
+      (c[1] as string).startsWith("push --force-with-lease origin "),
     );
     expect(pushCall).toBeDefined();
-    expect(pushCall![1]).toBe("push origin HEAD:refs/heads/main");
+    expect(pushCall![1]).toBe("push --force-with-lease origin HEAD:refs/heads/main");
   });
 
   it("resolves non-main branch correctly", async () => {
@@ -102,7 +102,7 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
       if (args === "symbolic-ref --short refs/remotes/origin/HEAD") {
         return "origin/develop";
       }
-      if (args.startsWith("push origin ")) {
+      if (args.startsWith("push --force-with-lease origin ")) {
         return "";
       }
       throw new Error(`Unexpected git args: ${args}`);
@@ -111,10 +111,10 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
     await writeSystemState(tmpDir, "test-sys", makeState());
 
     const pushCall = gitExecMock.mock.calls.find((c) =>
-      (c[1] as string).startsWith("push origin "),
+      (c[1] as string).startsWith("push --force-with-lease origin "),
     );
     expect(pushCall).toBeDefined();
-    expect(pushCall![1]).toBe("push origin HEAD:refs/heads/develop");
+    expect(pushCall![1]).toBe("push --force-with-lease origin HEAD:refs/heads/develop");
   });
 
   it("push failure is non-fatal (warning emitted, no throw)", async () => {
@@ -123,7 +123,7 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
       if (args === "symbolic-ref --short refs/remotes/origin/HEAD") {
         return "origin/main";
       }
-      if (args.startsWith("push origin ")) {
+      if (args.startsWith("push --force-with-lease origin ")) {
         throw new Error("push failed: branch diverged");
       }
       throw new Error(`Unexpected git args: ${args}`);
@@ -141,7 +141,7 @@ describe("RFC-0981: writeSystemState push refspec in detached HEAD", () => {
       if (args === "symbolic-ref --short refs/remotes/origin/HEAD") {
         return "origin/main";
       }
-      if (args.startsWith("push origin ")) {
+      if (args.startsWith("push --force-with-lease origin ")) {
         return "";
       }
       throw new Error(`Unexpected git args: ${args}`);
