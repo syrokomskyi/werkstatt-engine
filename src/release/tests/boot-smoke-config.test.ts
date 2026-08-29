@@ -31,7 +31,8 @@ describe("buildMiniflareOptions", () => {
       egressFetch: dummyFetch,
     });
     expect(result).not.toBeNull();
-    expect(result!.resolvedWorkerPath).toBe(entryPath);
+    const modules = result!.options["modules"] as Array<{ type: string; path: string }>;
+    expect(modules[0].path).toBe(entryPath);
   });
 
   it("uses main from wrangler config when it exists", async () => {
@@ -46,7 +47,8 @@ describe("buildMiniflareOptions", () => {
       egressFetch: dummyFetch,
     });
     expect(result).not.toBeNull();
-    expect(result!.resolvedWorkerPath).toBe(entryPath);
+    const modules = result!.options["modules"] as Array<{ type: string; path: string }>;
+    expect(modules[0].path).toBe(entryPath);
   });
 
   it("sets modulesRoot to the entry file's directory", async () => {

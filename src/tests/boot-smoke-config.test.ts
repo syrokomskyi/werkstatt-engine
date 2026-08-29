@@ -49,7 +49,7 @@ describe("RFC-0977: Boot-smoke Miniflare configuration invariants", () => {
   // ─── INVARIANT-1: modulesRoot equals entry point directory ───────────
 
   describe("INVARIANT-1: modulesRoot", () => {
-    it("sets modulesRoot to path.dirname(resolvedWorkerPath)", async () => {
+    it("sets modulesRoot to the entry point directory", async () => {
       const serverDir = join(tmpDist, "server");
       mkdirSync(serverDir, { recursive: true });
       const entryPath = join(serverDir, "entry.mjs");
