@@ -44,25 +44,24 @@ function makeContext(): KernelRuntimeContext {
 function writeMissionManifest(workspaceRoot: string, missionId: string, state: string): void {
   const missionDir = join(workspaceRoot, "missions", missionId);
   mkdirSync(missionDir, { recursive: true });
-  const manifest: Record<string, unknown> = {
-    schemaVersion: "1.0.0",
-    missionId,
-    systemId: "test-system",
-    state,
-    brief: "Test",
-    openedAt: "2026-01-01T00:00:00.000Z",
-    openedBy: "test-agent",
-    closedAt: null,
-    closedBy: null,
-    pinAtOpen: "1.0.0",
-    materializedAt: "2026-01-01T01:00:00.000Z",
-    migratedAt: null,
-    reconciledAt: "2026-01-01T02:00:00.000Z",
-    releaseId: null,
-    rfcId: null,
-    operationId: "op-001",
-  };
-  writeFileSync(join(missionDir, "mission.yaml"), JSON.stringify(manifest, null, 2) + "\n");
+  const manifestYaml = `schemaVersion: "1.0.0"
+missionId: "${missionId}"
+systemId: "test-system"
+state: "${state}"
+brief: "Test"
+openedAt: "2026-01-01T00:00:00.000Z"
+openedBy: "test-agent"
+closedAt: null
+closedBy: null
+pinAtOpen: "1.0.0"
+materializedAt: "2026-01-01T01:00:00.000Z"
+migratedAt: null
+reconciledAt: "2026-01-01T02:00:00.000Z"
+releaseId: null
+rfcId: null
+operationId: "op-001"
+`;
+  writeFileSync(join(missionDir, "mission.yaml"), manifestYaml);
 }
 
 test("Measure 6: --stale-dirs archives aborted missions to archive/aborted/", async () => {
