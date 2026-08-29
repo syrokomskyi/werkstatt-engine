@@ -239,22 +239,6 @@ export async function runColdE2e(
           // Create systems-cache directory (sibling of werkstatt clone)
           await fs.mkdir(path.join(coldRoot, "systems-cache"), { recursive: true });
           await fs.mkdir(path.join(coldRoot, "systems-git"), { recursive: true });
-
-          // RFC-0966/0968: Generate a temporary signing key for passport generation.
-          // sternsystem.register auto-generates a passport if SIGNING_PRIVATE_KEY is set.
-          // The key is generated in the cold root and loaded into process.env so that
-          // all subsequent in-process kernel command executions can sign passports.
-          const keyDir = path.join(coldRoot, "signing-key");
-          await fs.mkdir(keyDir, { recursive: true });
-          await runSubCommand(
-            stepCtx.workspaceRoot,
-            "signing.key.generate",
-            [`--output-dir=${keyDir}`, "--encoding=pem", "--force"],
-            logger,
-          );
-          const privateKeyPem = await fs.readFile(path.join(keyDir, "signing.key.pem"), "utf8");
-          process.env.SIGNING_PRIVATE_KEY = privateKeyPem.trim();
-          logger.info(`  [e2e.cold] temporary signing key generated for passport signing`);
         },
         logger,
         perStepTimeout,
@@ -290,6 +274,21 @@ export async function runColdE2e(
           const cachePath = path.join(coldRoot, "systems-cache", systemId);
           const barePath = path.join(coldRoot, "systems-git", systemId);
           const mirrorsFlag = `${cachePath}:non-bare,${barePath}:bare`;
+
+          // RFC-0966/0968: Generate a temporary signing key for passport generation.
+          // Must run after install step so deps are available. sternsystem.register
+          // auto-generates a passport if SIGNING_PRIVATE_KEY is set.
+          const keyDir = path.join(coldRoot, "signing-key");
+          await fs.mkdir(keyDir, { recursive: true });
+          await runSubCommand(
+            stepCtx.workspaceRoot,
+            "signing.key.generate",
+            [`--output-dir=${keyDir}`, "--encoding=pem", "--force"],
+            logger,
+          );
+          const privateKeyPem = await fs.readFile(path.join(keyDir, "signing.key.pem"), "utf8");
+          process.env.SIGNING_PRIVATE_KEY = privateKeyPem.trim();
+          logger.info(`  [e2e.cold] temporary signing key generated for passport signing`);
 
           // Initialize bare repo
           await fs.mkdir(barePath, { recursive: true });
