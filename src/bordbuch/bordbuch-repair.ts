@@ -333,10 +333,10 @@ export async function runBordbuchRepair(
         cacheCloneDir,
         `bordbuch.repair: ${systemId} — auto-repair ${totalRepairs} violation(s) (${orphans.length} orphan-close, ${unmatched.length} unmatched-open)`,
       );
-      if (!commitResult.commitSha) {
+      if (!commitResult.commitSha || !commitResult.pushed) {
         throw new Error(
-          `[bordbuch.repair] ${systemId}: bordbuch file written but commit failed — cache clone has unstaged changes. ` +
-            `Error: ${commitResult.error ?? "unknown"}. ` +
+          `[bordbuch.repair] ${systemId}: bordbuch file written but ${!commitResult.commitSha ? "commit" : "push"} failed — ` +
+            `cache clone may have rebase conflicts. Error: ${commitResult.error ?? "unknown"}. ` +
             `Check git state in the cache clone and re-run bordbuch.repair.`,
         );
       }
