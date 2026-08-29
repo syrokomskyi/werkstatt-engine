@@ -60,6 +60,10 @@ HARDCODED_VALUES_AUDIT (RFC-0980):
     (b) workshop-specific — ensures boot-smoke runs representative requests when dist/client/ structure is unexpected
 */
 
+// CI GUARD: boot-smoke tests run in .github/workflows/ci.yml
+// Any change to Miniflare options, language detection, or module enumeration
+// MUST be accompanied by a test update. See ADR-0067 for testing strategy.
+
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
