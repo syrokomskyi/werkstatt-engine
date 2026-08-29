@@ -405,3 +405,13 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 ## Test helper conventions (nachweis)
 
 - **`readPbpEntity` in test files must use `parseMarkdownFrontmatter` from `@warpgogol/werkstatt-shared/content`.** Naive line-by-line YAML parsing (splitting on `:` and `JSON.parse`) fails on multi-line YAML that `stringifyMarkdownFrontmatter` produces — nested objects like `consentScope` are written as multi-line YAML maps, not inline JSON. The helper should be: `const { parseMarkdownFrontmatter } = await import("@warpgogol/werkstatt-shared/content"); const { data } = parseMarkdownFrontmatter(raw); return data as Record<string, unknown>;`
+
+## Release pipeline hardcoded values audit (RFC-0980)
+
+- Release pipeline files (`src/release/release-commands.ts`, `src/release/boot-smoke.ts`) must include a `HARDCODED_VALUES_AUDIT` comment block after the `MODULE_CONTRACT`/`CHANGE_SUMMARY` scaffolding.
+- The block lists every remaining constant with its classification and justification:
+  - **(a) safe default** — runtime/protocol constants, fallbacks used when configuration is missing
+  - **(b) workshop-specific** — values specific to this workshop but not to a single site
+  - **(c) site-specific** — values that vary per site; must be replaced with dynamic detection (not listed in the block — they are eliminated)
+- New constants added to release pipeline files must be documented in the `HARDCODED_VALUES_AUDIT` block.
+- The audit report lives at `docs/audits/2026-08-29-release-pipeline-hardcoded-values-audit.md`.
