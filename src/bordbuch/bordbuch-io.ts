@@ -20,7 +20,7 @@
 */
 
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import {
@@ -457,11 +457,17 @@ export async function commitAndPushBordbuch(
     return { commitSha: null, pushed: false, error: null };
   }
 
-  let branch: string;
+  // RFC-0987 Fix 4: resolve branch via symbolic-ref instead of rev-parse --abbrev-ref.
+  // In detached HEAD, rev-parse returns "HEAD" which produces invalid refspecs.
+  // symbolic-ref --short refs/remotes/origin/HEAD returns the remote default branch.
+  let branch = "main";
   try {
-    branch = gitExec(systemDir, "rev-parse --abbrev-ref HEAD");
+    const ref = gitExec(systemDir, "symbolic-ref --short refs/remotes/origin/HEAD", {
+      allowNonZero: true,
+    });
+    branch = ref.replace("origin/", "") || "main";
   } catch {
-    return { commitSha, pushed: false, error: "could not detect current branch" };
+    // No remote HEAD set — default to main (same pattern as RFC-0981 writeSystemState)
   }
 
   let stashed = false;
@@ -489,9 +495,25 @@ export async function commitAndPushBordbuch(
         }
       }
     }
-    gitExec(systemDir, `push origin ${branch}`);
+    // RFC-0987 Fix 5: use --force-with-lease to safely overwrite diverged bare repo
+    // history. The cache clone is the source of truth (RFC-0480); --force-with-lease
+    // rejects the push if the remote HEAD changed unexpectedly.
+    gitExec(systemDir, `push --force-with-lease origin ${branch}`);
     return { commitSha, pushed: true, error: null };
   } catch (err) {
+    // RFC-0987 Fix 1: abort any in-progress rebase to prevent stale rebase-merge
+    // state from blocking subsequent git operations (e.g. mission.open bordbuch.repair).
+    try {
+      gitExec(systemDir, "rebase --abort", { allowNonZero: true });
+    } catch {
+      // If git rebase --abort fails, manually remove the rebase state directories
+      try {
+        rmSync(path.join(systemDir, ".git", "rebase-merge"), { recursive: true, force: true });
+      } catch {}
+      try {
+        rmSync(path.join(systemDir, ".git", "rebase-apply"), { recursive: true, force: true });
+      } catch {}
+    }
     // Clean up stash on push failure too
     if (stashed) {
       try {
