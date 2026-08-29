@@ -42,6 +42,7 @@ export {
   type BootSmokeRequestSpec,
   type BootSmokeRequestResult,
   planBootSmokeRequests,
+  detectBootSmokeLanguages,
   simulateBindings,
 } from "./boot-smoke.ts";
 

@@ -484,7 +484,8 @@ export async function runReleasePrepare(
       await fs.rm(path.join(publicWellKnownDir, "build-identity.json"), { force: true });
 
       // RFC-0961: Boot-smoke — boot built worker in miniflare and execute representative requests
-      const { runBootSmoke, planBootSmokeRequests } = await import("./boot-smoke.ts");
+      const { runBootSmoke, planBootSmokeRequests, detectBootSmokeLanguages } =
+        await import("./boot-smoke.ts");
       // Prefer the Astro-generated wrangler.json in dist/server/ which has
       // correct paths relative to the dist directory. Fall back to workpiece
       // wrangler.jsonc if the Astro output doesn't exist.
@@ -498,9 +499,11 @@ export async function runReleasePrepare(
         // dist/server/ (entry.mjs and assets.directory are relative to it).
         const bootSmokeDistDir =
           wranglerConfigPath === astroWranglerPath ? path.join(distDest, "server") : distDest;
+        // Derive languages from actual dist/client subdirectories (RFC-0978)
+        const bootSmokeLanguages = await detectBootSmokeLanguages(distDest);
         const bootSmokeRequests = planBootSmokeRequests({
           distDir: distDest,
-          languages: ["de", "en", "uk"],
+          languages: bootSmokeLanguages,
         });
         logger.info(`  Running boot-smoke (${bootSmokeRequests.length} representative requests)…`);
         const bootSmokeResult = await runBootSmoke({
@@ -519,8 +522,14 @@ export async function runReleasePrepare(
           if (!bootSmokeResult.booted)
             parts.push(`boot failed: ${bootSmokeResult.bootError ?? "unknown"}`);
           const failedReqs = bootSmokeResult.requests.filter((r) => !r.ok);
-          if (failedReqs.length > 0)
+          if (failedReqs.length > 0) {
+            for (const r of failedReqs) {
+              logger.error(
+                `  boot-smoke request failed: ${r.path} — status=${r.status ?? "null"}, error=${r.error ?? "none"}`,
+              );
+            }
             parts.push(`${failedReqs.length}/${bootSmokeResult.requests.length} requests failed`);
+          }
           if (bootSmokeResult.egressViolations.length > 0)
             parts.push(`${bootSmokeResult.egressViolations.length} egress violations`);
           if (bootSmokeResult.missingBindings.length > 0)

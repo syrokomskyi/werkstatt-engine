@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0961: initial release.boot-smoke command handler, binding simulator, egress interceptor, and route planner.</item>
+  <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -50,6 +51,29 @@ interface DistRouteEntry {
   path?: string;
   pattern?: string;
   kind?: string;
+}
+
+// ─── Language detection (RFC-0978) ───────────────────────────────────
+
+export async function detectBootSmokeLanguages(distDir: string): Promise<string[]> {
+  const clientDistDir = path.join(distDir, "client");
+  const languages: string[] = [];
+  if (existsSync(clientDistDir)) {
+    for (const entry of await fs.readdir(clientDistDir, { withFileTypes: true })) {
+      if (
+        entry.isDirectory() &&
+        !entry.name.startsWith("_") &&
+        entry.name !== "api" &&
+        /^[a-z]{2}$/.test(entry.name)
+      ) {
+        languages.push(entry.name);
+      }
+    }
+  }
+  if (languages.length === 0) {
+    languages.push("de", "uk");
+  }
+  return languages;
 }
 
 // ─── Route planner ───────────────────────────────────────────────────
@@ -536,8 +560,8 @@ export async function runBootSmokeCommand(
     };
   }
 
-  // Plan requests
-  const languages = ["de", "en", "uk"];
+  // Plan requests — detect languages from dist/client/ (RFC-0978)
+  const languages = await detectBootSmokeLanguages(distDir);
   const requests = planBootSmokeRequests({ distDir, languages });
 
   if (diagnose) {
