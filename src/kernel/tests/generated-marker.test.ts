@@ -1,6 +1,7 @@
 import { test, expect } from "vitest";
 import {
   GENERATED_MARKER,
+  EDITABLE_GENERATED_MARKER,
   buildGeneratedHeader,
   hasGeneratedMarker,
   stripGeneratedMarker,
@@ -97,7 +98,9 @@ test("stripGeneratedMarker removes the full line-comment advisory block", () => 
   const { changed, content: stripped } = stripGeneratedMarker(content);
   expect(changed).toBe(true);
   expect(hasGeneratedMarker(stripped)).toBe(false);
-  expect(stripped).toBe('import { defineKernelConfig } from "@warpgogol/werkstatt-engine/kernel";\n');
+  expect(stripped).toBe(
+    'import { defineKernelConfig } from "@warpgogol/werkstatt-engine/kernel";\n',
+  );
 });
 
 test("stripGeneratedMarker removes the full HTML block advisory header", () => {
@@ -167,4 +170,29 @@ test("buildGeneratedHeader without templatePath names the owner command as the e
   expect(header).toMatch(
     /Edit instead: the api\.routes\.generate generator source \(not this file\)\.$/m,
   );
+});
+
+test("buildGeneratedHeader with editable: true uses permissive marker and advisory", () => {
+  const header = buildGeneratedHeader({
+    filePath: "AGENTS.md",
+    ownerCommand: "forge.agents.generate",
+    editable: true,
+  });
+  expect(header).toContain(EDITABLE_GENERATED_MARKER);
+  expect(header).not.toContain(GENERATED_MARKER);
+  expect(header).not.toContain("DO NOT EDIT");
+  expect(hasGeneratedMarker(header)).toBe(true);
+});
+
+test("stripGeneratedMarker removes the full editable HTML block advisory header", () => {
+  const header = buildGeneratedHeader({
+    filePath: "AGENTS.md",
+    ownerCommand: "forge.agents.generate",
+    editable: true,
+  });
+  const content = `${header}# Agent Guide\n\nBody text.\n`;
+  const { changed, content: stripped } = stripGeneratedMarker(content);
+  expect(changed).toBe(true);
+  expect(hasGeneratedMarker(stripped)).toBe(false);
+  expect(stripped).toBe("# Agent Guide\n\nBody text.\n");
 });

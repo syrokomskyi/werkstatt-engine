@@ -113,6 +113,7 @@ export * from "./workspace-io.ts";
 // RFC-0336: buildGeneratedHeader is the single shared advisory-block builder.
 export {
   GENERATED_MARKER,
+  EDITABLE_GENERATED_MARKER,
   hasGeneratedMarker,
   stripGeneratedMarker,
   isGeneratedMarkerTextCandidate,

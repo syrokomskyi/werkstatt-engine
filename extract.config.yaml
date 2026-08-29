@@ -5,7 +5,7 @@
 projectDir: packages/werkstatt-engine
 destName: werkstatt-engine
 standalone: true
-versionBump: minor
+versionBump: patch
 
 workspacePrefixes:
   - "@warpgogol/"
