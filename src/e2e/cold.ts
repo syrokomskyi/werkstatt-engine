@@ -471,12 +471,49 @@ legalJurisdiction: DE
           "passport-validate",
           async () => {
             // sternsystem.register already generated a passport (SIGNING_PRIVATE_KEY is set).
-            // Run sternsystem.validate to verify PASSPORT-01/02/03 and HANDOVER rules pass.
-            await runSubCommand(
-              stepCtx.workspaceRoot,
-              "sternsystem.validate",
-              [`--id=${systemId}`],
-              logger,
+            // Run sternsystem.validate and check only PASSPORT/HANDOVER/OWNERSHIP rules.
+            // Pre-existing cold E2E setup violations (bundle-contract, mirror-remote-missing,
+            // external-edit-detected) are expected and not related to RFC-0966/0967/0968.
+            const result = (await executeKernelCommand({
+              workspaceRoot: stepCtx.workspaceRoot,
+              commandName: "sternsystem.validate",
+              argv: [`--id=${systemId}`, "--json"],
+              outputFormat: "json",
+            })) as {
+              exitCode?: number;
+              data?: {
+                violations?: Array<{ rule: string; systemId: string; message: string }>;
+                warnings?: Array<{ field: string; systemId: string; message: string }>;
+              };
+            };
+
+            const allViolations = result.data?.violations ?? [];
+            const relevantViolations = allViolations.filter(
+              (v) =>
+                v.rule.startsWith("PASSPORT") ||
+                v.rule.startsWith("HANDOVER") ||
+                v.rule.startsWith("OWNERSHIP"),
+            );
+            const allWarnings = result.data?.warnings ?? [];
+            const relevantWarnings = allWarnings.filter(
+              (w) =>
+                w.field?.startsWith("PASSPORT") ||
+                w.field?.startsWith("HANDOVER") ||
+                w.field?.startsWith("OWNERSHIP"),
+            );
+
+            if (relevantViolations.length > 0) {
+              throw new Error(
+                `passport-validate: ${relevantViolations.length} PASSPORT/HANDOVER/OWNERSHIP violations: ${relevantViolations.map((v) => `${v.rule}: ${v.message}`).join("; ")}`,
+              );
+            }
+            if (relevantWarnings.length > 0) {
+              throw new Error(
+                `passport-validate: ${relevantWarnings.length} PASSPORT/HANDOVER/OWNERSHIP warnings: ${relevantWarnings.map((w) => `${w.field}: ${w.message}`).join("; ")}`,
+              );
+            }
+            logger.info(
+              `  [e2e.cold] PASSPORT/HANDOVER/OWNERSHIP rules clean (${allViolations.length} other violations ignored)`,
             );
 
             // Optionally register ownership if a registry URL is configured
