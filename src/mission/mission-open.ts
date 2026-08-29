@@ -166,6 +166,58 @@ export async function runMissionOpen(
     );
   }
 
+  // RFC-0987 Fix 3: Pre-preflight cache clone git sanity check — must run before
+  // bordbuch.repair to prevent rebase cascade from blocking mission.open. A stale
+  // rebase-merge from a previous failed commitAndPushBordbuch will cause bordbuch.repair's
+  // git pull --rebase to fail with "It seems that there is already a rebase-merge directory".
+  // Auto-recover: abort the stale rebase and log a warning. Detached HEAD remains fail-fast.
+  const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
+  if (existsSync(path.join(cacheDir, ".git"))) {
+    // Check detached HEAD — fail-fast (requires operator decision)
+    try {
+      execSync("git symbolic-ref HEAD", {
+        cwd: cacheDir,
+        stdio: ["pipe", "pipe", "pipe"],
+        encoding: "utf-8",
+      });
+    } catch {
+      throw new Error(
+        `[mission.open] cache clone for '${systemId}' is in detached HEAD. ` +
+          `Run: git -C ${cacheDir} checkout main`,
+      );
+    }
+    // Check stale rebase-merge — auto-recover + warn
+    if (existsSync(path.join(cacheDir, ".git", "rebase-merge"))) {
+      logger.warn(
+        `[mission.open] cache clone for '${systemId}' has stale rebase-merge — auto-aborting before bordbuch validation.`,
+      );
+      let abortSucceeded = false;
+      try {
+        execSync("git rebase --abort", {
+          cwd: cacheDir,
+          stdio: ["pipe", "pipe", "pipe"],
+          timeout: 10_000,
+        });
+        abortSucceeded = true;
+      } catch {
+        // If git rebase --abort fails, manually remove the rebase state directories
+        try {
+          rmSync(path.join(cacheDir, ".git", "rebase-merge"), { recursive: true, force: true });
+          try {
+            rmSync(path.join(cacheDir, ".git", "rebase-apply"), { recursive: true, force: true });
+          } catch {}
+          abortSucceeded = true;
+        } catch {}
+      }
+      if (!abortSucceeded) {
+        throw new Error(
+          `[mission.open] stale rebase-merge found in cache clone for '${systemId}' and auto-abort failed. ` +
+            `Run: git -C ${cacheDir} rebase --abort`,
+        );
+      }
+    }
+  }
+
   // RFC-0593: pre-flight bordbuch validation gate — refuse to open a new mission
   // if the system's bordbuch has any violations. This runs before lock acquisition
   // to avoid holding locks during validation. Known TOCTOU limitation: bordbuch.repair
