@@ -10,13 +10,15 @@
 <CHANGE_SUMMARY>
   <item>RFC-0962: initial leitstand.ship composite command — buildShipPlan, runLeitstandShip, ShipContext/ShipResult types.</item>
   <item>RFC-0962 fo-fix: --until validation, releaseId restoration from journal on resume, step metadata + durationMs tracking via StepResult, removed duplicate ShipStepResult type.</item>
+  <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check.</item>
 </CHANGE_SUMMARY>
 */
 
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -170,6 +172,45 @@ function buildPreflightStep(): OperationStep<ShipContext> {
         throw new Error(`preflight: .env file not found in workpiece ${ctx.workpieceDir}`);
       }
       ctx.logger.info("  [ship] preflight: env vars presence check ok");
+
+      // 5. Cache-clone git divergence check (RFC-0986)
+      // Warns if cache clone HEAD and bare repo HEAD have diverged —
+      // mirror sync will fail with non-fast-forward in this case.
+      const cacheDir = ctx.cacheCloneDir;
+      if (existsSync(path.join(cacheDir, ".git"))) {
+        try {
+          const cacheHead = execSync("git rev-parse HEAD", {
+            cwd: cacheDir,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          const bareDir = path.resolve(ctx.workspaceRoot, "..", "systems-git", ctx.systemId);
+          if (existsSync(bareDir)) {
+            try {
+              const bareHead = execSync("git rev-parse master", {
+                cwd: bareDir,
+                encoding: "utf-8",
+                stdio: ["pipe", "pipe", "pipe"],
+              }).trim();
+              if (cacheHead !== bareHead) {
+                ctx.logger.info(
+                  `  [ship] preflight: WARN cache clone and bare repo have diverged (cache=${cacheHead.slice(0, 8)}, bare=${bareHead.slice(0, 8)}) — mirror sync may fail with non-fast-forward`,
+                );
+              } else {
+                ctx.logger.info("  [ship] preflight: cache-clone git divergence check ok");
+              }
+            } catch {
+              ctx.logger.info(
+                "  [ship] preflight: cache-clone git divergence check skipped (bare repo unreadable)",
+              );
+            }
+          }
+        } catch {
+          ctx.logger.info(
+            "  [ship] preflight: cache-clone git divergence check skipped (cache clone unreadable)",
+          );
+        }
+      }
     },
   };
 }
@@ -277,8 +318,12 @@ function buildCertifyAndDeployStep(
 
 // ─── buildShipPlan ───────────────────────────────────────────────────────────
 
-export function buildShipPlan(input: { until: ShipPhase }): OperationDefinition<ShipContext> {
+export function buildShipPlan(input: {
+  until: ShipPhase;
+  missionClosed?: boolean;
+}): OperationDefinition<ShipContext> {
   const stepCount = PHASE_STEP_COUNT[input.until];
+  const skipLifecycle = input.missionClosed === true;
 
   const allSteps: OperationStep<ShipContext>[] = [
     buildPreflightStep(),
@@ -336,6 +381,18 @@ export function buildShipPlan(input: { until: ShipPhase }): OperationDefinition<
     },
   ];
 
+  // When mission is already closed, skip lifecycle phases (validate, reconcile, close)
+  // and start from release-prepare. This allows resuming a deployment after a
+  // failed release.prepare without manually running individual steps.
+  if (skipLifecycle) {
+    const lifecycleSteps = new Set(["mission-validate", "mission-reconcile", "mission-close"]);
+    const filtered = allSteps.filter((s) => !lifecycleSteps.has(s.name));
+    return {
+      op: "leitstand.ship",
+      steps: filtered.slice(0, stepCount),
+    };
+  }
+
   return {
     op: "leitstand.ship",
     steps: allSteps.slice(0, stepCount),
@@ -343,6 +400,18 @@ export function buildShipPlan(input: { until: ShipPhase }): OperationDefinition<
 }
 
 // ─── Command handler ─────────────────────────────────────────────────────────
+
+function checkMissionClosed(workspaceRoot: string, missionId: string): boolean {
+  const missionYamlPath = path.join(workspaceRoot, "missions", missionId, "mission.yaml");
+  if (!existsSync(missionYamlPath)) return false;
+  try {
+    const raw = readFileSync(missionYamlPath, "utf-8");
+    const parsed = parseYaml(raw) as { state?: string };
+    return parsed.state === "closed";
+  } catch {
+    return false;
+  }
+}
 
 function phaseFromStepCount(stepCount: number): ShipPhase | "preflight" {
   switch (stepCount) {
@@ -401,7 +470,15 @@ export async function runLeitstandShip(
     logger,
   };
 
-  const plan = buildShipPlan({ until });
+  // Detect mission state — if already closed, skip lifecycle phases
+  const missionClosed = checkMissionClosed(workspaceRoot, missionId);
+  if (missionClosed) {
+    logger.info(
+      `  [ship] mission ${missionId} is closed — skipping lifecycle phases (validate, reconcile, close)`,
+    );
+  }
+
+  const plan = buildShipPlan({ until, missionClosed });
   const stepCount = plan.steps.length;
   const reachedPhase = phaseFromStepCount(stepCount);
 
