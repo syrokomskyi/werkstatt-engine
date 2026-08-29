@@ -363,11 +363,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os"
-  ],
+  "files": ["src", "bin", "os"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
@@ -426,14 +422,14 @@
     "@syrokomskyi/axiom-factory-app": "link:../../../pipelines/apps/axiom/factory",
     "@syrokomskyi/axiom-study": "link:../../../pipelines/packages/axiom/axiom-study",
     "better-sqlite3": "^13.0.3",
-    "lighthouse": "13.4.1",
-    "miniflare": "^3.20250101.0"
+    "lighthouse": "13.4.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/semver": "^7.8.0",
     "eslint": "^10.9.0",
     "fast-check": "^4.9.0",
+    "miniflare": "^3.20250101.0",
     "sharp": "^0.35.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "8.68.0",
