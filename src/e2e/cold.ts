@@ -579,7 +579,7 @@ legalJurisdiction: DE
                   }
                   if (!fm.includes("pages:")) {
                     fm +=
-                      "\npages:\n  - pageId: home\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Oberon\n        pin: latest\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: ''\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Oberon\n        pin: latest\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Oberon\n        pin: latest\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Oberon\n        pin: latest\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Oberon\n        pin: latest\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
+                      "\npages:\n  - pageId: home\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: ''\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
                   }
                   // Fix i18n config: scaffold creates supported.de without hreflang,
                   // which causes validateI18nConfig to reject it and i18n.middleware.generate
@@ -636,7 +636,7 @@ legalJurisdiction: DE
                 if (!existsSync(pageFile)) {
                   await fs.writeFile(
                     pageFile,
-                    `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${meta.title}\ndescription: ${meta.description}\nlang: de\nblocks:\n  - id: ${slug}-heading\n    type: header\n    variant: h1\n    heading: ${meta.title}\n  - id: ${slug}-main\n    type: markdown\n---\n`,
+                    `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${meta.title}\ndescription: ${meta.description}\nlang: de\nblocks:\n  - id: ${slug}-main\n    type: markdown\n    props:\n      hideSectionNumber: true\n---\n`,
                   );
                 }
               }
