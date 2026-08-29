@@ -30,10 +30,10 @@ vi.mock("../werkstatt/git-exec.ts", () => ({
     if (args === "stash pop" && gitCalls.failOnPop) {
       throw new Error("stash pop conflict");
     }
-    if (args.startsWith("push origin") && gitCalls.failOnPush) {
+    if (args.startsWith("push") && args.includes("origin") && gitCalls.failOnPush) {
       throw new Error("push failed");
     }
-    if (args === "rev-parse --abbrev-ref HEAD") return "master";
+    if (args === "symbolic-ref --short HEAD") return "master";
     if (args === "rev-parse HEAD") return "abc123";
     return "";
   }),
@@ -96,7 +96,7 @@ test("no stash drop when nothing was stashed", async () => {
       if (args === "stash push -m bordbuch-pull-rebase") {
         throw new Error("no changes to stash");
       }
-      if (args === "rev-parse --abbrev-ref HEAD") return "master";
+      if (args === "symbolic-ref --short HEAD") return "master";
       if (args === "rev-parse HEAD") return "abc123";
       return "";
     },

@@ -459,15 +459,22 @@ export async function commitAndPushBordbuch(
 
   // RFC-0987 Fix 4: resolve branch via symbolic-ref instead of rev-parse --abbrev-ref.
   // In detached HEAD, rev-parse returns "HEAD" which produces invalid refspecs.
-  // symbolic-ref --short refs/remotes/origin/HEAD returns the remote default branch.
+  // Try symbolic-ref --short HEAD first (current branch when not detached),
+  // then refs/remotes/origin/HEAD (remote default for detached HEAD), then main.
   let branch = "main";
   try {
-    const ref = gitExec(systemDir, "symbolic-ref --short refs/remotes/origin/HEAD", {
-      allowNonZero: true,
-    });
-    branch = ref.replace("origin/", "") || "main";
+    const ref = gitExec(systemDir, "symbolic-ref --short HEAD", { allowNonZero: true });
+    branch = ref.trim() || "main";
   } catch {
-    // No remote HEAD set — default to main (same pattern as RFC-0981 writeSystemState)
+    // Detached HEAD — try remote default
+    try {
+      const ref = gitExec(systemDir, "symbolic-ref --short refs/remotes/origin/HEAD", {
+        allowNonZero: true,
+      });
+      branch = ref.replace("origin/", "").trim() || "main";
+    } catch {
+      // No remote HEAD set — default to main
+    }
   }
 
   let stashed = false;
@@ -504,7 +511,7 @@ export async function commitAndPushBordbuch(
     // RFC-0987 Fix 1: abort any in-progress rebase to prevent stale rebase-merge
     // state from blocking subsequent git operations (e.g. mission.open bordbuch.repair).
     try {
-      gitExec(systemDir, "rebase --abort", { allowNonZero: true });
+      gitExec(systemDir, "rebase --abort");
     } catch {
       // If git rebase --abort fails, manually remove the rebase state directories
       try {

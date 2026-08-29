@@ -539,16 +539,28 @@ async function syncCacheClone(
       execSync("git fetch origin", { cwd: cachePath, stdio: "pipe", timeout: 30_000 });
       // RFC-0987 Fix 4: resolve branch via symbolic-ref instead of rev-parse --abbrev-ref.
       // In detached HEAD, rev-parse returns "HEAD" which produces invalid refspec for reset.
+      // Try symbolic-ref --short HEAD first (current branch when not detached),
+      // then refs/remotes/origin/HEAD (remote default for detached HEAD), then main.
       let branch = "main";
       try {
-        const ref = execSync("git symbolic-ref --short refs/remotes/origin/HEAD", {
+        const ref = execSync("git symbolic-ref --short HEAD", {
           cwd: cachePath,
           encoding: "utf-8",
           timeout: 10_000,
         }).trim();
-        branch = ref.replace("origin/", "") || "main";
+        branch = ref || "main";
       } catch {
-        // No remote HEAD set — default to main (same pattern as RFC-0981 writeSystemState)
+        // Detached HEAD — try remote default
+        try {
+          const ref = execSync("git symbolic-ref --short refs/remotes/origin/HEAD", {
+            cwd: cachePath,
+            encoding: "utf-8",
+            timeout: 10_000,
+          }).trim();
+          branch = ref.replace("origin/", "") || "main";
+        } catch {
+          // No remote HEAD set — default to main
+        }
       }
       execSync(`git reset --hard origin/${branch}`, {
         cwd: cachePath,
