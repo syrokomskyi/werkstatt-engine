@@ -19,6 +19,7 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
   <item>RFC-0794: push system-state.yaml commit to bare repo in writeSystemState to survive syncCacheClone resets.</item>
   <item>RFC-0966: add readPassport, writePassport, resolvePassportPath helpers and passportRequired to default state.</item>
   <item>RFC-0967: add ownershipRequired to default state.</item>
+  <item>RFC-0981: fix writeSystemState push to use symbolic-ref and fully-qualified refspec HEAD:refs/heads/{branch} instead of broken rev-parse --abbrev-ref HEAD in detached HEAD state.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -172,9 +173,20 @@ export async function writeSystemState(
     // RFC-0794: Push to bare repo so syncCacheClone's git reset --hard origin/main
     // does not discard the commit. Without this push, mission.materialize loses
     // the system-state.yaml update written by mission.open.
+    // RFC-0981: Cache clones are in detached HEAD state — rev-parse --abbrev-ref
+    // HEAD returns "HEAD", causing "git push origin HEAD" to fail. Resolve the
+    // branch name via symbolic-ref and use a fully-qualified refspec.
     try {
-      const branch = gitExec(cacheClone, "rev-parse --abbrev-ref HEAD");
-      gitExec(cacheClone, `push origin ${branch}`);
+      let branch = "main";
+      try {
+        const ref = gitExec(cacheClone, "symbolic-ref --short refs/remotes/origin/HEAD", {
+          allowNonZero: true,
+        });
+        branch = ref.replace("origin/", "") || "main";
+      } catch {
+        // No remote HEAD set — default to main
+      }
+      gitExec(cacheClone, `push origin HEAD:refs/heads/${branch}`);
     } catch (err) {
       // Push may fail if no bare repo is configured or branch diverged — non-fatal
       const msg = err instanceof Error ? err.message : String(err);
