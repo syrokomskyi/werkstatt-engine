@@ -395,7 +395,7 @@ export function createMissionModule(): KernelModule {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Remove workpiece/distribution for a closed or aborted mission, or clean old missions by age (RFC-0480).",
+          "Remove workpiece/distribution for a closed or aborted mission, or clean old missions by age (RFC-0480). --stale-dirs archives aborted missions and removes stub dirs (RFC-0985).",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -410,11 +410,17 @@ export function createMissionModule(): KernelModule {
             description:
               "RFC-0652: Retention period in days for local Axiom evidence cleanup (default: 30). Set to 0 to preserve all evidence.",
           },
+          "stale-dirs": {
+            kind: "boolean",
+            description:
+              "RFC-0985: Archive aborted missions to missions/archive/aborted/ and remove stub directories (no mission.yaml).",
+          },
         },
         writes: [
           "missions/{mission}/workpiece/**",
           "missions/{mission}/distribution/**",
           "missions/{mission}/evidence/axiom/**",
+          "missions/archive/aborted/{mission}/**",
         ],
         reads: ["missions/*/mission.yaml"],
         cacheable: false,

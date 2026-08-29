@@ -26,7 +26,11 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { readSystemState, writeSystemState } from "../sternsystem/registry-io.ts";
+import {
+  readSystemState,
+  writeSystemState,
+  resolveCacheClonePath,
+} from "../sternsystem/registry-io.ts";
 import { readMissionManifest, writeMissionManifest, resolveMissionDir } from "./mission-io.ts";
 import { isWorkpieceDirty, countOperatorCommits } from "./mission-git-commit.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
@@ -283,6 +287,53 @@ export async function buildAbortSteps(
           [path.join("missions", cc.missionId, "mission.yaml")],
           `werkstatt: mission.abort ${cc.missionId}`,
         );
+      },
+    },
+    {
+      name: "commit-cache-clone-state",
+      run: async (c: unknown) => {
+        const cc = c as AbortStepCtx;
+        // RFC-0985 Measure 3: Commit system-state.yaml to cache clone git
+        // so that git push does not restore the stale currentMission value.
+        const cacheCloneDir = resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
+        if (existsSync(path.join(cacheCloneDir, ".git"))) {
+          try {
+            execSync(
+              'git add system-state.yaml && git commit -m "mission.abort: clear currentMission"',
+              {
+                cwd: cacheCloneDir,
+                stdio: ["pipe", "pipe", "pipe"],
+                encoding: "utf-8",
+                env: { ...process.env, MISSION_GIT_COMMIT: "1" },
+              },
+            );
+          } catch {
+            // Non-fatal — system-state.yaml may already be committed or unchanged
+          }
+        }
+      },
+    },
+    {
+      name: "archive-mission",
+      run: async (c: unknown) => {
+        const cc = c as AbortStepCtx;
+        // RFC-0985 Measure 1: Move mission dir to archive/aborted/ so that
+        // pnpm.store.health-check and other validators do not find stale workpieces.
+        const archiveDir = path.join(
+          cc.workspaceRoot,
+          "missions",
+          "archive",
+          "aborted",
+          cc.missionId,
+        );
+        await fs.mkdir(path.dirname(archiveDir), { recursive: true });
+        try {
+          await fs.rename(cc.missionDir, archiveDir);
+        } catch {
+          // Cross-device fallback: copy then remove
+          await fs.cp(cc.missionDir, archiveDir, { recursive: true, force: true });
+          await fs.rm(cc.missionDir, { recursive: true, force: true });
+        }
       },
     },
   ];

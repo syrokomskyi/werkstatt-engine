@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0480: mission.cleanup — explicit workpiece cleanup with age-based option. RFC-0652: age-based Axiom evidence cleanup.</purpose>
+<purpose>RFC-0480: mission.cleanup — explicit workpiece cleanup with age-based option. RFC-0652: age-based Axiom evidence cleanup. RFC-0985: --stale-dirs mode to archive aborted missions and remove stub directories.</purpose>
 <non-goals>
   <item>Does not remove non-Axiom evidence bundles (close-report.json, workpiece.git-bundle) — those are permanent audit artifacts.</item>
   <item>Does not abort missions — use mission.abort for that.</item>
@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0480: initial mission.cleanup command handler.</item>
   <item>RFC-0652: replace unconditional evidence preservation with age-based Axiom evidence cleanup; add --evidence-retention-days flag.</item>
+  <item>RFC-0985: add --stale-dirs mode to archive aborted missions and remove stub directories.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -28,6 +29,8 @@ export interface MissionCleanupData {
   skipped: string[];
   evidenceCleaned: boolean;
   evidenceRetentionDays: number;
+  archived?: string[];
+  warnings?: string[];
 }
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
@@ -45,6 +48,11 @@ function flagNumber(input: KernelCommandInput, key: string, defaultValue: number
   return defaultValue;
 }
 
+function flagBoolean(input: KernelCommandInput, key: string): boolean {
+  const v = input.flags[key];
+  return v === true || v === "true";
+}
+
 function parseOlderThan(value: string): number | null {
   const match = value.match(/^(\d+)d$/);
   if (!match) return null;
@@ -58,15 +66,94 @@ export async function runMissionCleanup(
   const { workspaceRoot, logger } = context;
   const missionId = flagString(input, "mission");
   const olderThan = flagString(input, "older-than");
+  const staleDirs = flagBoolean(input, "stale-dirs");
   const evidenceRetentionDays = flagNumber(input, "evidence-retention-days", 30);
 
-  if (!missionId && !olderThan) {
-    throw new Error("[mission.cleanup] either --mission or --older-than is required");
+  if (!missionId && !olderThan && !staleDirs) {
+    throw new Error(
+      "[mission.cleanup] either --mission, --older-than, or --stale-dirs is required",
+    );
   }
 
   const removedPaths: string[] = [];
   const skipped: string[] = [];
   let evidenceCleaned = false;
+
+  // --stale-dirs mode: RFC-0985 Measure 6 — archive aborted missions, remove stub dirs
+  if (staleDirs) {
+    const missionsDir = path.join(workspaceRoot, "missions");
+    if (!existsSync(missionsDir)) {
+      return {
+        data: {
+          missionId: "*",
+          removedPaths,
+          skipped,
+          evidenceCleaned,
+          evidenceRetentionDays,
+          archived: [],
+          warnings: [],
+        },
+        summary: `[mission.cleanup] no missions directory found`,
+        nextSteps: [],
+      };
+    }
+
+    const archived: string[] = [];
+    const warnings: string[] = [];
+    const entries = await fs.readdir(missionsDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.name === "archive") continue;
+      if (entry.isSymbolicLink()) continue;
+      if (!entry.isDirectory()) continue;
+
+      const missionDir = path.join(missionsDir, entry.name);
+      const missionFile = path.join(missionDir, "mission.yaml");
+
+      if (!existsSync(missionFile)) {
+        // Stub directory from failed mission.open — remove it
+        await fs.rm(missionDir, { recursive: true, force: true });
+        removedPaths.push(`${entry.name} (stub — no mission.yaml)`);
+        logger.info(`  Removed stub directory '${entry.name}'`);
+        continue;
+      }
+
+      try {
+        const manifest = await readMissionManifest(workspaceRoot, entry.name);
+        if (manifest.state === "aborted") {
+          // Move to archive/aborted/
+          const archiveDir = path.join(missionsDir, "archive", "aborted", entry.name);
+          await fs.mkdir(path.dirname(archiveDir), { recursive: true });
+          try {
+            await fs.rename(missionDir, archiveDir);
+          } catch {
+            await fs.cp(missionDir, archiveDir, { recursive: true, force: true });
+            await fs.rm(missionDir, { recursive: true, force: true });
+          }
+          archived.push(entry.name);
+          logger.info(`  Archived aborted mission '${entry.name}'`);
+        } else if (manifest.state === "open") {
+          warnings.push(`${entry.name} is open — skipped`);
+        }
+      } catch {
+        warnings.push(`${entry.name} — failed to read mission.yaml`);
+      }
+    }
+
+    return {
+      data: {
+        missionId: "*",
+        removedPaths,
+        skipped,
+        evidenceCleaned,
+        evidenceRetentionDays,
+        archived,
+        warnings,
+      },
+      summary: `[mission.cleanup] stale-dirs: archived ${archived.length}, removed ${removedPaths.length}, warnings ${warnings.length}`,
+      nextSteps: [],
+    };
+  }
 
   if (missionId) {
     const manifest = await readMissionManifest(workspaceRoot, missionId);

@@ -22,9 +22,10 @@
 </CHANGE_SUMMARY>
 */
 
-import { existsSync, lstatSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -374,6 +375,12 @@ export async function runMissionOpen(
           );
         }
         const missionDir = path.join(workspaceRoot, "missions", missionId);
+        // RFC-0985 Measure 7: Write rollback marker before cleanup for crash safety
+        try {
+          writeFileSync(path.join(missionDir, ".rollback-pending"), missionId);
+        } catch {
+          // best-effort — mission dir may not exist
+        }
         try {
           await fs.rm(missionDir, { recursive: true, force: true });
         } catch {
@@ -386,6 +393,23 @@ export async function runMissionOpen(
           [path.join("..", "systems-cache", systemId, "system-state.yaml")],
           `werkstatt: mission.open rollback ${missionId}`,
         );
+        // RFC-0985 Measure 3: Commit system-state.yaml to cache clone git
+        const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
+        if (existsSync(path.join(cacheCloneDir, ".git"))) {
+          try {
+            execSync(
+              'git add system-state.yaml && git commit -m "mission.open rollback: clear currentMission"',
+              {
+                cwd: cacheCloneDir,
+                stdio: ["pipe", "pipe", "pipe"],
+                encoding: "utf-8",
+                env: { ...process.env, MISSION_GIT_COMMIT: "1" },
+              },
+            );
+          } catch {
+            // Non-fatal — system-state.yaml may already be committed or unchanged
+          }
+        }
         throw new Error(`[mission.open] materialization failed — mission rolled back: ${detail}`);
       }
 
@@ -445,6 +469,59 @@ export async function buildOpenSteps(
   ctx: unknown,
 ): Promise<OperationStep<unknown>[]> {
   const steps: OperationStep<unknown>[] = [
+    {
+      name: "cache-clone-git-check",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        // RFC-0985 Measure 4: Pre-flight cache clone git sanity check.
+        const cacheDir = resolveCacheClonePath(cc.workspaceRoot, cc.systemId);
+        if (!existsSync(path.join(cacheDir, ".git"))) return;
+        // Check detached HEAD
+        try {
+          execSync("git symbolic-ref HEAD", {
+            cwd: cacheDir,
+            stdio: ["pipe", "pipe", "pipe"],
+            encoding: "utf-8",
+          });
+        } catch {
+          throw new Error(
+            `[mission.open] cache clone for '${cc.systemId}' is in detached HEAD. ` +
+              `Run: git -C ${cacheDir} checkout main`,
+          );
+        }
+        // Check stale rebase-merge
+        if (existsSync(path.join(cacheDir, ".git", "rebase-merge"))) {
+          throw new Error(
+            `[mission.open] stale rebase-merge found in cache clone for '${cc.systemId}'. ` +
+              `Run: git -C ${cacheDir} rebase --abort`,
+          );
+        }
+      },
+    },
+    {
+      name: "rollback-marker-check",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        // RFC-0985 Measure 7: Crash-safe rollback — if a previous mission.open
+        // was killed during rollback, complete the cleanup before proceeding.
+        const missionsDir = path.join(cc.workspaceRoot, "missions");
+        if (!existsSync(missionsDir)) return;
+        const entries = readdirSync(missionsDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory() || entry.name === "archive") continue;
+          const marker = path.join(missionsDir, entry.name, ".rollback-pending");
+          if (existsSync(marker)) {
+            // Complete the rollback: remove mission dir, clear system-state
+            const staleDir = path.join(missionsDir, entry.name);
+            try {
+              rmSync(staleDir, { recursive: true, force: true });
+            } catch {
+              // best-effort
+            }
+          }
+        }
+      },
+    },
     {
       name: "write-manifest",
       run: async (c: unknown) => {
