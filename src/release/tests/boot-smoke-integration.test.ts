@@ -1,20 +1,9 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { runBootSmoke, planBootSmokeRequests } from "../boot-smoke.ts";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-
-let miniflareAvailable = false;
-
-beforeAll(async () => {
-  try {
-    await import("miniflare");
-    miniflareAvailable = true;
-  } catch {
-    miniflareAvailable = true; // assume available — optional dep may still resolve
-  }
-});
 
 function createMinimalWorkerFixture(distDir: string): void {
   const serverDir = join(distDir, "server");
@@ -60,11 +49,6 @@ function createMinimalWorkerFixture(distDir: string): void {
 
 describe("runBootSmoke integration (ADR-0067)", () => {
   it("boots a minimal worker and executes requests successfully", async () => {
-    if (!miniflareAvailable) {
-      console.warn("Miniflare not available — skipping integration test");
-      return;
-    }
-
     const distDir = mkdtempSync(join(tmpdir(), "boot-smoke-integration-"));
     try {
       createMinimalWorkerFixture(distDir);
@@ -152,11 +136,6 @@ describe("runBootSmoke integration (ADR-0067)", () => {
   });
 
   it("writes boot-smoke.json evidence file to dist directory", async () => {
-    if (!miniflareAvailable) {
-      console.warn("Miniflare not available — skipping integration test");
-      return;
-    }
-
     const distDir = mkdtempSync(join(tmpdir(), "boot-smoke-int-evidence-"));
     try {
       createMinimalWorkerFixture(distDir);

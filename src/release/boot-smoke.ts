@@ -315,7 +315,6 @@ export interface MiniflareOptionsInput {
 export interface MiniflareOptionsResult {
   options: Record<string, unknown>;
   resolvedWorkerPath: string;
-  workerPath: string;
 }
 
 export async function buildMiniflareOptions(
@@ -332,6 +331,7 @@ export async function buildMiniflareOptions(
   if (!existsSync(resolvedWorkerPath)) {
     return null;
   }
+  void workerMain;
 
   const entryDir = path.dirname(resolvedWorkerPath);
   const moduleEntries: Array<{ type: string; path: string }> = [
@@ -374,7 +374,7 @@ export async function buildMiniflareOptions(
     }
   }
 
-  return { options: mfOptions, resolvedWorkerPath, workerPath };
+  return { options: mfOptions, resolvedWorkerPath };
 }
 
 // ─── Boot-smoke runner ───────────────────────────────────────────────
