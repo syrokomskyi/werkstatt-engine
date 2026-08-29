@@ -477,6 +477,59 @@ export async function runBootSmoke(input: {
 
 // ─── Command handler ─────────────────────────────────────────────────
 
+export interface WranglerResolution {
+  wranglerConfigPath: string;
+  bootSmokeDistDir: string;
+}
+
+export function resolveWranglerConfig(
+  distDir: string,
+  wranglerConfigFlag: string | undefined,
+  workspaceRoot: string,
+): WranglerResolution | null {
+  if (wranglerConfigFlag) {
+    return {
+      wranglerConfigPath: path.resolve(wranglerConfigFlag),
+      bootSmokeDistDir: distDir,
+    };
+  }
+  const astroWranglerPath = path.join(distDir, "server", "wrangler.json");
+  if (existsSync(astroWranglerPath)) {
+    return {
+      wranglerConfigPath: astroWranglerPath,
+      bootSmokeDistDir: path.join(distDir, "server"),
+    };
+  }
+  const fallbackPath = path.join(distDir, "..", "wrangler.jsonc");
+  if (existsSync(fallbackPath)) {
+    return {
+      wranglerConfigPath: fallbackPath,
+      bootSmokeDistDir: distDir,
+    };
+  }
+  const workpiecePath = path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc");
+  if (existsSync(workpiecePath)) {
+    return {
+      wranglerConfigPath: workpiecePath,
+      bootSmokeDistDir: distDir,
+    };
+  }
+  return null;
+}
+
+export async function resolveLanguages(
+  distDir: string,
+  languagesFlag: string | undefined,
+): Promise<string[]> {
+  if (languagesFlag) {
+    return languagesFlag
+      .split(",")
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+  return detectBootSmokeLanguages(distDir);
+}
+
 export interface BootSmokeCommandData {
   booted: boolean;
   requests: number;
@@ -547,51 +600,25 @@ export async function runBootSmokeCommand(
   }
 
   // Resolve wrangler config (RFC-0979): --wrangler-config flag → Astro-generated → fallback
-  let wranglerConfigPath: string;
-  let bootSmokeDistDir = distDir;
-  if (wranglerConfigFlag) {
-    wranglerConfigPath = path.resolve(wranglerConfigFlag);
-  } else {
-    const astroWranglerPath = path.join(distDir, "server", "wrangler.json");
-    if (existsSync(astroWranglerPath)) {
-      wranglerConfigPath = astroWranglerPath;
-      bootSmokeDistDir = path.join(distDir, "server");
-    } else {
-      const fallbackPath = path.join(distDir, "..", "wrangler.jsonc");
-      if (existsSync(fallbackPath)) {
-        wranglerConfigPath = fallbackPath;
-      } else {
-        const workpiecePath = path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc");
-        if (existsSync(workpiecePath)) {
-          wranglerConfigPath = workpiecePath;
-        } else {
-          return {
-            data: {
-              booted: false,
-              requests: 0,
-              failed: 0,
-              egressViolations: [],
-              missingBindings: [],
-              bootError: `wrangler config not found — tried ${astroWranglerPath}, ${fallbackPath}, ${workpiecePath}`,
-            },
-            exitCode: 1,
-            summary: `[release.boot-smoke] wrangler config not found`,
-          };
-        }
-      }
-    }
+  const wranglerResolution = resolveWranglerConfig(distDir, wranglerConfigFlag, workspaceRoot);
+  if (!wranglerResolution) {
+    return {
+      data: {
+        booted: false,
+        requests: 0,
+        failed: 0,
+        egressViolations: [],
+        missingBindings: [],
+        bootError: `wrangler config not found — tried ${path.join(distDir, "server", "wrangler.json")}, ${path.join(distDir, "..", "wrangler.jsonc")}, ${path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc")}`,
+      },
+      exitCode: 1,
+      summary: `[release.boot-smoke] wrangler config not found`,
+    };
   }
+  const { wranglerConfigPath, bootSmokeDistDir } = wranglerResolution;
 
   // Plan requests — use --languages flag or auto-detect from dist/client/ (RFC-0978)
-  let languages: string[];
-  if (languagesFlag) {
-    languages = languagesFlag
-      .split(",")
-      .map((l) => l.trim())
-      .filter(Boolean);
-  } else {
-    languages = await detectBootSmokeLanguages(distDir);
-  }
+  const languages = await resolveLanguages(distDir, languagesFlag);
   const requests = planBootSmokeRequests({ distDir, languages });
 
   if (diagnose) {

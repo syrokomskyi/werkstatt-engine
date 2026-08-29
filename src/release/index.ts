@@ -42,6 +42,9 @@ export {
   type BootSmokeRequestResult,
   planBootSmokeRequests,
   detectBootSmokeLanguages,
+  resolveWranglerConfig,
+  resolveLanguages,
+  type WranglerResolution,
   simulateBindings,
 } from "./boot-smoke.ts";
 
