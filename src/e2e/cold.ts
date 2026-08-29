@@ -471,6 +471,29 @@ legalJurisdiction: DE
           "passport-validate",
           async () => {
             // sternsystem.register already generated a passport (SIGNING_PRIVATE_KEY is set).
+            // Optionally register ownership first (if a registry URL is configured) so that
+            // sternsystem.validate doesn't report OWNERSHIP-01.
+            const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
+            if (registryUrl) {
+              await runSubCommand(
+                stepCtx.workspaceRoot,
+                "fleet.ownership.register",
+                [`--id=${systemId}`],
+                logger,
+              );
+              await runSubCommand(
+                stepCtx.workspaceRoot,
+                "fleet.ownership.verify",
+                [`--id=${systemId}`],
+                logger,
+              );
+              logger.info(`  [e2e.cold] ownership registered and verified`);
+            } else {
+              logger.info(
+                `  [e2e.cold] FLEET_OWNERSHIP_REGISTRY_URL not set — ownership registration skipped`,
+              );
+            }
+
             // Run sternsystem.validate and check only PASSPORT/HANDOVER/OWNERSHIP rules.
             // Pre-existing cold E2E setup violations (bundle-contract, mirror-remote-missing,
             // external-edit-detected) are expected and not related to RFC-0966/0967/0968.
@@ -515,28 +538,6 @@ legalJurisdiction: DE
             logger.info(
               `  [e2e.cold] PASSPORT/HANDOVER/OWNERSHIP rules clean (${allViolations.length} other violations ignored)`,
             );
-
-            // Optionally register ownership if a registry URL is configured
-            const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
-            if (registryUrl) {
-              await runSubCommand(
-                stepCtx.workspaceRoot,
-                "fleet.ownership.register",
-                [`--id=${systemId}`],
-                logger,
-              );
-              await runSubCommand(
-                stepCtx.workspaceRoot,
-                "fleet.ownership.verify",
-                [`--id=${systemId}`],
-                logger,
-              );
-              logger.info(`  [e2e.cold] ownership registered and verified`);
-            } else {
-              logger.info(
-                `  [e2e.cold] FLEET_OWNERSHIP_REGISTRY_URL not set — ownership registration skipped`,
-              );
-            }
           },
           logger,
           perStepTimeout,
