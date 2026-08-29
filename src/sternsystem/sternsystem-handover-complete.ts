@@ -234,7 +234,7 @@ export async function runSternsystemHandoverComplete(
       systemId,
       previousCreator: authorization.payload.sender.identity,
       newCreator: authorization.payload.recipient.identity,
-      newPassportHash,
+      newPassportHash: newPassportHash,
       bordbuchEventHash: entry.hash,
       ownershipRegistryUpdated,
     };

@@ -567,13 +567,41 @@ export async function runSternsystemValidate(
             creatorPublicKey: passportDoc.payload.creator.publicKey,
           });
           freshPayload.provenance.createdAt = passportDoc.payload.provenance.createdAt;
+          freshPayload.provenance.generatedAt = passportDoc.payload.provenance.generatedAt;
           const freshHash = computePassportHash(freshPayload);
           if (freshHash !== passportDoc.passportHash) {
-            warnings.push({
-              systemId: entry.id,
-              field: "PASSPORT-03",
-              message: `passport content drift detected — bordbuchHead or resources changed since last generation. Run: pnpm exec werkstatt run sternsystem.passport.generate --id ${entry.id}`,
-            });
+            // Tolerate stale bordbuchHead right after a handover — the passport is
+            // generated before the handover bordbuch entry is appended, so the head
+            // legitimately doesn't include it. Check if the only difference is the
+            // bordbuch head pointing to the entry before the latest handover event.
+            let isPostHandoverDrift = false;
+            try {
+              const entries = await readBordbuch(workspaceRoot, entry.id);
+              const handoverEntries = entries.filter((e) => e.kind === "handover");
+              if (
+                handoverEntries.length > 0 &&
+                entries.length > 0 &&
+                entries[entries.length - 1].kind === "handover"
+              ) {
+                // The latest bordbuch entry is a handover event — check if the
+                // passport's bordbuchHead matches the entry just before it
+                const prevEntry = entries[entries.length - 2];
+                const expectedHead = prevEntry ? prevEntry.hash : "";
+                if (passportDoc.payload.provenance.bordbuchHead === expectedHead) {
+                  isPostHandoverDrift = true;
+                }
+              }
+            } catch {
+              // Bordbuch read failed — can't determine, treat as real drift
+            }
+
+            if (!isPostHandoverDrift) {
+              warnings.push({
+                systemId: entry.id,
+                field: "PASSPORT-03",
+                message: `passport content drift detected — bordbuchHead or resources changed since last generation. Run: pnpm exec werkstatt run sternsystem.passport.generate --id ${entry.id}`,
+              });
+            }
           }
         } catch {
           // Non-fatal — drift check skipped

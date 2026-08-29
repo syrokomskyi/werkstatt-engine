@@ -43,7 +43,10 @@ afterEach(async () => {
 async function setupSystemWithPassport(
   root: string,
   systemId: string,
-): Promise<{ passport: SignedSitePassport; keyPair: { privateKey: Uint8Array; publicKey: Uint8Array } }> {
+): Promise<{
+  passport: SignedSitePassport;
+  keyPair: { privateKey: Uint8Array; publicKey: Uint8Array };
+}> {
   await writeSystemConfig(root, [{ path: "./systems/test-bundle", storageType: "non-bare" }]);
 
   const keyPair = await generateKeyPair();
@@ -167,12 +170,18 @@ test("HANDOVER-05: passport hash mismatch with bordbuch handover event → valid
   expect(handover05[0].message).toContain("incomplete handover");
 });
 
+test("PASSPORT-03: freshly generated passport → no content drift warning (generatedAt preserved)", async () => {
+  await setupSystemWithPassport(workspaceRoot, "test-bundle");
+
+  const result = await runSternsystemValidate(makeInput({}), makeContext(workspaceRoot));
+  const passport03 = result.data!.warnings.filter((w) => w.field === "PASSPORT-03");
+  expect(passport03).toHaveLength(0);
+});
+
 test("clean state: no authorization file, no handover bordbuch event → no HANDOVER violations", async () => {
   await setupSystemWithPassport(workspaceRoot, "test-bundle");
 
   const result = await runSternsystemValidate(makeInput({}), makeContext(workspaceRoot));
-  const handoverViolations = result.data!.violations.filter((v) =>
-    v.rule.startsWith("HANDOVER"),
-  );
+  const handoverViolations = result.data!.violations.filter((v) => v.rule.startsWith("HANDOVER"));
   expect(handoverViolations).toHaveLength(0);
 });

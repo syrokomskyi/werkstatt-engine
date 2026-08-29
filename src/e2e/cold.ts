@@ -221,8 +221,8 @@ export async function runColdE2e(
     missionId,
   };
 
-  // Per-step timeout: divide total budget across steps (7 base steps + 1 optional)
-  const stepCount = withDeploy ? 8 : 7;
+  // Per-step timeout: divide total budget across steps (8 base steps + 1 optional)
+  const stepCount = withDeploy ? 9 : 8;
   const perStepTimeout = Math.floor(timeoutMs / stepCount);
 
   try {
@@ -239,6 +239,22 @@ export async function runColdE2e(
           // Create systems-cache directory (sibling of werkstatt clone)
           await fs.mkdir(path.join(coldRoot, "systems-cache"), { recursive: true });
           await fs.mkdir(path.join(coldRoot, "systems-git"), { recursive: true });
+
+          // RFC-0966/0968: Generate a temporary signing key for passport generation.
+          // sternsystem.register auto-generates a passport if SIGNING_PRIVATE_KEY is set.
+          // The key is generated in the cold root and loaded into process.env so that
+          // all subsequent in-process kernel command executions can sign passports.
+          const keyDir = path.join(coldRoot, "signing-key");
+          await fs.mkdir(keyDir, { recursive: true });
+          await runSubCommand(
+            stepCtx.workspaceRoot,
+            "signing.key.generate",
+            [`--output-dir=${keyDir}`, "--encoding=pem", "--force"],
+            logger,
+          );
+          const privateKeyPem = await fs.readFile(path.join(keyDir, "signing.key.pem"), "utf8");
+          process.env.SIGNING_PRIVATE_KEY = privateKeyPem.trim();
+          logger.info(`  [e2e.cold] temporary signing key generated for passport signing`);
         },
         logger,
         perStepTimeout,
@@ -444,6 +460,51 @@ legalJurisdiction: DE
     if (!missionId) {
       logger.info(
         `  [e2e.cold] register-site did not produce missionId — skipping remaining steps`,
+      );
+    }
+
+    // Step 3.5: passport-validate (only if register-site succeeded)
+    // RFC-0966/0967/0968: Verify that passport generation, validation, and ownership
+    // registration work end-to-end on the freshly registered synthetic Sternsystem.
+    if (missionId) {
+      steps.push(
+        await runStep(
+          "passport-validate",
+          async () => {
+            // sternsystem.register already generated a passport (SIGNING_PRIVATE_KEY is set).
+            // Run sternsystem.validate to verify PASSPORT-01/02/03 and HANDOVER rules pass.
+            await runSubCommand(
+              stepCtx.workspaceRoot,
+              "sternsystem.validate",
+              [`--id=${systemId}`],
+              logger,
+            );
+
+            // Optionally register ownership if a registry URL is configured
+            const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
+            if (registryUrl) {
+              await runSubCommand(
+                stepCtx.workspaceRoot,
+                "fleet.ownership.register",
+                [`--id=${systemId}`],
+                logger,
+              );
+              await runSubCommand(
+                stepCtx.workspaceRoot,
+                "fleet.ownership.verify",
+                [`--id=${systemId}`],
+                logger,
+              );
+              logger.info(`  [e2e.cold] ownership registered and verified`);
+            } else {
+              logger.info(
+                `  [e2e.cold] FLEET_OWNERSHIP_REGISTRY_URL not set — ownership registration skipped`,
+              );
+            }
+          },
+          logger,
+          perStepTimeout,
+        ),
       );
     }
 

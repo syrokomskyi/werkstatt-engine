@@ -791,6 +791,7 @@ export async function buildCloseSteps(
             creatorPublicKey,
           });
           payload.provenance.createdAt = existingPassport.payload.provenance.createdAt;
+          payload.provenance.generatedAt = existingPassport.payload.provenance.generatedAt;
           const { passportHash, signature } = await signPassport(payload, privateKeyBytes);
 
           if (passportHash === existingPassport.passportHash) {
