@@ -12,6 +12,7 @@
   <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
   <item>RFC-0979: add --wrangler-config and --languages flags to runBootSmokeCommand, implement wrangler config fallback resolution, write boot-smoke.json to dist directory.</item>
   <item>ADR-0067: extract buildMiniflareOptions from runBootSmoke for unit testability of Miniflare options construction without a real runtime.</item>
+  <item>ADR-0068: remove unused resolvedWorkerPath field from MiniflareOptionsResult interface and buildMiniflareOptions return value — the field was never consumed by the caller.</item>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
