@@ -12,6 +12,38 @@
   <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
   <item>RFC-0979: add --wrangler-config and --languages flags to runBootSmokeCommand, implement wrangler config fallback resolution, write boot-smoke.json to dist directory.</item>
 </CHANGE_SUMMARY>
+
+HARDCODED_VALUES_AUDIT (RFC-0980):
+  - SUPPORTED_BINDING_TYPES set (kv_namespaces, r2_buckets, d1_databases, vectorize, vars, secrets, assets)
+    (a) safe default — Cloudflare Workers runtime binding types, not site-specific
+  - compatibilityDate fallback "2024-01-01"
+    (a) safe default — wrangler config usually provides compatibility_date; fallback only used when missing
+  - workerMain fallback "./dist/_worker.js/index.js"
+    (a) safe default — Astro Cloudflare adapter output (server/entry.mjs) is the primary path; fallback for non-Astro workers
+  - Fallback languages ["de", "uk"] in detectBootSmokeLanguages
+    (b) workshop-specific — ensures boot-smoke runs representative requests when dist/client/ structure is unexpected
+  - timeoutMs default 60_000
+    (a) safe default — 60s timeout for boot-smoke requests; configurable via input.timeoutMs
+  - HTTP status codes (200, 404)
+    (a) safe default — HTTP protocol constants
+  - "/favicon.ico" probe path
+    (a) safe default — conventional favicon path for static asset smoke test
+  - "/__boot-smoke-404-probe__" path
+    (a) safe default — synthetic probe path for intentional 404 test
+  - "http://localhost" URL
+    (a) safe default — miniflare internal URL for request dispatch
+  - "ASSETS" binding name fallback
+    (a) safe default — Cloudflare convention for static assets binding
+  - "__secret_placeholder_${key}__" format
+    (a) safe default — synthetic placeholder for secret bindings during smoke test
+  - "entry.mjs" filename
+    (a) safe default — Astro Cloudflare adapter output filename
+  - "server" directory name
+    (a) safe default — Astro Cloudflare adapter output directory
+  - "wrangler.json" / "wrangler.jsonc" filenames
+    (a) safe default — Cloudflare wrangler config filenames
+  - Excluded wrangler config keys (name, main, compatibility_date, compatibility_flags, observability, conditions)
+    (a) safe default — wrangler config metadata keys, not binding declarations
 */
 
 import fs from "node:fs/promises";

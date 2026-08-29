@@ -22,6 +22,42 @@
   <item>RFC-0931: add runReleaseSign command handler for Ed25519 signing of build-identity.json and signed-manifest.json production.</item>
   <item>RFC-0948: add entitlement diff logging — compares workpiece entitlements against previous release and logs added/removed features.</item>
 </CHANGE_SUMMARY>
+
+HARDCODED_VALUES_AUDIT (RFC-0980):
+  - semver default "0.1.0"
+    (a) safe default — release version fallback when --semver flag is not provided
+  - 999999 max sequence number
+    (a) safe default — guard against release ID sequence exhaustion
+  - Release state "prepared"
+    (a) safe default — release state enum value
+  - Verdict values "pass" | "fail" | "skipped"
+    (a) safe default — verdict enum values
+  - bootSmokeVerdict "pass" | "fail"
+    (a) safe default — boot-smoke verdict enum values
+  - Mission state "closed" check
+    (a) safe default — mission state enum value
+  - "releases" directory name
+    (a) safe default — conventional releases directory
+  - "evidence" directory name
+    (a) safe default — conventional evidence directory
+  - "validation-report.json" filename
+    (a) safe default — conventional validation report filename
+  - "src/entitlements.generated.yaml" path
+    (a) safe default — generated entitlements file path
+  - "dist/client" directory name
+    (a) safe default — Astro output directory
+  - "dist/server" directory name
+    (a) safe default — Astro Cloudflare adapter output directory
+  - "wrangler.json" / "wrangler.jsonc" filenames
+    (a) safe default — Cloudflare wrangler config filenames
+  - "build-identity.json" filename
+    (a) safe default — build identity artifact filename
+  - ".well-known" directory name
+    (a) safe default — conventional well-known directory
+  - "boot-smoke.json" filename
+    (a) safe default — boot-smoke evidence filename
+  - Fallback languages ["de", "uk"] (via detectBootSmokeLanguages)
+    (b) workshop-specific — ensures boot-smoke runs representative requests when dist/client/ structure is unexpected
 */
 
 import fs from "node:fs/promises";
