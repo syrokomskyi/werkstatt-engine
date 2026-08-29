@@ -267,6 +267,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 
 - `commitWorkpieceIfDirty(workpieceDir, missionId)` (RFC-0644): auto-commits all dirty files in the workpiece via `git add -A` + `git commit --no-verify`. Returns `{ committed: boolean, commitSha: string | null }`. Used by `mission.reconcile` and `mission.close` (RFC-0797) to auto-commit dirty workpieces instead of throwing.
 - `commitCacheCloneIfDirty(systemDir, systemId)` (RFC-0797): auto-commits all dirty files in the cache clone via `git add -A` + `git commit --no-verify`. Returns `{ committed: boolean, commitSha: string | null }`. Used by `mission.reconcile` (before the dirty guard) and `mission.validate` (post-validate cleanup) to auto-commit generated files instead of leaving the cache clone dirty.
+- **3-tier branch resolution for cache clone git operations** (RFC-0987): Always resolve the current branch using `git symbolic-ref --short HEAD` first (returns current branch when not detached). If that fails (detached HEAD), try `git symbolic-ref --short refs/remotes/origin/HEAD` (remote default branch). If that also fails, fall back to `"main"`. Never use `git rev-parse --abbrev-ref HEAD` — it returns `"HEAD"` in detached state, producing invalid refspecs for `pull`, `push`, and `reset` commands. This pattern is used in `commitAndPushBordbuch` (`bordbuch-io.ts`) and `syncCacheClone` (`mission-materialize.ts`).
 
 ## Mission close dist-reuse prerequisite (RFC-0918)
 
