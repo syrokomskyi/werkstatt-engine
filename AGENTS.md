@@ -415,3 +415,8 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
   - **(c) site-specific** — values that vary per site; must be replaced with dynamic detection (not listed in the block — they are eliminated)
 - New constants added to release pipeline files must be documented in the `HARDCODED_VALUES_AUDIT` block.
 - The audit report lives at `docs/audits/2026-08-29-release-pipeline-hardcoded-values-audit.md`.
+
+## Leitstand.ship deployment resilience (RFC-0986)
+
+- **`leitstand.ship` MUST skip lifecycle phases (validate, reconcile, close) when the mission is already closed.** `buildShipPlan` reads `mission.yaml` via `checkMissionClosed` before constructing the step list. If `state: closed`, lifecycle steps are filtered out and the plan starts from `release-prepare`. This allows resuming a deployment after a failed `release.prepare` without manually running individual steps. The skip is automatic — no `--skip-step` flags (DNA-73). See `src/leitstand/ship.ts:404-414`, `src/leitstand/ship.ts:345-355`.
+- **`leitstand.ship` preflight MUST warn when cache clone and bare repo HEADs have diverged.** The preflight step compares `git rev-parse HEAD` in the cache clone with `git rev-parse master` in the bare repo. When they differ, a non-fatal warning is logged: `WARN cache clone and bare repo have diverged — mirror sync may fail with non-fast-forward`. This makes a pre-existing failure mode visible before deployment starts. See `src/leitstand/ship.ts:176-213`.
