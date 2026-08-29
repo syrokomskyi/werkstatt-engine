@@ -313,11 +313,32 @@ export async function runBootSmoke(input: {
   let booted = false;
   let bootError: string | null = null;
 
+  // Enumerate all ES modules in the entry's directory tree so workerd can
+  // resolve chunk imports (Astro Cloudflare adapter outputs entry.mjs + chunks/).
+  const entryDir = path.dirname(resolvedWorkerPath);
+  const moduleEntries: Array<{ type: string; path: string }> = [
+    { type: "ESModule", path: resolvedWorkerPath },
+  ];
+  const walkDir = async (dir: string): Promise<void> => {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walkDir(fullPath);
+      } else if (entry.name.endsWith(".mjs") && fullPath !== resolvedWorkerPath) {
+        moduleEntries.push({ type: "ESModule", path: fullPath });
+      }
+    }
+  };
+  await walkDir(entryDir);
+
   // Resolve assets directory to absolute path — workerd rejects relative paths
   // containing ".." (e.g. "../client" in Astro-generated wrangler.json).
   const mfOptions: Record<string, unknown> = {
-    modules: [{ type: "ESModule", path: resolvedWorkerPath }],
+    modules: moduleEntries,
+    modulesRoot: entryDir,
     compatibilityDate: (wranglerConfig["compatibility_date"] as string) ?? "2024-01-01",
+    compatibilityFlags: (wranglerConfig["compatibility_flags"] as string[]) ?? [],
     bindings,
     // Egress: override fetch to block external requests
     fetch: egressInterceptor.fetch as unknown as typeof fetch,
