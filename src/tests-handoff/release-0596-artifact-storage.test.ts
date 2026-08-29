@@ -18,7 +18,7 @@ import {
   readdirSync,
   readFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { stringify as stringifyYaml, parse as parseYaml } from "yaml";
 import { storeArtifactCore } from "../artifact-store/artifact-store-commands.ts";
 import { runReleaseReady, runReleaseValidate } from "../release/release-commands.ts";
@@ -123,6 +123,9 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
+  // resolveCacheClonePath uses ../systems-cache relative to workspaceRoot,
+  // which escapes tmpDir. Clean up to prevent stale system-state.yaml across runs.
+  rmSync(resolve(tmpDir, "..", "systems-cache"), { recursive: true, force: true });
 });
 
 // --- storeArtifactCore tests ---

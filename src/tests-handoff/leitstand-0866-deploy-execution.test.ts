@@ -10,7 +10,7 @@
 
 import { test, expect } from "vitest";
 import { mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { executeDeployPhases } from "../leitstand/deploy-execution.ts";
@@ -141,6 +141,7 @@ test("executeDeployPhases returns deploymentUrl from channel config for dev", as
     expect(result.healthState).toBe("healthy");
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }
 });
 
@@ -151,6 +152,7 @@ test("executeDeployPhases returns deploymentUrl from channel config for alt", as
     expect(result.deploymentUrl).toBe("https://alt.example.com");
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }
 });
 
@@ -161,5 +163,6 @@ test("executeDeployPhases returns deploymentUrl from channel config for main", a
     expect(result.deploymentUrl).toBe("https://main.example.com");
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }
 });
