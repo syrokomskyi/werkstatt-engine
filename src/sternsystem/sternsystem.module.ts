@@ -312,7 +312,7 @@ export function createSternsystemModule(): KernelModule {
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
         description:
-          "RFC-0968: Complete a handover — verify authorization, regenerate passport, append bordbuch event, update ownership registry. Flags: --id.",
+          "RFC-0968/0988: Complete a handover — verify authorization, regenerate passport, append bordbuch event, update ownership registry. Flags: --id, --source-locator, --dry-run, --authorization-data.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -321,6 +321,16 @@ export function createSternsystemModule(): KernelModule {
           "source-locator": {
             kind: "string",
             description: "Git remote or bundle path to fetch authorization from (optional).",
+          },
+          "dry-run": {
+            kind: "boolean",
+            description:
+              "Execute in memory without writing bordbuch, passport, or registry. Requires --authorization-data. Incompatible with --source-locator.",
+          },
+          "authorization-data": {
+            kind: "string",
+            description:
+              "JSON string containing the full SignedHandoverAuthorization object from prepare. Required when --dry-run is set.",
           },
         },
         writes: [

@@ -11,6 +11,7 @@ the authorization file.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover complete command handler.</item>
+  <item>RFC-0988: add --dry-run and --authorization-data flags — verify authorization in memory, return preview data, skip all writes.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,8 +31,10 @@ import {
   verifyAuthorization,
   isAuthorizationExpired,
   resolveAuthorizationPath,
+  parseAuthorizationData,
   type HandoverCompleteResult,
   type HandoverEventMetadata,
+  type SignedHandoverAuthorization,
 } from "./handover.ts";
 import {
   buildPassportPayload,
@@ -44,11 +47,26 @@ import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/inde
 
 export interface SternsystemHandoverCompleteData extends HandoverCompleteResult {
   command: "sternsystem.handover.complete";
+  dryRun: boolean;
+  newPassportHashPreview?: string;
+  bordbuchEventPreview?: {
+    kind: "handover";
+    metadata: { newPassportHash: string; authorizationHash: string };
+  };
+  registryTransferPreview?: {
+    systemId: string;
+    previousOwner: string;
+    newOwner: string;
+  };
 }
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
   return typeof v === "string" ? v : undefined;
+}
+
+function flagBool(input: KernelCommandInput, key: string): boolean {
+  return input.flags[key] === true;
 }
 
 function filterEnv(env: Record<string, string | undefined>): Record<string, string> {
@@ -67,9 +85,24 @@ export async function runSternsystemHandoverComplete(
 ): Promise<KernelCommandResult<SternsystemHandoverCompleteData>> {
   const { workspaceRoot, logger } = context;
   const systemId = flagString(input, "id");
+  const dryRun = flagBool(input, "dry-run");
+  const authorizationDataJson = flagString(input, "authorization-data");
+  const sourceLocator = flagString(input, "source-locator");
 
   if (!systemId) {
     throw new Error("[sternsystem.handover.complete] requires --id <systemId>");
+  }
+
+  if (dryRun && sourceLocator) {
+    throw new Error(
+      "[sternsystem.handover.complete] --source-locator is incompatible with --dry-run",
+    );
+  }
+
+  if (dryRun && !authorizationDataJson) {
+    throw new Error(
+      "[sternsystem.handover.complete] --authorization-data is required in dry-run mode",
+    );
   }
 
   const recipientIdentity = resolveActor(input);
@@ -99,11 +132,17 @@ export async function runSternsystemHandoverComplete(
 
   const recipientPublicKey = await derivePublicKey(privateKeyBytes);
 
-  const authorization = await readAuthorization(workspaceRoot, systemId);
-  if (!authorization) {
-    throw new Error(
-      `[sternsystem.handover.complete] No handover-authorization.json found for ${systemId}. Ensure the sender has prepared and synced the authorization.`,
-    );
+  let authorization: SignedHandoverAuthorization;
+  if (dryRun && authorizationDataJson) {
+    authorization = parseAuthorizationData(authorizationDataJson);
+  } else {
+    const read = await readAuthorization(workspaceRoot, systemId);
+    if (!read) {
+      throw new Error(
+        `[sternsystem.handover.complete] No handover-authorization.json found for ${systemId}. Ensure the sender has prepared and synced the authorization.`,
+      );
+    }
+    authorization = read;
   }
 
   // HANDOVER-02: check expiry
@@ -176,6 +215,38 @@ export async function runSternsystemHandoverComplete(
   );
 
   try {
+    if (dryRun) {
+      logger.success(
+        `[sternsystem.handover.complete] ${systemId} dry-run: handover verified for ${authorization.payload.recipient.identity} — no files written`,
+      );
+      return {
+        data: {
+          command: "sternsystem.handover.complete",
+          systemId,
+          previousCreator: authorization.payload.sender.identity,
+          newCreator: authorization.payload.recipient.identity,
+          newPassportHash: newPassportHash,
+          bordbuchEventHash: "",
+          ownershipRegistryUpdated: false,
+          dryRun: true,
+          newPassportHashPreview: newPassportHash,
+          bordbuchEventPreview: {
+            kind: "handover",
+            metadata: {
+              newPassportHash,
+              authorizationHash: authorization.authorizationHash,
+            },
+          },
+          registryTransferPreview: {
+            systemId,
+            previousOwner: authorization.payload.sender.identity,
+            newOwner: authorization.payload.recipient.identity,
+          },
+        },
+        summary: `[sternsystem.handover.complete] ${systemId} dry-run: handover verified (no files written)`,
+      };
+    }
+
     // Write new passport
     await writePassport(workspaceRoot, systemId, newPassport);
     logger.info(
@@ -243,6 +314,7 @@ export async function runSternsystemHandoverComplete(
       data: {
         command: "sternsystem.handover.complete",
         ...result,
+        dryRun: false,
       },
       summary: `[sternsystem.handover.complete] ${systemId} handed over from ${result.previousCreator} to ${result.newCreator}, passport regenerated, bordbuch updated, ownership registry synced`,
     };
