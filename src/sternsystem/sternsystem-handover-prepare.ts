@@ -11,6 +11,7 @@ builds HandoverAuthorizationV1, signs it, and writes handover-authorization.json
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover prepare command handler.</item>
+  <item>RFC-0988: add --dry-run flag — sign authorization in memory, return SignedHandoverAuthorization in result, skip writeAuthorization.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -39,11 +40,17 @@ export interface SternsystemHandoverPrepareData {
   authorizationHash: string;
   authorizationPath: string;
   expiresAt: string;
+  dryRun: boolean;
+  signedAuthorization?: SignedHandoverAuthorization;
 }
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
   return typeof v === "string" ? v : undefined;
+}
+
+function flagBool(input: KernelCommandInput, key: string): boolean {
+  return input.flags[key] === true;
 }
 
 function filterEnv(env: Record<string, string | undefined>): Record<string, string> {
@@ -66,6 +73,7 @@ export async function runSternsystemHandoverPrepare(
   const systemId = flagString(input, "id");
   const recipientIdentity = flagString(input, "recipient-identity");
   const recipientPublicKey = flagString(input, "recipient-public-key");
+  const dryRun = flagBool(input, "dry-run");
 
   if (!systemId) {
     throw new Error("[sternsystem.handover.prepare] requires --id <systemId>");
@@ -158,6 +166,27 @@ export async function runSternsystemHandoverPrepare(
   let doc: SignedHandoverAuthorization;
   try {
     doc = await signAuthorization(payload, privateKeyBytes);
+
+    if (dryRun) {
+      logger.success(
+        `[sternsystem.handover.prepare] ${systemId} dry-run: authorization signed for ${recipientIdentity} (hash: ${doc.authorizationHash}) — no files written`,
+      );
+      return {
+        data: {
+          command: "sternsystem.handover.prepare",
+          systemId,
+          senderIdentity,
+          recipientIdentity,
+          authorizationHash: doc.authorizationHash,
+          authorizationPath: "",
+          expiresAt: expiresAt.toISOString(),
+          dryRun: true,
+          signedAuthorization: doc,
+        },
+        summary: `[sternsystem.handover.prepare] ${systemId} dry-run: authorization generated for ${recipientIdentity} (no files written)`,
+      };
+    }
+
     const authorizationPath = await writeAuthorization(workspaceRoot, systemId, doc);
     logger.success(
       `[sternsystem.handover.prepare] ${systemId} authorization signed for ${recipientIdentity} (hash: ${doc.authorizationHash})`,
@@ -172,6 +201,7 @@ export async function runSternsystemHandoverPrepare(
         authorizationHash: doc.authorizationHash,
         authorizationPath,
         expiresAt: expiresAt.toISOString(),
+        dryRun: false,
       },
       summary: `[sternsystem.handover.prepare] ${systemId} handover authorized from ${senderIdentity} to ${recipientIdentity}, expires ${expiresAt.toISOString()}`,
     };

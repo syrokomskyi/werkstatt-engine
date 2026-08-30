@@ -281,7 +281,7 @@ export function createSternsystemModule(): KernelModule {
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
         description:
-          "RFC-0968: Generate a signed handover authorization to transfer a Sternsystem to a recipient identity. Flags: --id, --recipient-identity, --recipient-public-key.",
+          "RFC-0968/0988: Generate a signed handover authorization to transfer a Sternsystem to a recipient identity. Flags: --id, --recipient-identity, --recipient-public-key, --dry-run.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -296,6 +296,11 @@ export function createSternsystemModule(): KernelModule {
             kind: "string",
             required: true,
             description: "Recipient Ed25519 public key (hex).",
+          },
+          "dry-run": {
+            kind: "boolean",
+            description:
+              "Execute in memory without writing handover-authorization.json. Returns SignedHandoverAuthorization in result.",
           },
         },
         writes: ["../systems-cache/{id}/handover-authorization.json"],
