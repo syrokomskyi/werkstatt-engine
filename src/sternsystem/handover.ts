@@ -20,6 +20,7 @@ and Ed25519 signing (RFC-0931 helpers), same patterns as passport.ts.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover authorization types, signing/verification, and file IO helpers.</item>
+  <item>RFC-0988: add Zod schema and parseAuthorizationData for --dry-run --authorization-data CLI input validation.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,14 +31,10 @@ import {
   snapshotCanonicalJsonObjectV1,
   canonicalJsonHashV1,
 } from "@warpgogol/werkstatt-engine/fingerprint";
-import {
-  signBytes,
-  verifyBytes,
-  toHex,
-  fromHex,
-} from "@warpgogol/werkstatt-engine/signing";
+import { signBytes, verifyBytes, toHex, fromHex } from "@warpgogol/werkstatt-engine/signing";
 import { resolveCacheClonePath } from "./registry-io.ts";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
+import { z } from "zod";
 
 export interface HandoverAuthorizationV1 {
   schema: "handover-authorization/v1";
@@ -185,4 +182,46 @@ export async function removeAuthorization(
 export function isAuthorizationExpired(expiresAt: string, now: Date = new Date()): boolean {
   const expiry = new Date(expiresAt);
   return expiry.getTime() < now.getTime();
+}
+
+const handoverAuthorizationV1Schema = z.object({
+  schema: z.literal("handover-authorization/v1"),
+  systemId: z.string(),
+  sender: z.object({
+    identity: z.string(),
+    publicKey: z.string(),
+  }),
+  recipient: z.object({
+    identity: z.string(),
+    publicKey: z.string(),
+  }),
+  passportHash: z.string(),
+  bordbuchHead: z.string(),
+  authorizedAt: z.string(),
+  expiresAt: z.string(),
+});
+
+const signedHandoverAuthorizationSchema = z.object({
+  payload: handoverAuthorizationV1Schema,
+  authorizationHash: z.string(),
+  signature: z.string(),
+});
+
+export function parseAuthorizationData(json: string): SignedHandoverAuthorization {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch (err) {
+    throw new Error(
+      `[sternsystem.handover.complete] invalid authorization-data JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const result = signedHandoverAuthorizationSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(
+      `[sternsystem.handover.complete] authorization-data validation failed: ${issues}`,
+    );
+  }
+  return result.data as SignedHandoverAuthorization;
 }
