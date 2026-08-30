@@ -626,6 +626,11 @@ export function createLeitstandModule(): KernelModule {
             kind: "boolean",
             description: "Resume from the last incomplete ship operation.",
           },
+          force: {
+            kind: "boolean",
+            description:
+              "Delete stale ship journal and start a fresh operation instead of resuming.",
+          },
         },
         writes: [
           "missions/{mission}/**",

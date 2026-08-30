@@ -402,8 +402,7 @@ export function buildShipPlan(input: {
     {
       name: "mission-archive",
       run: async (ctx: ShipContext) => {
-        // mission.archive is not yet registered as a kernel command (RFC-0801 gap).
-        // Best-effort: try to call it, non-fatal on failure.
+        // Best-effort: archive the mission after shipping. Non-fatal on failure.
         try {
           const result = await runShipPhase(ctx, "mission.archive", [
             `--mission=${ctx.missionId}`,
@@ -453,7 +452,24 @@ function checkMissionClosed(workspaceRoot: string, missionId: string): boolean {
   }
 }
 
-function phaseFromStepCount(stepCount: number): ShipPhase | "preflight" {
+function phaseFromStepCount(stepCount: number, missionClosed = false): ShipPhase | "preflight" {
+  if (missionClosed) {
+    // When lifecycle phases are skipped (mission already closed), step counts shift by -3.
+    switch (stepCount) {
+      case 0:
+        return "preflight";
+      case 6:
+        return "dev";
+      case 8:
+        return "alt";
+      case 10:
+        return "main";
+      case 12:
+        return "archived";
+      default:
+        return "preflight";
+    }
+  }
   switch (stepCount) {
     case 0:
       return "preflight";
@@ -491,6 +507,7 @@ export async function runLeitstandShip(
     );
   }
   const isResume = input.flags["resume"] === true;
+  const isForce = input.flags["force"] === true;
 
   const workpieceDir = path.join(workspaceRoot, "missions", missionId, "workpiece");
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
@@ -499,6 +516,12 @@ export async function runLeitstandShip(
 
   // Lazily create operations directory
   await fs.mkdir(operationsDir, { recursive: true });
+
+  // --force: delete stale ship journal to start fresh
+  if (isForce && existsSync(journalPath)) {
+    await fs.unlink(journalPath);
+    logger.info(`  [ship] --force: deleted stale journal ${journalPath}`);
+  }
 
   const ctx: ShipContext = {
     workspaceRoot,
@@ -520,7 +543,7 @@ export async function runLeitstandShip(
 
   const plan = buildShipPlan({ until, missionClosed });
   const stepCount = plan.steps.length;
-  const reachedPhase = phaseFromStepCount(stepCount);
+  const reachedPhase = phaseFromStepCount(stepCount, missionClosed);
 
   // Check for incomplete operation
   const existingRecords = await (async () => {

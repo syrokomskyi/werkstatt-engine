@@ -13,7 +13,19 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type {
+  KernelModule,
+  KernelCommandInput,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-engine/kernel";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { parse as parseYaml } from "yaml";
+
+function flagString(input: KernelCommandInput, key: string): string | undefined {
+  const v = input.flags[key];
+  return typeof v === "string" ? v : undefined;
+}
 
 export function createMissionModule(): KernelModule {
   return {
@@ -562,6 +574,92 @@ export function createMissionModule(): KernelModule {
         reads: ["systems-cache/{system}/public/**"],
         cacheable: false,
         execute: runMissionPreflight,
+      });
+      registry.registerCommand({
+        name: "mission.archive",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
+        description:
+          "Archive a terminal-state mission (RFC-0801 gap closure). Stub — moves closed/aborted missions to missions/archive/.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: true,
+        flags: {
+          mission: { kind: "string", description: "Mission id to archive." },
+          status: {
+            kind: "string",
+            description: "Archive missions with this status (e.g. 'closed', 'aborted').",
+          },
+          all: { kind: "boolean", description: "Archive all terminal-state missions." },
+          "dry-run": {
+            kind: "boolean",
+            description: "Report what would be archived without moving anything.",
+          },
+        },
+        writes: ["missions/{mission}/**", "missions/archive/**"],
+        reads: ["missions/{mission}/mission.yaml"],
+        cacheable: false,
+        execute: async (input: KernelCommandInput, context: KernelRuntimeContext) => {
+          const missionId = flagString(input, "mission");
+          const status = flagString(input, "status") ?? "closed";
+          const dryRun = input.flags["dry-run"] === true;
+          const { workspaceRoot } = context;
+          const missionsDir = path.join(workspaceRoot, "missions");
+          const archiveDir = path.join(missionsDir, "archive", status);
+
+          const candidates: string[] = [];
+          if (missionId) {
+            candidates.push(missionId);
+          } else {
+            const entries = await fs.readdir(missionsDir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isDirectory() || entry.name === "archive") continue;
+              const yamlPath = path.join(missionsDir, entry.name, "mission.yaml");
+              try {
+                const raw = await fs.readFile(yamlPath, "utf8");
+                const parsed = parseYaml(raw) as { state?: string };
+                if (parsed.state === status) {
+                  candidates.push(entry.name);
+                }
+              } catch {
+                // skip
+              }
+            }
+          }
+
+          if (candidates.length === 0) {
+            return {
+              data: { archived: [], status, dryRun },
+              summary: `[mission.archive] no missions with status '${status}' to archive`,
+              exitCode: 0,
+            };
+          }
+
+          if (!dryRun) {
+            await fs.mkdir(archiveDir, { recursive: true });
+          }
+
+          const archived: string[] = [];
+          for (const id of candidates) {
+            const src = path.join(missionsDir, id);
+            const dst = path.join(archiveDir, id);
+            if (dryRun) {
+              context.logger.info(
+                `  [mission.archive] dry-run: would move ${id} → archive/${status}/${id}`,
+              );
+            } else {
+              await fs.rename(src, dst);
+              context.logger.info(`  [mission.archive] moved ${id} → archive/${status}/${id}`);
+            }
+            archived.push(id);
+          }
+
+          return {
+            data: { archived, status, dryRun },
+            summary: `[mission.archive] ${dryRun ? "dry-run: " : ""}${archived.length} mission(s) ${dryRun ? "would be " : ""}archived (status: ${status})`,
+            exitCode: 0,
+          };
+        },
       });
     },
   };
