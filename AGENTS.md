@@ -41,6 +41,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 ## Command registration discipline
 
 - **Kernel commands MUST be registered in `*.module.ts` files, not in `index.ts` barrels.** The kernel loads modules via the `*-module` subpath export (e.g. `@warpgogol/werkstatt-engine/sternsystem-module` resolves to `sternsystem.module.ts`). A `createSternsystemModule` (or any `create*Module`) function in an `index.ts` barrel is dead code — the runtime never calls it. Commands registered there are invisible to `command.manifest.generate` and cause `RFC-CMD-02` validation errors. Discovered during RFC-0968: handover commands were added to `sternsystem/index.ts` instead of `sternsystem.module.ts`, making them invisible to the manifest generator.
+- **Before registering a new kernel command, grep for existing registrations across ALL packages.** The kernel registry rejects duplicate command names across modules with a fatal "Kernel command already registered" error that blocks ALL commands from loading. Commands like `mission.archive` are registered in `packages/forge/os/mission/mission.module.ts` — adding a second registration in `packages/werkstatt-engine/src/mission/mission.module.ts` crashes the entire kernel. Always run `grep -r 'name: "commandName"' packages/*/src/**/*.module.ts packages/*/os/**/*.module.ts` before adding a new `registry.registerCommand` call.
 
 ## Scripts
 
