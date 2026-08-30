@@ -29,11 +29,13 @@
   <item>RFC-0954: rescue uncommitted/unpushed workpiece edits before atomicMoveDir — commit dirty changes, merge workpiece HEAD into cache clone, backup on merge failure.</item>
   <item>RFC-0954: fail-closed guard blocks re-materialization when workpiece has uncommitted changes — operator must commit or reconcile first. --force bypasses with rescue.</item>
   <item>RFC-0958: rewire runMissionMaterializeInternal onto runOperation with granular journaled steps for crash-safe resumable materialization.</item>
+  <item>Increase pnpm install timeout from 120s to 300s — prevents ETIMEDOUT on workspaces with many packages.</item>
+  <item>Add stop-stale-dev-servers step — SIGTERM astro dev processes under missions/ before pnpm install, preventing orphaned dev servers from previous missions.</item>
 </CHANGE_SUMMARY>
 */
 
 import fs from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readlinkSync } from "node:fs";
 import { glob as fsGlob } from "node:fs/promises";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -1562,6 +1564,37 @@ export async function buildMaterializeSteps(
       },
     },
     {
+      name: "stop-stale-dev-servers",
+      run: async (c: unknown) => {
+        const cc = c as MaterializeStepCtx;
+        cc.logger.info(`  Stopping stale astro dev servers from previous missions…`);
+        try {
+          const output = execSync("pgrep -af 'astro.*dev'", {
+            encoding: "utf-8",
+            timeout: 10_000,
+          });
+          const lines = output.trim().split("\n").filter(Boolean);
+          for (const line of lines) {
+            const pidStr = line.split("\s+")[0];
+            if (!pidStr) continue;
+            const pid = parseInt(pidStr, 10);
+            if (Number.isNaN(pid) || pid === process.pid) continue;
+            try {
+              const cwd = readlinkSync(`/proc/${pid}/cwd`).trim();
+              if (cwd.includes("/missions/")) {
+                process.kill(pid, "SIGTERM");
+                cc.logger.info(`  Stopped stale dev server (pid=${pid}, cwd=${cwd})`);
+              }
+            } catch {
+              // Process may have exited or cwd unreadable — skip silently
+            }
+          }
+        } catch {
+          // pgrep returns non-zero when no matches — no stale servers to stop
+        }
+      },
+    },
+    {
       name: "pnpm-install",
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
@@ -1570,7 +1603,7 @@ export async function buildMaterializeSteps(
           execSync("pnpm install", {
             cwd: cc.workspaceRoot,
             stdio: ["pipe", "pipe", "pipe"],
-            timeout: 120_000,
+            timeout: 300_000,
           });
           cc.logger.info(`  Workpiece workspace dependencies linked`);
         } catch (err) {
