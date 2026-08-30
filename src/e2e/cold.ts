@@ -12,6 +12,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0965: initial werkstatt.e2e.cold command handler, ColdRunReport type, step runner with timeout and intervention tracking.</item>
+  <item>RFC-0988: add handover-dry-run step — verifies prepare and complete dry-run commands work end-to-end without side effects.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,6 +27,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
+import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -537,6 +539,88 @@ legalJurisdiction: DE
             }
             logger.info(
               `  [e2e.cold] PASSPORT/HANDOVER/OWNERSHIP rules clean (${allViolations.length} other violations ignored)`,
+            );
+          },
+          logger,
+          perStepTimeout,
+        ),
+      );
+    }
+
+    // Step 3.6: handover-dry-run (only if register-site succeeded)
+    // RFC-0988: Verify that handover prepare and complete dry-run commands work
+    // end-to-end on the freshly registered Sternsystem without side effects.
+    if (missionId) {
+      steps.push(
+        await runStep(
+          "handover-dry-run",
+          async () => {
+            const recipientPublicKey = toHex((await generateKeyPair()).publicKey);
+
+            const prepareResult = (await executeKernelCommand({
+              workspaceRoot: stepCtx.workspaceRoot,
+              commandName: "sternsystem.handover.prepare",
+              argv: [
+                `--id=${systemId}`,
+                "--recipient-identity=human:e2e-recipient",
+                `--recipient-public-key=${recipientPublicKey}`,
+                "--dry-run",
+                "--json",
+              ],
+              outputFormat: "json",
+            })) as {
+              exitCode?: number;
+              data?: {
+                dryRun?: boolean;
+                signedAuthorization?: unknown;
+                authorizationHash?: string;
+              };
+            };
+
+            if (prepareResult.exitCode !== 0) {
+              throw new Error(
+                `handover-dry-run: sternsystem.handover.prepare --dry-run failed with exit code ${prepareResult.exitCode}`,
+              );
+            }
+            if (!prepareResult.data?.dryRun || !prepareResult.data?.signedAuthorization) {
+              throw new Error(
+                "handover-dry-run: prepare --dry-run did not return signedAuthorization in result",
+              );
+            }
+            logger.info(
+              `  [e2e.cold] handover.prepare --dry-run returned signedAuthorization (hash: ${prepareResult.data.authorizationHash})`,
+            );
+
+            const completeResult = (await executeKernelCommand({
+              workspaceRoot: stepCtx.workspaceRoot,
+              commandName: "sternsystem.handover.complete",
+              argv: [
+                `--id=${systemId}`,
+                "--dry-run",
+                `--authorization-data=${JSON.stringify(prepareResult.data.signedAuthorization)}`,
+                "--json",
+              ],
+              outputFormat: "json",
+            })) as {
+              exitCode?: number;
+              data?: {
+                dryRun?: boolean;
+                newPassportHashPreview?: string;
+                bordbuchEventPreview?: { kind: string };
+                registryTransferPreview?: { previousOwner: string; newOwner: string };
+              };
+            };
+
+            if (completeResult.exitCode !== 0) {
+              throw new Error(
+                `handover-dry-run: sternsystem.handover.complete --dry-run failed with exit code ${completeResult.exitCode}`,
+              );
+            }
+            if (!completeResult.data?.dryRun || !completeResult.data?.newPassportHashPreview) {
+              throw new Error("handover-dry-run: complete --dry-run did not return preview data");
+            }
+            logger.info(
+              `  [e2e.cold] handover.complete --dry-run returned preview data (newPassportHash: ${completeResult.data.newPassportHashPreview})`,
             );
           },
           logger,
