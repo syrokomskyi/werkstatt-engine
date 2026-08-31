@@ -32,6 +32,7 @@
   <item>RFC-0913: add reconcile-freshness gate — compare workpiece HEAD against workpieceHeadAtReconcile from reconciliation report; fail-closed on missing report; add --skip-reconcile-check escape hatch.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal — each step records to journal.jsonl for crash-safe resume.</item>
   <item>RFC-0991: add behavior-snapshot-refresh step to buildCloseSteps for auto-generating behavior snapshot during mission close.</item>
+  <item>RFC-0992: behavior-snapshot-refresh now updates workpieceHeadAtReconcile in reconciliation-report.json after commit, preventing false unreconciled-commit freshness-check failure.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -490,7 +491,23 @@ export async function buildCloseSteps(
             commandName: "behavior.snapshot.generate",
             siteName: cc.manifest.systemId,
           });
-          commitWorkpieceIfDirty(cc.workpieceDir, cc.missionId, "behavior-snapshot-refresh");
+          const snapshotCommit = commitWorkpieceIfDirty(
+            cc.workpieceDir,
+            cc.missionId,
+            "behavior-snapshot-refresh",
+          );
+          if (snapshotCommit.committed) {
+            try {
+              const reconcileReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
+              if (existsSync(reconcileReportPath)) {
+                const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
+                report.workpieceHeadAtReconcile = snapshotCommit.commitSha;
+                await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
+              }
+            } catch {
+              // Non-fatal
+            }
+          }
           logger.info("  [behavior-snapshot-refresh] Snapshot regenerated and committed");
         } catch (err) {
           logger.warn(
