@@ -184,6 +184,22 @@ async function runInlineValidate(
   return { passed: false, failures, report: result.data ?? null };
 }
 
+async function updateReconcileReportHead(
+  evidenceDir: string,
+  commitSha: string | null,
+): Promise<void> {
+  try {
+    const reconcileReportPath = path.join(evidenceDir, "reconciliation-report.json");
+    if (existsSync(reconcileReportPath)) {
+      const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
+      report.workpieceHeadAtReconcile = commitSha;
+      await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
 function gitExec(cwd: string, args: string, options?: { env?: NodeJS.ProcessEnv }): string {
   return execSync(`git ${args}`, {
     cwd,
@@ -463,16 +479,7 @@ export async function buildCloseSteps(
           logger.info(
             `  Auto-committed dirty workpiece (${workpieceCommit.commitSha?.slice(0, 8)}) before close`,
           );
-          try {
-            const reconcileReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
-            if (existsSync(reconcileReportPath)) {
-              const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
-              report.workpieceHeadAtReconcile = workpieceCommit.commitSha;
-              await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
-            }
-          } catch {
-            // Non-fatal
-          }
+          await updateReconcileReportHead(cc.evidenceDir, workpieceCommit.commitSha);
         }
       },
     },
@@ -497,16 +504,7 @@ export async function buildCloseSteps(
             "behavior-snapshot-refresh",
           );
           if (snapshotCommit.committed) {
-            try {
-              const reconcileReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
-              if (existsSync(reconcileReportPath)) {
-                const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
-                report.workpieceHeadAtReconcile = snapshotCommit.commitSha;
-                await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
-              }
-            } catch {
-              // Non-fatal
-            }
+            await updateReconcileReportHead(cc.evidenceDir, snapshotCommit.commitSha);
           }
           logger.info("  [behavior-snapshot-refresh] Snapshot regenerated and committed");
         } catch (err) {
