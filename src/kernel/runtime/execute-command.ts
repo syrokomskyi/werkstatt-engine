@@ -397,7 +397,7 @@ export async function executeKernelCommand(
   // Always check the workspace-level config first. Workspace-scoped commands
   // (scope: "workspace") must be resolved from the root tools/kernel.config.ts,
   // not from an app-scoped config. This must happen even when --site is given,
-  // because workspace commands like lagebild.tenant.add use --site as a
+  // because workspace commands like sternsystem.sync use --site as a
   // command-level parameter, not as a site selector.
   //
   // App-scoped commands (scope: "app") that are ALSO registered in the workspace
@@ -455,7 +455,7 @@ export async function executeKernelCommand(
           logger.section(`workspace: ${wsCommand.name}`);
         }
         // Re-inject --site into argv for workspace commands that declare it
-        // as a command-level flag (e.g. lagebild.tenant.add). The CLI layer
+        // as a command-level flag (e.g. sternsystem.sync). The CLI layer
         // consumes --site as a common flag for site selection, but workspace
         // commands need it in their argv for flag resolution.
         const wsArgv = [...argv];
