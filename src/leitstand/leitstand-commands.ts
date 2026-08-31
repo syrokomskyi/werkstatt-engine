@@ -1122,6 +1122,71 @@ export interface LeitstandPromoteData {
   failingPhase?: string;
 }
 
+/**
+ * Mirror sync pre-flight check (RFC-0995).
+ *
+ * Non-blocking advisory check that compares the bare repo's origin SHA
+ * against refs/mirror/<branch> and logs a warning if they differ.
+ * All errors are caught and swallowed — the check must never block promotion.
+ */
+export async function checkMirrorSyncPreFlight(
+  workspaceRoot: string,
+  systemId: string,
+  logger: { warn: (msg: string) => void },
+): Promise<void> {
+  try {
+    const { readSystemConfig, resolveMirrorPath } = await import("../sternsystem/registry-io.ts");
+    const { execSync } = await import("node:child_process");
+    const config = await readSystemConfig(workspaceRoot, systemId);
+    if (config && config.mirrors.length > 2) {
+      const bareMirror = config.mirrors[1];
+      const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
+      if (existsSync(bareRepoPath)) {
+        let branch = "main";
+        try {
+          branch = execSync("git symbolic-ref HEAD", {
+            cwd: bareRepoPath,
+            encoding: "utf-8",
+          })
+            .trim()
+            .replace("refs/heads/", "");
+        } catch {
+          // default to main
+        }
+        let originSha: string | null = null;
+        let mirrorSha: string | null = null;
+        try {
+          originSha = execSync(`git rev-parse ${branch}`, {
+            cwd: bareRepoPath,
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          // bare repo empty
+        }
+        try {
+          mirrorSha = execSync(`git rev-parse refs/mirror/${branch}`, {
+            cwd: bareRepoPath,
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          // no mirror ref
+        }
+        if (originSha && mirrorSha && originSha !== mirrorSha) {
+          logger.warn(
+            `[leitstand.promote] external mirrors are out of sync (origin=${originSha?.slice(0, 8)}, mirror=${mirrorSha?.slice(0, 8)}) — run sternsystem.sync --id ${systemId} after promote to align`,
+          );
+        } else if (originSha && !mirrorSha) {
+          logger.warn(
+            `[leitstand.promote] mirror ref not found — run sternsystem.sync --id ${systemId} to initialize external mirror tracking`,
+          );
+        }
+      }
+    }
+  } catch {
+    // Non-fatal — mirror check is advisory
+  }
+}
+
 export async function runLeitstandPromote(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
@@ -1196,6 +1261,9 @@ export async function runLeitstandPromote(
       ],
     } as unknown as KernelCommandResult<LeitstandPromoteData>;
   }
+
+  // Mirror sync pre-flight check (non-blocking warning, RFC-0995)
+  await checkMirrorSyncPreFlight(context.workspaceRoot, systemId, context.logger);
 
   const operationId = generateOperationId();
   const now = new Date().toISOString();
