@@ -94,14 +94,6 @@
       "types": "./src/kernel/swim/swim-module.ts",
       "default": "./src/kernel/swim/swim-module.ts"
     },
-    "./kernel/lagebild": {
-      "types": "./src/kernel/lagebild/index.ts",
-      "default": "./src/kernel/lagebild/index.ts"
-    },
-    "./kernel/lagebild-module": {
-      "types": "./src/kernel/lagebild/lagebild.module.ts",
-      "default": "./src/kernel/lagebild/lagebild.module.ts"
-    },
     "./kernel/pipeline-budget": {
       "types": "./src/kernel/pipeline-budget.module.ts",
       "default": "./src/kernel/pipeline-budget.module.ts"
