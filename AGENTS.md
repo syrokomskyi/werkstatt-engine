@@ -327,6 +327,8 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 
 - **Use narrow credential regex patterns in assessment bundles.** When scanning assessment bundles for credential leakage, use specific key names (`aws_secret_access_key`, `private_key`, `client_secret`) rather than generic `secret`/`password` substrings. Generic patterns produce false positives on legitimate assessment data containing field names like `"secret": "some-value"`. The narrowed patterns are in `CREDENTIAL_PATTERNS` in `nachweis-assessment-ingest.ts`.
 
+- **Extract advisory/non-blocking checks into exported pure functions.** When a kernel command handler contains an inline advisory check (non-blocking warning, pre-flight check, or soft validation that logs but does not block), extract it into a separate exported pure function that takes `(workspaceRoot, systemId, logger)` and can be tested independently. This follows the pure function + thin handler pattern: the handler calls the extracted function, the test creates a temp bare repo and verifies the warning output. Example: `checkMirrorSyncPreFlight` in `leitstand-commands.ts` (RFC-0995).
+
 ## nachweis.measure.lighthouse (RFC-0874)
 
 `nachweis.measure.lighthouse` is a provider adapter that runs five sequential canonical Google Lighthouse runs against a target HTTPS URL, parses the LHR JSON output, aggregates category scores, builds an `AssessmentBundleV1`, and delegates to `nachweis.assessment.ingest` (RFC-0873) for R2 upload, PBP write, and Bordbuch append.
