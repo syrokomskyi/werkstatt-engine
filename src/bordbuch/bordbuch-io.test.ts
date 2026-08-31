@@ -4,6 +4,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>Guard against duplicate mission-close/abort in appendBordbuchEntry.</item>
+  <item>RFC-0994: add redactForBordbuch unit tests and integration test for redacted summary storage.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -12,7 +13,12 @@ import fs from "node:fs/promises";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { appendBordbuchEntry, computeEntryHash } from "./bordbuch-io.ts";
+import {
+  appendBordbuchEntry,
+  computeEntryHash,
+  redactForBordbuch,
+  containsSensitivePayload,
+} from "./bordbuch-io.ts";
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
 
 let testRoot: string;
@@ -217,4 +223,53 @@ test("appendBordbuchEntry allows non-mission-close kinds after mission-close", a
     { writerRole: "nachweis" },
   );
   expect(entry.kind).toBe("sichtpass");
+});
+
+// --- RFC-0994: redactForBordbuch ---
+
+test("redactForBordbuch replaces SSH git URLs with [redacted-git-url]", () => {
+  const input = "Mirror sync — git@github.com:syrokomskyi/warpgogol-com.git";
+  const result = redactForBordbuch(input);
+  expect(result).toBe("Mirror sync — [redacted-git-url]");
+});
+
+test("redactForBordbuch replaces HTTPS URLs with credentials", () => {
+  const input = "Push to https://token@github.com/user/repo.git completed";
+  const result = redactForBordbuch(input);
+  expect(result).toBe("Push to [redacted-git-url] completed");
+});
+
+test("redactForBordbuch handles multiple git URLs in one string", () => {
+  const input = "Sync from git@github.com:foo/bar.git to git@gitlab.com:baz/qux.git";
+  const result = redactForBordbuch(input);
+  expect(result).toBe("Sync from [redacted-git-url] to [redacted-git-url]");
+});
+
+test("redactForBordbuch leaves non-git text unchanged", () => {
+  const input = "Mission m001 closed — all checks passed";
+  expect(redactForBordbuch(input)).toBe(input);
+});
+
+test("redactForBordbuch prevents false positive sensitive payload on SSH URL", () => {
+  const summary = "Mirror sync — git@github.com:syrokomskyi/warpgogol-com.git";
+  const redacted = redactForBordbuch(summary);
+  expect(containsSensitivePayload(redacted)).toBe(false);
+});
+
+test("redactForBordbuch still allows real secrets to be caught after redaction", () => {
+  const summary = "Token abc123 set on git@github.com:user/repo.git";
+  const redacted = redactForBordbuch(summary);
+  expect(containsSensitivePayload(redacted)).toBe(true);
+});
+
+test("appendBordbuchEntry stores redacted summary for SSH URL", async () => {
+  const entry = await appendBordbuchEntry(
+    tmpDir,
+    systemId,
+    "mirror-sync",
+    "Mirror sync — git@github.com:syrokomskyi/warpgogol-com.git",
+    "agent",
+    { writerRole: "sternsystem" },
+  );
+  expect(entry.summary).toBe("Mirror sync — [redacted-git-url]");
 });

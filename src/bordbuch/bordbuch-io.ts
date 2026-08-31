@@ -16,6 +16,7 @@
   <item>RFC-0715: add nachweis-signed and nachweis-timestamped to nachweis writer-role for N3 crypto verification.</item>
   <item>RFC-0724: add DEPRECATED_KIND_MIGRATIONS for forward-only kind renames (release-published -> release-ready).</item>
   <item>Bug fix: guard against duplicate mission-close/abort events for the same missionId in appendBordbuchEntry.</item>
+  <item>RFC-0994: add redactForBordbuch to strip git remote URLs before sensitive payload check.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -127,6 +128,19 @@ const SENSITIVE_PATTERNS: RegExp[] = [
   /\+?\d{1,4}[\s-]?\(?\d{1,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/,
 ];
 
+const GIT_URL_REDACTION_PATTERNS: RegExp[] = [
+  /git@[a-zA-Z0-9.-]+:[a-zA-Z0-9._/-]+/g,
+  /https?:\/\/[^\s@]+@[a-zA-Z0-9.-]+\/[^\s]+/g,
+];
+
+export function redactForBordbuch(text: string): string {
+  let redacted = text;
+  for (const pattern of GIT_URL_REDACTION_PATTERNS) {
+    redacted = redacted.replace(pattern, "[redacted-git-url]");
+  }
+  return redacted;
+}
+
 export function containsSensitivePayload(text: string): boolean {
   return SENSITIVE_PATTERNS.some((p) => p.test(text));
 }
@@ -185,7 +199,9 @@ export async function appendBordbuchEntry(
     await fs.mkdir(dir, { recursive: true });
   }
 
-  if (containsSensitivePayload(summary)) {
+  const redactedSummary = redactForBordbuch(summary);
+
+  if (containsSensitivePayload(redactedSummary)) {
     throw new Error(
       "[bordbuch.append] sensitive payload detected in summary — redact before appending",
     );
@@ -237,7 +253,7 @@ export async function appendBordbuchEntry(
     missionId: options?.missionId ?? null,
     releaseId: options?.releaseId ?? null,
     actor,
-    summary,
+    summary: redactedSummary,
     metadata: options?.metadata,
     previousHash,
     erratumOf: options?.erratumOf,
@@ -342,8 +358,8 @@ export async function validateBordbuch(
       }
     }
 
-    // Sensitive payload guard
-    if (containsSensitivePayload(entry.summary)) {
+    // Sensitive payload guard (with git URL redaction)
+    if (containsSensitivePayload(redactForBordbuch(entry.summary))) {
       violations.push({
         rule: "sensitive-payload",
         message: `sensitive payload detected in '${entry.id}'`,
