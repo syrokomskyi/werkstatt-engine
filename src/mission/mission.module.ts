@@ -136,10 +136,16 @@ export function createMissionModule(): KernelModule {
             description:
               "RFC-0913: Skip reconcile-freshness gate. Escape hatch for edge cases — writes bordbuch audit entry.",
           },
+          "skip-behavior-snapshot": {
+            kind: "boolean",
+            description:
+              "RFC-0991: Skip behavior-snapshot-refresh step (auto-generate behavior snapshot during close).",
+          },
         },
         writes: [
           "missions/{mission}/mission.yaml",
           "missions/{mission}/evidence/close-report.json",
+          "missions/{mission}/workpiece/behavior.snapshot.generated.yaml",
           "systems-cache/{system}/system-state.yaml",
           "systems-cache/{system}/bordbuch/events.ndjson",
         ],

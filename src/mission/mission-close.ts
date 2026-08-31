@@ -31,6 +31,7 @@
   <item>RFC-0878: write .closed sentinel file to workpiece as final step before returning.</item>
   <item>RFC-0913: add reconcile-freshness gate — compare workpiece HEAD against workpieceHeadAtReconcile from reconciliation report; fail-closed on missing report; add --skip-reconcile-check escape hatch.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal — each step records to journal.jsonl for crash-safe resume.</item>
+  <item>RFC-0991: add behavior-snapshot-refresh step to buildCloseSteps for auto-generating behavior snapshot during mission close.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -315,6 +316,7 @@ export async function runMissionClose(
       skipReconcileCheck,
       allowNoOp,
       skipContentRegression: flagBoolean(input, "skip-content-regression"),
+      skipBehaviorSnapshot: flagBoolean(input, "skip-behavior-snapshot"),
       context,
       templateSyncResult,
       closeReport: null,
@@ -416,6 +418,7 @@ export interface CloseStepCtx {
   skipReconcileCheck: boolean;
   allowNoOp: boolean;
   skipContentRegression: boolean;
+  skipBehaviorSnapshot: boolean;
   context: KernelRuntimeContext;
   templateSyncResult: CloseReportTemplateSync;
   closeReport: CloseReport | null;
@@ -469,6 +472,30 @@ export async function buildCloseSteps(
           } catch {
             // Non-fatal
           }
+        }
+      },
+    },
+    {
+      name: "behavior-snapshot-refresh",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (cc.skipBehaviorSnapshot) {
+          logger.info("  [behavior-snapshot-refresh] Skipped by --skip-behavior-snapshot");
+          return;
+        }
+        try {
+          const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+          await executeKernelCommand({
+            workspaceRoot: cc.workspaceRoot,
+            commandName: "behavior.snapshot.generate",
+            siteName: cc.manifest.systemId,
+          });
+          commitWorkpieceIfDirty(cc.workpieceDir, cc.missionId, "behavior-snapshot-refresh");
+          logger.info("  [behavior-snapshot-refresh] Snapshot regenerated and committed");
+        } catch (err) {
+          logger.warn(
+            `  [behavior-snapshot-refresh] Non-fatal: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       },
     },
