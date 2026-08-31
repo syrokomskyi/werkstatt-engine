@@ -39,7 +39,6 @@ export default defineKernelConfig({
     compass: async () => (await import("@warpgogol/forge")).forgeCompassModule,
     naming: async () => (await import("@warpgogol/forge")).forgeNamingModule,
     werkstatt: async () => (await import("@warpgogol/forge")).forgeWerkstattModule,
-    lagebild: async () => (await import("@warpgogol/werkstatt-engine/kernel")).lagebildModule,
     "change-impact": async () => (await import("@warpgogol/werkstatt-engine/kernel")).changeImpactModule,
     bordbuch: async () =>
       (await import("@warpgogol/werkstatt-engine/handoff")).createBordbuchModule(),

@@ -139,9 +139,6 @@ export type {
   WorkflowLintResult,
 } from "./workflow/index.ts";
 
-// RFC-0186: Lagebild shared sync worker domain
-export * from "./lagebild/index.ts";
-
 // RFC-0265: commit message hygiene lint
 export { commitMessageModule } from "./commit-message.module.ts";
 export {
