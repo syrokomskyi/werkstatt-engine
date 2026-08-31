@@ -75,6 +75,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `mission.resume` reads the journal, resolves steps via `resolveOperationSteps`, and calls `runOperation` with `resumeOpId` to skip completed steps.
 - Different-kind operation blocking: before calling `runOperation`, each lifecycle command calls `checkDifferentKindOperation` to block if a different-kind operation is incomplete.
 - `mission.preflight` (RFC-0971) runs `ownership.sync.validate` and `generated.stale.validate` against the cache clone before mission open. Read-only per K-0004. Dispatches via `executeRegisteredCommand` with a custom `site.directory` pointing to the cache clone path.
+- RFC-0991: `behavior-snapshot-refresh` step in `mission.close` auto-generates and commits `behavior.snapshot.generated.yaml` during close. Positioned after `auto-commit-workpiece` (step 2), before `zero-commit-guard` (step 3). Non-fatal — logs warning on failure. Skipped via `--skip-behavior-snapshot` flag.
 
 ### Agent Gate (RFC-0286, RFC-0954)
 
