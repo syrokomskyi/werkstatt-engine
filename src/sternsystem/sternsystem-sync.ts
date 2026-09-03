@@ -12,6 +12,7 @@
   <item>RFC-0477: commit and push bordbuch after appending mirror-sync entry.</item>
   <item>RFC-0480: remove pull/both directions — push-only (edits-only-through-missions invariant).</item>
   <item>RFC-0818: reorder external push + bundle creation to after bordbuch commit so bordbuch entry reaches external mirrors.</item>
+  <item>Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -191,13 +192,25 @@ export async function runSternsystemSync(
     if (direction === "push") {
       logger.info(`[sternsystem.sync] pushing ${refSpec} to ${remoteName}…`);
       try {
-        git(bareRepoPath, `push ${remoteName} ${refSpec}${tagSpec}`);
+        // Fetch first to establish lease baseline for --force-with-lease.
+        // Bare repo is the source of truth — external mirrors are backups.
+        // --force-with-lease overwrites diverged external commits safely
+        // (edits-only-through-missions invariant) while protecting against
+        // true concurrent pushes between fetch and push.
+        try {
+          git(bareRepoPath, `fetch ${remoteName}`);
+        } catch {
+          // First push or network issue — no tracking ref, proceed below
+        }
+        try {
+          git(bareRepoPath, `push --force-with-lease ${remoteName} ${refSpec}${tagSpec}`);
+        } catch {
+          // Fallback: plain push (first push, no remote ref to lease against)
+          git(bareRepoPath, `push ${remoteName} ${refSpec}${tagSpec}`);
+        }
       } catch (err) {
         const stderr = (err as Error).message;
-        const msg =
-          stderr.includes("non-fast-forward") || stderr.includes("rejected")
-            ? `git push to ${mirrorUrl} failed (non-fast-forward): ${stderr}. Mirror may have diverged — disaster recovery required.`
-            : `git push to ${mirrorUrl} failed: ${stderr}`;
+        const msg = `git push to ${mirrorUrl} failed: ${stderr}`;
         warnings.push(msg);
         logger.warn(`[sternsystem.sync] ${msg}`);
       }
