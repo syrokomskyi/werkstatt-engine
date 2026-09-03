@@ -12,7 +12,7 @@
   <item>RFC-0477: commit and push bordbuch after appending mirror-sync entry.</item>
   <item>RFC-0480: remove pull/both directions — push-only (edits-only-through-missions invariant).</item>
   <item>RFC-0818: reorder external push + bundle creation to after bordbuch commit so bordbuch entry reaches external mirrors.</item>
-  <item>Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
+  <item>ADR-0073: Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
 </CHANGE_SUMMARY>
 */
 
