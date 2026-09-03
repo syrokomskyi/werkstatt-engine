@@ -349,3 +349,53 @@ test("sync with failing external mirror — refs/mirror tracks bare HEAD despite
   // Known residual: the failed external mirror (nonExistentMirror) has N,
   // but refs/mirror = N+1 — false positive only on push failure, not on every sync.
 });
+
+// ADR-0073: --force-with-lease on external mirror push overwrites diverged mirrors
+test("sync overwrites diverged external mirror via --force-with-lease", async () => {
+  await setupSystemConfig([
+    { path: cacheDir, storageType: "non-bare" },
+    { path: bareDir, storageType: "bare" },
+    { path: externalDir, storageType: "bare" },
+  ]);
+
+  // Initial sync to establish baseline
+  await writeFile(join(cacheDir, "src/content/system.md"), "# Initial\n");
+  git(cacheDir, "add -A");
+  git(cacheDir, 'commit -m "initial-sync"');
+  await runSternsystemSync(
+    makeInput({ id: "test-bundle", direction: "push" }),
+    makeContext(workspaceRoot),
+  );
+
+  // Diverge the external mirror — add a commit directly to it
+  const externalClone = join(testRoot, "external-clone");
+  git(testRoot, `clone "${externalDir}" "${externalClone}"`);
+  git(externalClone, 'config user.email "test@example.com"');
+  git(externalClone, 'config user.name "Test"');
+  await writeFile(join(externalClone, "DIVERGE.md"), "diverged\n");
+  git(externalClone, "add -A");
+  git(externalClone, 'commit -m "diverge-external"');
+  git(externalClone, "push origin main");
+
+  // Now make a new commit in cache and sync — --force-with-lease should overwrite
+  await writeFile(join(cacheDir, "src/content/system.md"), "# After divergence\n");
+  git(cacheDir, "add -A");
+  git(cacheDir, 'commit -m "after-divergence"');
+
+  const result = await runSternsystemSync(
+    makeInput({ id: "test-bundle", direction: "push" }),
+    makeContext(workspaceRoot),
+  );
+
+  // Sync succeeds (no non-fast-forward error)
+  expect(result.exitCode).toBe(0);
+
+  // External mirror HEAD now matches bare repo HEAD (diverged commit overwritten)
+  const bareHead = git(bareDir, "rev-parse main");
+  const externalHead = git(externalDir, "rev-parse main");
+  expect(externalHead).toBe(bareHead);
+
+  // The diverged commit is gone from external mirror
+  const externalLog = git(externalDir, "log --oneline");
+  expect(externalLog).not.toContain("diverge-external");
+});
