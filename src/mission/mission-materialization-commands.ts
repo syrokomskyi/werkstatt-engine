@@ -39,6 +39,7 @@
   <item>RFC-0958: wrap mission.reconcile post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-0958: wrap mission.validate build cycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-0973: --force auto-clears kernel cache DB, pipeline cache hits, journal, and validation report before pipeline execution.</item>
+  <item>RFC-1020: delete stale validation-report.json at the start of runMissionValidate to prevent mission.reconcile from reading a failed report from a previous run.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -687,6 +688,13 @@ export async function runMissionValidate(
   const evidenceDir = path.join(missionDir, "evidence");
   const distributionDir = path.join(missionDir, "distribution");
   await fs.mkdir(evidenceDir, { recursive: true });
+
+  // RFC-1020: Delete stale validation report from any previous run.
+  // This prevents mission.reconcile from reading a failed report after a successful re-validate.
+  // The report is always rewritten by the validate step (success or failure), so deleting it
+  // upfront is safe — a fresh report will be written by the end of this run.
+  const validationReportPath = path.join(evidenceDir, "validation-report.json");
+  await fs.unlink(validationReportPath).catch(() => {});
 
   // RFC-0724: Auto-commit dirty bordbuch files on all paths (not just reuse).
   // This prevents dirty bordbuch projection files from blocking the pipeline.
