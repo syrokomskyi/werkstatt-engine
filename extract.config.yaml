@@ -1,3 +1,4 @@
+forgePlugin: false
 # extract.config.yaml — repo-extract standalone package export for @warpgogol/werkstatt-engine
 # Extracts packages/werkstatt from the werkstatt monorepo into a standalone private repo.
 # RFC-0773: Engine publication pipeline via repo-extract to private npm.
