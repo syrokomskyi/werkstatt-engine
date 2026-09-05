@@ -20,6 +20,7 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>RFC-0870: add pipeline hint to not-registered and no-target-site error messages.</item>
   <item>RFC-0960: inject registry and ownershipMap into KernelRuntimeContext at all 3 construction sites.</item>
   <item>RFC-0960 fo-fix: add console.warn to computeOwnershipMap catch block for agent-facing clarity on import failures.</item>
+  <item>RFC-1026: add module state check before execute (KERNEL-MODULE-02 for non-active modules), trackInFlight with try/finally release, KERNEL-MODULE-01 for disposed commands.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -269,6 +270,40 @@ export async function executeRegisteredCommand(
     );
   }
 
+  // RFC-1026: check module state before execution. Reject commands from
+  // non-active modules with KERNEL-MODULE-02.
+  const moduleName = context.registry.commandModules.get(command.name);
+  if (moduleName) {
+    const moduleState = context.registry.getModuleState(moduleName);
+    if (moduleState && moduleState !== "active") {
+      const summary = `KERNEL-MODULE-02: command '${command.name}' belongs to module '${moduleName}' in state '${moduleState}' — wait for unload to complete or load the module again`;
+      logger.error(summary);
+      const logs = logger.getEvents();
+      return {
+        siteName: context.site?.name,
+        commandName: command.name,
+        data: {
+          command: command.name,
+          status: "fail",
+          diagnostics: [],
+          summary: { error: 1, warning: 0, info: 0 },
+        },
+        exitCode: 1,
+        ok: false,
+        summary,
+        metadata: command,
+        logs,
+        logSummary: summarizeLogs(logs),
+        timing: timing(false),
+        filesModified: [],
+      };
+    }
+  }
+
+  // RFC-1026: track in-flight execution. Release in finally to ensure
+  // the count is decremented even on failure or timeout.
+  const releaseInFlight = context.registry.trackInFlight(command.name);
+
   try {
     const result = await runWithOptionalTimeout();
     const exitCode = result?.exitCode ?? 0;
@@ -355,6 +390,9 @@ export async function executeRegisteredCommand(
     if (pusher) recordCommandTelemetry(pusher, errorReport);
 
     return errorReport;
+  } finally {
+    // RFC-1026: always release the in-flight count, even on failure or timeout.
+    releaseInFlight();
   }
 }
 
@@ -562,6 +600,13 @@ export async function executeKernelCommand(
     }
 
     if (!command) {
+      // RFC-1026: check if the command was previously registered but unloaded.
+      const disposedOrigin = siteRegistry?.disposedCommandOrigins.get(options.commandName);
+      if (disposedOrigin) {
+        throw new Error(
+          `KERNEL-MODULE-01: command \`${options.commandName}\` was registered by module \`${disposedOrigin}\` but the module has been unloaded. Load the module again to use this command.`,
+        );
+      }
       throw new Error(
         `Kernel command \`${options.commandName}\` is not registered for site \`${site.name}\`.${pipelineHint(options.commandName)}`,
       );
