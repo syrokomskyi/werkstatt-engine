@@ -1,8 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-Site workspace resolver: resolves a site id to its runnable workspace across transitional
-apps/<id> directories and materialized mission workpieces missions/<missionId>/workpiece/.
+Site workspace resolver: resolves a site id to its runnable workspace across cache clones
+(../systems-cache/<id>/), materialized mission workpieces missions/<missionId>/workpiece/,
+and transitional apps/<id> directories.
 </purpose>
 <non-goals>
   <item>Do not define mission lifecycle or materialization semantics — that is RFC-0355/RFC-0356.</item>
@@ -12,17 +13,22 @@ apps/<id> directories and materialized mission workpieces missions/<missionId>/w
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0378: initial creation of the site workspace resolver seam.</item>
+  <item>RFC-1025: add cache clone fallback (tryResolveCacheClone) as third resolution path.</item>
 </CHANGE_SUMMARY>
 */
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "@warpgogol/werkstatt-shared/share/fs";
-import { discoverSystems, readSystemState } from "../sternsystem/registry-io.ts";
+import {
+  discoverSystems,
+  readSystemState,
+  resolveCacheClonePath,
+} from "../sternsystem/registry-io.ts";
 import type { DiscoveredSiteWorkspace } from "./types.ts";
 // @ai-invariant: The resolver must refuse dual representation — a site existing as both apps/<id> and a mission workpiece is an error, not a fallback.
 
-export type SiteWorkspaceSource = "apps" | "mission";
+export type SiteWorkspaceSource = "apps" | "mission" | "cache-clone";
 
 export interface SiteWorkspace extends DiscoveredSiteWorkspace {
   source: SiteWorkspaceSource;
@@ -100,6 +106,25 @@ async function tryResolveMissionWorkpiece(
   };
 }
 
+async function tryResolveCacheClone(
+  workspaceRoot: string,
+  siteId: string,
+): Promise<SiteWorkspace | null> {
+  const cacheDir = resolveCacheClonePath(workspaceRoot, siteId);
+  if (!(await fileExists(path.join(cacheDir, "package.json")))) return null;
+  const configPath = await resolveConfigPath(cacheDir);
+  const packageName = await readPackageName(path.join(cacheDir, "package.json"));
+  return {
+    name: siteId,
+    source: "cache-clone",
+    directory: cacheDir,
+    toolsDirectory: path.join(cacheDir, "tools"),
+    missionId: null,
+    configPath: configPath ?? undefined,
+    packageName,
+  };
+}
+
 async function tryResolveAppsDirectory(
   workspaceRoot: string,
   siteId: string,
@@ -126,6 +151,7 @@ export async function resolveSiteWorkspace(
   const infos = await discoverSystemInfos(workspaceRoot);
   const info = infos.find((i) => i.id === siteId);
   const missionWorkspace = info ? await tryResolveMissionWorkpiece(workspaceRoot, info) : null;
+  const cacheCloneWorkspace = await tryResolveCacheClone(workspaceRoot, siteId);
   const appsWorkspace = await tryResolveAppsDirectory(workspaceRoot, siteId);
 
   if (missionWorkspace && appsWorkspace) {
@@ -138,6 +164,7 @@ export async function resolveSiteWorkspace(
   }
 
   if (missionWorkspace) return missionWorkspace;
+  if (cacheCloneWorkspace) return cacheCloneWorkspace;
   if (appsWorkspace) return appsWorkspace;
 
   const resolvable = await discoverSiteWorkspaces(workspaceRoot);
@@ -153,6 +180,16 @@ export async function discoverSiteWorkspaces(workspaceRoot: string): Promise<Sit
   // Mission workpieces from discovered systems
   for (const info of infos) {
     const ws = await tryResolveMissionWorkpiece(workspaceRoot, info);
+    if (ws) {
+      results.push(ws);
+      seen.add(info.id);
+    }
+  }
+
+  // Cache clone discovery (RFC-1025): sites with cache clones but no active mission
+  for (const info of infos) {
+    if (seen.has(info.id)) continue;
+    const ws = await tryResolveCacheClone(workspaceRoot, info.id);
     if (ws) {
       results.push(ws);
       seen.add(info.id);

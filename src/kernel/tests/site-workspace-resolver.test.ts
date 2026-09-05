@@ -31,6 +31,15 @@ async function writeWorkpiece(wsRoot: string, missionId: string, siteId: string)
   );
 }
 
+async function writeCacheClonePackage(wsRoot: string, siteId: string): Promise<void> {
+  const cacheDir = path.join(wsRoot, "..", "systems-cache", siteId);
+  await fs.mkdir(cacheDir, { recursive: true });
+  await fs.writeFile(
+    path.join(cacheDir, "package.json"),
+    JSON.stringify({ name: `@warpgogol/${siteId}` }),
+  );
+}
+
 async function writeSystemFiles(
   wsRoot: string,
   systems: { id: string; currentMission?: string }[],
@@ -96,6 +105,44 @@ describe("resolveSiteWorkspace", () => {
     const ws = await makeWorkspace();
     await writeApp(ws, "demo");
     await expect(resolveSiteWorkspace(ws, "nope")).rejects.toThrow("Unknown site id");
+  });
+});
+
+describe("RFC-1025: cache clone fallback", () => {
+  test("AC-1: resolves cache clone when no mission and no apps/", async () => {
+    const ws = await makeWorkspace();
+    await writeSystemFiles(ws, [{ id: "demo" }]);
+    await writeCacheClonePackage(ws, "demo");
+    const result = await resolveSiteWorkspace(ws, "demo");
+    expect(result.source).toBe("cache-clone");
+    expect(result.name).toBe("demo");
+    expect(result.missionId).toBeNull();
+  });
+
+  test("AC-2: prefers mission workpiece over cache clone", async () => {
+    const ws = await makeWorkspace();
+    await writeSystemFiles(ws, [{ id: "demo", currentMission: "demo-m000001" }]);
+    await writeWorkpiece(ws, "demo-m000001", "demo");
+    await writeCacheClonePackage(ws, "demo");
+    const result = await resolveSiteWorkspace(ws, "demo");
+    expect(result.source).toBe("mission");
+    expect(result.missionId).toBe("demo-m000001");
+  });
+
+  test("AC-3: throws Unknown site id when no cache clone, no mission, no apps/", async () => {
+    const ws = await makeWorkspace();
+    await writeSystemFiles(ws, [{ id: "demo" }]);
+    await expect(resolveSiteWorkspace(ws, "demo")).rejects.toThrow("Unknown site id");
+  });
+
+  test("AC-4: discoverSiteWorkspaces includes cache clone-resolvable sites", async () => {
+    const ws = await makeWorkspace();
+    await writeSystemFiles(ws, [{ id: "alpha" }]);
+    await writeCacheClonePackage(ws, "alpha");
+    const results = await discoverSiteWorkspaces(ws);
+    expect(results.length).toBe(1);
+    expect(results[0]!.source).toBe("cache-clone");
+    expect(results[0]!.name).toBe("alpha");
   });
 });
 
