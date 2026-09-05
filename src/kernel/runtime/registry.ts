@@ -315,9 +315,22 @@ function commandInfo(
     ...(command.gate ? { gate: command.gate } : {}),
     ...(command.validatesOutputs ? { validatesOutputs: command.validatesOutputs } : {}),
     ...(command.generates ? { generates: command.generates } : {}),
+    ...(command.modulePath ? { moduleBasePath: deriveModuleBasePath(command.modulePath) } : {}),
     provider,
     siteName,
   };
+}
+
+/**
+ * RFC-1028: Derive the module's src/ directory from a repo-relative modulePath.
+ * Given "packages/werkstatt-engine/src/kernel/runtime/registry.ts", returns
+ * "packages/werkstatt-engine/src" — everything up to and including the src/ segment.
+ * Returns undefined if no src/ segment is found.
+ */
+function deriveModuleBasePath(modulePath: string): string | undefined {
+  const srcIndex = modulePath.indexOf("/src/");
+  if (srcIndex === -1) return undefined;
+  return modulePath.slice(0, srcIndex + 4); // include "/src"
 }
 
 export async function listRegisteredKernelCommands(

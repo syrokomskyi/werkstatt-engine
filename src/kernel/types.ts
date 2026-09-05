@@ -19,6 +19,7 @@
   <item>RFC-0960 fo-fix: make modulePath optional (modulePath?: string) — forge commands don't declare it; validateRegistration skips undefined modulePath.</item>
   <item>RFC-1026: add ModuleFiberState, KernelModuleHandle, KernelLifecycleRegistry for lifecycle-owned kernel registrations with disposer pattern.</item>
   <item>RFC-1027: add RemediationHint interface and optional remediationHints field to KernelExecutionReport for agent-actionable fix suggestions.</item>
+  <item>RFC-1028: add moduleBasePath to KernelRegisteredCommandInfo, derived from modulePath (RFC-0960) for dynamic moduleSrcDir resolution in the pipeline executor.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -154,6 +155,13 @@ export interface KernelRegisteredCommandInfo extends KernelCommandMetadata {
   validatesOutputs?: string[];
   /** RFC-0960: declared generated artifacts, propagated from KernelCommandDefinition. */
   generates?: GeneratedArtifactSpec[];
+  /**
+   * RFC-1028: repo-relative path to the module's src/ directory (e.g.
+   * "packages/werkstatt-engine/src"). Derived from KernelCommandDefinition.modulePath
+   * (RFC-0960) by taking everything up to and including the src/ segment.
+   * Used by the pipeline executor to resolve moduleSrcDir for computeModuleHash.
+   */
+  moduleBasePath?: string;
 }
 
 export interface KernelNextStep {
