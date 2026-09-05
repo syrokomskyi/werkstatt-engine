@@ -74,6 +74,8 @@ export const bordbuchEntryKindSchema = z.enum([
   "sichtpass",
   // RFC-0968: Sternsystem handover protocol
   "handover",
+  // RFC-1031: Evolution controller candidate lifecycle
+  "candidate",
 ]);
 
 export const bordbuchEntryStatusSchema = z.enum(["done", "failed", "waiting", "escalated"]);

@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { byteHash } from "../fingerprint/primitives.ts";
 import type { Sha256Digest } from "../fingerprint/primitives.ts";
 import { createEvolutionController } from "../evolution/controller.ts";
@@ -29,6 +31,8 @@ import { createShadowExecutor } from "../evolution/shadow-executor.ts";
 import { createCanaryRouter } from "../evolution/canary-router.ts";
 import { createHealthMonitor } from "../evolution/health-monitor.ts";
 import { checkActivatingTransaction, checkActiveHealthMonitoring } from "../evolution/guards.ts";
+import { runCandidateDefine } from "../evolution/evolution-commands.ts";
+import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import type {
   CapabilityCandidateV1,
   EvolutionEvidenceBundleV1,
@@ -1038,5 +1042,47 @@ describe("controller new methods", () => {
       true,
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("bordbuch integration (AC-11)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(process.cwd(), "tmp-evo-bordbuch-"));
+    writeFileSync(join(tmpDir, "package.json"), JSON.stringify({ version: "1.0.0" }) + "\n");
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("records candidate event in bordbuch with candidateId, state, and artifactHash", async () => {
+    const context = {
+      workspaceRoot: tmpDir,
+      site: { name: "test-system" },
+      logger: { warn: () => {}, info: () => {}, success: () => {}, error: () => {} },
+    } as never;
+
+    const input = {
+      argv: [],
+      flags: {
+        "component-id": "comp-001",
+        version: "1.0.0",
+        artifact: "abc123",
+      },
+    } as never;
+
+    await runCandidateDefine(input, context);
+
+    const entries = await readBordbuch(tmpDir, "test-system");
+    const candidateEntries = entries.filter((e) => e.kind === "candidate");
+    expect(candidateEntries.length).toBeGreaterThanOrEqual(1);
+
+    const entry = candidateEntries[0];
+    const metadata = entry.metadata as Record<string, unknown>;
+    expect(metadata.candidateId).toBe("comp-001@1.0.0");
+    expect(metadata.state).toBe("defined");
+    expect(metadata.artifactHash).toMatch(/^sha256:/);
   });
 });

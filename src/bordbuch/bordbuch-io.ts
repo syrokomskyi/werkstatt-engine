@@ -88,6 +88,8 @@ const WRITER_ROLE_KINDS: Record<string, BordbuchEntryKind[]> = {
     "nachweis-timestamped",
     "sichtpass",
   ],
+  // RFC-1031: Evolution controller candidate lifecycle
+  evolution: ["candidate"],
 };
 
 export function validateWriterRole(writerRole: string, kind: BordbuchEntryKind): boolean {
