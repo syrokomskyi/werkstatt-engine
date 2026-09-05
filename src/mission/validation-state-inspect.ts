@@ -26,6 +26,7 @@ import {
   type ValidatorState,
 } from "./validation-state.ts";
 import { createCacheLayer, type CacheEntryInfo } from "../kernel/cache/cache-layer.ts";
+import { COMMAND_RESULT_CACHE_NAMESPACE } from "../kernel/cache/command-result-cache.ts";
 
 export interface ValidationStateInspectData {
   missionId: string;
@@ -52,7 +53,9 @@ export async function runValidationStateInspect(
   const state = await readValidationState(context.workspaceRoot, missionId);
   const cache = await createCacheLayer(context.workspaceRoot);
   try {
-    const cacheEntries = cache.list ? await cache.list({ namespace: "command_results" }) : [];
+    const cacheEntries = cache.list
+      ? await cache.list({ namespace: COMMAND_RESULT_CACHE_NAMESPACE })
+      : [];
     const validatorStates = state?.validatorStates ?? [];
     const data: ValidationStateInspectData = {
       missionId,
