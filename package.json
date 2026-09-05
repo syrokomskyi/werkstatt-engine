@@ -338,6 +338,10 @@
       "types": "./src/component-runtime/reflection.ts",
       "default": "./src/component-runtime/reflection.ts"
     },
+    "./component-runtime-module": {
+      "types": "./src/component-runtime/component-runtime.module.ts",
+      "default": "./src/component-runtime/component-runtime.module.ts"
+    },
     "./component-runtime/conformance": {
       "types": "./src/component-runtime/conformance.ts",
       "default": "./src/component-runtime/conformance.ts"
