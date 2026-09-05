@@ -84,3 +84,7 @@ export {
   readValidationState,
   writeValidationState,
 } from "./validation-state.ts";
+export {
+  runValidationStateInspect,
+  type ValidationStateInspectData,
+} from "./validation-state-inspect.ts";

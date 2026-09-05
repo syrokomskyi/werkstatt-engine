@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Lazy-loading kernel module for RFC-0355/0356/0480 mission lifecycle commands: open, status, close, abort, list, materialize, validate, preview, build, diff, reconcile, git.commit, cleanup, resume, journal.show.</purpose>
+  <purpose>Lazy-loading kernel module for RFC-0355/0356/0480 mission lifecycle commands: open, status, close, abort, list, materialize, validate, preview, build, diff, reconcile, git.commit, cleanup, resume, journal.show, preflight, validation.state.inspect.</purpose>
   <non-goals>
     <item>Do not re-export types or utilities — the barrel mission/index.ts remains the public API surface.</item>
     <item>Do not register sternsystem, bordbuch, or release commands here.</item>
@@ -10,6 +10,7 @@
   <item>Lazy loading refactor: extracted from mission/index.ts to use dynamic imports inside async register().</item>
   <item>RFC-0560: add --actor-from-auth flag to mission.open, mission.close, mission.abort, mission.reconcile; change actor default from 'agent' to 'unknown'.</item>
   <item>ADR-0041: mission.module.ts is the single source of truth for command flag registration. mission/index.ts is now a pure re-export barrel with no command registrations.</item>
+  <item>RFC-1028: add validation.state.inspect command for read-only validation cache state inspection.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -41,6 +42,7 @@ export function createMissionModule(): KernelModule {
       const { runWorkpieceConfigPresenceCheck } =
         await import("./workpiece-config-presence-check.ts");
       const { runMissionPreflight } = await import("./mission-preflight.ts");
+      const { runValidationStateInspect } = await import("./validation-state-inspect.ts");
       registry.registerCommand({
         name: "mission.open",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
@@ -572,6 +574,22 @@ export function createMissionModule(): KernelModule {
         reads: ["systems-cache/{system}/public/**"],
         cacheable: false,
         execute: runMissionPreflight,
+      });
+      registry.registerCommand({
+        name: "validation.state.inspect",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
+        description: "Inspect validation cache state for a mission (RFC-1028). Read-only.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: false,
+        flags: {
+          mission: { kind: "string", required: true, description: "Mission id." },
+          json: { kind: "boolean", description: "Output as JSON." },
+        },
+        reads: ["missions/{mission}/.validation-state.json"],
+        cacheable: false,
+        execute: runValidationStateInspect,
       });
     },
   };
