@@ -29,7 +29,7 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
     requires: [],
     requestedGrants: [],
     effects: [],
-    isolation: { tier: 0, adapterId: null },
+    isolation: { tier: "trusted-in-process", adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: componentId, lifecycle: "process" }],
     ...overrides,
   };

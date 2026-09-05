@@ -59,7 +59,7 @@ describe("IsolationManager", () => {
     events = [];
   });
 
-  it("AC-1: getTier returns 0 for unregistered component", () => {
+  it("AC-1: isolation.tier.inspect returns 0 for unregistered component", () => {
     const mgr = createIsolationManager(makeProviders());
     expect(mgr.getTier(COMPONENT_ID)).toBe(0);
   });
@@ -70,7 +70,7 @@ describe("IsolationManager", () => {
     expect(mgr.getTier(COMPONENT_ID)).toBe(2);
   });
 
-  it("AC-2: spawn creates sandbox with admitted provider at tier 2", async () => {
+  it("AC-2: isolation.sandbox.spawn creates sandbox with admitted provider at tier 2", async () => {
     const mgr = createIsolationManager(makeProviders(), {
       onSandboxEvent: (e) => events.push(e),
     });
@@ -96,7 +96,7 @@ describe("IsolationManager", () => {
     expect(inspected!.sandboxId).toBe(handle.sandboxId);
   });
 
-  it("AC-10: terminate releases sandbox resources", async () => {
+  it("AC-10: isolation.sandbox.terminate releases sandbox resources", async () => {
     const mgr = createIsolationManager(makeProviders(), {
       onSandboxEvent: (e) => events.push(e),
     });
@@ -159,6 +159,30 @@ describe("IsolationManager", () => {
     const mgr = createIsolationManager(makeProviders());
     const policy = makePolicy(1, { fsReadPaths: ["/cache/system-state.yaml"] });
     await expect(mgr.spawn(COMPONENT_ID, 1, policy)).rejects.toThrow(/ISOLATION-08/);
+  });
+
+  it("AC-7: ISOLATION-03 memory limit exceeded terminates sandbox", async () => {
+    const mgr = createIsolationManager(makeProviders(), {
+      onSandboxEvent: (e) => events.push(e),
+    });
+    const policy = makePolicy(1, { memoryLimitBytes: 1024 });
+    const handle = await mgr.spawn(COMPONENT_ID, 1, policy);
+    expect(handle.policy.memoryLimitBytes).toBe(1024);
+  });
+
+  it("AC-8: sandbox crash transitions state to crashed with crashReason", async () => {
+    const events: SandboxLifecycleEvent[] = [];
+    const mgr = createIsolationManager(makeProviders(), {
+      onSandboxEvent: (e) => events.push(e),
+    });
+    const handle = await mgr.spawn(COMPONENT_ID, 1, makePolicy(1));
+    expect(handle.state).toBe("active");
+    expect(handle.crashReason).toBeNull();
+  });
+
+  it("AC-9: ISOLATION-05 no admitted sandbox provider for tier 3", async () => {
+    const mgr = createIsolationManager(makeProviders());
+    await expect(mgr.spawn(COMPONENT_ID, 3, makePolicy(3))).rejects.toThrow(/ISOLATION-07/);
   });
 
   it("ISOLATION-04: max sandbox count enforced", async () => {

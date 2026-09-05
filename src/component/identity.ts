@@ -147,7 +147,7 @@ export function computeEffectPolicyHash(
 }
 
 export function computeIsolationPolicyHash(
-  isolations: Array<{ componentId: string; tier: string | number; adapterId: string | null }>,
+  isolations: Array<{ componentId: string; tier: string; adapterId: string | null }>,
 ): Sha256Digest {
   const sorted = sortByIdentity(isolations, (i) => `${i.componentId}:${i.tier}`);
   const payload = { isolations: sorted };
