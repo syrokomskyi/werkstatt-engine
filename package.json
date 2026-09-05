@@ -346,6 +346,10 @@
       "types": "./src/component-runtime/component-runtime.module.ts",
       "default": "./src/component-runtime/component-runtime.module.ts"
     },
+    "./effects-module": {
+      "types": "./src/component-runtime/effects.module.ts",
+      "default": "./src/component-runtime/effects.module.ts"
+    },
     "./evolution-module": {
       "types": "./src/evolution/evolution.module.ts",
       "default": "./src/evolution/evolution.module.ts"
