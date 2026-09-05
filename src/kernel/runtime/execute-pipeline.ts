@@ -20,6 +20,7 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>ADR-0022: workspace registry now uses process-lifetime cache via getOrBuildWorkspaceRegistry.</item>
   <item>ADR-0023: reuse CacheLayer SQLite connection across pipeline steps; batch telemetry writes to a single append at pipeline completion; close cache after pipeline run.</item>
   <item>RFC-0809: add collect-errors mode — aggregate all independent step failures instead of stopping at first failure. Extract aggregateCollectErrors pure function for testability.</item>
+  <item>RFC-1028: replace hardcoded moduleSrcDir with dynamic per-command resolution from command.modulePath via deriveModuleBasePath. Fixes stale cache keys caused by deleted packages/os/site-kernel-checks path.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,6 +30,7 @@ import os from "node:os";
 import { join, relative, sep } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
+import { deriveModuleBasePath } from "./registry.ts";
 import type { KernelRegistry } from "../registry.ts";
 import {
   batchAppendStepTelemetry,
@@ -683,7 +685,6 @@ async function executePipelineForSite(
   };
 
   const scheduled = buildSchedule(steps);
-  const moduleSrcDir = join(options.workspaceRoot, "packages", "os", "site-kernel-checks", "src");
 
   const stepTimings: Map<number, PipelineStepTiming> = new Map();
 
@@ -699,6 +700,12 @@ async function executePipelineForSite(
             `Kernel pipeline step \`${step.command}\` is not registered for site \`${site.name}\`.`,
           );
         }
+
+        // RFC-1028: resolve moduleSrcDir dynamically from command.modulePath.
+        // Falls back to a constant hash when modulePath is absent (legacy modules).
+        const moduleSrcDir = command.modulePath
+          ? join(options.workspaceRoot, deriveModuleBasePath(command.modulePath) ?? "")
+          : join(options.workspaceRoot, "packages", "werkstatt-site", "src");
 
         const logger = createKernelLogger(options.outputFormat ?? "pretty");
         const { io, intents } = createDefaultIO();
@@ -939,7 +946,6 @@ async function executePipelineForWorkspace(
   };
 
   const scheduled = buildSchedule(steps);
-  const moduleSrcDir = join(options.workspaceRoot, "packages", "os", "site-kernel-checks", "src");
 
   const stepTimings: Map<number, PipelineStepTiming> = new Map();
 
@@ -960,6 +966,12 @@ async function executePipelineForWorkspace(
             `Workspace pipeline \`${options.pipelineName}\` cannot execute app-scoped step \`${step.command}\` without an app target.`,
           );
         }
+
+        // RFC-1028: resolve moduleSrcDir dynamically from command.modulePath.
+        // Falls back to a constant hash when modulePath is absent (legacy modules).
+        const moduleSrcDir = command.modulePath
+          ? join(options.workspaceRoot, deriveModuleBasePath(command.modulePath) ?? "")
+          : join(options.workspaceRoot, "packages", "werkstatt-site", "src");
 
         const logger = createKernelLogger(options.outputFormat ?? "pretty");
         const { io, intents } = createDefaultIO();

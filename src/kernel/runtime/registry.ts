@@ -327,7 +327,7 @@ function commandInfo(
  * "packages/werkstatt-engine/src" — everything up to and including the src/ segment.
  * Returns undefined if no src/ segment is found.
  */
-function deriveModuleBasePath(modulePath: string): string | undefined {
+export function deriveModuleBasePath(modulePath: string): string | undefined {
   const srcIndex = modulePath.indexOf("/src/");
   if (srcIndex === -1) return undefined;
   return modulePath.slice(0, srcIndex + 4); // include "/src"
