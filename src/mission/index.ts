@@ -83,6 +83,7 @@ export {
   resolveValidationStatePath,
   readValidationState,
   writeValidationState,
+  buildValidatorStatesFromSteps,
 } from "./validation-state.ts";
 export {
   runValidationStateInspect,

@@ -40,6 +40,7 @@
   <item>RFC-0958: wrap mission.validate build cycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-0973: --force auto-clears kernel cache DB, pipeline cache hits, journal, and validation report before pipeline execution.</item>
   <item>RFC-1020: delete stale validation-report.json at the start of runMissionValidate to prevent mission.reconcile from reading a failed report from a previous run.</item>
+  <item>RFC-1028: write .validation-state.json after mission.validate completes (pass, fail, and distribution-reuse paths) with per-validator states for inspection.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -90,6 +91,7 @@ import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
+import { writeValidationState, buildValidatorStatesFromSteps } from "./validation-state.ts";
 
 const STERNSYSTEM_DATA_PATHS = [
   "src/content",
@@ -803,6 +805,14 @@ export async function runMissionValidate(
           }
         }
 
+        // RFC-1028: write .validation-state.json
+        await writeValidationState(workspaceRoot, {
+          missionId,
+          lastValidatedAt: now,
+          lastValidationStatus: "pass",
+          validatorStates: [],
+        });
+
         return {
           data: { ...reusedReport, staleEntryWarnings } as unknown as MissionValidateData,
           summary: `[mission.validate] ${missionId} validation passed (distribution reused, build-input-hash matched)`,
@@ -1086,6 +1096,15 @@ export async function runMissionValidate(
     ];
     // RFC-0763: clean bordbuch projections on validation failure path
     await cleanupBordbuchOnFailure(workspaceRoot, manifest.systemId, "validation failure", logger);
+    // RFC-1028: write .validation-state.json
+    await writeValidationState(workspaceRoot, {
+      missionId,
+      lastValidatedAt: validateCtx.now,
+      lastValidationStatus: "fail",
+      validatorStates: validateCtx.pipelineReport
+        ? buildValidatorStatesFromSteps(validateCtx.pipelineReport.steps)
+        : [],
+    });
     return {
       data: report as unknown as MissionValidateData,
       exitCode: 1,
@@ -1140,6 +1159,16 @@ export async function runMissionValidate(
 
   // RFC-0579: populate nextSteps based on workpiece dirty state
   const passNextSteps = buildValidateNextSteps(missionId, dirtyCheck);
+
+  // RFC-1028: write .validation-state.json
+  await writeValidationState(workspaceRoot, {
+    missionId,
+    lastValidatedAt: validateCtx.now,
+    lastValidationStatus: "pass",
+    validatorStates: validateCtx.pipelineReport
+      ? buildValidatorStatesFromSteps(validateCtx.pipelineReport.steps)
+      : [],
+  });
 
   return {
     data: { ...report, staleEntryWarnings } as unknown as MissionValidateData,

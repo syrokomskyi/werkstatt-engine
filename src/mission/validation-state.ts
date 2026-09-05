@@ -18,6 +18,7 @@ validation.state.inspect.
 
 import { join } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import type { KernelExecutionReport } from "../kernel/types.ts";
 
 export interface ValidationState {
   missionId: string;
@@ -64,4 +65,25 @@ export async function writeValidationState(
   const path = resolveValidationStatePath(workspaceRoot, state.missionId);
   await mkdir(join(path, ".."), { recursive: true });
   await writeFile(path, JSON.stringify(state, null, 2) + "\n", "utf-8");
+}
+
+/**
+ * RFC-1028: Build ValidatorState[] from pipeline step reports.
+ * Maps KernelExecutionReport[] to the compact ValidatorState format
+ * for .validation-state.json.
+ */
+export function buildValidatorStatesFromSteps(steps: KernelExecutionReport[]): ValidatorState[] {
+  return steps.map((step) => ({
+    commandName: step.commandName,
+    status: step.ok ? "pass" : "fail",
+    cached: (step.timing as { fromCache?: boolean })?.fromCache ?? false,
+    durationMs: step.timing?.durationMs,
+    diagnosticCounts: step.logSummary
+      ? {
+          error: step.logSummary.error,
+          warning: step.logSummary.warning,
+          info: step.logSummary.notice,
+        }
+      : undefined,
+  }));
 }
