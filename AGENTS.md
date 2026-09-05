@@ -30,6 +30,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/fingerprint` | `./src/fingerprint/index.ts` |
 | `@warpgogol/werkstatt-engine/fingerprint/semantic` | `./src/fingerprint/semantic.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate` | `./src/agent-gate/index.ts` |
+| `@warpgogol/werkstatt-engine/agent-gate/reflect-route` | `./src/agent-gate/reflect-route.ts` |
+| `@warpgogol/werkstatt-engine/component-runtime-module` | `./src/component-runtime/component-runtime.module.ts` |
 | `@warpgogol/werkstatt-engine/changelog` | `./src/changelog/index.ts` |
 | `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` |
 | `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` |
@@ -56,6 +58,18 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `clearModule(cacheKey, moduleName)` in `registry-cache.ts` incrementally invalidates a single module from a cached registry without clearing the entire cache. Removes the cache entry when no active modules remain.
 - `kernel-module.module.ts` registers `kernel.module.inspect`, `kernel.module.unload`, `kernel.module.load` commands for runtime lifecycle management.
 - Tests: `src/kernel/tests/module-lifecycle.test.ts` covers states, unregister, drain, rollback, cache invalidation, trackInFlight.
+
+## Runtime reflection (RFC-1030)
+
+- `component-runtime.module.ts` registers 5 `runtime.reflect.*` commands for live runtime introspection:
+  - `runtime.reflect.graph` — full `RuntimeReflectionV1` (components, dependency edges, law kernel summary)
+  - `runtime.reflect.capabilities` — `CapabilityCatalogV1` (reuses `createCapabilityCatalog` from RFC-1029)
+  - `runtime.reflect.health` — health check results for all components (parallel, 5s per-component, 10s global batch timeout)
+  - `runtime.reflect.fibers` — lightweight `{ componentId, fiberState }[]` view
+  - `runtime.reflect.catalog.generate` — writes `docs/runtime-catalog.generated.yaml` (gitignored)
+- `reflectRuntime()` in `src/component-runtime/reflection.ts` is a pure function: takes `ReflectionInput` + `LawKernelSummary`, returns `RuntimeReflectionV1`. Skips disposed components (increments `skippedDisposed`). No kernel types — callable from any package.
+- `createAgentReflectRoute()` in `src/agent-gate/reflect-route.ts` is an Astro API route factory. Returns `{ GET, OPTIONS }`. GET calls `reflectRuntime()` and returns JSON. Rate limited: 10 req/min per IP via `createFixedWindowLimiter` (in-memory, per-isolate soft limit). ACCESS_PIN middleware respected at the Astro middleware layer.
+- `command.manifest.generate` includes optional `runtimeState` section (reflectedAt, resolvedComponentSetHash, catalogHash) when a live component runtime is available. In build-time context, `runtimeState` is omitted.
 
 ## Scripts
 
