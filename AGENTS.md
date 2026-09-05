@@ -61,6 +61,27 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 
 ## Runtime reflection (RFC-1030)
 
+## Evolution controller (RFC-1031)
+
+- `evolution.module.ts` registers 9 `evolution.candidate.*` commands for agent-driven component candidate lifecycle:
+  - `evolution.candidate.define` — register immutable candidate from content-addressed artifact
+  - `evolution.candidate.shadow` — parallel execution alongside active component with comparison metric
+  - `evolution.candidate.test` — run held-out evaluation scenarios
+  - `evolution.candidate.canary` — route a subset of traffic to candidate (deterministic hash-based)
+  - `evolution.candidate.activate` — atomically replace active component with candidate
+  - `evolution.candidate.promote` — persist activation through mission/release pipeline
+  - `evolution.candidate.rollback` — revert to previous component
+  - `evolution.candidate.quarantine` — deactivate candidate due to health failure
+  - `evolution.candidate.inspect` — return all candidates with lifecycle state
+- Lifecycle stages: `defined → shadowing → testing → canary → activating → active → promoted` with `rolled-back` and `quarantined` as terminal exits.
+- `shadow-executor.ts` runs candidate and active functions in parallel, records `CandidateEvidenceV1` with delta metric.
+- `canary-router.ts` uses deterministic `Sha256Digest` of canonical JSON input for routing decisions.
+- `health-monitor.ts` tracks consecutive failures; quarantine threshold defaults to 3.
+- Agent-written candidates require `--allow-agent-written` flag on `evolution.candidate.define`.
+- Tests: `src/tests/evolution-controller.test.ts` covers contracts, reducer, guards, controller, shadow executor, canary router, health monitor.
+
+## Runtime reflection (RFC-1030)
+
 - `component-runtime.module.ts` registers 5 `runtime.reflect.*` commands for live runtime introspection:
   - `runtime.reflect.graph` — full `RuntimeReflectionV1` (components, dependency edges, law kernel summary)
   - `runtime.reflect.capabilities` — `CapabilityCatalogV1` (reuses `createCapabilityCatalog` from RFC-1029)
