@@ -2,33 +2,59 @@ export type ComponentId = `${string}/${string}`;
 export type CapabilityId = `${string}/${string}`;
 
 export type EffectClass =
-  | "revertible"
-  | "transactional"
-  | "compensatable"
-  | "irreversible-emission";
+  "revertible" | "transactional" | "compensatable" | "irreversible-emission";
 
 export type IsolationTier = "trusted-in-process" | "sandboxed";
 
-export type GrantScope =
-  | "read"
-  | "append"
-  | "deploy"
-  | "certify"
-  | "administer";
+export type GrantScope = "read" | "append" | "deploy" | "certify" | "administer";
 
-export type ResourceKind =
-  | "cpu"
-  | "memory"
-  | "disk"
-  | "network"
-  | "timer"
-  | "subprocess";
+export type ResourceKind = "cpu" | "memory" | "disk" | "network" | "timer" | "subprocess";
 
-export type LifecycleScope =
-  | "process"
-  | "request"
-  | "session"
-  | "scheduled";
+export type LifecycleScope = "process" | "request" | "session" | "scheduled";
+
+export type ComponentScope =
+  "per-command" | "per-mission" | "per-session" | "per-workshop" | "per-fleet";
+
+export interface ScopeContext {
+  readonly scope: ComponentScope;
+  readonly missionId?: string;
+  readonly sessionId?: string;
+  readonly fleetId?: string;
+  readonly invocationId?: string;
+}
+
+export interface ScopedRegistry {
+  readonly context: ScopeContext;
+  register(manifest: ComponentManifestV1): void;
+  resolve(capabilityId: CapabilityId): ComponentManifestV1 | null;
+  dispose(): void;
+  list(): ReadonlyArray<ComponentManifestV1>;
+  getScope(): ComponentScope;
+}
+
+export interface ScopeManager {
+  getRegistry(context: ScopeContext): ScopedRegistry;
+  disposeRegistry(context: ScopeContext): void;
+  resolveAcrossScopes(
+    capabilityId: CapabilityId,
+    context: ScopeContext,
+  ): ComponentManifestV1 | null;
+  inspect(): ReadonlyArray<{
+    context: ScopeContext;
+    componentCount: number;
+    componentIds: ComponentId[];
+  }>;
+  adopt(componentId: ComponentId, targetContext: ScopeContext): void;
+  getScope(componentId: ComponentId): ComponentScope | null;
+}
+
+export const SCOPE_ERROR_CODES = {
+  SCOPE_01: "SCOPE-01",
+  SCOPE_02: "SCOPE-02",
+  SCOPE_03: "SCOPE-03",
+  SCOPE_04: "SCOPE-04",
+  SCOPE_05: "SCOPE-05",
+} as const;
 
 export interface CapabilityProvideV1 {
   capability: CapabilityId;
@@ -73,6 +99,7 @@ export interface ComponentManifestV1 {
   componentId: ComponentId;
   version: string;
   artifactHash: string;
+  scope: ComponentScope;
   provides: CapabilityProvideV1[];
   requires: CapabilityRequireV1[];
   requestedGrants: GrantRequestV1[];

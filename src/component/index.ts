@@ -6,6 +6,10 @@ export type {
   GrantScope,
   ResourceKind,
   LifecycleScope,
+  ComponentScope,
+  ScopeContext,
+  ScopedRegistry,
+  ScopeManager,
   CapabilityProvideV1,
   CapabilityRequireV1,
   GrantRequestV1,
@@ -18,6 +22,8 @@ export type {
   ComponentContractViolation,
   ComponentContractResult,
 } from "./contracts.ts";
+
+export { SCOPE_ERROR_CODES } from "./contracts.ts";
 
 export {
   parseComponentManifestV1,

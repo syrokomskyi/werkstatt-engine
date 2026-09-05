@@ -33,6 +33,7 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
     componentId,
     version: "1.0.0",
     artifactHash: VALID_SHA as string,
+    scope: "per-workshop",
     provides: [
       { capability: cap("werkstatt/kernel"), version: "1.0.0", schemaHash: VALID_SHA as string },
     ],

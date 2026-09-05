@@ -25,6 +25,7 @@ function makeValidManifest(overrides: Partial<ComponentManifestV1> = {}): Compon
     componentId: "werkstatt/engine",
     version: "1.0.0",
     artifactHash: VALID_SHA,
+    scope: "per-workshop",
     provides: [{ capability: "werkstatt/kernel", version: "1.0.0", schemaHash: VALID_SHA }],
     requires: [
       {

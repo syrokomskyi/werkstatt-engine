@@ -8,9 +8,11 @@ import type {
 
 const COMPONENT_ID_RE = /^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
 const CAPABILITY_ID_RE = /^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
-const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+const SEMVER_RE =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 const SHA256_RE = /^sha256:[0-9a-f]{64}$/;
-const COMPAT_RE = /^(?:\^|~|>=?|<=?|=)?\s*(?:0|[1-9]\d*)\.(?:0|[1-9]\d*|x)\.(?:0|[1-9]\d*|x)(?:\.\d+)?$/;
+const COMPAT_RE =
+  /^(?:\^|~|>=?|<=?|=)?\s*(?:0|[1-9]\d*)\.(?:0|[1-9]\d*|x)\.(?:0|[1-9]\d*|x)(?:\.\d+)?$/;
 
 const MAX_PROVIDES = 64;
 const MAX_REQUIRES = 128;
@@ -26,34 +28,27 @@ const componentIdSchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(COMPONENT_ID_RE, "invalid componentId: must be namespace/name, lowercase alphanumeric and hyphens");
+  .regex(
+    COMPONENT_ID_RE,
+    "invalid componentId: must be namespace/name, lowercase alphanumeric and hyphens",
+  );
 
 const capabilityIdSchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(CAPABILITY_ID_RE, "invalid capability: must be namespace/name, lowercase alphanumeric and hyphens");
+  .regex(
+    CAPABILITY_ID_RE,
+    "invalid capability: must be namespace/name, lowercase alphanumeric and hyphens",
+  );
 
-const semverSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(SEMVER_RE, "invalid semver version");
+const semverSchema = z.string().min(1).max(64).regex(SEMVER_RE, "invalid semver version");
 
-const sha256Schema = z
-  .string()
-  .min(1)
-  .max(80)
-  .regex(SHA256_RE, "invalid sha256 digest");
+const sha256Schema = z.string().min(1).max(80).regex(SHA256_RE, "invalid sha256 digest");
 
-const compatSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(COMPAT_RE, "invalid compatibility range");
+const compatSchema = z.string().min(1).max(64).regex(COMPAT_RE, "invalid compatibility range");
 
-const boundedString = (max: number) =>
-  z.string().min(1).max(max);
+const boundedString = (max: number) => z.string().min(1).max(max);
 
 const effectClassSchema = z.enum([
   "revertible",
@@ -62,102 +57,108 @@ const effectClassSchema = z.enum([
   "irreversible-emission",
 ]);
 
-const isolationTierSchema = z.enum([
-  "trusted-in-process",
-  "sandboxed",
+const isolationTierSchema = z.enum(["trusted-in-process", "sandboxed"]);
+
+const grantScopeSchema = z.enum(["read", "append", "deploy", "certify", "administer"]);
+
+const resourceKindSchema = z.enum(["cpu", "memory", "disk", "network", "timer", "subprocess"]);
+
+const lifecycleScopeSchema = z.enum(["process", "request", "session", "scheduled"]);
+
+const componentScopeSchema = z.enum([
+  "per-command",
+  "per-mission",
+  "per-session",
+  "per-workshop",
+  "per-fleet",
 ]);
 
-const grantScopeSchema = z.enum([
-  "read",
-  "append",
-  "deploy",
-  "certify",
-  "administer",
-]);
+const capabilityProvideSchema = z
+  .object({
+    capability: capabilityIdSchema,
+    version: semverSchema,
+    schemaHash: sha256Schema,
+  })
+  .strict();
 
-const resourceKindSchema = z.enum([
-  "cpu",
-  "memory",
-  "disk",
-  "network",
-  "timer",
-  "subprocess",
-]);
+const capabilityRequireSchema = z
+  .object({
+    capability: capabilityIdSchema,
+    compatibility: compatSchema,
+    schemaHash: sha256Schema.nullable(),
+    optional: z.boolean(),
+  })
+  .strict();
 
-const lifecycleScopeSchema = z.enum([
-  "process",
-  "request",
-  "session",
-  "scheduled",
-]);
+const grantRequestSchema = z
+  .object({
+    scope: grantScopeSchema,
+    resource: boundedString(MAX_STRING_BYTES),
+    attenuated: z.boolean(),
+  })
+  .strict();
 
-const capabilityProvideSchema = z.object({
-  capability: capabilityIdSchema,
-  version: semverSchema,
-  schemaHash: sha256Schema,
-}).strict();
+const effectDeclarationSchema = z
+  .object({
+    effectClass: effectClassSchema,
+    description: boundedString(MAX_DESC_BYTES),
+    recoveryCommand: z.string().max(MAX_STRING_BYTES).nullable(),
+    commitMetadata: z.string().max(MAX_STRING_BYTES).nullable(),
+  })
+  .strict();
 
-const capabilityRequireSchema = z.object({
-  capability: capabilityIdSchema,
-  compatibility: compatSchema,
-  schemaHash: sha256Schema.nullable(),
-  optional: z.boolean(),
-}).strict();
+const isolationRequirementSchema = z
+  .object({
+    tier: isolationTierSchema,
+    adapterId: z.string().max(128).nullable(),
+  })
+  .strict();
 
-const grantRequestSchema = z.object({
-  scope: grantScopeSchema,
-  resource: boundedString(MAX_STRING_BYTES),
-  attenuated: z.boolean(),
-}).strict();
+const resourceBoundSchema = z
+  .object({
+    kind: resourceKindSchema,
+    limit: boundedString(MAX_STRING_BYTES),
+    owner: componentIdSchema,
+    lifecycle: lifecycleScopeSchema,
+  })
+  .strict();
 
-const effectDeclarationSchema = z.object({
-  effectClass: effectClassSchema,
-  description: boundedString(MAX_DESC_BYTES),
-  recoveryCommand: z.string().max(MAX_STRING_BYTES).nullable(),
-  commitMetadata: z.string().max(MAX_STRING_BYTES).nullable(),
-}).strict();
+export const componentManifestV1Schema = z
+  .object({
+    schema: z.literal("werkstatt/component-manifest@1"),
+    componentId: componentIdSchema,
+    version: semverSchema,
+    artifactHash: sha256Schema,
+    scope: componentScopeSchema,
+    provides: z.array(capabilityProvideSchema).min(1).max(MAX_PROVIDES),
+    requires: z.array(capabilityRequireSchema).max(MAX_REQUIRES),
+    requestedGrants: z.array(grantRequestSchema).max(MAX_GRANTS),
+    effects: z.array(effectDeclarationSchema).max(MAX_EFFECTS),
+    isolation: isolationRequirementSchema,
+    resources: z.array(resourceBoundSchema).max(MAX_RESOURCES),
+  })
+  .strict();
 
-const isolationRequirementSchema = z.object({
-  tier: isolationTierSchema,
-  adapterId: z.string().max(128).nullable(),
-}).strict();
+const resolvedComponentIdentitySchema = z
+  .object({
+    componentId: componentIdSchema,
+    version: semverSchema,
+    artifactHash: sha256Schema,
+  })
+  .strict();
 
-const resourceBoundSchema = z.object({
-  kind: resourceKindSchema,
-  limit: boundedString(MAX_STRING_BYTES),
-  owner: componentIdSchema,
-  lifecycle: lifecycleScopeSchema,
-}).strict();
-
-export const componentManifestV1Schema = z.object({
-  schema: z.literal("werkstatt/component-manifest@1"),
-  componentId: componentIdSchema,
-  version: semverSchema,
-  artifactHash: sha256Schema,
-  provides: z.array(capabilityProvideSchema).min(1).max(MAX_PROVIDES),
-  requires: z.array(capabilityRequireSchema).max(MAX_REQUIRES),
-  requestedGrants: z.array(grantRequestSchema).max(MAX_GRANTS),
-  effects: z.array(effectDeclarationSchema).max(MAX_EFFECTS),
-  isolation: isolationRequirementSchema,
-  resources: z.array(resourceBoundSchema).max(MAX_RESOURCES),
-}).strict();
-
-const resolvedComponentIdentitySchema = z.object({
-  componentId: componentIdSchema,
-  version: semverSchema,
-  artifactHash: sha256Schema,
-}).strict();
-
-export const resolvedComponentSetV1Schema = z.object({
-  schema: z.literal("werkstatt/resolved-component-set@1"),
-  profileId: boundedString(MAX_PROFILE_ID_LEN),
-  components: z.array(resolvedComponentIdentitySchema).min(1).max(MAX_COMPONENTS),
-  dependencyGraphHash: sha256Schema,
-  grantSetHash: sha256Schema,
-  effectPolicyHash: sha256Schema,
-  isolationPolicyHash: sha256Schema,
-  setHash: sha256Schema,
-}).strict();
+export const resolvedComponentSetV1Schema = z
+  .object({
+    schema: z.literal("werkstatt/resolved-component-set@1"),
+    profileId: boundedString(MAX_PROFILE_ID_LEN),
+    components: z.array(resolvedComponentIdentitySchema).min(1).max(MAX_COMPONENTS),
+    dependencyGraphHash: sha256Schema,
+    grantSetHash: sha256Schema,
+    effectPolicyHash: sha256Schema,
+    isolationPolicyHash: sha256Schema,
+    setHash: sha256Schema,
+  })
+  .strict();
 
 const LAW_KERNEL_GRANT_SCOPES = new Set(["certify", "administer"]);
 
