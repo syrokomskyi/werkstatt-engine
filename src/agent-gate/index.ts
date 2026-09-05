@@ -189,3 +189,6 @@ export function createAgentGate(
     },
   };
 }
+
+export { createAgentReflectRoute } from "./reflect-route.ts";
+export type { CreateAgentReflectRouteOptions } from "./reflect-route.ts";

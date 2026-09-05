@@ -306,6 +306,10 @@
       "types": "./src/agent-gate/astro.ts",
       "default": "./src/agent-gate/astro.ts"
     },
+    "./agent-gate/reflect-route": {
+      "types": "./src/agent-gate/reflect-route.ts",
+      "default": "./src/agent-gate/reflect-route.ts"
+    },
     "./changelog": {
       "types": "./src/changelog/index.ts",
       "default": "./src/changelog/index.ts"
