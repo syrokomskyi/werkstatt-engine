@@ -151,9 +151,7 @@ export interface ScopeManagerOptions {
   readonly registryLimit?: number;
 }
 
-export function createScopeManager(
-  options: ScopeManagerOptions = {},
-): ScopeManager {
+export function createScopeManager(options: ScopeManagerOptions = {}): ScopeManager {
   const limit = options.registryLimit ?? DEFAULT_REGISTRY_LIMIT;
   const registries = new Map<string, ScopedRegistryImpl>();
 
@@ -191,7 +189,9 @@ export function createScopeManager(
 
   function buildResolutionContexts(ctx: ScopeContext): ScopeContext[] {
     const contexts: ScopeContext[] = [];
-    for (const scope of SCOPE_RESOLUTION_ORDER) {
+    const startIdx = SCOPE_RESOLUTION_ORDER.indexOf(ctx.scope);
+    for (let i = startIdx; i < SCOPE_RESOLUTION_ORDER.length; i++) {
+      const scope = SCOPE_RESOLUTION_ORDER[i]!;
       if (scope === "per-command" && ctx.invocationId) {
         contexts.push({ scope, invocationId: ctx.invocationId });
       } else if (scope === "per-mission" && ctx.missionId) {
@@ -220,10 +220,7 @@ export function createScopeManager(
       }
     },
 
-    resolveAcrossScopes(
-      capabilityId: CapabilityId,
-      ctx: ScopeContext,
-    ): ComponentManifestV1 | null {
+    resolveAcrossScopes(capabilityId: CapabilityId, ctx: ScopeContext): ComponentManifestV1 | null {
       const contexts = buildResolutionContexts(ctx);
       for (const c of contexts) {
         const result = resolveInScope(capabilityId, c);

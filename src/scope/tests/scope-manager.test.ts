@@ -145,6 +145,21 @@ describe("ScopeManager", () => {
         ScopeError,
       );
     });
+
+    it("AC-2: register throws SCOPE-03 when manifest is missing scope field", () => {
+      const mgr = createScopeManager();
+      const r = mgr.getRegistry({ scope: "per-workshop" });
+      const manifest: Record<string, unknown> = {
+        ...makeManifest("comp/a", "per-workshop", "cap/test"),
+      };
+      delete manifest.scope;
+      expect(() => r.register(manifest as unknown as ComponentManifestV1)).toThrow(ScopeError);
+      try {
+        r.register(manifest as unknown as ComponentManifestV1);
+      } catch (e) {
+        expect((e as ScopeError).code).toBe(SCOPE_ERROR_CODES.SCOPE_03);
+      }
+    });
   });
 
   describe("resolveAcrossScopes", () => {
@@ -230,6 +245,79 @@ describe("ScopeManager", () => {
       const result = mgr.resolveAcrossScopes("cap/test" as `${string}/${string}`, ctx);
       expect(result).not.toBeNull();
       expect(result!.componentId).toBe("comp/fleet");
+    });
+
+    it("AC-6: per-workshop scope cannot see per-command or per-mission providers", () => {
+      const mgr = createScopeManager();
+      const cmdRegistry = mgr.getRegistry({
+        scope: "per-command",
+        invocationId: "cmd-001",
+      });
+      cmdRegistry.register(makeManifest("comp/cmd", "per-command", "cap/test"));
+
+      const missionRegistry = mgr.getRegistry({
+        scope: "per-mission",
+        missionId: "m001",
+      });
+      missionRegistry.register(makeManifest("comp/mission", "per-mission", "cap/test"));
+
+      // Caller in per-workshop scope should NOT find per-command or per-mission providers
+      const ctx: ScopeContext = { scope: "per-workshop" };
+      const result = mgr.resolveAcrossScopes("cap/test" as `${string}/${string}`, ctx);
+      expect(result).toBeNull();
+    });
+
+    it("AC-6: per-mission scope can see per-mission and outer but not per-command", () => {
+      const mgr = createScopeManager();
+      const cmdRegistry = mgr.getRegistry({
+        scope: "per-command",
+        invocationId: "cmd-001",
+      });
+      cmdRegistry.register(makeManifest("comp/cmd", "per-command", "cap/test"));
+
+      const missionRegistry = mgr.getRegistry({
+        scope: "per-mission",
+        missionId: "m001",
+      });
+      missionRegistry.register(makeManifest("comp/mission", "per-mission", "cap/test"));
+
+      // Caller in per-mission scope should find per-mission, not per-command
+      const ctx: ScopeContext = { scope: "per-mission", missionId: "m001" };
+      const result = mgr.resolveAcrossScopes("cap/test" as `${string}/${string}`, ctx);
+      expect(result).not.toBeNull();
+      expect(result!.componentId).toBe("comp/mission");
+    });
+
+    it("AC-5: concurrent missions with same component ID are isolated", () => {
+      const mgr = createScopeManager();
+      const r1 = mgr.getRegistry({ scope: "per-mission", missionId: "m001" });
+      const r2 = mgr.getRegistry({ scope: "per-mission", missionId: "m002" });
+      r1.register(makeManifest("comp/a", "per-mission", "cap/test"));
+      r2.register(makeManifest("comp/a", "per-mission", "cap/test"));
+
+      // Each mission resolves its own component
+      const result1 = mgr.resolveAcrossScopes("cap/test" as `${string}/${string}`, {
+        scope: "per-mission",
+        missionId: "m001",
+      });
+      const result2 = mgr.resolveAcrossScopes("cap/test" as `${string}/${string}`, {
+        scope: "per-mission",
+        missionId: "m002",
+      });
+      expect(result1).not.toBeNull();
+      expect(result2).not.toBeNull();
+      // Both have same component ID but in separate registries
+      expect(result1!.componentId).toBe("comp/a");
+      expect(result2!.componentId).toBe("comp/a");
+
+      // Disposing one does not affect the other
+      mgr.disposeRegistry({ scope: "per-mission", missionId: "m001" });
+      const result2After = mgr.resolveAcrossScopes("cap/test" as `${string}/${string}`, {
+        scope: "per-mission",
+        missionId: "m002",
+      });
+      expect(result2After).not.toBeNull();
+      expect(result2After!.componentId).toBe("comp/a");
     });
   });
 
