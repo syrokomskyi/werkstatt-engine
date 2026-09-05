@@ -90,6 +90,8 @@ const WRITER_ROLE_KINDS: Record<string, BordbuchEntryKind[]> = {
   ],
   // RFC-1031: Evolution controller candidate lifecycle
   evolution: ["candidate"],
+  // RFC-1037: External-effect compensation verification
+  effect: ["effect"],
 };
 
 export function validateWriterRole(writerRole: string, kind: BordbuchEntryKind): boolean {

@@ -76,6 +76,8 @@ export const bordbuchEntryKindSchema = z.enum([
   "handover",
   // RFC-1031: Evolution controller candidate lifecycle
   "candidate",
+  // RFC-1037: External-effect compensation verification
+  "effect",
 ]);
 
 export const bordbuchEntryStatusSchema = z.enum(["done", "failed", "waiting", "escalated"]);
