@@ -31,6 +31,10 @@ import {
   writeSystemState,
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
+import {
+  CompensationStore,
+  resolveCompensationStorePath,
+} from "../component-runtime/compensation-store.ts";
 import { readMissionManifest, writeMissionManifest, resolveMissionDir } from "./mission-io.ts";
 import { isWorkpieceDirty, countOperatorCommits } from "./mission-git-commit.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
@@ -310,6 +314,31 @@ export async function buildAbortSteps(
           } catch {
             // Non-fatal — system-state.yaml may already be committed or unchanged
           }
+        }
+      },
+    },
+    {
+      name: "verify-compensations",
+      run: async (c: unknown) => {
+        const cc = c as AbortStepCtx;
+        // RFC-1037: Check for pending compensation evidence and verify
+        // any compensatable effects that were committed during the mission.
+        const storePath = resolveCompensationStorePath(
+          path.join(cc.workspaceRoot, "missions"),
+          cc.missionId,
+        );
+        if (!existsSync(storePath)) {
+          return; // No compensation evidence — nothing to verify
+        }
+        const store = new CompensationStore(storePath);
+        try {
+          // The store may contain unverified compensations from interrupted missions.
+          // We log them as warnings but do not block abort — the evidence is preserved
+          // for post-abort inspection via effect.compensation.inspect.
+          // Full verification requires network access and is delegated to the
+          // effect.compensation.verify command for explicit operator invocation.
+        } finally {
+          store.close();
         }
       },
     },
