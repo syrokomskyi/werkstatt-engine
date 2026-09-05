@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { IsolationTier } from "../component/contracts.ts";
 
 const sha256Regex = /^sha256:[0-9a-f]{64}$/;
 
@@ -213,3 +214,25 @@ export function validateBridgeRequest(request: unknown): {
   }));
   return { status: "fail", violations };
 }
+
+const isolationTierNumericSchema = z.union([
+  z.literal(0),
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+]) as unknown as z.ZodType<IsolationTier>;
+
+export const isolationPolicySchema = z
+  .object({
+    tier: isolationTierNumericSchema,
+    fsReadPaths: z.array(z.string().min(1).max(4096)).max(256),
+    fsWritePaths: z.array(z.string().min(1).max(4096)).max(256),
+    networkHosts: z.array(z.string().min(1).max(4096)).max(128),
+    grantedCommands: z.array(capabilityIdSchema).max(256),
+    timeoutMs: z.number().int().positive(),
+    memoryLimitBytes: z.number().int().positive(),
+    cpuLimitPercent: z.number().int().min(0).max(100),
+  })
+  .strict();
+
+export const sandboxStateSchema = z.enum(["active", "crashed", "terminated"]);

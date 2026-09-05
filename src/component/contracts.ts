@@ -2,33 +2,15 @@ export type ComponentId = `${string}/${string}`;
 export type CapabilityId = `${string}/${string}`;
 
 export type EffectClass =
-  | "revertible"
-  | "transactional"
-  | "compensatable"
-  | "irreversible-emission";
+  "revertible" | "transactional" | "compensatable" | "irreversible-emission";
 
-export type IsolationTier = "trusted-in-process" | "sandboxed";
+export type IsolationTier = 0 | 1 | 2 | 3;
 
-export type GrantScope =
-  | "read"
-  | "append"
-  | "deploy"
-  | "certify"
-  | "administer";
+export type GrantScope = "read" | "append" | "deploy" | "certify" | "administer";
 
-export type ResourceKind =
-  | "cpu"
-  | "memory"
-  | "disk"
-  | "network"
-  | "timer"
-  | "subprocess";
+export type ResourceKind = "cpu" | "memory" | "disk" | "network" | "timer" | "subprocess";
 
-export type LifecycleScope =
-  | "process"
-  | "request"
-  | "session"
-  | "scheduled";
+export type LifecycleScope = "process" | "request" | "session" | "scheduled";
 
 export interface CapabilityProvideV1 {
   capability: CapabilityId;

@@ -37,7 +37,7 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
         commitMetadata: null,
       },
     ],
-    isolation: { tier: "trusted-in-process", adapterId: null },
+    isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: componentId, lifecycle: "process" }],
     ...overrides,
   };

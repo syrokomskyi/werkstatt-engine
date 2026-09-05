@@ -43,7 +43,7 @@ function makeValidManifest(overrides: Partial<ComponentManifestV1> = {}): Compon
         commitMetadata: null,
       },
     ],
-    isolation: { tier: "trusted-in-process", adapterId: null },
+    isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: "werkstatt/engine", lifecycle: "process" }],
     ...overrides,
   };
@@ -401,8 +401,8 @@ describe("sub-hash functions", () => {
   });
 
   it("computeIsolationPolicyHash is order-invariant", () => {
-    const i1 = { componentId: "a/b", tier: "sandboxed", adapterId: "wasm" };
-    const i2 = { componentId: "c/d", tier: "trusted-in-process", adapterId: null };
+    const i1 = { componentId: "a/b", tier: 2, adapterId: "wasm" };
+    const i2 = { componentId: "c/d", tier: 0, adapterId: null };
     expect(computeIsolationPolicyHash([i1, i2])).toBe(computeIsolationPolicyHash([i2, i1]));
   });
 });
