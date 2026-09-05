@@ -33,6 +33,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/agent-gate/reflect-route` | `./src/agent-gate/reflect-route.ts` |
 | `@warpgogol/werkstatt-engine/component-runtime-module` | `./src/component-runtime/component-runtime.module.ts` |
 | `@warpgogol/werkstatt-engine/isolation-module` | `./src/isolation/isolation.module.ts` |
+| `@warpgogol/werkstatt-engine/scope-module` | `./src/scope/scope.module.ts` |
+| `@warpgogol/werkstatt-engine/scope` | `./src/scope/scope.ts` |
 | `@warpgogol/werkstatt-engine/changelog` | `./src/changelog/index.ts` |
 | `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` |
 | `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` |
@@ -93,6 +95,22 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `CapabilityBridge` (`capability-bridge.ts`): client-side proxy extending `CapabilityBrokerV1` with policy enforcement. Tracks violations (3 within 60s triggers auto-terminate). Enforces ISOLATION-01 (command not granted) and ISOLATION-02 (timeout).
 - Bordbuch entry kind `"isolation"` records sandbox lifecycle events (spawn, terminate, crash) with sandboxId, tier, componentId, action metadata.
 - Tests: `src/isolation/tests/isolation-manager.test.ts` covers AC-1 through AC-11 plus edge cases (24 tests).
+
+## Scope controller (RFC-1036)
+
+- `scope.module.ts` registers 3 `scope.*` commands for component scope lifecycle management:
+  - `scope.inspect` — inspect all active scopes with component counts and IDs
+  - `scope.resolve` — resolve the active component for a capability in a given scope context (innermost-first)
+  - `scope.lifecycle.adopt` — adopt a component into a manual scope (per-fleet or per-session only)
+- `ComponentScope` union: `per-command`, `per-mission`, `per-session`, `per-workshop`, `per-fleet`.
+- `ScopeManager` (`scope.ts`): manages scoped component registries with lifecycle-owned creation and disposal. Five scopes with innermost-first resolution order: per-command → per-mission → per-session → per-workshop → per-fleet.
+- Automatic scopes (`per-command`, `per-mission`) are created/disposed automatically by the kernel and mission lifecycle. Manual scopes (`per-session`, `per-fleet`) require explicit adoption via `scope.lifecycle.adopt`.
+- `ScopeError` with codes SCOPE-01 (registry disposed / scope mismatch / duplicate), SCOPE-02 (adopt into non-manual scope / manifest-target mismatch), SCOPE-03 (missing scope field), SCOPE-04 (registry limit reached), SCOPE-05 (reserved).
+- Registry limit default: 64 active registries (configurable via `WERKSTATT_SCOPE_REGISTRY_LIMIT` env var).
+- `getDefaultScopeManager()` returns a per-workshop singleton. `resetDefaultScopeManager()` resets it (for tests).
+- Mission lifecycle integration: `mission.open` creates a `per-mission` registry, `mission.close` disposes it.
+- Command execution integration: `executeRegisteredCommand` creates a `per-command` registry before execution and disposes it in the `finally` block.
+- Tests: `src/scope/tests/scope-manager.test.ts` covers registry lifecycle, resolution order, adopt, error codes, registry limit, default manager (30 tests).
 
 ## Runtime reflection (RFC-1030)
 
