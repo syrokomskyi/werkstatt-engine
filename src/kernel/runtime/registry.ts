@@ -219,14 +219,20 @@ export async function listRegisteredKernelCommands(
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
   for (const site of sites.filter((candidate) => candidate.configPath)) {
-    const { registry } = await loadAppRuntime(workspaceRoot, site);
-    for (const commandName of registry.listCommandNames()) {
-      const command = registry.getCommand(commandName);
-      if (command)
-        byKey.set(
-          `site:${site.name}:${commandName}`,
-          commandInfo(command, "site", site.name, registry.commandModules.get(commandName)),
-        );
+    try {
+      const { registry } = await loadAppRuntime(workspaceRoot, site);
+      for (const commandName of registry.listCommandNames()) {
+        const command = registry.getCommand(commandName);
+        if (command)
+          byKey.set(
+            `site:${site.name}:${commandName}`,
+            commandInfo(command, "site", site.name, registry.commandModules.get(commandName)),
+          );
+      }
+    } catch (err) {
+      process.stderr.write(
+        `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
     }
   }
 
@@ -258,9 +264,15 @@ export async function listRegisteredKernelPipelines(
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
   for (const site of sites.filter((candidate) => candidate.configPath)) {
-    const { registry } = await loadAppRuntime(workspaceRoot, site);
-    for (const [name, steps] of registry.pipelines) {
-      if (!(name in pipelines)) pipelines[name] = steps.map((step) => step.command);
+    try {
+      const { registry } = await loadAppRuntime(workspaceRoot, site);
+      for (const [name, steps] of registry.pipelines) {
+        if (!(name in pipelines)) pipelines[name] = steps.map((step) => step.command);
+      }
+    } catch (err) {
+      process.stderr.write(
+        `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
     }
   }
 
