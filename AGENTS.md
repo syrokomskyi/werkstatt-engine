@@ -32,6 +32,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/agent-gate` | `./src/agent-gate/index.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate/reflect-route` | `./src/agent-gate/reflect-route.ts` |
 | `@warpgogol/werkstatt-engine/component-runtime-module` | `./src/component-runtime/component-runtime.module.ts` |
+| `@warpgogol/werkstatt-engine/effects-module` | `./src/component-runtime/effects.module.ts` |
 | `@warpgogol/werkstatt-engine/isolation-module` | `./src/isolation/isolation.module.ts` |
 | `@warpgogol/werkstatt-engine/scope-module` | `./src/scope/scope.module.ts` |
 | `@warpgogol/werkstatt-engine/scope` | `./src/scope/scope.ts` |
@@ -112,6 +113,20 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - Command execution integration: `executeRegisteredCommand` creates a `per-command` registry before execution and disposes it in the `finally` block.
 - Tests: `src/scope/tests/scope-manager.test.ts` covers registry lifecycle, resolution order, adopt, error codes, registry limit, default manager, scope boundary enforcement (34 tests).
 - **Acceptance probe paths MUST point to files where string literals are defined, not where constants are referenced.** SCOPE error codes (SCOPE-01, SCOPE-02, SCOPE-03) are defined as string literals in `src/component/contracts.ts` (`SCOPE_ERROR_CODES` object), not in `src/scope/scope.ts` which references them via the constant. `file-contains` probes search for literal strings, not resolved constant values. Discovered during RFC-1036: probes for "SCOPE-01" in `scope.ts` failed because the file uses `SCOPE_ERROR_CODES.SCOPE_01`, not the literal string.
+
+## Effects controller (RFC-1037)
+
+- `effects.module.ts` registers 3 `effect.*` commands for external-effect compensation verification:
+  - `effect.classify` — classify an operation into one of four effect classes (revertible, transactional, compensatable, irreversible-emission) before execution
+  - `effect.compensation.verify` — verify that a compensating action restored the system to an equivalent state by running verification probes in parallel, storing the result in the compensation evidence store (SQLite)
+  - `effect.compensation.inspect` — inspect stored compensation evidence for a given operation hash
+- `EffectClassifier` (`effect-classifier.ts`): O(1) Map lookup from operation name to `EffectDeclarationExt`. Default registry includes known operations (leitstand.propagate, mission.close, sternsystem.sync, release.prepare, etc.).
+- `CompensationVerifier` (`compensation-verifier.ts`): runs verification probes in parallel using `Promise.allSettled` with a global timeout. Probe types: `dns-resolved`, `http-status`, `cdn-cleared`, `mirror-synced`, `custom`. Stores results via `CompensationStore`.
+- `CompensationStore` (`compensation-store.ts`): SQLite-backed persistent store using `better-sqlite3` with WAL mode. DB path: `missions/<missionId>/compensation-evidence.db`. Self-healing: corrupt DB is deleted and recreated on open error.
+- `CompensatableEffectHandler` migrated from `equivalenceEvidence: string` to structured `CompensationAction` with verification probes. EFFECT-02 guard: compensatable effects require a `compensationAction` with at least one verification probe.
+- Bordbuch entry kind `"effect"` records compensation verification events with `effect` writer role.
+- `mission.abort` pipeline includes a `verify-compensations` step that checks for pending compensation evidence before aborting.
+- Tests: `src/component-runtime/tests/effect-classifier.test.ts` (8 tests), `src/component-runtime/tests/compensation-store.test.ts` (6 tests), `src/component-runtime/tests/compensation-verifier.test.ts` (6 tests), `src/component-runtime/tests/effects.test.ts` (25 tests).
 
 ## Runtime reflection (RFC-1030)
 
