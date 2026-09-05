@@ -59,8 +59,6 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `kernel-module.module.ts` registers `kernel.module.inspect`, `kernel.module.unload`, `kernel.module.load` commands for runtime lifecycle management.
 - Tests: `src/kernel/tests/module-lifecycle.test.ts` covers states, unregister, drain, rollback, cache invalidation, trackInFlight.
 
-## Runtime reflection (RFC-1030)
-
 ## Evolution controller (RFC-1031)
 
 - `evolution.module.ts` registers 9 `evolution.candidate.*` commands for agent-driven component candidate lifecycle:

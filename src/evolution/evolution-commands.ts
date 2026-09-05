@@ -21,6 +21,7 @@ import type {
 import { createEvolutionController, type EvolutionControllerV1 } from "./controller.ts";
 import type { CapabilityCandidateV1, CandidateEvidenceV1 } from "./contracts.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
+import { byteHash } from "../fingerprint/primitives.ts";
 
 let controller: EvolutionControllerV1 | null = null;
 
@@ -64,7 +65,7 @@ function makeIntent(intentId: string, description: string, scope: string) {
     description,
     scope,
     constraints: [],
-    intentHash: `sha256:${intentId.padEnd(64, "0").slice(0, 64)}` as never,
+    intentHash: byteHash(intentId) as never,
   };
 }
 

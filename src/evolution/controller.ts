@@ -235,7 +235,9 @@ export function createEvolutionController(
       if (!candidate) {
         throw new Error(`candidate "${candidateId}" not found`);
       }
-      return [];
+      throw new Error(
+        `evolution.candidate.test not implemented: scenario loading from "${_scenariosPath}" is not yet wired`,
+      );
     },
 
     async canary(candidateId: string, trafficPercent: number): Promise<void> {

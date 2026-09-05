@@ -15,6 +15,10 @@
 import { byteHash } from "../fingerprint/primitives.ts";
 import type { Sha256Digest } from "../fingerprint/primitives.ts";
 
+const HASH_PREFIX_LENGTH = "sha256:".length;
+const ROUTING_HASH_HEX_CHARS = 12;
+const ROUTING_MODULUS = 100;
+
 export interface CanaryRouter {
   routeToCandidate(input: unknown, trafficPercent: number): boolean;
   getRoutingHash(input: unknown): Sha256Digest;
@@ -26,8 +30,11 @@ export function createCanaryRouter(): CanaryRouter {
       if (trafficPercent <= 0) return false;
       if (trafficPercent >= 100) return true;
       const hash = this.getRoutingHash(input);
-      const hashNum = parseInt(hash.slice(7, 19), 16);
-      return (hashNum % 100) < trafficPercent;
+      const hashNum = parseInt(
+        hash.slice(HASH_PREFIX_LENGTH, HASH_PREFIX_LENGTH + ROUTING_HASH_HEX_CHARS),
+        16,
+      );
+      return hashNum % ROUTING_MODULUS < trafficPercent;
     },
 
     getRoutingHash(input: unknown): Sha256Digest {
