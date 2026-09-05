@@ -1,3 +1,5 @@
+import type { Sha256Digest } from "../fingerprint/primitives.ts";
+
 export type ComponentId = `${string}/${string}`;
 export type CapabilityId = `${string}/${string}`;
 
@@ -80,6 +82,51 @@ export interface EffectDeclarationV1 {
   description: string;
   recoveryCommand: string | null;
   commitMetadata: string | null;
+}
+
+/** RFC-1037: Probe type for compensation verification. */
+export type CompensationProbeType =
+  "dns-resolved" | "http-status" | "cdn-cleared" | "mirror-synced" | "custom";
+
+/** RFC-1037: A single verification probe that checks equivalence after compensation. */
+export interface CompensationProbe {
+  readonly type: CompensationProbeType;
+  readonly target: string;
+  readonly expected: string;
+  readonly timeoutMs: number;
+  readonly customVerifyCommand?: string;
+}
+
+/** RFC-1037: The compensating action with verification probes. */
+export interface CompensationAction {
+  readonly compensatingOperation: string;
+  readonly verificationProbes: readonly CompensationProbe[];
+  readonly verificationTimeoutMs: number;
+  readonly failureMode: "blocking" | "non-blocking";
+}
+
+/** RFC-1037: Result of a single probe execution. */
+export interface ProbeResult {
+  readonly probe: CompensationProbe;
+  readonly passed: boolean;
+  readonly actualValue?: string;
+  readonly latencyMs: number;
+}
+
+/** RFC-1037: Result of compensation verification. */
+export interface CompensationResult {
+  readonly operationHash: Sha256Digest;
+  readonly compensationHash: Sha256Digest;
+  readonly verified: boolean;
+  readonly probeResults: readonly ProbeResult[];
+  readonly verifiedAt: string;
+  readonly failureReason?: string;
+}
+
+/** RFC-1037: Extension of EffectDeclarationV1 with compensation verification contracts. */
+export interface EffectDeclarationExt extends EffectDeclarationV1 {
+  readonly compensation?: CompensationAction;
+  readonly commitBoundary?: string;
 }
 
 export interface IsolationRequirementV1 {
