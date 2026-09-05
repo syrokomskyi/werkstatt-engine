@@ -82,6 +82,7 @@ export const serviceModule: KernelModule = {
     });
     registry.registerCommand({
       name: "material.credits.generate",
+      modulePath: "tools/modules/service.module.ts",
       description: "Generate localized material credits pages from *.credits.yaml sidecars.",
       scope: "app",
       mutatesState: true,
@@ -91,6 +92,10 @@ export const serviceModule: KernelModule = {
         "<app>/src/content/prose/{lang}/credits.md",
       ],
       reads: ["<app>/src/content/**/*.credits.yaml", "<app>/public/**/*.credits.yaml"],
+      generates: [
+        { path: "src/content/pages/{lang}/credits.md", phase: "build.post" },
+        { path: "src/content/prose/{lang}/credits.md", phase: "build.post" },
+      ],
       flags: {},
       execute: runGenerateMaterialCreditsPage,
     });
