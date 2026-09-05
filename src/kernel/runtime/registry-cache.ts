@@ -12,6 +12,7 @@ executeKernelCommand is called multiple times within the same Node.js process.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0022: initial implementation — process-lifetime Map keyed by config source path.</item>
+  <item>RFC-1026: add clearModule for incremental single-module invalidation without clearing the entire cache.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -90,4 +91,22 @@ export function setRegistryCacheEnabled(enabled: boolean): void {
  */
 export function isRegistryCacheEnabled(): boolean {
   return cacheEnabled;
+}
+
+/**
+ * RFC-1026: Incrementally invalidate a single module from a cached registry.
+ * Calls `unregisterModule` on the cached registry for the given cache key.
+ * If the registry has no remaining active modules after unregister, the
+ * cache entry is removed entirely to force a full rebuild on next access.
+ */
+export async function clearModule(cacheKey: string, moduleName: string): Promise<void> {
+  const cached = registryCache.get(cacheKey);
+  if (!cached) return;
+
+  await cached.unregisterModule(moduleName);
+
+  const hasActiveModules = [...cached.moduleStates.values()].some((state) => state === "active");
+  if (!hasActiveModules) {
+    registryCache.delete(cacheKey);
+  }
 }
