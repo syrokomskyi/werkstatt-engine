@@ -3,8 +3,11 @@ import {
   createCapabilityCatalog,
   assertNoForbiddenFields,
   toReflectedState,
+  reflectRuntime,
   type CapabilityCatalogV1,
   type LiveComponentObservation,
+  type LawKernelSummary,
+  type RuntimeReflectionV1,
 } from "../reflection.ts";
 import type {
   ComponentManifestV1,
@@ -400,5 +403,255 @@ describe("negative: catalog must not leak private data", () => {
       "resolvedComponentSetHash",
       "schema",
     ]);
+  });
+});
+
+const STUB_LAW_KERNEL: LawKernelSummary = {
+  activeGrants: 3,
+  artifactStoreEntries: 12,
+  killSwitchArmed: false,
+};
+
+function makeTwoComponentSet(): {
+  set: ResolvedComponentSetV1;
+  manifests: Map<ComponentId, ComponentManifestV1>;
+  observations: Map<ComponentId, LiveComponentObservation>;
+} {
+  const manifestA = makeManifest({
+    componentId: cid("werkstatt/alpha"),
+    provides: [
+      { capability: "werkstatt/kernel", version: "1.0.0", schemaHash: VALID_SHA as string },
+    ],
+    requires: [
+      {
+        capability: "werkstatt/storage",
+        compatibility: "1.0.0",
+        schemaHash: VALID_SHA as string,
+        optional: false,
+      },
+    ],
+  });
+  const manifestB = makeManifest({
+    componentId: cid("werkstatt/beta"),
+    provides: [
+      { capability: "werkstatt/storage", version: "1.0.0", schemaHash: VALID_SHA as string },
+    ],
+    requires: [],
+  });
+
+  const set = makeResolvedSet({
+    components: [
+      makeResolvedIdentity({ componentId: cid("werkstatt/alpha") }),
+      makeResolvedIdentity({ componentId: cid("werkstatt/beta") }),
+    ],
+  });
+  const manifests = new Map<ComponentId, ComponentManifestV1>([
+    ["werkstatt/alpha", manifestA],
+    ["werkstatt/beta", manifestB],
+  ]);
+  const observations = new Map<ComponentId, LiveComponentObservation>([
+    ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
+    ["werkstatt/beta", { componentId: cid("werkstatt/beta"), lifecycleState: "active" }],
+  ]);
+
+  return { set, manifests, observations };
+}
+
+describe("reflectRuntime", () => {
+  it("returns RuntimeReflectionV1 with correct component states (AC-1)", () => {
+    const { set, manifests, observations } = makeTwoComponentSet();
+
+    const reflection = reflectRuntime(
+      { activeSet: set, manifests, observations, observedAt: "2026-01-01T00:00:00Z" },
+      STUB_LAW_KERNEL,
+    );
+
+    expect(reflection.reflectedAt).toBe("2026-01-01T00:00:00Z");
+    expect(reflection.components).toHaveLength(2);
+    expect(reflection.components[0]!.componentId).toBe("werkstatt/alpha");
+    expect(reflection.components[0]!.fiberState).toBe("active");
+    expect(reflection.components[1]!.componentId).toBe("werkstatt/beta");
+    expect(reflection.components[1]!.fiberState).toBe("active");
+    expect(reflection.lawKernel).toEqual(STUB_LAW_KERNEL);
+  });
+
+  it("skips disposed components and increments skippedDisposed (AC-1, failure mode)", () => {
+    const { set, manifests } = makeTwoComponentSet();
+    const observations = new Map<ComponentId, LiveComponentObservation>([
+      ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
+      ["werkstatt/beta", { componentId: cid("werkstatt/beta"), lifecycleState: "disposed" }],
+    ]);
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    expect(reflection.components).toHaveLength(1);
+    expect(reflection.components[0]!.componentId).toBe("werkstatt/alpha");
+    expect(reflection.summary.skippedDisposed).toBe(1);
+    expect(reflection.summary.total).toBe(1);
+  });
+
+  it("skips components without manifests without error", () => {
+    const { set, observations } = makeTwoComponentSet();
+
+    const reflection = reflectRuntime(
+      { activeSet: set, manifests: new Map(), observations },
+      STUB_LAW_KERNEL,
+    );
+
+    expect(reflection.components).toHaveLength(0);
+    expect(reflection.summary.total).toBe(0);
+  });
+
+  it("builds dependency edges from requires/provides mapping", () => {
+    const { set, manifests, observations } = makeTwoComponentSet();
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    expect(reflection.dependencyEdges).toHaveLength(1);
+    expect(reflection.dependencyEdges[0]!.from).toBe("werkstatt/alpha");
+    expect(reflection.dependencyEdges[0]!.to).toBe("werkstatt/beta");
+    expect(reflection.dependencyEdges[0]!.capability).toBe("werkstatt/storage");
+  });
+
+  it("resolves requirements with resolvedBy and resolution status", () => {
+    const { set, manifests, observations } = makeTwoComponentSet();
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    const alpha = reflection.components.find((c) => c.componentId === "werkstatt/alpha")!;
+    expect(alpha.requires).toHaveLength(1);
+    expect(alpha.requires[0]!.resolution).toBe("resolved");
+    expect(alpha.requires[0]!.resolvedBy).toBe("werkstatt/beta");
+  });
+
+  it("marks unresolved non-optional requires as missing", () => {
+    const manifestA = makeManifest({
+      componentId: cid("werkstatt/alpha"),
+      provides: [],
+      requires: [
+        {
+          capability: "werkstatt/missing",
+          compatibility: "1.0.0",
+          schemaHash: VALID_SHA as string,
+          optional: false,
+        },
+      ],
+    });
+    const set = makeResolvedSet({
+      components: [makeResolvedIdentity({ componentId: cid("werkstatt/alpha") })],
+    });
+    const manifests = new Map<ComponentId, ComponentManifestV1>([["werkstatt/alpha", manifestA]]);
+    const observations = new Map<ComponentId, LiveComponentObservation>([
+      ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
+    ]);
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    const alpha = reflection.components[0]!;
+    expect(alpha.requires[0]!.resolution).toBe("missing");
+    expect(alpha.requires[0]!.resolvedBy).toBeUndefined();
+  });
+
+  it("marks unresolved optional requires as waiting", () => {
+    const manifestA = makeManifest({
+      componentId: cid("werkstatt/alpha"),
+      provides: [],
+      requires: [
+        {
+          capability: "werkstatt/optional",
+          compatibility: "1.0.0",
+          schemaHash: VALID_SHA as string,
+          optional: true,
+        },
+      ],
+    });
+    const set = makeResolvedSet({
+      components: [makeResolvedIdentity({ componentId: cid("werkstatt/alpha") })],
+    });
+    const manifests = new Map<ComponentId, ComponentManifestV1>([["werkstatt/alpha", manifestA]]);
+    const observations = new Map<ComponentId, LiveComponentObservation>([
+      ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
+    ]);
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    const alpha = reflection.components[0]!;
+    expect(alpha.requires[0]!.resolution).toBe("waiting");
+  });
+
+  it("summary counts states correctly", () => {
+    const manifestA = makeManifest({ componentId: cid("werkstatt/alpha") });
+    const manifestB = makeManifest({ componentId: cid("werkstatt/beta") });
+    const manifestC = makeManifest({ componentId: cid("werkstatt/gamma") });
+
+    const set = makeResolvedSet({
+      components: [
+        makeResolvedIdentity({ componentId: cid("werkstatt/alpha") }),
+        makeResolvedIdentity({ componentId: cid("werkstatt/beta") }),
+        makeResolvedIdentity({ componentId: cid("werkstatt/gamma") }),
+      ],
+    });
+    const manifests = new Map<ComponentId, ComponentManifestV1>([
+      ["werkstatt/alpha", manifestA],
+      ["werkstatt/beta", manifestB],
+      ["werkstatt/gamma", manifestC],
+    ]);
+    const observations = new Map<ComponentId, LiveComponentObservation>([
+      ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
+      ["werkstatt/beta", { componentId: cid("werkstatt/beta"), lifecycleState: "waiting" }],
+      ["werkstatt/gamma", { componentId: cid("werkstatt/gamma"), lifecycleState: "failed" }],
+    ]);
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    expect(reflection.summary.total).toBe(3);
+    expect(reflection.summary.active).toBe(1);
+    expect(reflection.summary.waiting).toBe(1);
+    expect(reflection.summary.failed).toBe(1);
+    expect(reflection.summary.skippedDisposed).toBe(0);
+  });
+
+  it("does not leak forbidden fields in reflection output (AC-7)", () => {
+    const { set, manifests, observations } = makeTwoComponentSet();
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    const json = JSON.stringify(reflection);
+    const forbidden = [
+      "secrets",
+      "credentials",
+      "privateState",
+      "rawGrants",
+      "prompts",
+      "executableBytes",
+      "leaseTokens",
+      "authorityMaterial",
+      "artifactBytes",
+      "sourceCode",
+    ];
+    for (const field of forbidden) {
+      expect(json, `Reflection must not contain forbidden field: ${field}`).not.toContain(field);
+    }
+  });
+
+  it("returns RuntimeReflectionV1 with correct top-level shape", () => {
+    const { set, manifests, observations } = makeTwoComponentSet();
+
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    const keys = Object.keys(reflection).sort();
+    expect(keys).toEqual(["components", "dependencyEdges", "lawKernel", "reflectedAt", "summary"]);
+  });
+});
+
+describe("reflectRuntime: capability catalog reuse (AC-2)", () => {
+  it("createCapabilityCatalog and reflectRuntime share the same activeSet hash", () => {
+    const { set, manifests, observations } = makeTwoComponentSet();
+
+    const catalog = createCapabilityCatalog({ activeSet: set, manifests, observations });
+    const reflection = reflectRuntime({ activeSet: set, manifests, observations }, STUB_LAW_KERNEL);
+
+    expect(catalog.resolvedComponentSetHash).toBe(set.setHash);
+    expect(reflection.components.length).toBeGreaterThan(0);
   });
 });
