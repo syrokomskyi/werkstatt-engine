@@ -43,6 +43,20 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - **Kernel commands MUST be registered in `*.module.ts` files, not in `index.ts` barrels.** The kernel loads modules via the `*-module` subpath export (e.g. `@warpgogol/werkstatt-engine/sternsystem-module` resolves to `sternsystem.module.ts`). A `createSternsystemModule` (or any `create*Module`) function in an `index.ts` barrel is dead code — the runtime never calls it. Commands registered there are invisible to `command.manifest.generate` and cause `RFC-CMD-02` validation errors. Discovered during RFC-0968: handover commands were added to `sternsystem/index.ts` instead of `sternsystem.module.ts`, making them invisible to the manifest generator.
 - **Before registering a new kernel command, grep for existing registrations across ALL packages.** The kernel registry rejects duplicate command names across modules with a fatal "Kernel command already registered" error that blocks ALL commands from loading. Commands like `mission.archive` are registered in `packages/forge/os/mission/mission.module.ts` — adding a second registration in `packages/werkstatt-engine/src/mission/mission.module.ts` crashes the entire kernel. Always run `grep -r 'name: "commandName"' packages/*/src/**/*.module.ts packages/*/os/**/*.module.ts` before adding a new `registry.registerCommand` call.
 
+## Kernel module lifecycle (RFC-1026)
+
+- `KernelRegistry` implements `KernelLifecycleRegistry` with `unregisterModule`, `trackInFlight`, `getModuleState` for lifecycle-owned registrations.
+- `ModuleFiberState`: `declared` → `loading` → `active` → `draining` → `unloading` → `disposed` (or `failed` on registration error).
+- `buildRegistry` and `buildRegistryForModule` set module states during loading; rollback on `register()` failure removes all commands and pipelines owned by the failed module.
+- `buildRegistryWithHandles` returns a `Map<string, KernelModuleHandle>` alongside the registry — each handle exposes `dispose()` and live `state`.
+- `unregisterModule` drains in-flight commands (polling with `WERKSTATT_DRAIN_TIMEOUT_MS`, default 30s), then removes all commands/pipelines and sets state to `disposed`. Records disposed command origins in `disposedCommandOrigins` for `KERNEL-MODULE-01` error reporting.
+- `trackInFlight(commandName)` returns a release function — must be called in `finally` to ensure the count is decremented on failure or timeout.
+- `executeRegisteredCommand` checks module state before execution: rejects with `KERNEL-MODULE-02` if the owning module is not `active`.
+- `executeKernelCommand` checks `disposedCommandOrigins` when a command is not found: reports `KERNEL-MODULE-01` if the command was previously registered but its module was unloaded.
+- `clearModule(cacheKey, moduleName)` in `registry-cache.ts` incrementally invalidates a single module from a cached registry without clearing the entire cache. Removes the cache entry when no active modules remain.
+- `kernel-module.module.ts` registers `kernel.module.inspect`, `kernel.module.unload`, `kernel.module.load` commands for runtime lifecycle management.
+- Tests: `src/kernel/tests/module-lifecycle.test.ts` covers states, unregister, drain, rollback, cache invalidation, trackInFlight.
+
 ## Scripts
 
 | Script        | Command                                       |
