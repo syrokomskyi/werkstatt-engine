@@ -13,6 +13,7 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>RFC-0303: split out of runtime.ts (Phase 3 file-size split, hot-path file 8/8).</item>
   <item>ADR-0022: loadAppRuntime and list functions now use process-lifetime registry cache from registry-cache.ts.</item>
   <item>RFC-0960: buildRegistry and buildRegistryForModule call config.postBuildValidation after all modules are loaded.</item>
+  <item>RFC-1026: buildRegistry and buildRegistryForModule set moduleStates (loading → active, failed on throw); rollback on register() failure; buildRegistryWithHandles returns KernelModuleHandle map.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -24,10 +25,23 @@ import { getOrBuildRegistry, getOrBuildWorkspaceRegistry } from "./registry-cach
 import type {
   DiscoveredSiteWorkspace,
   KernelAppConfig,
+  KernelModuleHandle,
   SiteWorkspacesListResult,
   KernelCommandDefinition,
   KernelRegisteredCommandInfo,
 } from "../types.ts";
+
+function createModuleHandle(registry: KernelRegistry, moduleName: string): KernelModuleHandle {
+  return {
+    moduleName,
+    get state() {
+      return registry.getModuleState(moduleName) ?? "declared";
+    },
+    async dispose() {
+      await registry.unregisterModule(moduleName);
+    },
+  };
+}
 
 export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegistry> {
   const registry = new KernelRegistry();
@@ -36,14 +50,30 @@ export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegi
     for (const moduleDefinition of config.modules) {
       process.stderr.write(`  [registry] loading module ${moduleDefinition.name} …\n`);
       registry.currentModuleName = moduleDefinition.name;
-      await moduleDefinition.register(registry);
+      registry.moduleStates.set(moduleDefinition.name, "loading");
+      try {
+        await moduleDefinition.register(registry);
+        registry.moduleStates.set(moduleDefinition.name, "active");
+      } catch (err) {
+        registry.moduleStates.set(moduleDefinition.name, "failed");
+        rollbackModuleRegistrations(registry, moduleDefinition.name);
+        throw err;
+      }
     }
   } else if (config.moduleLoaders) {
     for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
       process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
       const moduleDefinition = await loader();
       registry.currentModuleName = moduleName;
-      await moduleDefinition.register(registry);
+      registry.moduleStates.set(moduleName, "loading");
+      try {
+        await moduleDefinition.register(registry);
+        registry.moduleStates.set(moduleName, "active");
+      } catch (err) {
+        registry.moduleStates.set(moduleName, "failed");
+        rollbackModuleRegistrations(registry, moduleName);
+        throw err;
+      }
     }
   }
   registry.currentModuleName = undefined;
@@ -59,6 +89,74 @@ export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegi
   return registry;
 }
 
+function rollbackModuleRegistrations(registry: KernelRegistry, moduleName: string): void {
+  const commandsToRemove = [...registry.commandModules.entries()]
+    .filter(([, mod]) => mod === moduleName)
+    .map(([cmd]) => cmd);
+  for (const cmd of commandsToRemove) {
+    registry.commands.delete(cmd);
+    registry.commandModules.delete(cmd);
+  }
+  const pipelinesToRemove = [...registry.pipelineModules.entries()]
+    .filter(([, mod]) => mod === moduleName)
+    .map(([pipe]) => pipe);
+  for (const pipe of pipelinesToRemove) {
+    registry.pipelines.delete(pipe);
+    registry.pipelineModules.delete(pipe);
+  }
+}
+
+export async function buildRegistryWithHandles(
+  config: KernelAppConfig,
+): Promise<{ registry: KernelRegistry; handles: Map<string, KernelModuleHandle> }> {
+  const handles = new Map<string, KernelModuleHandle>();
+  const registry = new KernelRegistry();
+
+  if (config.modules) {
+    for (const moduleDefinition of config.modules) {
+      process.stderr.write(`  [registry] loading module ${moduleDefinition.name} …\n`);
+      registry.currentModuleName = moduleDefinition.name;
+      registry.moduleStates.set(moduleDefinition.name, "loading");
+      try {
+        await moduleDefinition.register(registry);
+        registry.moduleStates.set(moduleDefinition.name, "active");
+        handles.set(moduleDefinition.name, createModuleHandle(registry, moduleDefinition.name));
+      } catch (err) {
+        registry.moduleStates.set(moduleDefinition.name, "failed");
+        rollbackModuleRegistrations(registry, moduleDefinition.name);
+        throw err;
+      }
+    }
+  } else if (config.moduleLoaders) {
+    for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
+      process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
+      const moduleDefinition = await loader();
+      registry.currentModuleName = moduleName;
+      registry.moduleStates.set(moduleName, "loading");
+      try {
+        await moduleDefinition.register(registry);
+        registry.moduleStates.set(moduleName, "active");
+        handles.set(moduleName, createModuleHandle(registry, moduleName));
+      } catch (err) {
+        registry.moduleStates.set(moduleName, "failed");
+        rollbackModuleRegistrations(registry, moduleName);
+        throw err;
+      }
+    }
+  }
+  registry.currentModuleName = undefined;
+
+  if (config.pipelines) {
+    for (const [name, steps] of Object.entries(config.pipelines)) {
+      registry.registerPipeline(name, steps);
+    }
+  }
+
+  config.postBuildValidation?.(registry);
+
+  return { registry, handles };
+}
+
 export async function buildRegistryForModule(
   config: KernelAppConfig,
   moduleName: string,
@@ -72,14 +170,30 @@ export async function buildRegistryForModule(
     }
     const moduleDefinition = await loader();
     registry.currentModuleName = moduleName;
-    await moduleDefinition.register(registry);
+    registry.moduleStates.set(moduleName, "loading");
+    try {
+      await moduleDefinition.register(registry);
+      registry.moduleStates.set(moduleName, "active");
+    } catch (err) {
+      registry.moduleStates.set(moduleName, "failed");
+      rollbackModuleRegistrations(registry, moduleName);
+      throw err;
+    }
   } else if (config.modules) {
     const moduleDefinition = config.modules.find((m) => m.name === moduleName);
     if (!moduleDefinition) {
       throw new Error(`No module named \`${moduleName}\` in config.`);
     }
     registry.currentModuleName = moduleName;
-    await moduleDefinition.register(registry);
+    registry.moduleStates.set(moduleName, "loading");
+    try {
+      await moduleDefinition.register(registry);
+      registry.moduleStates.set(moduleName, "active");
+    } catch (err) {
+      registry.moduleStates.set(moduleName, "failed");
+      rollbackModuleRegistrations(registry, moduleName);
+      throw err;
+    }
   }
   registry.currentModuleName = undefined;
 
@@ -164,8 +278,14 @@ export async function listRegisteredKernelCommandNames(workspaceRoot: string): P
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
   for (const site of sites.filter((candidate) => candidate.configPath)) {
-    const { registry } = await loadAppRuntime(workspaceRoot, site);
-    for (const commandName of registry.listCommandNames()) names.add(commandName);
+    try {
+      const { registry } = await loadAppRuntime(workspaceRoot, site);
+      for (const commandName of registry.listCommandNames()) names.add(commandName);
+    } catch (err) {
+      process.stderr.write(
+        `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
   }
 
   return [...names].sort();
