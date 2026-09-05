@@ -25,6 +25,10 @@ import {
   isTerminalStage,
   FORWARD_ONLY_SEQUENCE,
 } from "../evolution/contracts.ts";
+import { createShadowExecutor } from "../evolution/shadow-executor.ts";
+import { createCanaryRouter } from "../evolution/canary-router.ts";
+import { createHealthMonitor } from "../evolution/health-monitor.ts";
+import { checkActivatingTransaction, checkActiveHealthMonitoring } from "../evolution/guards.ts";
 import type {
   CapabilityCandidateV1,
   EvolutionEvidenceBundleV1,
@@ -110,7 +114,7 @@ function mkObservation(exposure: "shadow" | "canary" = "shadow"): ObservationEvi
   };
 }
 
-function mkAuthority(allowedTransition: EvolutionStage = "tested"): AuthorityEvidenceV1 {
+function mkAuthority(allowedTransition: EvolutionStage = "testing"): AuthorityEvidenceV1 {
   return {
     schema: "werkstatt/authority-evidence@1",
     lawKernelDecisionHash: D,
@@ -176,18 +180,22 @@ function mkCandidate(
   return {
     schema: "werkstatt/capability-candidate@1",
     candidateId: "cand-001",
+    componentId: "comp-001",
+    version: "1.0.0",
     parentArtifactHash: parentHash,
     artifactHash,
     intentHash: D3,
     policyHash: D4,
     stage: "defined",
+    replacesComponentId: "comp-000",
+    canaryTrafficPercent: 0,
   };
 }
 
 function mkTransitionRequest(
   candidateId: string = "cand-001",
   fromStage: EvolutionStage = "defined",
-  toStage: EvolutionStage = "tested",
+  toStage: EvolutionStage = "testing",
   evidence?: EvolutionEvidenceBundleV1,
   seq: number = 0,
 ): TransitionRequestV1 {
@@ -226,33 +234,35 @@ function mkIntent(scope: string = "compute"): BoundedIntentV1 {
 }
 
 describe("contracts", () => {
-  it("forward-only sequence has 5 stages", () => {
-    expect(FORWARD_ONLY_SEQUENCE).toHaveLength(5);
+  it("forward-only sequence has 7 stages", () => {
+    expect(FORWARD_ONLY_SEQUENCE).toHaveLength(7);
     expect(FORWARD_ONLY_SEQUENCE[0]).toBe("defined");
-    expect(FORWARD_ONLY_SEQUENCE[4]).toBe("promoted");
+    expect(FORWARD_ONLY_SEQUENCE[6]).toBe("promoted");
   });
 
   it("isForwardTransition allows sequential forward", () => {
-    expect(isForwardTransition("defined", "tested")).toBe(true);
-    expect(isForwardTransition("tested", "shadowed")).toBe(true);
-    expect(isForwardTransition("shadowed", "canary")).toBe(true);
-    expect(isForwardTransition("canary", "promoted")).toBe(true);
+    expect(isForwardTransition("defined", "shadowing")).toBe(true);
+    expect(isForwardTransition("shadowing", "testing")).toBe(true);
+    expect(isForwardTransition("testing", "canary")).toBe(true);
+    expect(isForwardTransition("canary", "activating")).toBe(true);
+    expect(isForwardTransition("activating", "active")).toBe(true);
+    expect(isForwardTransition("active", "promoted")).toBe(true);
   });
 
   it("isForwardTransition rejects skips", () => {
-    expect(isForwardTransition("defined", "shadowed")).toBe(false);
+    expect(isForwardTransition("defined", "testing")).toBe(false);
     expect(isForwardTransition("defined", "canary")).toBe(false);
   });
 
   it("isForwardTransition allows rollback and quarantine from any stage", () => {
     expect(isForwardTransition("canary", "rolled-back")).toBe(true);
     expect(isForwardTransition("promoted", "rolled-back")).toBe(true);
-    expect(isForwardTransition("tested", "quarantined")).toBe(true);
+    expect(isForwardTransition("testing", "quarantined")).toBe(true);
   });
 
   it("isForwardTransition rejects backward non-rollback", () => {
-    expect(isForwardTransition("tested", "defined")).toBe(false);
-    expect(isForwardTransition("canary", "tested")).toBe(false);
+    expect(isForwardTransition("testing", "defined")).toBe(false);
+    expect(isForwardTransition("canary", "testing")).toBe(false);
   });
 
   it("isTerminalStage identifies terminal stages", () => {
@@ -284,20 +294,24 @@ describe("reducer", () => {
 
   it("rejects candidate not starting at defined", () => {
     const state = createEvolutionReducerState();
-    const result = registerCandidate(state, { ...mkCandidate(), stage: "tested" });
+    const result = registerCandidate(state, { ...mkCandidate(), stage: "testing" });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-EVO-10");
     }
   });
 
-  it("applies forward transition defined → tested", () => {
+  it("applies forward transition defined → shadowing", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    const result = applyTransition(state, mkTransitionRequest("cand-001", "defined", "tested"), TS);
+    const result = applyTransition(
+      state,
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
+      TS,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.updatedCandidate.stage).toBe("tested");
+      expect(result.updatedCandidate.stage).toBe("shadowing");
       expect(result.record.decision).toBe("admit");
     }
   });
@@ -316,7 +330,7 @@ describe("reducer", () => {
     registerCandidate(state, mkCandidate());
     const result = applyTransition(
       state,
-      mkTransitionRequest("cand-001", "tested", "shadowed"),
+      mkTransitionRequest("cand-001", "testing", "shadowing"),
       TS,
     );
     expect(result.ok).toBe(false);
@@ -330,7 +344,7 @@ describe("reducer", () => {
     registerCandidate(state, mkCandidate());
     const result = applyTransition(
       state,
-      mkTransitionRequest("cand-001", "defined", "shadowed"),
+      mkTransitionRequest("cand-001", "defined", "testing"),
       TS,
     );
     expect(result.ok).toBe(false);
@@ -344,7 +358,7 @@ describe("reducer", () => {
     registerCandidate(state, mkCandidate());
     const result = applyTransition(
       state,
-      mkTransitionRequest("cand-001", "defined", "tested", undefined, 5),
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow"), 5),
       TS,
     );
     expect(result.ok).toBe(false);
@@ -356,7 +370,12 @@ describe("reducer", () => {
   it("rejects duplicate idempotency key", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    const req = mkTransitionRequest("cand-001", "defined", "tested");
+    const req = mkTransitionRequest(
+      "cand-001",
+      "defined",
+      "shadowing",
+      mkEvidence(D, D2, "shadow"),
+    );
     applyTransition(state, req, TS);
     const result = applyTransition(state, req, TS);
     expect(result.ok).toBe(false);
@@ -376,26 +395,20 @@ describe("reducer", () => {
     }
   });
 
-  it("rejects promotion with missing evaluation evidence", () => {
+  it("rejects testing with missing evaluation evidence", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    applyTransition(state, mkTransitionRequest("cand-001", "defined", "tested"), TS);
     applyTransition(
       state,
-      mkTransitionRequest("cand-001", "tested", "shadowed", mkEvidence(D, D2, "shadow"), 1),
-      TS,
-    );
-    applyTransition(
-      state,
-      mkTransitionRequest("cand-001", "shadowed", "canary", mkEvidence(D, D2, "canary"), 2),
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
       TS,
     );
 
-    const badEvidence = mkEvidence(D, D2, "canary");
+    const badEvidence = mkEvidence(D, D2, "shadow");
     badEvidence.evaluation = mkEvaluation(false);
     const result = applyTransition(
       state,
-      mkTransitionRequest("cand-001", "canary", "promoted", badEvidence, 3),
+      mkTransitionRequest("cand-001", "shadowing", "testing", badEvidence, 1),
       TS,
     );
     expect(result.ok).toBe(false);
@@ -407,11 +420,15 @@ describe("reducer", () => {
   it("rollback creates compensating action", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    applyTransition(state, mkTransitionRequest("cand-001", "defined", "tested"), TS);
+    applyTransition(
+      state,
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
+      TS,
+    );
     const rollbackEvidence = mkEvidence();
     const result = applyTransition(
       state,
-      mkTransitionRequest("cand-001", "tested", "rolled-back", rollbackEvidence, 1),
+      mkTransitionRequest("cand-001", "shadowing", "rolled-back", rollbackEvidence, 1),
       TS,
     );
     expect(result.ok).toBe(true);
@@ -424,10 +441,14 @@ describe("reducer", () => {
   it("quarantine creates compensating action", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    applyTransition(state, mkTransitionRequest("cand-001", "defined", "tested"), TS);
+    applyTransition(
+      state,
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
+      TS,
+    );
     const result = applyTransition(
       state,
-      mkTransitionRequest("cand-001", "tested", "quarantined", mkEvidence(), 1),
+      mkTransitionRequest("cand-001", "shadowing", "quarantined", mkEvidence(), 1),
       TS,
     );
     expect(result.ok).toBe(true);
@@ -439,17 +460,25 @@ describe("reducer", () => {
   it("getCandidateHistory returns transitions for candidate", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    applyTransition(state, mkTransitionRequest("cand-001", "defined", "tested"), TS);
+    applyTransition(
+      state,
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
+      TS,
+    );
     expect(getCandidateHistory(state, "cand-001")).toHaveLength(1);
   });
 
   it("rejects transition from terminal stage", () => {
     const state = createEvolutionReducerState();
     registerCandidate(state, mkCandidate());
-    applyTransition(state, mkTransitionRequest("cand-001", "defined", "tested"), TS);
     applyTransition(
       state,
-      mkTransitionRequest("cand-001", "tested", "rolled-back", mkEvidence(), 1),
+      mkTransitionRequest("cand-001", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
+      TS,
+    );
+    applyTransition(
+      state,
+      mkTransitionRequest("cand-001", "shadowing", "rolled-back", mkEvidence(), 1),
       TS,
     );
     const result = applyTransition(
@@ -568,16 +597,35 @@ describe("controller", () => {
 
   it("defines a candidate from inspection and intent", () => {
     const controller = createEvolutionController();
-    const result = controller.defineCandidate(mkSnapshot(), mkIntent(), D, D2, D4);
+    const result = controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.candidate.stage).toBe("defined");
+      expect(result.candidate.candidateId).toBe("comp-001@1.0.0");
     }
   });
 
   it("rejects candidate definition for forbidden scope", () => {
     const controller = createEvolutionController();
-    const result = controller.defineCandidate(mkSnapshot(), mkIntent("law-kernel"), D, D2, D4);
+    const result = controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent("law-kernel"),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-EVO-GUARD-01");
@@ -586,9 +634,18 @@ describe("controller", () => {
 
   it("requests transition through controller", () => {
     const controller = createEvolutionController();
-    controller.defineCandidate(mkSnapshot(), mkIntent(), D, D2, D4);
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
     const result = controller.requestTransition(
-      mkTransitionRequest("cand-000000000000", "defined", "tested", mkEvidence(D, D2)),
+      mkTransitionRequest("comp-001@1.0.0", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
       TS,
     );
     expect(result.ok).toBe(true);
@@ -596,10 +653,19 @@ describe("controller", () => {
 
   it("kill switch denies all transitions", () => {
     const controller = createEvolutionController();
-    controller.defineCandidate(mkSnapshot(), mkIntent(), D, D2, D4);
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
     controller.activateKillSwitch("emergency", TS);
     const result = controller.requestTransition(
-      mkTransitionRequest("cand-000000000000", "defined", "tested", mkEvidence(D, D2)),
+      mkTransitionRequest("comp-001@1.0.0", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
       TS,
     );
     expect(result.ok).toBe(false);
@@ -607,23 +673,370 @@ describe("controller", () => {
 
   it("getCandidate returns registered candidate", () => {
     const controller = createEvolutionController();
-    controller.defineCandidate(mkSnapshot(), mkIntent(), D, D2, D4);
-    const candidate = controller.getCandidate("cand-000000000000");
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    const candidate = controller.getCandidate("comp-001@1.0.0");
     expect(candidate).not.toBeNull();
   });
 
   it("getCandidateHistory returns transitions", () => {
     const controller = createEvolutionController();
-    controller.defineCandidate(mkSnapshot(), mkIntent(), D, D2, D4);
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
     controller.requestTransition(
-      mkTransitionRequest("cand-000000000000", "defined", "tested", mkEvidence(D, D2)),
+      mkTransitionRequest("comp-001@1.0.0", "defined", "shadowing", mkEvidence(D, D2, "shadow")),
       TS,
     );
-    expect(controller.getCandidateHistory("cand-000000000000")).toHaveLength(1);
+    expect(controller.getCandidateHistory("comp-001@1.0.0")).toHaveLength(1);
   });
 
   it("getKillSwitchState returns current state", () => {
     const controller = createEvolutionController();
     expect(controller.getKillSwitchState().active).toBe(false);
+  });
+});
+
+describe("shadow executor", () => {
+  it("executes candidate and active functions in parallel and returns evidence", async () => {
+    const executor = createShadowExecutor();
+    const evidence = await executor.execute(
+      "cand-001",
+      "latency",
+      () => 90,
+      () => 100,
+      { test: true },
+    );
+    expect(evidence.schema).toBe("werkstatt/candidate-evidence@1");
+    expect(evidence.phase).toBe("shadow");
+    expect(evidence.metric).toBe("latency");
+    expect(evidence.candidateValue).toBe(90);
+    expect(evidence.activeValue).toBe(100);
+    expect(evidence.delta).toBe(-10);
+    expect(evidence.scenarioHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it("handles non-numeric results by defaulting to 0", async () => {
+    const executor = createShadowExecutor();
+    const evidence = await executor.execute(
+      "cand-001",
+      "latency",
+      () => "result",
+      () => "other",
+      { test: true },
+    );
+    expect(evidence.candidateValue).toBe(0);
+    expect(evidence.activeValue).toBe(0);
+    expect(evidence.delta).toBe(0);
+  });
+});
+
+describe("canary router", () => {
+  it("routes all traffic to candidate at 100%", () => {
+    const router = createCanaryRouter();
+    expect(router.routeToCandidate({ id: "a" }, 100)).toBe(true);
+  });
+
+  it("routes no traffic to candidate at 0%", () => {
+    const router = createCanaryRouter();
+    expect(router.routeToCandidate({ id: "a" }, 0)).toBe(false);
+  });
+
+  it("deterministically routes based on input hash", () => {
+    const router = createCanaryRouter();
+    const input = { userId: "user-123" };
+    const r1 = router.routeToCandidate(input, 50);
+    const r2 = router.routeToCandidate(input, 50);
+    expect(r1).toBe(r2);
+  });
+
+  it("produces sha256 hash for routing", () => {
+    const router = createCanaryRouter();
+    const hash = router.getRoutingHash({ test: true });
+    expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+});
+
+describe("health monitor", () => {
+  it("does not quarantine with fewer than threshold failures", () => {
+    const monitor = createHealthMonitor(3);
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    expect(monitor.shouldQuarantine("cand-001")).toBe(false);
+    expect(monitor.getConsecutiveFailures("cand-001")).toBe(2);
+  });
+
+  it("quarantines after threshold consecutive failures", () => {
+    const monitor = createHealthMonitor(3);
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    expect(monitor.shouldQuarantine("cand-001")).toBe(true);
+  });
+
+  it("resets failure count on healthy result", () => {
+    const monitor = createHealthMonitor(3);
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "healthy",
+      latencyMs: 50,
+    });
+    expect(monitor.getConsecutiveFailures("cand-001")).toBe(0);
+  });
+
+  it("reset clears failure count", () => {
+    const monitor = createHealthMonitor(3);
+    monitor.recordResult("cand-001", {
+      schema: "werkstatt/health-check-result@1",
+      timestamp: TS,
+      status: "unhealthy",
+      latencyMs: 100,
+    });
+    monitor.reset("cand-001");
+    expect(monitor.getConsecutiveFailures("cand-001")).toBe(0);
+  });
+});
+
+describe("new guards", () => {
+  it("checkActivatingTransaction rejects missing artifact evidence", () => {
+    const evidence = mkEvidence();
+    delete (evidence as { artifact?: ArtifactEvidenceV1 }).artifact;
+    expect(checkActivatingTransaction(evidence).ok).toBe(false);
+  });
+
+  it("checkActivatingTransaction rejects missing authority evidence", () => {
+    const evidence = mkEvidence();
+    delete (evidence as { authority?: AuthorityEvidenceV1 }).authority;
+    expect(checkActivatingTransaction(evidence).ok).toBe(false);
+  });
+
+  it("checkActivatingTransaction passes with full evidence", () => {
+    const evidence = mkEvidence();
+    expect(checkActivatingTransaction(evidence).ok).toBe(true);
+  });
+
+  it("checkActiveHealthMonitoring rejects missing observation", () => {
+    const evidence = mkEvidence();
+    evidence.observation = undefined as never;
+    expect(checkActiveHealthMonitoring(evidence).ok).toBe(false);
+  });
+
+  it("checkActiveHealthMonitoring passes with observation", () => {
+    const evidence = mkEvidence();
+    expect(checkActiveHealthMonitoring(evidence).ok).toBe(true);
+  });
+});
+
+describe("controller new methods", () => {
+  it("inspectAll returns all registered candidates", () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D1,
+      D2,
+      D4,
+      "comp-002",
+      "1.0.0",
+      "comp-000",
+    );
+    const candidates = controller.inspectAll();
+    expect(candidates).toHaveLength(2);
+  });
+
+  it("canary sets traffic percent on candidate", async () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    await controller.canary("comp-001@1.0.0", 25);
+    const candidate = controller.getCandidate("comp-001@1.0.0");
+    expect(candidate?.canaryTrafficPercent).toBe(25);
+  });
+
+  it("activate sets stage to active", async () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    await controller.activate("comp-001@1.0.0");
+    const candidate = controller.getCandidate("comp-001@1.0.0");
+    expect(candidate?.stage).toBe("active");
+  });
+
+  it("promote sets stage to promoted", async () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    await controller.promote("comp-001@1.0.0", "m000001");
+    const candidate = controller.getCandidate("comp-001@1.0.0");
+    expect(candidate?.stage).toBe("promoted");
+  });
+
+  it("rollback transitions active candidate to rolled-back", async () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    await controller.activate("comp-001@1.0.0");
+    await controller.rollback("comp-001");
+    const candidate = controller.getCandidate("comp-001@1.0.0");
+    expect(candidate?.stage).toBe("rolled-back");
+  });
+
+  it("quarantine sets stage to quarantined", async () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    await controller.quarantine("comp-001@1.0.0", "bad performance");
+    const candidate = controller.getCandidate("comp-001@1.0.0");
+    expect(candidate?.stage).toBe("quarantined");
+  });
+
+  it("shadow returns candidate evidence", async () => {
+    const controller = createEvolutionController();
+    controller.defineCandidate(
+      mkSnapshot(),
+      mkIntent(),
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    const evidence = await controller.shadow("comp-001@1.0.0", "latency");
+    expect(evidence.schema).toBe("werkstatt/candidate-evidence@1");
+    expect(evidence.phase).toBe("shadow");
+  });
+
+  it("rejects agent-written candidate without allowAgentWritten flag", () => {
+    const controller = createEvolutionController();
+    const intent = mkIntent("agent-authored");
+    const result = controller.defineCandidate(
+      mkSnapshot(),
+      intent,
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.ruleId).toBe("EVOLUTION-01");
+    }
+  });
+
+  it("allows agent-written candidate with allowAgentWritten flag", () => {
+    const controller = createEvolutionController();
+    const intent = mkIntent("agent-authored");
+    const result = controller.defineCandidate(
+      mkSnapshot(),
+      intent,
+      D,
+      D2,
+      D4,
+      "comp-001",
+      "1.0.0",
+      "comp-000",
+      true,
+    );
+    expect(result.ok).toBe(true);
   });
 });

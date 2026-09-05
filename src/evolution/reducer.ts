@@ -9,7 +9,7 @@ import type {
   TransitionRecordV1,
   CompensatingActionV1,
 } from "./contracts.ts";
-import { isForwardTransition, isTerminalStage, } from "./contracts.ts";
+import { isForwardTransition, isTerminalStage } from "./contracts.ts";
 
 export interface ReducerStateV1 {
   candidates: Map<string, CapabilityCandidateV1>;
@@ -280,7 +280,7 @@ function checkEvidenceForStage(
     return { ok: true, message: "" };
   }
 
-  if (stage === "tested") {
+  if (stage === "testing") {
     if (!evidence.evaluation.deterministicFixturesPassed) {
       return { ok: false, message: "deterministic fixtures did not pass" };
     }
@@ -293,14 +293,31 @@ function checkEvidenceForStage(
     return { ok: true, message: "" };
   }
 
-  if (stage === "shadowed") {
+  if (stage === "shadowing") {
     if (evidence.observation.exposure !== "shadow") {
-      return { ok: false, message: "shadow stage requires shadow exposure observation" };
+      return { ok: false, message: "shadowing stage requires shadow exposure observation" };
     }
     if (
       evidence.observation.incidents.some((i) => i.severity === "critical" || i.severity === "high")
     ) {
-      return { ok: false, message: "shadow stage has high/critical incidents" };
+      return { ok: false, message: "shadowing stage has high/critical incidents" };
+    }
+    return { ok: true, message: "" };
+  }
+
+  if (stage === "activating") {
+    if (!evidence.artifact) {
+      return { ok: false, message: "artifact evidence required for activation" };
+    }
+    if (!evidence.authority) {
+      return { ok: false, message: "authority evidence required for activation" };
+    }
+    return { ok: true, message: "" };
+  }
+
+  if (stage === "active") {
+    if (!evidence.observation) {
+      return { ok: false, message: "observation evidence required for active stage" };
     }
     return { ok: true, message: "" };
   }

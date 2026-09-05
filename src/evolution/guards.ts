@@ -173,6 +173,35 @@ export function checkEvidencePoisoning(evidence: EvolutionEvidenceBundleV1): Gua
   return { ok: true, ruleId: "", message: "" };
 }
 
+export function checkActivatingTransaction(evidence: EvolutionEvidenceBundleV1): GuardResultV1 {
+  if (!evidence.artifact) {
+    return {
+      ok: false,
+      ruleId: "CERT-EVO-GUARD-12",
+      message: "activating stage requires artifact evidence for transaction boundary",
+    };
+  }
+  if (!evidence.authority) {
+    return {
+      ok: false,
+      ruleId: "CERT-EVO-GUARD-13",
+      message: "activating stage requires authority evidence for transaction boundary",
+    };
+  }
+  return { ok: true, ruleId: "", message: "" };
+}
+
+export function checkActiveHealthMonitoring(evidence: EvolutionEvidenceBundleV1): GuardResultV1 {
+  if (!evidence.observation) {
+    return {
+      ok: false,
+      ruleId: "CERT-EVO-GUARD-14",
+      message: "active stage requires observation evidence for health monitoring",
+    };
+  }
+  return { ok: true, ruleId: "", message: "" };
+}
+
 export function runAllGuards(
   candidate: CapabilityCandidateV1,
   request: TransitionRequestV1,
@@ -188,6 +217,8 @@ export function runAllGuards(
     checkShadowSideEffects(request.evidence),
     checkCanaryBoundaries(request.evidence, maxCanaryDuration, minSampleSize),
     checkEvidencePoisoning(request.evidence),
+    checkActivatingTransaction(request.evidence),
+    checkActiveHealthMonitoring(request.evidence),
   ];
 
   for (const check of checks) {

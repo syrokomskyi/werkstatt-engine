@@ -2,9 +2,11 @@ import type { Sha256Digest } from "../fingerprint/primitives.ts";
 
 export type EvolutionStage =
   | "defined"
-  | "tested"
-  | "shadowed"
+  | "shadowing"
+  | "testing"
   | "canary"
+  | "activating"
+  | "active"
   | "promoted"
   | "rolled-back"
   | "quarantined";
@@ -14,11 +16,15 @@ export type EvolutionDecision = "admit" | "deny" | "incomplete";
 export interface CapabilityCandidateV1 {
   schema: "werkstatt/capability-candidate@1";
   candidateId: string;
+  componentId: string;
+  version: string;
   parentArtifactHash: Sha256Digest;
   artifactHash: Sha256Digest;
   intentHash: Sha256Digest;
   policyHash: Sha256Digest;
   stage: EvolutionStage;
+  replacesComponentId: string;
+  canaryTrafficPercent: number;
 }
 
 export interface DefinitionEvidenceV1 {
@@ -170,9 +176,11 @@ export interface KillSwitchStateV1 {
 
 export const FORWARD_ONLY_SEQUENCE: readonly EvolutionStage[] = [
   "defined",
-  "tested",
-  "shadowed",
+  "shadowing",
+  "testing",
   "canary",
+  "activating",
+  "active",
   "promoted",
 ];
 
@@ -196,4 +204,23 @@ export function isForwardTransition(from: EvolutionStage, to: EvolutionStage): b
 
 export function isTerminalStage(stage: EvolutionStage): boolean {
   return TERMINAL_STAGES.includes(stage);
+}
+
+export interface CandidateEvidenceV1 {
+  schema: "werkstatt/candidate-evidence@1";
+  phase: "shadow" | "test" | "canary";
+  metric: string;
+  candidateValue: number;
+  activeValue: number;
+  delta: number;
+  timestamp: string;
+  scenarioHash: Sha256Digest;
+}
+
+export interface HealthCheckResultV1 {
+  schema: "werkstatt/health-check-result@1";
+  timestamp: string;
+  status: "healthy" | "degraded" | "unhealthy";
+  latencyMs: number;
+  detail?: string;
 }
