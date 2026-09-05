@@ -110,6 +110,10 @@
       "types": "./src/kernel/validator-inventory.module.ts",
       "default": "./src/kernel/validator-inventory.module.ts"
     },
+    "./remediation-module": {
+      "types": "./src/remediation/remediation.module.ts",
+      "default": "./src/remediation/remediation.module.ts"
+    },
     "./kernel/semantic": {
       "types": "./src/kernel/semantic/semantic.module.ts",
       "default": "./src/kernel/semantic/semantic.module.ts"
