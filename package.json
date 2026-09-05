@@ -354,6 +354,14 @@
       "types": "./src/isolation/isolation.module.ts",
       "default": "./src/isolation/isolation.module.ts"
     },
+    "./scope-module": {
+      "types": "./src/scope/scope.module.ts",
+      "default": "./src/scope/scope.module.ts"
+    },
+    "./scope": {
+      "types": "./src/scope/scope.ts",
+      "default": "./src/scope/scope.ts"
+    },
     "./component-runtime/conformance": {
       "types": "./src/component-runtime/conformance.ts",
       "default": "./src/component-runtime/conformance.ts"
