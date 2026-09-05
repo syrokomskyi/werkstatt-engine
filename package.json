@@ -350,6 +350,10 @@
       "types": "./src/evolution/evolution.module.ts",
       "default": "./src/evolution/evolution.module.ts"
     },
+    "./isolation-module": {
+      "types": "./src/isolation/isolation.module.ts",
+      "default": "./src/isolation/isolation.module.ts"
+    },
     "./component-runtime/conformance": {
       "types": "./src/component-runtime/conformance.ts",
       "default": "./src/component-runtime/conformance.ts"
