@@ -52,9 +52,16 @@ export interface CommandManifestEntry {
   pipelines: string[];
 }
 
+export interface CommandManifestRuntimeState {
+  reflectedAt: string;
+  resolvedComponentSetHash: string | null;
+  catalogHash: string | null;
+}
+
 export interface CommandManifest {
   meta: { schemaVersion: 1; deterministic: true; generatedAt: null; contentHash: string };
   commands: CommandManifestEntry[];
+  runtimeState?: CommandManifestRuntimeState;
 }
 
 const MANIFEST_RELATIVE_PATH = join("docs", "command-manifest.generated.yaml");
@@ -154,15 +161,27 @@ export async function buildCommandManifest(workspaceRoot: string): Promise<Comma
 
   entries.sort((a, b) => a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider));
 
+  const runtimeState = await buildRuntimeState();
+
   const withoutHash: Omit<CommandManifest, "meta"> & {
     meta: Omit<CommandManifest["meta"], "contentHash">;
   } = {
     meta: { schemaVersion: 1, deterministic: true, generatedAt: null },
     commands: entries,
+    ...(runtimeState ? { runtimeState } : {}),
   };
   const contentHash = createHash("sha256").update(yamlStringify(withoutHash)).digest("hex");
 
   return { ...withoutHash, meta: { ...withoutHash.meta, contentHash } };
+}
+
+async function buildRuntimeState(): Promise<CommandManifestRuntimeState | null> {
+  try {
+    await import("../component-runtime/reflection.ts");
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function runCommandManifestGenerate(
