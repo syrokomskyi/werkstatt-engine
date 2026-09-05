@@ -21,6 +21,7 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>RFC-0960: inject registry and ownershipMap into KernelRuntimeContext at all 3 construction sites.</item>
   <item>RFC-0960 fo-fix: add console.warn to computeOwnershipMap catch block for agent-facing clarity on import failures.</item>
   <item>RFC-1026: add module state check before execute (KERNEL-MODULE-02 for non-active modules), trackInFlight with try/finally release, KERNEL-MODULE-01 for disposed commands.</item>
+  <item>RFC-1027: aggregate remediationHints from CheckResult diagnostics into KernelExecutionReport, capped at 3 entries sorted by occurrence count.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -43,6 +44,7 @@ import type {
   KernelCommandInput,
   KernelExecutionReport,
   KernelRuntimeContext,
+  RemediationHint,
 } from "../types.ts";
 import { parse as yamlParse } from "yaml";
 import { parseKernelArgv, resolveCommandFlags } from "./argv.ts";
@@ -326,6 +328,7 @@ export async function executeRegisteredCommand(
       logSummary: summarizeLogs(logs),
       timing: result?.timing ?? timing(false),
       nextSteps: result?.nextSteps,
+      remediationHints: aggregateRemediationHints(result?.data),
       filesModified,
     };
 
@@ -394,6 +397,40 @@ export async function executeRegisteredCommand(
     // RFC-1026: always release the in-flight count, even on failure or timeout.
     releaseInFlight();
   }
+}
+
+/**
+ * RFC-1027: aggregate remediation hints from CheckResult diagnostics.
+ * Groups by ruleId, counts occurrences, sorts descending, caps at 3.
+ * Returns undefined when no diagnostics have remediation data.
+ */
+function aggregateRemediationHints(data: unknown): RemediationHint[] | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const checkResult = data as CheckResult;
+  if (!Array.isArray(checkResult.diagnostics)) return undefined;
+
+  const hintMap = new Map<string, RemediationHint>();
+  for (const diag of checkResult.diagnostics) {
+    if (!diag.remediation) continue;
+    const existing = hintMap.get(diag.remediation.ruleId);
+    if (existing) {
+      existing.occurrenceCount++;
+    } else {
+      const hint: RemediationHint = {
+        ruleId: diag.remediation.ruleId,
+        action: diag.remediation.action,
+        occurrenceCount: 1,
+      };
+      if (diag.remediation.template !== undefined) hint.template = diag.remediation.template;
+      if (diag.remediation.docRef !== undefined) hint.docRef = diag.remediation.docRef;
+      if (diag.remediation.targetFiles !== undefined)
+        hint.targetFiles = diag.remediation.targetFiles;
+      hintMap.set(hint.ruleId, hint);
+    }
+  }
+
+  if (hintMap.size === 0) return undefined;
+  return [...hintMap.values()].sort((a, b) => b.occurrenceCount - a.occurrenceCount).slice(0, 3);
 }
 
 /**
