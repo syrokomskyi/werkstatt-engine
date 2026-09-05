@@ -427,14 +427,57 @@ export async function runMissionOpen(
           );
         }
         const missionDir = path.join(workspaceRoot, "missions", missionId);
+        const workpieceDir = path.join(missionDir, "workpiece");
+        const workpieceFailedDir = path.join(missionDir, "workpiece-failed");
+
+        // RFC-1033: Preserve workpiece for post-failure debugging before cleanup.
+        // Rename workpiece/ to workpiece-failed/ and write failure-report.json.
+        if (existsSync(workpieceDir)) {
+          try {
+            // If a previous workpiece-failed/ exists, remove it first
+            if (existsSync(workpieceFailedDir)) {
+              await fs.rm(workpieceFailedDir, { recursive: true, force: true });
+            }
+            await fs.rename(workpieceDir, workpieceFailedDir);
+          } catch {
+            // best-effort — if rename fails, continue with deletion
+          }
+        }
+
+        // Write failure-report.json alongside preserved workpiece
+        try {
+          const failureReport = {
+            missionId,
+            systemId,
+            failedStep,
+            error: detail,
+            rolledBackAt: new Date().toISOString(),
+            preservedAt: existsSync(workpieceFailedDir)
+              ? "missions/" + missionId + "/workpiece-failed"
+              : null,
+          };
+          writeFileSync(
+            path.join(missionDir, "failure-report.json"),
+            JSON.stringify(failureReport, null, 2) + "\n",
+          );
+        } catch {
+          // best-effort
+        }
+
         // RFC-0985 Measure 7: Write rollback marker before cleanup for crash safety
         try {
           writeFileSync(path.join(missionDir, ".rollback-pending"), missionId);
         } catch {
           // best-effort — mission dir may not exist
         }
+
+        // Remove everything except workpiece-failed/ and failure-report.json
         try {
-          await fs.rm(missionDir, { recursive: true, force: true });
+          const entries = await fs.readdir(missionDir);
+          for (const entry of entries) {
+            if (entry === "workpiece-failed" || entry === "failure-report.json") continue;
+            await fs.rm(path.join(missionDir, entry), { recursive: true, force: true });
+          }
         } catch {
           // best-effort cleanup
         }

@@ -225,9 +225,12 @@ test("mission.open rolls back on materialization failure with compensating bordb
     /materialization failed — mission rolled back/,
   );
 
-  // Mission directory should not exist
+  // RFC-1033: Mission directory persists with workpiece-failed/ and failure-report.json
   const missionDir = path.join(workspaceRoot, "missions", "test-system-m000001");
-  expect(existsSync(missionDir)).toBe(false);
+  expect(existsSync(path.join(missionDir, "workpiece-failed"))).toBe(true);
+  expect(existsSync(path.join(missionDir, "failure-report.json"))).toBe(true);
+  // workpiece/ should not exist (renamed to workpiece-failed/)
+  expect(existsSync(path.join(missionDir, "workpiece"))).toBe(false);
 
   // Compensating bordbuch entry was appended
   expect(mockAppendAndCommit).toHaveBeenCalledTimes(2);
@@ -265,7 +268,8 @@ test("mission.open rollback still throws even if compensating bordbuch entry fai
     /materialization failed — mission rolled back/,
   );
 
-  // Mission directory should not exist despite bordbuch failure
+  // RFC-1033: Mission directory persists with workpiece-failed/ despite bordbuch failure
   const missionDir = path.join(workspaceRoot, "missions", "test-system-m000001");
-  expect(existsSync(missionDir)).toBe(false);
+  expect(existsSync(path.join(missionDir, "workpiece-failed"))).toBe(true);
+  expect(existsSync(path.join(missionDir, "failure-report.json"))).toBe(true);
 });

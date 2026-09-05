@@ -752,6 +752,33 @@ export async function runSternsystemValidate(
     } catch {
       // Non-fatal — handover check skipped
     }
+
+    // RFC-1034: STERN-CONFIG-RESOLVE-01 — check if cache clone's kernel.config.ts can be loaded
+    try {
+      const cachePath = resolveMirrors(workspaceRoot, entry).cachePath;
+      if (cachePath) {
+        const configPath = path.join(cachePath, "tools", "kernel.config.ts");
+        if (existsSync(configPath)) {
+          try {
+            const { loadAppRuntime } = await import("../kernel/runtime/registry.ts");
+            await loadAppRuntime(workspaceRoot, {
+              name: entry.id,
+              directory: cachePath,
+              configPath: "tools/kernel.config.ts",
+              toolsDirectory: path.join(cachePath, "tools"),
+            });
+          } catch (configErr) {
+            warnings.push({
+              systemId: entry.id,
+              field: "STERN-CONFIG-RESOLVE-01",
+              message: `cache clone kernel.config.ts failed to load: ${configErr instanceof Error ? configErr.message : String(configErr)} — run pnpm install in the cache clone or re-materialize`,
+            });
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — config resolution check skipped
+    }
   }
 
   const validated = systems.length;
