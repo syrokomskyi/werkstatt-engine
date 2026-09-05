@@ -7,14 +7,25 @@ import {
   createEffectHandler,
   buildUnwindReport,
 } from "../effects.ts";
-import type { EffectDeclarationV1 } from "../../component/contracts.ts";
+import type { EffectDeclarationV1, CompensationAction } from "../../component/contracts.ts";
 
 const _VALID_SHA = "sha256:" + "a".repeat(64);
+
+const TEST_COMPENSATION_ACTION: CompensationAction = {
+  compensatingOperation: "test.compensate",
+  verificationProbes: [
+    { type: "http-status", target: "https://example.com", expected: "200", timeoutMs: 5000 },
+  ],
+  verificationTimeoutMs: 30000,
+  failureMode: "blocking",
+};
 
 describe("RevertibleEffectHandler", () => {
   it("dispose calls disposer and succeeds", async () => {
     let disposed = false;
-    const handler = new RevertibleEffectHandler(async () => { disposed = true; });
+    const handler = new RevertibleEffectHandler(async () => {
+      disposed = true;
+    });
     const result = await handler.dispose();
     expect(result.ok).toBe(true);
     expect(result.outcome).toBe("aborted");
@@ -23,14 +34,18 @@ describe("RevertibleEffectHandler", () => {
 
   it("dispose is idempotent", async () => {
     let count = 0;
-    const handler = new RevertibleEffectHandler(async () => { count++; });
+    const handler = new RevertibleEffectHandler(async () => {
+      count++;
+    });
     await handler.dispose();
     await handler.dispose();
     expect(count).toBe(1);
   });
 
   it("dispose failure yields failed-rollback", async () => {
-    const handler = new RevertibleEffectHandler(async () => { throw new Error("disposer failed"); });
+    const handler = new RevertibleEffectHandler(async () => {
+      throw new Error("disposer failed");
+    });
     const result = await handler.dispose();
     expect(result.ok).toBe(false);
     expect(result.outcome).toBe("failed-rollback");
@@ -46,11 +61,16 @@ describe("RevertibleEffectHandler", () => {
 
 describe("TransactionalEffectHandler", () => {
   it("prepare then commit succeeds", async () => {
-    let prepared = false, committed = false;
+    let prepared = false,
+      committed = false;
     const handler = new TransactionalEffectHandler(
       "tx-1",
-      async () => { prepared = true; },
-      async () => { committed = true; },
+      async () => {
+        prepared = true;
+      },
+      async () => {
+        committed = true;
+      },
       async () => {},
     );
     expect((await handler.prepare()).ok).toBe(true);
@@ -60,7 +80,12 @@ describe("TransactionalEffectHandler", () => {
   });
 
   it("commit before prepare fails", async () => {
-    const handler = new TransactionalEffectHandler("tx-2", async () => {}, async () => {}, async () => {});
+    const handler = new TransactionalEffectHandler(
+      "tx-2",
+      async () => {},
+      async () => {},
+      async () => {},
+    );
     const result = await handler.commit();
     expect(result.ok).toBe(false);
     expect(result.outcome).toBe("failed-rollback");
@@ -72,7 +97,9 @@ describe("TransactionalEffectHandler", () => {
       "tx-3",
       async () => {},
       async () => {},
-      async () => { aborted = true; },
+      async () => {
+        aborted = true;
+      },
     );
     await handler.prepare();
     const result = await handler.abort();
@@ -83,7 +110,14 @@ describe("TransactionalEffectHandler", () => {
 
   it("commit is idempotent", async () => {
     let count = 0;
-    const handler = new TransactionalEffectHandler("tx-4", async () => {}, async () => { count++; }, async () => {});
+    const handler = new TransactionalEffectHandler(
+      "tx-4",
+      async () => {},
+      async () => {
+        count++;
+      },
+      async () => {},
+    );
     await handler.prepare();
     await handler.commit();
     await handler.commit();
@@ -92,16 +126,34 @@ describe("TransactionalEffectHandler", () => {
 });
 
 describe("CompensatableEffectHandler", () => {
-  it("requires non-empty equivalence evidence", () => {
-    expect(() => new CompensatableEffectHandler(async () => {}, async () => {}, "")).toThrow();
+  it("requires at least one verification probe", () => {
+    const emptyAction: CompensationAction = {
+      compensatingOperation: "test.compensate",
+      verificationProbes: [],
+      verificationTimeoutMs: 30000,
+      failureMode: "blocking",
+    };
+    expect(
+      () =>
+        new CompensatableEffectHandler(
+          async () => {},
+          async () => {},
+          emptyAction,
+        ),
+    ).toThrow();
   });
 
   it("commit then compensate succeeds", async () => {
-    let committed = false, compensated = false;
+    let committed = false,
+      compensated = false;
     const handler = new CompensatableEffectHandler(
-      async () => { committed = true; },
-      async () => { compensated = true; },
-      "equivalence proof",
+      async () => {
+        committed = true;
+      },
+      async () => {
+        compensated = true;
+      },
+      TEST_COMPENSATION_ACTION,
     );
     expect((await handler.commit()).ok).toBe(true);
     expect(committed).toBe(true);
@@ -112,7 +164,11 @@ describe("CompensatableEffectHandler", () => {
   });
 
   it("compensate without commit is a no-op abort", async () => {
-    const handler = new CompensatableEffectHandler(async () => {}, async () => {}, "evidence");
+    const handler = new CompensatableEffectHandler(
+      async () => {},
+      async () => {},
+      TEST_COMPENSATION_ACTION,
+    );
     const result = await handler.compensate();
     expect(result.ok).toBe(true);
     expect(result.outcome).toBe("aborted");
@@ -121,20 +177,33 @@ describe("CompensatableEffectHandler", () => {
   it("compensation failure quarantines", async () => {
     const handler = new CompensatableEffectHandler(
       async () => {},
-      async () => { throw new Error("compensation failed"); },
-      "evidence",
+      async () => {
+        throw new Error("compensation failed");
+      },
+      TEST_COMPENSATION_ACTION,
     );
     await handler.commit();
     const result = await handler.compensate();
     expect(result.ok).toBe(false);
     expect(result.outcome).toBe("quarantined");
   });
+
+  it("exposes compensation action via getter", () => {
+    const handler = new CompensatableEffectHandler(
+      async () => {},
+      async () => {},
+      TEST_COMPENSATION_ACTION,
+    );
+    expect(handler.compensation).toBe(TEST_COMPENSATION_ACTION);
+  });
 });
 
 describe("IrreversibleEmissionEffectHandler", () => {
   it("withholds until commit", async () => {
     let emitted = false;
-    const handler = new IrreversibleEmissionEffectHandler(async () => { emitted = true; });
+    const handler = new IrreversibleEmissionEffectHandler(async () => {
+      emitted = true;
+    });
     expect(handler.isWithheld).toBe(true);
     const prepResult = await handler.prepare();
     expect(prepResult.outcome).toBe("withheld");
@@ -148,7 +217,9 @@ describe("IrreversibleEmissionEffectHandler", () => {
 
   it("abort before emit succeeds", async () => {
     let emitted = false;
-    const handler = new IrreversibleEmissionEffectHandler(async () => { emitted = true; });
+    const handler = new IrreversibleEmissionEffectHandler(async () => {
+      emitted = true;
+    });
     const result = await handler.abort();
     expect(result.ok).toBe(true);
     expect(result.outcome).toBe("aborted");
@@ -189,16 +260,29 @@ describe("createEffectHandler", () => {
 
   it("creates transactional handler", () => {
     const h = createEffectHandler(makeDecl("transactional"), {
-      prepare: async () => {}, commit: async () => {}, abort: async () => {},
+      prepare: async () => {},
+      commit: async () => {},
+      abort: async () => {},
     });
     expect(h.effectClass).toBe("transactional");
   });
 
   it("creates compensatable handler", () => {
     const h = createEffectHandler(makeDecl("compensatable"), {
-      commit: async () => {}, compensate: async () => {}, equivalenceEvidence: "proof",
+      commit: async () => {},
+      compensate: async () => {},
+      compensationAction: TEST_COMPENSATION_ACTION,
     });
     expect(h.effectClass).toBe("compensatable");
+  });
+
+  it("rejects compensatable handler without compensationAction", () => {
+    expect(() =>
+      createEffectHandler(makeDecl("compensatable"), {
+        commit: async () => {},
+        compensate: async () => {},
+      }),
+    ).toThrow(/EFFECT-02/);
   });
 
   it("creates irreversible-emission handler", () => {
@@ -211,7 +295,12 @@ describe("buildUnwindReport", () => {
   it("allSucceeded when all entries are clean", () => {
     const report = buildUnwindReport([
       { componentId: "a/b" as const, effectClass: "revertible", outcome: "aborted", error: null },
-      { componentId: "a/b" as const, effectClass: "transactional", outcome: "committed", error: null },
+      {
+        componentId: "a/b" as const,
+        effectClass: "transactional",
+        outcome: "committed",
+        error: null,
+      },
     ]);
     expect(report.allSucceeded).toBe(true);
     expect(report.quarantined).toBe(false);
@@ -220,7 +309,12 @@ describe("buildUnwindReport", () => {
   it("quarantined when any entry is quarantined", () => {
     const report = buildUnwindReport([
       { componentId: "a/b" as const, effectClass: "revertible", outcome: "aborted", error: null },
-      { componentId: "a/b" as const, effectClass: "irreversible-emission", outcome: "quarantined", error: "oops" },
+      {
+        componentId: "a/b" as const,
+        effectClass: "irreversible-emission",
+        outcome: "quarantined",
+        error: "oops",
+      },
     ]);
     expect(report.allSucceeded).toBe(false);
     expect(report.quarantined).toBe(true);
@@ -228,7 +322,12 @@ describe("buildUnwindReport", () => {
 
   it("not allSucceeded when any entry is failed-rollback", () => {
     const report = buildUnwindReport([
-      { componentId: "a/b" as const, effectClass: "revertible", outcome: "failed-rollback", error: "fail" },
+      {
+        componentId: "a/b" as const,
+        effectClass: "revertible",
+        outcome: "failed-rollback",
+        error: "fail",
+      },
     ]);
     expect(report.allSucceeded).toBe(false);
     expect(report.quarantined).toBe(true);

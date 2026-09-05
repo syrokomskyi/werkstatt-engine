@@ -1,13 +1,12 @@
-import type { EffectClass, EffectDeclarationV1 } from "../component/contracts.ts";
+import type {
+  EffectClass,
+  EffectDeclarationV1,
+  CompensationAction,
+} from "../component/contracts.ts";
 import type { ComponentId } from "../component/contracts.ts";
 
 export type EffectOutcome =
-  | "committed"
-  | "aborted"
-  | "compensated"
-  | "withheld"
-  | "failed-rollback"
-  | "quarantined";
+  "committed" | "aborted" | "compensated" | "withheld" | "failed-rollback" | "quarantined";
 
 export interface EffectUnwindEntryV1 {
   readonly componentId: ComponentId;
@@ -64,7 +63,11 @@ export class RevertibleEffectHandler implements EffectHandler {
   }
 
   async compensate(): Promise<EffectHandlerResult> {
-    return { ok: false, outcome: "failed-rollback", error: "revertible effects do not support compensation; use dispose" };
+    return {
+      ok: false,
+      outcome: "failed-rollback",
+      error: "revertible effects do not support compensation; use dispose",
+    };
   }
 
   async dispose(): Promise<EffectHandlerResult> {
@@ -114,7 +117,11 @@ export class TransactionalEffectHandler implements EffectHandler {
       this.prepared = true;
       return { ok: true, outcome: "committed", error: null };
     } catch (e) {
-      return { ok: false, outcome: "failed-rollback", error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false,
+        outcome: "failed-rollback",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
@@ -130,7 +137,11 @@ export class TransactionalEffectHandler implements EffectHandler {
       this.committed = true;
       return { ok: true, outcome: "committed", error: null };
     } catch (e) {
-      return { ok: false, outcome: "failed-rollback", error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false,
+        outcome: "failed-rollback",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
@@ -143,12 +154,20 @@ export class TransactionalEffectHandler implements EffectHandler {
       this.aborted = true;
       return { ok: true, outcome: "aborted", error: null };
     } catch (e) {
-      return { ok: false, outcome: "failed-rollback", error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false,
+        outcome: "failed-rollback",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
   async compensate(): Promise<EffectHandlerResult> {
-    return { ok: false, outcome: "failed-rollback", error: "transactional effects use abort, not compensation" };
+    return {
+      ok: false,
+      outcome: "failed-rollback",
+      error: "transactional effects use abort, not compensation",
+    };
   }
 
   async dispose(): Promise<EffectHandlerResult> {
@@ -168,19 +187,23 @@ export class CompensatableEffectHandler implements EffectHandler {
   private compensated = false;
   private readonly commitFn: () => Promise<void>;
   private readonly compensateFn: () => Promise<void>;
-  private readonly equivalenceEvidence: string;
+  private readonly compensationAction: CompensationAction;
 
   constructor(
     commitFn: () => Promise<void>,
     compensateFn: () => Promise<void>,
-    equivalenceEvidence: string,
+    compensationAction: CompensationAction,
   ) {
-    if (!equivalenceEvidence.trim()) {
-      throw new Error("compensatable effects require non-empty equivalence evidence");
+    if (compensationAction.verificationProbes.length === 0) {
+      throw new Error("compensatable effects require at least one verification probe");
     }
     this.commitFn = commitFn;
     this.compensateFn = compensateFn;
-    this.equivalenceEvidence = equivalenceEvidence;
+    this.compensationAction = compensationAction;
+  }
+
+  get compensation(): CompensationAction {
+    return this.compensationAction;
   }
 
   async prepare(): Promise<EffectHandlerResult> {
@@ -196,7 +219,11 @@ export class CompensatableEffectHandler implements EffectHandler {
       this.committed = true;
       return { ok: true, outcome: "committed", error: null };
     } catch (e) {
-      return { ok: false, outcome: "failed-rollback", error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false,
+        outcome: "failed-rollback",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
@@ -219,7 +246,11 @@ export class CompensatableEffectHandler implements EffectHandler {
       this.compensated = true;
       return { ok: true, outcome: "compensated", error: null };
     } catch (e) {
-      return { ok: false, outcome: "quarantined", error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false,
+        outcome: "quarantined",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
@@ -255,13 +286,21 @@ export class IrreversibleEmissionEffectHandler implements EffectHandler {
       this.withheld = false;
       return { ok: true, outcome: "committed", error: null };
     } catch (e) {
-      return { ok: false, outcome: "failed-rollback", error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false,
+        outcome: "failed-rollback",
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
   async abort(): Promise<EffectHandlerResult> {
     if (this.emitted) {
-      return { ok: false, outcome: "quarantined", error: "irreversible emission already emitted; cannot abort" };
+      return {
+        ok: false,
+        outcome: "quarantined",
+        error: "irreversible emission already emitted; cannot abort",
+      };
     }
     this.withheld = false;
     return { ok: true, outcome: "aborted", error: null };
@@ -269,7 +308,11 @@ export class IrreversibleEmissionEffectHandler implements EffectHandler {
 
   async compensate(): Promise<EffectHandlerResult> {
     if (this.emitted) {
-      return { ok: false, outcome: "quarantined", error: "irreversible emissions cannot be compensated" };
+      return {
+        ok: false,
+        outcome: "quarantined",
+        error: "irreversible emissions cannot be compensated",
+      };
     }
     return { ok: true, outcome: "withheld", error: null };
   }
@@ -298,7 +341,7 @@ export function createEffectHandler(
     abort?: () => Promise<void>;
     compensate?: () => Promise<void>;
     emit?: () => Promise<void>;
-    equivalenceEvidence?: string;
+    compensationAction?: CompensationAction;
   },
 ): EffectHandler {
   switch (declaration.effectClass) {
@@ -311,16 +354,18 @@ export function createEffectHandler(
         handlers.commit ?? (async () => {}),
         handlers.abort ?? (async () => {}),
       );
-    case "compensatable":
+    case "compensatable": {
+      if (!handlers.compensationAction) {
+        throw new Error("EFFECT-02: compensatable effects require a compensationAction");
+      }
       return new CompensatableEffectHandler(
         handlers.commit ?? (async () => {}),
         handlers.compensate ?? (async () => {}),
-        handlers.equivalenceEvidence ?? "",
+        handlers.compensationAction,
       );
+    }
     case "irreversible-emission":
-      return new IrreversibleEmissionEffectHandler(
-        handlers.emit ?? (async () => {}),
-      );
+      return new IrreversibleEmissionEffectHandler(handlers.emit ?? (async () => {}));
     default: {
       const _exhaustive: never = declaration.effectClass;
       throw new Error(`unknown effect class: ${_exhaustive}`);
@@ -328,12 +373,16 @@ export function createEffectHandler(
   }
 }
 
-export function buildUnwindReport(
-  entries: readonly EffectUnwindEntryV1[],
-): EffectUnwindReportV1 {
+export function buildUnwindReport(entries: readonly EffectUnwindEntryV1[]): EffectUnwindReportV1 {
   const allSucceeded = entries.every(
-    (e) => e.outcome === "aborted" || e.outcome === "compensated" || e.outcome === "withheld" || e.outcome === "committed",
+    (e) =>
+      e.outcome === "aborted" ||
+      e.outcome === "compensated" ||
+      e.outcome === "withheld" ||
+      e.outcome === "committed",
   );
-  const quarantined = entries.some((e) => e.outcome === "quarantined" || e.outcome === "failed-rollback");
+  const quarantined = entries.some(
+    (e) => e.outcome === "quarantined" || e.outcome === "failed-rollback",
+  );
   return { entries, allSucceeded: allSucceeded && !quarantined, quarantined };
 }
