@@ -32,6 +32,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/agent-gate` | `./src/agent-gate/index.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate/reflect-route` | `./src/agent-gate/reflect-route.ts` |
 | `@warpgogol/werkstatt-engine/component-runtime-module` | `./src/component-runtime/component-runtime.module.ts` |
+| `@warpgogol/werkstatt-engine/isolation-module` | `./src/isolation/isolation.module.ts` |
 | `@warpgogol/werkstatt-engine/changelog` | `./src/changelog/index.ts` |
 | `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` |
 | `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` |
@@ -77,6 +78,21 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `health-monitor.ts` tracks consecutive failures; quarantine threshold defaults to 3.
 - Agent-written candidates require `--allow-agent-written` flag on `evolution.candidate.define`.
 - Tests: `src/tests/evolution-controller.test.ts` covers contracts, reducer, guards, controller, shadow executor, canary router, health monitor.
+
+## Isolation controller (RFC-1035)
+
+- `isolation.module.ts` registers 6 `isolation.*` commands for component isolation and sandboxing tiers:
+  - `isolation.tier.inspect` — inspect the isolation tier of registered components
+  - `isolation.tier.assign` — assign an isolation tier to a component (Tier 0 requires human approval)
+  - `isolation.sandbox.spawn` — spawn a sandbox at a specified tier with policy (fs paths, network, commands, limits)
+  - `isolation.sandbox.inspect` — inspect sandbox health, resource usage, and state
+  - `isolation.sandbox.terminate` — terminate a sandbox and release resources
+  - `isolation.capability.bridge` — create a capability bridge for policy-enforced host-sandbox communication
+- `IsolationTier` is a numeric union (0 = in-process, 1 = worker thread, 2 = subprocess, 3 = WASM), replacing the legacy binary string union.
+- `IsolationManager` (`isolation-manager.ts`): manages sandbox lifecycle (spawn, inspect, terminate, list) and tier assignments. Enforces ISOLATION-04 (max sandboxes), ISOLATION-06 (Tier 0 human approval), ISOLATION-07 (no admitted provider), ISOLATION-08 (sensitive path deny-list).
+- `CapabilityBridge` (`capability-bridge.ts`): client-side proxy extending `CapabilityBrokerV1` with policy enforcement. Tracks violations (3 within 60s triggers auto-terminate). Enforces ISOLATION-01 (command not granted) and ISOLATION-02 (timeout).
+- Bordbuch entry kind `"isolation"` records sandbox lifecycle events (spawn, terminate, crash) with sandboxId, tier, componentId, action metadata.
+- Tests: `src/isolation/tests/isolation-manager.test.ts` covers AC-1 through AC-11 plus edge cases (24 tests).
 
 ## Runtime reflection (RFC-1030)
 
