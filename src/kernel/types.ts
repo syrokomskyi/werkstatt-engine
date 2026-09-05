@@ -184,7 +184,12 @@ import type {
   Diagnostic as _Diagnostic,
 } from "../schemas/diagnostic.ts";
 
-export type { DiagnosticSeverity, DiagnosticEvidence, Diagnostic } from "../schemas/diagnostic.ts";
+export type {
+  DiagnosticSeverity,
+  DiagnosticEvidence,
+  Diagnostic,
+  RemediationRef,
+} from "../schemas/diagnostic.ts";
 
 /** Canonical per-command result payload carried inside KernelCommandResult.data. */
 export interface CheckResult {

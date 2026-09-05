@@ -13,6 +13,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0852: Move canonical Diagnostic ownership from site plugin into the engine.</item>
+  <item>RFC-1027: Add structured remediation hints — remediationRefSchema and remediation field on Diagnostic.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -38,6 +39,8 @@ export const DIAGNOSTIC_LIMITS = {
   dataBytes: 64 * 1024,
   diagnosticBytes: 128 * 1024,
   diagnosticsPerResult: 1000,
+  remediationActionBytes: 512,
+  remediationTargetFiles: 8,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -246,6 +249,25 @@ export const diagnosticEvidenceSchema = z
 export type DiagnosticEvidence = z.infer<typeof diagnosticEvidenceSchema>;
 
 // ---------------------------------------------------------------------------
+// Remediation reference (RFC-1027)
+// ---------------------------------------------------------------------------
+
+export const remediationRefSchema = z
+  .object({
+    ruleId: diagnosticRuleIdSchema,
+    action: redactedDiagnosticTextSchema(DIAGNOSTIC_LIMITS.remediationActionBytes),
+    template: redactedDiagnosticTextSchema(DIAGNOSTIC_LIMITS.fixHintBytes).optional(),
+    docRef: safeWorkspaceRelativePathSchema.optional(),
+    targetFiles: z
+      .array(safeWorkspaceRelativePathSchema)
+      .max(DIAGNOSTIC_LIMITS.remediationTargetFiles)
+      .optional(),
+  })
+  .strict();
+
+export type RemediationRef = z.infer<typeof remediationRefSchema>;
+
+// ---------------------------------------------------------------------------
 // Diagnostic
 // ---------------------------------------------------------------------------
 
@@ -258,6 +280,7 @@ export const diagnosticSchema = z
     line: z.number().int().positive().optional(),
     column: z.number().int().positive().optional(),
     fixHint: redactedDiagnosticTextSchema(DIAGNOSTIC_LIMITS.fixHintBytes).optional(),
+    remediation: remediationRefSchema.optional(),
     evidence: z.array(diagnosticEvidenceSchema).max(DIAGNOSTIC_LIMITS.evidenceItems).optional(),
     data: canonicalJsonObjectV1Schema.optional(),
   })

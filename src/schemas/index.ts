@@ -169,9 +169,15 @@ export {
   diagnosticRuleIdSchema,
   safeWorkspaceRelativePathSchema,
   safeDiagnosticUrlSchema,
+  remediationRefSchema,
   DIAGNOSTIC_LIMITS,
 } from "./diagnostic.ts";
-export type { DiagnosticSeverity, DiagnosticEvidence, Diagnostic } from "./diagnostic.ts";
+export type {
+  DiagnosticSeverity,
+  DiagnosticEvidence,
+  Diagnostic,
+  RemediationRef,
+} from "./diagnostic.ts";
 
 // RFC-0565: DHT site registry and content placement schemas.
 export {
