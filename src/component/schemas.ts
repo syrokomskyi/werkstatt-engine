@@ -139,6 +139,25 @@ export const componentManifestV1Schema = z
   })
   .strict();
 
+export const componentDeclarationSchema = z
+  .object({
+    schema: z.literal("werkstatt/component-declaration@1"),
+    componentId: componentIdSchema,
+    version: semverSchema,
+    artifactHash: sha256Schema,
+    scope: componentScopeSchema,
+    provides: z.array(capabilityProvideSchema).min(1).max(MAX_PROVIDES),
+    requires: z.array(capabilityRequireSchema).max(MAX_REQUIRES),
+    requestedGrants: z.array(grantRequestSchema).max(MAX_GRANTS),
+    effects: z.array(effectDeclarationSchema).max(MAX_EFFECTS),
+    isolation: isolationRequirementSchema,
+    resources: z.array(resourceBoundSchema).max(MAX_RESOURCES),
+    config: z.record(z.string(), z.unknown()).optional(),
+    priority: z.number().int().min(0).max(1000),
+    active: z.boolean(),
+  })
+  .strict();
+
 const resolvedComponentIdentitySchema = z
   .object({
     componentId: componentIdSchema,

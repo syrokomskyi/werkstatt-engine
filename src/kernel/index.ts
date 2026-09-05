@@ -25,6 +25,7 @@ export { createKernelLogger } from "./logger.ts";
 export { KernelRegistry } from "./registry.ts";
 export * from "./runtime.ts";
 export * from "./types.ts";
+export * from "../runtime/desired-state.ts";
 export { resolveCompassScanRoot } from "./resolve-compass-scan-root.ts";
 export { runKernelWire } from "./wire.ts";
 
