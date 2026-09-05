@@ -64,7 +64,8 @@ export async function computeOwnershipMap(
   registry: KernelRegistry,
 ): Promise<GeneratorOwnershipEntry[] | undefined> {
   try {
-    const mod = (await import("@warpgogol/werkstatt-site/checks")) as unknown as {
+    const siteChecksModule = "@warpgogol/werkstatt-site/checks";
+    const mod = (await import(siteChecksModule)) as unknown as {
       buildGeneratorOwnership?: (registry: KernelRegistry) => GeneratorOwnershipEntry[];
     };
     return mod.buildGeneratorOwnership?.(registry);

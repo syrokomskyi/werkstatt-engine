@@ -145,7 +145,8 @@ function buildPreflightStep(): OperationStep<ShipContext> {
     run: async (ctx: ShipContext) => {
       // 1. Playwright Chromium ensure (site plugin, dynamic import per DNA-64)
       try {
-        const { ensureChromium } = await import("@warpgogol/werkstatt-site/checks");
+        const siteChecksModule = "@warpgogol/werkstatt-site/checks";
+        const { ensureChromium } = await import(siteChecksModule);
         await ensureChromium(ctx.workspaceRoot, ctx.logger);
         ctx.logger.info("  [ship] preflight: Chromium ensure ok");
       } catch (err) {

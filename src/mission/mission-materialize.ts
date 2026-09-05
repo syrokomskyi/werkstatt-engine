@@ -238,7 +238,8 @@ const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
 async function getWorkspaceAbsoluteGeneratedPaths(
   ownershipMap: GeneratorOwnershipEntry[] | undefined,
 ): Promise<Set<string>> {
-  const { toOwnershipEntries } = await import("@warpgogol/werkstatt-site/checks");
+  const siteChecksModule = "@warpgogol/werkstatt-site/checks";
+  const { toOwnershipEntries } = await import(siteChecksModule);
   const prefix = "systems/{system}/";
   const paths = new Set<string>();
   for (const entry of toOwnershipEntries(ownershipMap ?? [])) {
@@ -290,10 +291,13 @@ async function generateFullBoilerplate(
   context: KernelRuntimeContext,
   logger: { info: (msg: string) => void },
 ): Promise<string[]> {
+  const codegenPath = "@warpgogol/werkstatt-site/codegen";
+  const onboardingPath = "@warpgogol/werkstatt-site/onboarding";
+  const checksPath = "@warpgogol/werkstatt-site/checks";
   const [codegenMod, onboardingMod, checksMod] = await Promise.all([
-    import("@warpgogol/werkstatt-site/codegen"),
-    import("@warpgogol/werkstatt-site/onboarding"),
-    import("@warpgogol/werkstatt-site/checks"),
+    import(codegenPath),
+    import(onboardingPath),
+    import(checksPath),
   ]);
   const {
     runGenerateAgentsDocs,
@@ -714,8 +718,8 @@ async function runPreflightGate(
     return results;
   }
 
-  const { MISSION_PREFLIGHT_CRITICAL, MISSION_PREFLIGHT_WARNING } =
-    await import("@warpgogol/werkstatt-site/checks");
+  const siteChecksModule = "@warpgogol/werkstatt-site/checks";
+  const { MISSION_PREFLIGHT_CRITICAL, MISSION_PREFLIGHT_WARNING } = await import(siteChecksModule);
   const criticalResults = await runSteps(MISSION_PREFLIGHT_CRITICAL, systemId);
   const warningResults = await runSteps(MISSION_PREFLIGHT_WARNING, systemId);
   const criticalPassed = criticalResults.every((r) => r.ok);
@@ -1475,8 +1479,8 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         try {
-          const { toOwnershipEntries } =
-            await import("@warpgogol/werkstatt-site/checks/generator-ownership");
+          const genOwnershipPath = "@warpgogol/werkstatt-site/checks/generator-ownership";
+          const { toOwnershipEntries } = await import(genOwnershipPath);
           const registryOnlyNonConditional = toOwnershipEntries(
             cc.context.ownershipMap ?? [],
           ).filter(
@@ -1649,7 +1653,8 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         try {
-          const { ensureChromium } = await import("@warpgogol/werkstatt-site/checks");
+          const siteChecksModule = "@warpgogol/werkstatt-site/checks";
+          const { ensureChromium } = await import(siteChecksModule);
           await ensureChromium(cc.workspaceRoot, cc.logger);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

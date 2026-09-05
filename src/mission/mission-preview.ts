@@ -259,7 +259,8 @@ export async function runMissionPreview(
     toolsDirectory: path.join(workpiecePath, "tools"),
   };
   try {
-    const { runContentRefIndexGenerate } = await import("@warpgogol/werkstatt-site/codegen");
+    const codegenModule = "@warpgogol/werkstatt-site/codegen";
+    const { runContentRefIndexGenerate } = await import(codegenModule);
     await runContentRefIndexGenerate({ argv: [], flags: {} }, { ...context, site: workpieceSite });
   } catch (err) {
     logger.warn(
