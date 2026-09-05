@@ -17,6 +17,7 @@
   <item>RFC-0686: add dependsOn to KernelPipelineStep and concurrency to ExecuteKernelPipelineOptions for parallel step execution.</item>
   <item>RFC-0960: add GeneratedArtifactSpec, GeneratorOwnershipEntry, modulePath + generates on KernelCommandDefinition, registry + ownershipMap on KernelRuntimeContext, postBuildValidation on KernelAppConfig.</item>
   <item>RFC-0960 fo-fix: make modulePath optional (modulePath?: string) — forge commands don't declare it; validateRegistration skips undefined modulePath.</item>
+  <item>RFC-1026: add ModuleFiberState, KernelModuleHandle, KernelLifecycleRegistry for lifecycle-owned kernel registrations with disposer pattern.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -360,6 +361,21 @@ export interface KernelModule {
   name: string;
   version: string;
   register(registry: KernelModuleRegistry): void | Promise<void>;
+}
+
+export type ModuleFiberState =
+  "declared" | "loading" | "active" | "draining" | "unloading" | "disposed" | "failed";
+
+export interface KernelModuleHandle {
+  readonly moduleName: string;
+  readonly state: ModuleFiberState;
+  dispose(): Promise<void>;
+}
+
+export interface KernelLifecycleRegistry {
+  unregisterModule(moduleName: string): Promise<void>;
+  trackInFlight(commandName: string): () => void;
+  getModuleState(moduleName: string): ModuleFiberState | undefined;
 }
 
 export interface KernelAppConfig {
