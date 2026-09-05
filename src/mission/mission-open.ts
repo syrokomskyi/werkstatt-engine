@@ -60,6 +60,7 @@ import { runMissionMaterializeInternal } from "./mission-materialize.ts";
 import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
+import { getDefaultScopeManager } from "../scope/scope.ts";
 
 export interface StaleEntryCheck {
   removedPaths: string[];
@@ -681,6 +682,14 @@ export async function buildOpenSteps(
           { reportOnly: false, skipPreflight: false, force: false, skipOperationBlockCheck: true },
         );
         cc.materializedAt = materializeResult.data?.materializedAt ?? null;
+      },
+    },
+    {
+      name: "create-scope-registry",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        const scopeManager = getDefaultScopeManager();
+        scopeManager.getRegistry({ scope: "per-mission", missionId: cc.missionId });
       },
     },
     {

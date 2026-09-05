@@ -76,6 +76,7 @@ import { readFileSync } from "node:fs";
 import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
+import { getDefaultScopeManager } from "../scope/scope.ts";
 
 // RFC-0597: Media cache directories to persist across missions
 const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
@@ -1281,6 +1282,20 @@ export async function buildCloseSteps(
       verify: async (c: unknown) => {
         const cc = c as CloseStepCtx;
         return existsSync(path.join(cc.workpieceDir, ".closed"));
+      },
+    },
+    {
+      name: "dispose-scope-registry",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        try {
+          const scopeManager = getDefaultScopeManager();
+          scopeManager.disposeRegistry({ scope: "per-mission", missionId: cc.missionId });
+        } catch (scopeErr) {
+          logger.warn(
+            `  [dispose-scope-registry] Non-fatal: ${scopeErr instanceof Error ? scopeErr.message : String(scopeErr)}`,
+          );
+        }
       },
     },
   ];
