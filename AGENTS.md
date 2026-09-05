@@ -110,7 +110,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `getDefaultScopeManager()` returns a per-workshop singleton. `resetDefaultScopeManager()` resets it (for tests).
 - Mission lifecycle integration: `mission.open` creates a `per-mission` registry, `mission.close` disposes it.
 - Command execution integration: `executeRegisteredCommand` creates a `per-command` registry before execution and disposes it in the `finally` block.
-- Tests: `src/scope/tests/scope-manager.test.ts` covers registry lifecycle, resolution order, adopt, error codes, registry limit, default manager (30 tests).
+- Tests: `src/scope/tests/scope-manager.test.ts` covers registry lifecycle, resolution order, adopt, error codes, registry limit, default manager, scope boundary enforcement (34 tests).
+- **Acceptance probe paths MUST point to files where string literals are defined, not where constants are referenced.** SCOPE error codes (SCOPE-01, SCOPE-02, SCOPE-03) are defined as string literals in `src/component/contracts.ts` (`SCOPE_ERROR_CODES` object), not in `src/scope/scope.ts` which references them via the constant. `file-contains` probes search for literal strings, not resolved constant values. Discovered during RFC-1036: probes for "SCOPE-01" in `scope.ts` failed because the file uses `SCOPE_ERROR_CODES.SCOPE_01`, not the literal string.
 
 ## Runtime reflection (RFC-1030)
 
