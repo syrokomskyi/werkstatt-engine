@@ -13,8 +13,8 @@ cross-referencing validator rules[] declarations to identify uncovered ruleIds.
 </CHANGE_SUMMARY>
 */
 
-import { writeFile as writeFileRaw } from "node:fs/promises";
-import { join } from "node:path";
+import { writeFile as writeFileRaw, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "../kernel/generated-marker.ts";
 import { writeFileAtomic } from "../kernel/fs-atomic.ts";
@@ -86,6 +86,7 @@ export async function runRemediationCatalogGenerate(
     ownerCommand: "remediation.catalog.generate",
   });
   const yaml = yamlStringify(file, { sortMapEntries: false });
+  await mkdir(dirname(catalogPath), { recursive: true });
   await writeFileAtomic(catalogPath, `${header}\n${yaml}`);
 
   return {
