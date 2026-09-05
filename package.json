@@ -94,6 +94,10 @@
       "types": "./src/kernel/swim/swim-module.ts",
       "default": "./src/kernel/swim/swim-module.ts"
     },
+    "./kernel/kernel-module": {
+      "types": "./src/kernel/kernel-module.module.ts",
+      "default": "./src/kernel/kernel-module.module.ts"
+    },
     "./kernel/pipeline-budget": {
       "types": "./src/kernel/pipeline-budget.module.ts",
       "default": "./src/kernel/pipeline-budget.module.ts"
@@ -355,11 +359,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os"
-  ],
+  "files": ["src", "bin", "os"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",

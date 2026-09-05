@@ -201,3 +201,6 @@ export type {
   SwimMembershipView,
   GenomeLogEntry,
 } from "./swim/types.ts";
+
+// RFC-1026: kernel module lifecycle management
+export { kernelModuleModule } from "./kernel-module.module.ts";
