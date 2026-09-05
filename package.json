@@ -362,6 +362,10 @@
       "types": "./src/scope/scope.module.ts",
       "default": "./src/scope/scope.module.ts"
     },
+    "./composition-module": {
+      "types": "./src/runtime/composition.module.ts",
+      "default": "./src/runtime/composition.module.ts"
+    },
     "./scope": {
       "types": "./src/scope/scope.ts",
       "default": "./src/scope/scope.ts"
