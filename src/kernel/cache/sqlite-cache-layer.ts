@@ -21,7 +21,18 @@ import { existsSync, statSync, unlinkSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createRequire } from "node:module";
 
-import type { CacheEntry, CacheLayer, CacheNamespaceStatus, CacheStatus } from "./cache-layer.ts";
+import type {
+  CacheEntry,
+  CacheEntryInfo,
+  CacheLayer,
+  CacheListFilter,
+  CacheNamespaceStatus,
+  CacheStatus,
+} from "./cache-layer.ts";
+import {
+  COMMAND_RESULT_CACHE_NAMESPACE,
+  parseCommandResultCacheKey,
+} from "./command-result-cache.ts";
 
 const require_ = createRequire(import.meta.url);
 
@@ -218,5 +229,48 @@ export class SqliteCacheLayer implements CacheLayer {
 
   async close(): Promise<void> {
     this.db.close();
+  }
+
+  async list(filter?: CacheListFilter): Promise<CacheEntryInfo[]> {
+    let sql = "SELECT namespace, key, updated_at FROM cache_entries";
+    const conditions: string[] = [];
+    const params: string[] = [];
+    if (filter?.namespace) {
+      conditions.push("namespace = ?");
+      params.push(filter.namespace);
+    }
+    if (filter?.commandName) {
+      conditions.push("key LIKE ?");
+      params.push(`%:${filter.commandName}:%`);
+    }
+    if (conditions.length > 0) {
+      sql += " WHERE " + conditions.join(" AND ");
+    }
+    sql += " ORDER BY updated_at DESC";
+    const rows = this.db.prepare(sql).all(...params) as {
+      namespace: string;
+      key: string;
+      updated_at: number;
+    }[];
+
+    const results: CacheEntryInfo[] = [];
+    for (const row of rows) {
+      const parsed = parseCommandResultCacheKey(row.namespace, row.key);
+      if (!parsed) continue;
+      const statsRow = this.db
+        .prepare<[string, string]>("SELECT hits FROM cache_stats WHERE namespace = ? AND key = ?")
+        .get(row.namespace, row.key) as { hits: number } | undefined;
+      results.push({
+        namespace: row.namespace,
+        key: row.key,
+        commandName: parsed.commandName,
+        siteName: parsed.siteName,
+        inputsHash: parsed.inputsHash,
+        moduleHash: parsed.moduleHash,
+        cachedAt: row.updated_at,
+        hitCount: statsRow?.hits ?? 0,
+      });
+    }
+    return results;
   }
 }

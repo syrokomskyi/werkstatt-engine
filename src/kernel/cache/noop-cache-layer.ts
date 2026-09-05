@@ -15,7 +15,13 @@ get() always returns null. Commands continue to work by parsing files directly.
 </CHANGE_SUMMARY>
 */
 
-import type { CacheEntry, CacheLayer, CacheStatus } from "./cache-layer.ts";
+import type {
+  CacheEntry,
+  CacheEntryInfo,
+  CacheLayer,
+  CacheListFilter,
+  CacheStatus,
+} from "./cache-layer.ts";
 
 export class NoopCacheLayer implements CacheLayer {
   readonly available = false;
@@ -57,5 +63,9 @@ export class NoopCacheLayer implements CacheLayer {
 
   async close(): Promise<void> {
     // no-op — no resources to release
+  }
+
+  async list(_filter?: CacheListFilter): Promise<CacheEntryInfo[]> {
+    return [];
   }
 }

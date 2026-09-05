@@ -67,16 +67,39 @@ function selectFingerprintMode(absPath: string): "byte" | "semantic" {
 }
 
 /**
- * Build a stable string key from a CommandResultCacheKey for CacheLayer.get/set.
+ * RFC-1028: Build a composite string key from a CommandResultCacheKey.
+ * Format: `${schemaVersion}:${commandName}:${siteName}:${inputsHash}:${moduleHash}`
+ * This replaces the previous stableJsonHash approach — the composite key is
+ * human-readable and enables SQL LIKE filtering by commandName in list().
  */
 export function buildCommandResultCacheKey(key: CommandResultCacheKey): string {
-  return stableJsonHash({
-    v: key.schemaVersion,
-    cmd: key.commandName,
-    site: key.siteName,
-    in: key.inputsHash,
-    mod: key.moduleHash,
-  });
+  return [
+    key.schemaVersion,
+    key.commandName,
+    key.siteName ?? "",
+    key.inputsHash,
+    key.moduleHash,
+  ].join(":");
+}
+
+/**
+ * RFC-1028: Parse a composite cache key back into its components.
+ * Returns null if the key does not match the expected format.
+ */
+export function parseCommandResultCacheKey(
+  namespace: string,
+  key: string,
+): { commandName: string; siteName: string | null; inputsHash: string; moduleHash: string } | null {
+  if (namespace !== COMMAND_RESULT_CACHE_NAMESPACE) return null;
+  const parts = key.split(":");
+  if (parts.length < 5) return null;
+  const [schemaVersion, commandName, siteName, inputsHash, moduleHash] = parts;
+  return {
+    commandName,
+    siteName: siteName || null,
+    inputsHash,
+    moduleHash,
+  };
 }
 
 function toPosix(p: string): string {

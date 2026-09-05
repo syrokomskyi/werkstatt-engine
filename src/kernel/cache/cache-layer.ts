@@ -16,6 +16,7 @@ and falls back to NoopCacheLayer when the native module is unavailable.
   <item>RFC-0382: initial implementation — CacheLayer interface, CacheEntry, CacheStatus, createCacheLayer factory.</item>
   <item>RFC-0382 post-review: remove unused staleEntries placeholder from CacheNamespaceStatus.</item>
   <item>ADR-0023: add close() method for explicit resource cleanup after pipeline completion.</item>
+  <item>RFC-1028: add CacheEntryInfo interface and optional list() method for cache entry inspection.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -57,6 +58,24 @@ export interface CacheLayer {
   clear(namespace?: string): Promise<void>;
   status(): Promise<CacheStatus>;
   close(): Promise<void>;
+  /** RFC-1028: list cache entries for inspection (validation.state.inspect). */
+  list?(filter?: CacheListFilter): Promise<CacheEntryInfo[]>;
+}
+
+export interface CacheListFilter {
+  namespace?: string;
+  commandName?: string;
+}
+
+export interface CacheEntryInfo {
+  namespace: string;
+  key: string;
+  commandName: string;
+  siteName: string | null;
+  inputsHash: string;
+  moduleHash: string;
+  cachedAt: number;
+  hitCount: number;
 }
 
 export const CACHE_DB_RELATIVE_PATH = join(".cache", "kernel-cache.db");
