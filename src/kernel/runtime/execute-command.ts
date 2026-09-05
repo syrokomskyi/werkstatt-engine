@@ -56,6 +56,7 @@ import { getFactoryTelemetryPusher, recordCommandTelemetry } from "./telemetry.t
 import { manifestFilePath, type CommandManifest } from "../command-manifest.ts";
 import type { KernelRegistry } from "../registry.ts";
 import type { GeneratorOwnershipEntry } from "../types.ts";
+import { getDefaultScopeManager } from "../../scope/scope.ts";
 
 /**
  * RFC-0960: Compute the derived generator ownership map via dynamic import
@@ -306,6 +307,11 @@ export async function executeRegisteredCommand(
   // the count is decremented even on failure or timeout.
   const releaseInFlight = context.registry.trackInFlight(command.name);
 
+  // RFC-1036: create per-command scope registry for this invocation.
+  const commandInvocationId = `${command.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const scopeManager = getDefaultScopeManager();
+  scopeManager.getRegistry({ scope: "per-command", invocationId: commandInvocationId });
+
   try {
     const result = await runWithOptionalTimeout();
     const exitCode = result?.exitCode ?? 0;
@@ -396,6 +402,12 @@ export async function executeRegisteredCommand(
   } finally {
     // RFC-1026: always release the in-flight count, even on failure or timeout.
     releaseInFlight();
+    // RFC-1036: dispose per-command scope registry.
+    try {
+      scopeManager.disposeRegistry({ scope: "per-command", invocationId: commandInvocationId });
+    } catch {
+      // best-effort — registry may already be disposed
+    }
   }
 }
 
