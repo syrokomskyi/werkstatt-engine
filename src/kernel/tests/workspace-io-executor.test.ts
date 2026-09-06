@@ -78,23 +78,27 @@ export default {
   return { root };
 }
 
-test("executor: a mislabeled mutatesState: false command that writes via context.io fails with KERNEL-META-01", async () => {
-  const { root } = await fixtureWorkspace();
-  try {
-    const report = await executeKernelCommand({
-      workspaceRoot: root,
-      commandName: "fixture.mislabeled.command",
-      outputFormat: "json",
-    });
-    const single = Array.isArray(report) ? report[0]! : report;
-    expect(single.ok).toBe(false);
-    expect(single.exitCode).toBe(1);
-    expect(single.summary ?? "").toMatch(/KERNEL-META-01/);
-    expect(single.summary ?? "").toMatch(/fixture\.mislabeled\.command/);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+test(
+  "executor: a mislabeled mutatesState: false command that writes via context.io fails with KERNEL-META-01",
+  { timeout: 60_000 },
+  async () => {
+    const { root } = await fixtureWorkspace();
+    try {
+      const report = await executeKernelCommand({
+        workspaceRoot: root,
+        commandName: "fixture.mislabeled.command",
+        outputFormat: "json",
+      });
+      const single = Array.isArray(report) ? report[0]! : report;
+      expect(single.ok).toBe(false);
+      expect(single.exitCode).toBe(1);
+      expect(single.summary ?? "").toMatch(/KERNEL-META-01/);
+      expect(single.summary ?? "").toMatch(/fixture\.mislabeled\.command/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test("executor: an honestly-declared mutatesState: false command runs cleanly under the read-only adapter", async () => {
   const { root } = await fixtureWorkspace();

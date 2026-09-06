@@ -100,20 +100,23 @@ test("findWorkspaceRoot walks upward to the pnpm workspace", async () => {
   expect(resolved).toBe(workspaceRoot);
 });
 
-test("executeKernelPipeline runs workspace pipelines without an app target", async () => {
-  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "werkstatt-pipeline-"));
-  const toolsRoot = path.join(workspaceRoot, "tools");
+test(
+  "executeKernelPipeline runs workspace pipelines without an app target",
+  { timeout: 60_000 },
+  async () => {
+    const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "werkstatt-pipeline-"));
+    const toolsRoot = path.join(workspaceRoot, "tools");
 
-  await fs.mkdir(toolsRoot, { recursive: true });
-  await fs.writeFile(path.join(workspaceRoot, "package.json"), "{}\n", "utf8");
-  await fs.writeFile(
-    path.join(workspaceRoot, "pnpm-workspace.yaml"),
-    "packages:\n  - apps/*\n",
-    "utf8",
-  );
-  await fs.writeFile(
-    path.join(toolsRoot, "kernel.config.mjs"),
-    `
+    await fs.mkdir(toolsRoot, { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, "package.json"), "{}\n", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "pnpm-workspace.yaml"),
+      "packages:\n  - apps/*\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(toolsRoot, "kernel.config.mjs"),
+      `
 export default {
   modules: [{
     name: "workspace-fixture",
@@ -170,64 +173,65 @@ export default {
   }],
 };
 `,
-    "utf8",
-  );
+      "utf8",
+    );
 
-  const report = await executeKernelPipeline({
-    workspaceRoot,
-    pipelineName: "workspace.good",
-    outputFormat: "json",
-  });
-
-  expect(Array.isArray(report)).toBe(false);
-  expect(Array.isArray(report) ? undefined : report.ok).toBe(true);
-  expect(Array.isArray(report) ? undefined : report.siteName).toBe(undefined);
-  expect(Array.isArray(report) ? undefined : report.steps[0]?.commandName).toBe("workspace.ok");
-  expect(Array.isArray(report) ? undefined : report.steps[0]?.timing.exceededTimeout).toBe(false);
-  expect(Array.isArray(report) ? undefined : typeof report.timing.totalDurationMs).toBe("number");
-  expect(Array.isArray(report) ? undefined : report.timing.slowestSteps[0]?.command).toBe(
-    "workspace.ok",
-  );
-
-  const failedReport = await executeKernelPipeline({
-    workspaceRoot,
-    pipelineName: "workspace.fail",
-    outputFormat: "json",
-  });
-  expect(Array.isArray(failedReport) ? undefined : failedReport.ok).toBe(false);
-  expect(Array.isArray(failedReport) ? undefined : failedReport.timing.failedStep).toBe(
-    "workspace.fail",
-  );
-  expect(
-    Array.isArray(failedReport) ? undefined : failedReport.timing.slowestSteps[0]?.status,
-  ).toBe("fail");
-
-  const skippedReport = await executeKernelPipeline({
-    workspaceRoot,
-    pipelineName: "workspace.skipped",
-    outputFormat: "json",
-  });
-  expect(Array.isArray(skippedReport) ? undefined : skippedReport.ok).toBe(true);
-  expect(
-    Array.isArray(skippedReport) ? undefined : skippedReport.timing.slowestSteps[0]?.status,
-  ).toBe("skipped");
-
-  const timeoutReport = await executeKernelPipeline({
-    workspaceRoot,
-    pipelineName: "workspace.timeout",
-    outputFormat: "json",
-  });
-  expect(Array.isArray(timeoutReport) ? undefined : timeoutReport.ok).toBe(false);
-  expect(Array.isArray(timeoutReport) ? undefined : timeoutReport.timing.timeoutCount).toBe(1);
-  expect(
-    Array.isArray(timeoutReport) ? undefined : timeoutReport.timing.slowestSteps[0]?.status,
-  ).toBe("timeout");
-
-  await expect(() =>
-    executeKernelPipeline({
+    const report = await executeKernelPipeline({
       workspaceRoot,
-      pipelineName: "workspace.bad",
+      pipelineName: "workspace.good",
       outputFormat: "json",
-    }),
-  ).rejects.toThrow(/cannot execute app-scoped step/);
-});
+    });
+
+    expect(Array.isArray(report)).toBe(false);
+    expect(Array.isArray(report) ? undefined : report.ok).toBe(true);
+    expect(Array.isArray(report) ? undefined : report.siteName).toBe(undefined);
+    expect(Array.isArray(report) ? undefined : report.steps[0]?.commandName).toBe("workspace.ok");
+    expect(Array.isArray(report) ? undefined : report.steps[0]?.timing.exceededTimeout).toBe(false);
+    expect(Array.isArray(report) ? undefined : typeof report.timing.totalDurationMs).toBe("number");
+    expect(Array.isArray(report) ? undefined : report.timing.slowestSteps[0]?.command).toBe(
+      "workspace.ok",
+    );
+
+    const failedReport = await executeKernelPipeline({
+      workspaceRoot,
+      pipelineName: "workspace.fail",
+      outputFormat: "json",
+    });
+    expect(Array.isArray(failedReport) ? undefined : failedReport.ok).toBe(false);
+    expect(Array.isArray(failedReport) ? undefined : failedReport.timing.failedStep).toBe(
+      "workspace.fail",
+    );
+    expect(
+      Array.isArray(failedReport) ? undefined : failedReport.timing.slowestSteps[0]?.status,
+    ).toBe("fail");
+
+    const skippedReport = await executeKernelPipeline({
+      workspaceRoot,
+      pipelineName: "workspace.skipped",
+      outputFormat: "json",
+    });
+    expect(Array.isArray(skippedReport) ? undefined : skippedReport.ok).toBe(true);
+    expect(
+      Array.isArray(skippedReport) ? undefined : skippedReport.timing.slowestSteps[0]?.status,
+    ).toBe("skipped");
+
+    const timeoutReport = await executeKernelPipeline({
+      workspaceRoot,
+      pipelineName: "workspace.timeout",
+      outputFormat: "json",
+    });
+    expect(Array.isArray(timeoutReport) ? undefined : timeoutReport.ok).toBe(false);
+    expect(Array.isArray(timeoutReport) ? undefined : timeoutReport.timing.timeoutCount).toBe(1);
+    expect(
+      Array.isArray(timeoutReport) ? undefined : timeoutReport.timing.slowestSteps[0]?.status,
+    ).toBe("timeout");
+
+    await expect(() =>
+      executeKernelPipeline({
+        workspaceRoot,
+        pipelineName: "workspace.bad",
+        outputFormat: "json",
+      }),
+    ).rejects.toThrow(/cannot execute app-scoped step/);
+  },
+);

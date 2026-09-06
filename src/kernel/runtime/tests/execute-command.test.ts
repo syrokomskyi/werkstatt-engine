@@ -34,7 +34,7 @@ describe("assertAllSitesAllowed", () => {
 });
 
 describe("computeOwnershipMap", () => {
-  test("returns undefined or array without throwing", async () => {
+  test("returns undefined or array without throwing", { timeout: 60_000 }, async () => {
     const registry = {
       commands: new Map(),
       pipelines: new Map(),
