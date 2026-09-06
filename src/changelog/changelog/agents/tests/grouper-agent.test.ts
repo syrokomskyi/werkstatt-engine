@@ -1,1 +1,1 @@
-import "../../tests/grouper.test.ts";
+import "../../../tests/grouper.test.ts";

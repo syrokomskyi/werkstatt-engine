@@ -1,3 +1,4 @@
+// test-adjacency: exempt — imports astro:env/server, not loadable in vitest
 /*
 <MODULE_CONTRACT>
 <purpose>

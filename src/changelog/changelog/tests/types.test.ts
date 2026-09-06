@@ -1,1 +1,1 @@
-import "../../tests/load-verification.test.ts";
+import "./load-verification.test.ts";

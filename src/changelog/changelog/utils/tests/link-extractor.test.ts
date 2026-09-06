@@ -1,1 +1,1 @@
-import "../../tests/link-extractor.test.ts";
+import "../../../tests/link-extractor.test.ts";

@@ -1,1 +1,1 @@
-import "../../tests/retry.test.ts";
+import "../../../tests/retry.test.ts";

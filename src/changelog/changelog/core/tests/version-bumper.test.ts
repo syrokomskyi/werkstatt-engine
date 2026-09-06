@@ -1,1 +1,1 @@
-import "../../tests/version-bumper.test.ts";
+import "../../../tests/version-bumper.test.ts";

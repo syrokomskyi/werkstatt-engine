@@ -1,1 +1,1 @@
-import "../../tests/classifier.test.ts";
+import "../../../tests/classifier.test.ts";

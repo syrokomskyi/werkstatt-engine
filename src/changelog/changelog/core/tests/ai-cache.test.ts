@@ -1,1 +1,1 @@
-import "../../tests/cache.test.ts";
+import "../../../tests/cache.test.ts";
