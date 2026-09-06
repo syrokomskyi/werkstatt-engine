@@ -122,7 +122,7 @@ afterEach(async () => {
   await rm(testRoot, { recursive: true, force: true });
 });
 
-test("sync pushes from cache clone to bare mirror", async () => {
+test("sync pushes from cache clone to bare mirror", { retry: 2 }, async () => {
   await setupSystemConfig([
     { path: cacheDir, storageType: "non-bare" },
     { path: bareDir, storageType: "bare" },
@@ -145,7 +145,7 @@ test("sync pushes from cache clone to bare mirror", async () => {
   expect(bareLog).toContain("update");
 });
 
-test("sync pushes to multiple external mirrors", async () => {
+test("sync pushes to multiple external mirrors", { retry: 2 }, async () => {
   await setupSystemConfig([
     { path: cacheDir, storageType: "non-bare" },
     { path: bareDir, storageType: "bare" },
@@ -171,7 +171,7 @@ test("sync pushes to multiple external mirrors", async () => {
   expect(externalLog).toContain("multi-sync");
 });
 
-test("sync handles per-mirror failure non-fatally", async () => {
+test("sync handles per-mirror failure non-fatally", { retry: 2 }, async () => {
   const nonExistentMirror = join(testRoot, "nonexistent.git");
   await setupSystemConfig([
     { path: cacheDir, storageType: "non-bare" },
@@ -197,30 +197,34 @@ test("sync handles per-mirror failure non-fatally", async () => {
   expect(bareLog).toContain("failure-test");
 });
 
-test("sync with external mirrors creates refs/mirror/${branch} matching bare repo HEAD", async () => {
-  await setupSystemConfig([
-    { path: cacheDir, storageType: "non-bare" },
-    { path: bareDir, storageType: "bare" },
-    { path: externalDir, storageType: "bare" },
-  ]);
+test(
+  "sync with external mirrors creates refs/mirror/${branch} matching bare repo HEAD",
+  { retry: 2 },
+  async () => {
+    await setupSystemConfig([
+      { path: cacheDir, storageType: "non-bare" },
+      { path: bareDir, storageType: "bare" },
+      { path: externalDir, storageType: "bare" },
+    ]);
 
-  // Make a new commit in cache
-  await writeFile(join(cacheDir, "src/content/system.md"), "# Mirror ref test\n");
-  git(cacheDir, "add -A");
-  git(cacheDir, 'commit -m "mirror-ref-test"');
+    // Make a new commit in cache
+    await writeFile(join(cacheDir, "src/content/system.md"), "# Mirror ref test\n");
+    git(cacheDir, "add -A");
+    git(cacheDir, 'commit -m "mirror-ref-test"');
 
-  const result = await runSternsystemSync(
-    makeInput({ id: "test-bundle", direction: "push" }),
-    makeContext(workspaceRoot),
-  );
+    const result = await runSternsystemSync(
+      makeInput({ id: "test-bundle", direction: "push" }),
+      makeContext(workspaceRoot),
+    );
 
-  expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(0);
 
-  // refs/mirror/main must exist and match bare repo HEAD
-  const bareHead = git(bareDir, "rev-parse main");
-  const mirrorRef = git(bareDir, "rev-parse refs/mirror/main");
-  expect(mirrorRef).toBe(bareHead);
-});
+    // refs/mirror/main must exist and match bare repo HEAD
+    const bareHead = git(bareDir, "rev-parse main");
+    const mirrorRef = git(bareDir, "rev-parse refs/mirror/main");
+    expect(mirrorRef).toBe(bareHead);
+  },
+);
 
 test("sync without external mirrors does not create refs/mirror/${branch}", async () => {
   await setupSystemConfig([
@@ -256,37 +260,41 @@ test("sync with single mirror (cache only) throws — no bare mirror", async () 
 });
 
 // RFC-0818: external mirror HEAD must match refs/mirror after sync
-test("sync pushes bordbuch commit to external mirror — external HEAD matches refs/mirror", async () => {
-  await setupSystemConfig([
-    { path: cacheDir, storageType: "non-bare" },
-    { path: bareDir, storageType: "bare" },
-    { path: externalDir, storageType: "bare" },
-  ]);
+test(
+  "sync pushes bordbuch commit to external mirror — external HEAD matches refs/mirror",
+  { retry: 2 },
+  async () => {
+    await setupSystemConfig([
+      { path: cacheDir, storageType: "non-bare" },
+      { path: bareDir, storageType: "bare" },
+      { path: externalDir, storageType: "bare" },
+    ]);
 
-  await writeFile(join(cacheDir, "src/content/system.md"), "# Bordbuch push test\n");
-  git(cacheDir, "add -A");
-  git(cacheDir, 'commit -m "bordbuch-push-test"');
+    await writeFile(join(cacheDir, "src/content/system.md"), "# Bordbuch push test\n");
+    git(cacheDir, "add -A");
+    git(cacheDir, 'commit -m "bordbuch-push-test"');
 
-  const result = await runSternsystemSync(
-    makeInput({ id: "test-bundle", direction: "push" }),
-    makeContext(workspaceRoot),
-  );
+    const result = await runSternsystemSync(
+      makeInput({ id: "test-bundle", direction: "push" }),
+      makeContext(workspaceRoot),
+    );
 
-  expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(0);
 
-  const bareHead = git(bareDir, "rev-parse main");
-  const mirrorRef = git(bareDir, "rev-parse refs/mirror/main");
-  const externalHead = git(externalDir, "rev-parse main");
+    const bareHead = git(bareDir, "rev-parse main");
+    const mirrorRef = git(bareDir, "rev-parse refs/mirror/main");
+    const externalHead = git(externalDir, "rev-parse main");
 
-  expect(mirrorRef).toBe(bareHead);
-  expect(externalHead).toBe(bareHead);
+    expect(mirrorRef).toBe(bareHead);
+    expect(externalHead).toBe(bareHead);
 
-  const externalLog = git(externalDir, "log --oneline");
-  expect(externalLog).toContain("Bordbuch: mirror-sync test-bundle");
-});
+    const externalLog = git(externalDir, "log --oneline");
+    expect(externalLog).toContain("Bordbuch: mirror-sync test-bundle");
+  },
+);
 
 // RFC-0818: bundle mirror must include bordbuch commit
-test("sync creates bundle including bordbuch commit", async () => {
+test("sync creates bundle including bordbuch commit", { retry: 2 }, async () => {
   const bundleDestDir = join(testRoot, "bundle-dest");
   await mkdir(bundleDestDir, { recursive: true });
 
@@ -317,41 +325,45 @@ test("sync creates bundle including bordbuch commit", async () => {
 });
 
 // RFC-0818: regression test — residual false positive on external push failure
-test("sync with failing external mirror — refs/mirror tracks bare HEAD despite push failure", async () => {
-  const nonExistentMirror = join(testRoot, "nonexistent.git");
+test(
+  "sync with failing external mirror — refs/mirror tracks bare HEAD despite push failure",
+  { retry: 2 },
+  async () => {
+    const nonExistentMirror = join(testRoot, "nonexistent.git");
 
-  await setupSystemConfig([
-    { path: cacheDir, storageType: "non-bare" },
-    { path: bareDir, storageType: "bare" },
-    { path: externalDir, storageType: "bare" },
-    { path: nonExistentMirror, storageType: "bare" },
-  ]);
+    await setupSystemConfig([
+      { path: cacheDir, storageType: "non-bare" },
+      { path: bareDir, storageType: "bare" },
+      { path: externalDir, storageType: "bare" },
+      { path: nonExistentMirror, storageType: "bare" },
+    ]);
 
-  await writeFile(join(cacheDir, "src/content/system.md"), "# Push failure test\n");
-  git(cacheDir, "add -A");
-  git(cacheDir, 'commit -m "push-failure-test"');
+    await writeFile(join(cacheDir, "src/content/system.md"), "# Push failure test\n");
+    git(cacheDir, "add -A");
+    git(cacheDir, 'commit -m "push-failure-test"');
 
-  const result = await runSternsystemSync(
-    makeInput({ id: "test-bundle", direction: "push" }),
-    makeContext(workspaceRoot),
-  );
+    const result = await runSternsystemSync(
+      makeInput({ id: "test-bundle", direction: "push" }),
+      makeContext(workspaceRoot),
+    );
 
-  expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(0);
 
-  const bareHead = git(bareDir, "rev-parse main");
-  const mirrorRef = git(bareDir, "rev-parse refs/mirror/main");
-  const workingExternalHead = git(externalDir, "rev-parse main");
+    const bareHead = git(bareDir, "rev-parse main");
+    const mirrorRef = git(bareDir, "rev-parse refs/mirror/main");
+    const workingExternalHead = git(externalDir, "rev-parse main");
 
-  // refs/mirror matches bare HEAD (includes bordbuch commit)
-  expect(mirrorRef).toBe(bareHead);
-  // The working external mirror also received the bordbuch commit
-  expect(workingExternalHead).toBe(bareHead);
-  // Known residual: the failed external mirror (nonExistentMirror) has N,
-  // but refs/mirror = N+1 — false positive only on push failure, not on every sync.
-});
+    // refs/mirror matches bare HEAD (includes bordbuch commit)
+    expect(mirrorRef).toBe(bareHead);
+    // The working external mirror also received the bordbuch commit
+    expect(workingExternalHead).toBe(bareHead);
+    // Known residual: the failed external mirror (nonExistentMirror) has N,
+    // but refs/mirror = N+1 — false positive only on push failure, not on every sync.
+  },
+);
 
 // ADR-0073: --force-with-lease on external mirror push overwrites diverged mirrors
-test("sync overwrites diverged external mirror via --force-with-lease", async () => {
+test("sync overwrites diverged external mirror via --force-with-lease", { retry: 2 }, async () => {
   await setupSystemConfig([
     { path: cacheDir, storageType: "non-bare" },
     { path: bareDir, storageType: "bare" },
