@@ -544,3 +544,9 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 - **`vitest.config.ts` reads `.flaky-tests.json`** from the workspace root and extends `test.exclude` with quarantined test file paths. The ledger is read synchronously at config load time. If the file is missing or unreadable, no exclusions are applied (graceful degradation).
 - **Integration tests in `src/sternsystem/sternsystem-sync-integration.test.ts` use `it.retry(2)`** (vitest options object: `test("name", { retry: 2 }, fn)`) for tests that race under parallel git I/O load. Retry is restricted to I/O races — never use retry to mask real bugs.
 - **The `.flaky-tests.json` ledger** is a committed file at the workspace root. It stores quarantined test metadata: file path, reason, owner, `quarantinedAt`, `consecutivePasses`, `lastRunAt`, `lastResult`, and `reviewDueAt`. Use `test.flaky.quarantine` to add/remove entries and `test.flaky.report` to run quarantined tests in isolation and update pass counts.
+
+## Mutation testing pilot (RFC-1056, DNA-102)
+
+- **Stryker 10 config schema requires `mutator` as an object, not a string.** Use `"mutator": {}` to activate the built-in TypeScript mutator. The string form `"mutator": "typescript"` is rejected by the Stryker 10 JSON schema. Discovered during RFC-1056.
+- **`@stryker-mutator/typescript` does not exist for Stryker 10.** The package was merged into `@stryker-mutator/core` since Stryker 5. Only `@stryker-mutator/core` and `@stryker-mutator/vitest-runner` are needed. The TypeScript mutator is built into core.
+- **NoCoverage mutants must be excluded from the mutation score denominator.** NoCoverage means tests did not exercise the mutated code at all — it is a coverage gap, not a test quality gap. Only `Killed`, `Survived`, and `Timeout` count toward the mutation score: `killed / (killed + survived + timeout)`.
