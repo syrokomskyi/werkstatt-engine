@@ -550,3 +550,7 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 - **Stryker 10 config schema requires `mutator` as an object, not a string.** Use `"mutator": {}` to activate the built-in TypeScript mutator. The string form `"mutator": "typescript"` is rejected by the Stryker 10 JSON schema. Discovered during RFC-1056.
 - **`@stryker-mutator/typescript` does not exist for Stryker 10.** The package was merged into `@stryker-mutator/core` since Stryker 5. Only `@stryker-mutator/core` and `@stryker-mutator/vitest-runner` are needed. The TypeScript mutator is built into core.
 - **NoCoverage mutants must be excluded from the mutation score denominator.** NoCoverage means tests did not exercise the mutated code at all — it is a coverage gap, not a test quality gap. Only `Killed`, `Survived`, and `Timeout` count toward the mutation score: `killed / (killed + survived + timeout)`.
+
+## Test adjacency coverage (RFC-1050)
+
+- **RFC-1050** ratcheted test adjacency for 106 kernel, certification, and mission files. All groups (A–F) are implemented: `kernel/runtime`, `kernel/cache`, `kernel/workflow`, `mission/`, `mission/steps`, `certification/`, `kernel` root, `kernel/dht`, `kernel/swim`, `kernel/gitmesh`, and `kernel/semantic` now have adjacent `.test.ts` files. The `.test-adjacency-baseline.json` has 0 untested files remaining in these directories.
