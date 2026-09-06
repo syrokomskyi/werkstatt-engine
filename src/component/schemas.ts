@@ -2,7 +2,7 @@ import { z } from "zod";
 import type {
   ComponentContractResult,
   ComponentContractViolation,
-  ComponentManifestV1,
+  ComponentDeclaration,
   ResolvedComponentSetV1,
 } from "./contracts.ts";
 
@@ -123,22 +123,6 @@ const resourceBoundSchema = z
   })
   .strict();
 
-export const componentManifestV1Schema = z
-  .object({
-    schema: z.literal("werkstatt/component-manifest@1"),
-    componentId: componentIdSchema,
-    version: semverSchema,
-    artifactHash: sha256Schema,
-    scope: componentScopeSchema,
-    provides: z.array(capabilityProvideSchema).min(1).max(MAX_PROVIDES),
-    requires: z.array(capabilityRequireSchema).max(MAX_REQUIRES),
-    requestedGrants: z.array(grantRequestSchema).max(MAX_GRANTS),
-    effects: z.array(effectDeclarationSchema).max(MAX_EFFECTS),
-    isolation: isolationRequirementSchema,
-    resources: z.array(resourceBoundSchema).max(MAX_RESOURCES),
-  })
-  .strict();
-
 export const componentDeclarationSchema = z
   .object({
     schema: z.literal("werkstatt/component-declaration@1"),
@@ -182,7 +166,7 @@ export const resolvedComponentSetV1Schema = z
 const LAW_KERNEL_GRANT_SCOPES = new Set(["certify", "administer"]);
 
 function checkDuplicateProvides(
-  manifest: z.infer<typeof componentManifestV1Schema>,
+  manifest: z.infer<typeof componentDeclarationSchema>,
   violations: ComponentContractViolation[],
 ): void {
   const seen = new Set<string>();
@@ -201,7 +185,7 @@ function checkDuplicateProvides(
 }
 
 function checkLawKernelAuthorityReservation(
-  manifest: z.infer<typeof componentManifestV1Schema>,
+  manifest: z.infer<typeof componentDeclarationSchema>,
   violations: ComponentContractViolation[],
 ): void {
   for (let i = 0; i < manifest.requestedGrants.length; i++) {
@@ -217,7 +201,7 @@ function checkLawKernelAuthorityReservation(
 }
 
 function checkResourceOwners(
-  manifest: z.infer<typeof componentManifestV1Schema>,
+  manifest: z.infer<typeof componentDeclarationSchema>,
   violations: ComponentContractViolation[],
 ): void {
   for (let i = 0; i < manifest.resources.length; i++) {
@@ -232,12 +216,12 @@ function checkResourceOwners(
   }
 }
 
-export function parseComponentManifestV1(
+export function parseComponentDeclaration(
   input: unknown,
-): ComponentContractResult<ComponentManifestV1> {
+): ComponentContractResult<ComponentDeclaration> {
   const violations: ComponentContractViolation[] = [];
 
-  const parsed = componentManifestV1Schema.safeParse(input);
+  const parsed = componentDeclarationSchema.safeParse(input);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
       violations.push({
@@ -259,7 +243,7 @@ export function parseComponentManifestV1(
     return { status: "fail", data: null, violations };
   }
 
-  return { status: "pass", data: manifest as ComponentManifestV1, violations: [] };
+  return { status: "pass", data: manifest as ComponentDeclaration, violations: [] };
 }
 
 export function parseResolvedComponentSetV1(

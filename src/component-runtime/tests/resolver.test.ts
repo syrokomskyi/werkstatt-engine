@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { resolve, type ResolutionInputV1 } from "../resolver.ts";
-import type { ComponentManifestV1, ComponentId } from "../../component/contracts.ts";
+import { resolve, type ResolveOptions } from "../resolver.ts";
+import type { ComponentDeclaration, ComponentId } from "../../component/contracts.ts";
+import type { DesiredState } from "../../runtime/desired-state.ts";
 import type { Sha256Digest } from "../../fingerprint/primitives.ts";
 
 const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
@@ -10,13 +11,13 @@ function cid(id: string): ComponentId {
   return id as ComponentId;
 }
 
-function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentManifestV1 {
+function makeManifest(overrides: Partial<ComponentDeclaration> = {}): ComponentDeclaration {
   const componentId = overrides.componentId ?? "werkstatt/engine";
   return {
-    schema: "werkstatt/component-manifest@1",
+    schema: "werkstatt/component-declaration@1",
     componentId,
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     scope: "per-workshop",
     provides: [
       { capability: "werkstatt/kernel", version: "1.0.0", schemaHash: VALID_SHA as string },
@@ -33,19 +34,39 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
     ],
     isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: componentId, lifecycle: "process" }],
+    priority: 0,
+    active: true,
     ...overrides,
   };
 }
 
-function makeInput(overrides: Partial<ResolutionInputV1> = {}): ResolutionInputV1 {
+function makeDesiredState(overrides: Partial<DesiredState> = {}): DesiredState {
+  const manifest = makeManifest();
   return {
+    components: new Map([[manifest.componentId, manifest]]),
+    requiredCapabilities: [],
+    availableArtifacts: new Map([[cid("werkstatt/engine"), VALID_SHA]]),
+    admittedGrants: [],
     profileId: "astro-typescript-turborepo",
-    desired: [makeManifest()],
-    availableArtifacts: { artifacts: new Map([[cid("werkstatt/engine"), VALID_SHA]]) },
-    admittedGrants: { admitted: [] },
-    effectPolicyHash: VALID_SHA as string,
-    isolationPolicyHash: VALID_SHA as string,
     ...overrides,
+  };
+}
+
+function componentsFromArray(manifests: ComponentDeclaration[]): Map<string, ComponentDeclaration> {
+  return new Map(manifests.map((m) => [m.componentId, m]));
+}
+
+function makeInput(
+  overrides: Partial<DesiredState> & {
+    effectPolicyHash?: string;
+    isolationPolicyHash?: string;
+  } = {},
+): ResolveOptions {
+  const { effectPolicyHash, isolationPolicyHash, ...stateOverrides } = overrides;
+  return {
+    desiredState: makeDesiredState(stateOverrides),
+    effectPolicyHash: effectPolicyHash ?? (VALID_SHA as string),
+    isolationPolicyHash: isolationPolicyHash ?? (VALID_SHA as string),
   };
 }
 
@@ -83,13 +104,11 @@ describe("resolve", () => {
     });
 
     const input = makeInput({
-      desired: [engine, fp],
-      availableArtifacts: {
-        artifacts: new Map([
-          [cid("werkstatt/engine"), VALID_SHA],
-          [cid("werkstatt/fingerprint"), VALID_SHA],
-        ]),
-      },
+      components: componentsFromArray([engine, fp]),
+      availableArtifacts: new Map([
+        [cid("werkstatt/engine"), VALID_SHA],
+        [cid("werkstatt/fingerprint"), VALID_SHA],
+      ]),
     });
 
     const result = resolve(input);
@@ -129,8 +148,14 @@ describe("resolve", () => {
       [cid("werkstatt/beta"), VALID_SHA],
     ]);
 
-    const input1 = makeInput({ desired: [a, b], availableArtifacts: { artifacts } });
-    const input2 = makeInput({ desired: [b, a], availableArtifacts: { artifacts } });
+    const input1 = makeInput({
+      components: componentsFromArray([a, b]),
+      availableArtifacts: artifacts,
+    });
+    const input2 = makeInput({
+      components: componentsFromArray([b, a]),
+      availableArtifacts: artifacts,
+    });
 
     const r1 = resolve(input1);
     const r2 = resolve(input2);
@@ -145,7 +170,7 @@ describe("resolve", () => {
   it("blocks on missing artifact", () => {
     const result = resolve(
       makeInput({
-        availableArtifacts: { artifacts: new Map() },
+        availableArtifacts: new Map(),
       }),
     );
     expect(result.status).toBe("blocked");
@@ -157,7 +182,7 @@ describe("resolve", () => {
   it("blocks on artifact hash mismatch", () => {
     const result = resolve(
       makeInput({
-        availableArtifacts: { artifacts: new Map([["werkstatt/engine", VALID_SHA_2]]) },
+        availableArtifacts: new Map([["werkstatt/engine", VALID_SHA_2]]),
       }),
     );
     expect(result.status).toBe("blocked");
@@ -174,7 +199,7 @@ describe("resolve", () => {
         },
       ],
     });
-    const result = resolve(makeInput({ desired: [manifest] }));
+    const result = resolve(makeInput({ components: componentsFromArray([manifest]) }));
     expect(result.status).toBe("blocked");
     if (result.status === "blocked") {
       expect(result.violations.some((v) => v.code === "RESOLUTION-04")).toBe(true);
@@ -204,13 +229,11 @@ describe("resolve", () => {
 
     const result = resolve(
       makeInput({
-        desired: [engine, fp],
-        availableArtifacts: {
-          artifacts: new Map([
-            [cid("werkstatt/engine"), VALID_SHA],
-            [cid("werkstatt/fingerprint"), VALID_SHA],
-          ]),
-        },
+        components: componentsFromArray([engine, fp]),
+        availableArtifacts: new Map([
+          [cid("werkstatt/engine"), VALID_SHA],
+          [cid("werkstatt/fingerprint"), VALID_SHA],
+        ]),
       }),
     );
     expect(result.status).toBe("blocked");
@@ -251,14 +274,12 @@ describe("resolve", () => {
 
     const result = resolve(
       makeInput({
-        desired: [a, b, consumer],
-        availableArtifacts: {
-          artifacts: new Map([
-            [cid("werkstatt/provider-a"), VALID_SHA],
-            [cid("werkstatt/provider-b"), VALID_SHA],
-            [cid("werkstatt/consumer"), VALID_SHA],
-          ]),
-        },
+        components: componentsFromArray([a, b, consumer]),
+        availableArtifacts: new Map([
+          [cid("werkstatt/provider-a"), VALID_SHA],
+          [cid("werkstatt/provider-b"), VALID_SHA],
+          [cid("werkstatt/consumer"), VALID_SHA],
+        ]),
       }),
     );
     expect(result.status).toBe("blocked");
@@ -299,13 +320,11 @@ describe("resolve", () => {
 
     const result = resolve(
       makeInput({
-        desired: [a, b],
-        availableArtifacts: {
-          artifacts: new Map([
-            [cid("werkstatt/cycle-a"), VALID_SHA],
-            [cid("werkstatt/cycle-b"), VALID_SHA],
-          ]),
-        },
+        components: componentsFromArray([a, b]),
+        availableArtifacts: new Map([
+          [cid("werkstatt/cycle-a"), VALID_SHA],
+          [cid("werkstatt/cycle-b"), VALID_SHA],
+        ]),
       }),
     );
     expect(result.status).toBe("blocked");
@@ -320,8 +339,8 @@ describe("resolve", () => {
     });
     const result = resolve(
       makeInput({
-        desired: [manifest],
-        admittedGrants: { admitted: [] },
+        components: componentsFromArray([manifest]),
+        admittedGrants: [],
       }),
     );
     expect(result.status).toBe("blocked");
@@ -341,7 +360,7 @@ describe("resolve", () => {
         },
       ],
     });
-    const result = resolve(makeInput({ desired: [manifest] }));
+    const result = resolve(makeInput({ components: componentsFromArray([manifest]) }));
     expect(result.status).toBe("resolved");
   });
 
@@ -368,13 +387,11 @@ describe("resolve", () => {
 
     const result = resolve(
       makeInput({
-        desired: [engine, fp],
-        availableArtifacts: {
-          artifacts: new Map([
-            [cid("werkstatt/engine"), VALID_SHA],
-            [cid("werkstatt/fingerprint"), VALID_SHA],
-          ]),
-        },
+        components: componentsFromArray([engine, fp]),
+        availableArtifacts: new Map([
+          [cid("werkstatt/engine"), VALID_SHA],
+          [cid("werkstatt/fingerprint"), VALID_SHA],
+        ]),
       }),
     );
     expect(result.status).toBe("resolved");

@@ -129,7 +129,7 @@ export async function runMissionPreflight(
   let totalViolations = 0;
 
   for (const checkName of PREFLIGHT_CHECKS) {
-    const command = context.actualState.getCommand(checkName);
+    const command = context.actualState.commands.get(checkName);
     if (!command) {
       checks.push({ command: checkName, status: "fail", violations: 0 });
       totalViolations += 1;

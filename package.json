@@ -94,10 +94,6 @@
       "types": "./src/kernel/swim/swim-module.ts",
       "default": "./src/kernel/swim/swim-module.ts"
     },
-    "./kernel/kernel-module": {
-      "types": "./src/kernel/kernel-module.module.ts",
-      "default": "./src/kernel/kernel-module.module.ts"
-    },
     "./kernel/pipeline-budget": {
       "types": "./src/kernel/pipeline-budget.module.ts",
       "default": "./src/kernel/pipeline-budget.module.ts"

@@ -25,7 +25,6 @@
 */
 
 import type { WorkspaceIO, WriteIntent } from "./workspace-io.ts";
-import type { KernelRegistry } from "./registry.ts";
 import type { ModuleExport, CommandDeclaration, ActualState } from "../runtime/desired-state.ts";
 // @ai-invariant: Kernel command contracts must stay explicit so agents cannot pass untyped command inputs.
 
@@ -268,8 +267,8 @@ export interface KernelRuntimeContext {
    * `filesModified` on the execution report.
    */
   fileIntents?: WriteIntent[];
-  /** RFC-1038: the actual state (KernelRegistry instance implementing ActualState), available to validators for derived projections like buildGeneratorOwnership. */
-  actualState: KernelRegistry;
+  /** RFC-1038: the actual state, available to validators for derived projections like buildGeneratorOwnership. */
+  actualState: ActualState;
   /**
    * RFC-0960: pre-computed derived generator ownership map. Computed once by
    * the executor via dynamic import of buildGeneratorOwnership from the site
@@ -339,15 +338,6 @@ export interface KernelAppConfig {
   modules?: ModuleExport[];
   /** Lazy module loaders — enables manifest-driven single-module loading. Functions are defined in kernel.config.ts so import() resolves from the workspace root. */
   moduleLoaders?: Record<string, () => Promise<ModuleExport>>;
-  pipelines?: Record<string, KernelPipelineStep[]>;
-  /**
-   * RFC-0960/RFC-1038: callback invoked after all modules are loaded and
-   * declarations are collected, before the actual state is returned. Used by
-   * the site plugin to inject validateDeclarations for fail-closed enforcement
-   * of modulePath and generates declarations. Engine calls the callback —
-   * does NOT import site code.
-   */
-  postBuildValidation?: (actualState: KernelRegistry) => void;
 }
 export interface KernelExecutionReport<TData = unknown> {
   siteName?: string;

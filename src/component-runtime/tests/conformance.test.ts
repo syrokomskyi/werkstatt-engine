@@ -7,7 +7,7 @@ import {
 } from "../testing/harness.ts";
 import type { ConformanceScenarioV1 } from "../conformance.ts";
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   ComponentId,
   CapabilityId,
   ResolvedComponentSetV1,
@@ -26,13 +26,13 @@ function cap(id: string): CapabilityId {
   return id as CapabilityId;
 }
 
-function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentManifestV1 {
+function makeManifest(overrides: Partial<ComponentDeclaration> = {}): ComponentDeclaration {
   const componentId = overrides.componentId ?? cid("werkstatt/engine");
   return {
-    schema: "werkstatt/component-manifest@1",
+    schema: "werkstatt/component-declaration@1",
     componentId,
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     scope: "per-workshop",
     provides: [
       { capability: cap("werkstatt/kernel"), version: "1.0.0", schemaHash: VALID_SHA as string },
@@ -42,6 +42,8 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
     effects: [],
     isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: componentId, lifecycle: "process" }],
+    priority: 0,
+    active: true,
     ...overrides,
   };
 }
@@ -52,7 +54,7 @@ function makeResolvedIdentity(
   return {
     componentId: cid("werkstatt/engine"),
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     ...overrides,
   };
 }
@@ -78,7 +80,7 @@ function makeTrustedFixture(overrides: Partial<TrustedFixture> = {}): TrustedFix
   const manifest = makeManifest();
   return {
     fixtureId: "test-fixture",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     trusted: true,
     manifests: [manifest],
     availableArtifacts: new Map<ComponentId, Sha256Digest>([["werkstatt/engine", VALID_SHA]]),
@@ -286,7 +288,7 @@ describe("runConformanceScenario", () => {
     const identityA = makeResolvedIdentity({ componentId: cid("werkstatt/alpha") });
     const identityB = makeResolvedIdentity({
       componentId: cid("werkstatt/beta"),
-      artifactHash: VALID_SHA as string,
+      artifactHash: VALID_SHA,
     });
 
     const set = makeResolvedSet({ components: [identityA, identityB] });
@@ -381,7 +383,7 @@ describe("runConformanceScenario: test-only guard", () => {
 describe("buildCatalog", () => {
   it("builds a catalog from active set, manifests, and observations", () => {
     const set = makeResolvedSet();
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, import("../reflection.ts").LiveComponentObservation>([

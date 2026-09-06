@@ -4,7 +4,7 @@ import {
 } from "../fingerprint/canonical-json.ts";
 import { type Sha256Digest } from "../fingerprint/primitives.ts";
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   IsolationTier,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
@@ -18,7 +18,7 @@ function sortByIdentity<T>(items: T[], keyFn: (item: T) => string): T[] {
   });
 }
 
-function manifestIdentityPayload(manifest: ComponentManifestV1): unknown {
+function manifestIdentityPayload(manifest: ComponentDeclaration): unknown {
   return {
     schema: manifest.schema,
     componentId: manifest.componentId,
@@ -36,7 +36,7 @@ function manifestIdentityPayload(manifest: ComponentManifestV1): unknown {
   };
 }
 
-export function computeManifestHash(manifest: ComponentManifestV1): Sha256Digest {
+export function computeManifestHash(manifest: ComponentDeclaration): Sha256Digest {
   const result = snapshotCanonicalJsonObjectV1(manifestIdentityPayload(manifest));
   if (!result.ok) {
     throw new Error(`CERT-CANONICAL-${result.code}: failed to snapshot manifest identity payload`);

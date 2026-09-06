@@ -27,10 +27,10 @@ export interface ScopeContext {
 
 export interface ScopedRegistry {
   readonly context: ScopeContext;
-  register(manifest: ComponentManifestV1): void;
-  resolve(capabilityId: CapabilityId): ComponentManifestV1 | null;
+  register(manifest: ComponentDeclaration): void;
+  resolve(capabilityId: CapabilityId): ComponentDeclaration | null;
   dispose(): void;
-  list(): ReadonlyArray<ComponentManifestV1>;
+  list(): ReadonlyArray<ComponentDeclaration>;
   getScope(): ComponentScope;
 }
 
@@ -40,7 +40,7 @@ export interface ScopeManager {
   resolveAcrossScopes(
     capabilityId: CapabilityId,
     context: ScopeContext,
-  ): ComponentManifestV1 | null;
+  ): ComponentDeclaration | null;
   inspect(): ReadonlyArray<{
     context: ScopeContext;
     componentCount: number;
@@ -141,11 +141,12 @@ export interface ResourceBoundV1 {
   lifecycle: LifecycleScope;
 }
 
-export interface ComponentManifestV1 {
-  schema: "werkstatt/component-manifest@1";
+export interface ComponentDeclaration {
+  schema: "werkstatt/component-declaration@1";
+  /** Stable component ID — survives reconfiguration without losing identity. */
   componentId: ComponentId;
   version: string;
-  artifactHash: string;
+  artifactHash: Sha256Digest;
   scope: ComponentScope;
   provides: CapabilityProvideV1[];
   requires: CapabilityRequireV1[];
@@ -153,6 +154,12 @@ export interface ComponentManifestV1 {
   effects: EffectDeclarationV1[];
   isolation: IsolationRequirementV1;
   resources: ResourceBoundV1[];
+  /** Configuration overrides for this component instance. */
+  config?: Record<string, unknown>;
+  /** Priority — higher priority components override lower for the same capability. */
+  priority: number;
+  /** Whether this component is desired to be active. */
+  active: boolean;
 }
 
 export interface ResolvedComponentIdentityV1 {

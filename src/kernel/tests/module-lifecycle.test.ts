@@ -54,14 +54,7 @@ const failingModule: ModuleExport = {
   name: "failing-module",
   version: "1.0.0",
   declarations: [],
-  commands: [
-    {
-      ...makeCmd("failing.cmd"),
-      execute: () => {
-        throw new Error("intentional registration failure");
-      },
-    },
-  ],
+  commands: [makeCmd("a.ping")], // duplicate command name — causes registration error
   pipelines: [],
 };
 
@@ -83,7 +76,7 @@ test("buildRegistry sets module states to active after successful load", async (
 
 test("buildRegistry sets module state to failed on registration error and rolls back", async () => {
   const failingConfig: KernelAppConfig = { modules: [moduleA, failingModule] };
-  await expect(buildRegistry(failingConfig)).rejects.toThrow("intentional registration failure");
+  await expect(buildRegistry(failingConfig)).rejects.toThrow("already registered");
 });
 
 test("buildRegistryWithHandles returns handles with dispose", async () => {

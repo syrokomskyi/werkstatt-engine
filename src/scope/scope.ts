@@ -17,7 +17,7 @@ per-session, per-workshop, per-fleet. Resolution searches innermost-first.</purp
 import type {
   ComponentId,
   CapabilityId,
-  ComponentManifestV1,
+  ComponentDeclaration,
   ComponentScope,
   ScopeContext,
   ScopedRegistry,
@@ -56,7 +56,7 @@ function scopeContextKey(ctx: ScopeContext): string {
 }
 
 interface RegistryEntry {
-  readonly manifest: ComponentManifestV1;
+  readonly manifest: ComponentDeclaration;
   readonly registeredAt: number;
 }
 
@@ -70,7 +70,7 @@ class ScopedRegistryImpl implements ScopedRegistry {
     this.context = context;
   }
 
-  register(manifest: ComponentManifestV1): void {
+  register(manifest: ComponentDeclaration): void {
     if (this.disposed) {
       throw new ScopeError(
         SCOPE_ERROR_CODES.SCOPE_01,
@@ -102,7 +102,7 @@ class ScopedRegistryImpl implements ScopedRegistry {
     this.order.push(manifest.componentId);
   }
 
-  resolve(capabilityId: CapabilityId): ComponentManifestV1 | null {
+  resolve(capabilityId: CapabilityId): ComponentDeclaration | null {
     if (this.disposed) return null;
     for (const entry of this.components.values()) {
       for (const provide of entry.manifest.provides) {
@@ -125,7 +125,7 @@ class ScopedRegistryImpl implements ScopedRegistry {
     this.order.length = 0;
   }
 
-  list(): ReadonlyArray<ComponentManifestV1> {
+  list(): ReadonlyArray<ComponentDeclaration> {
     return this.order.map((id) => this.components.get(id)!.manifest);
   }
 
@@ -137,7 +137,7 @@ class ScopedRegistryImpl implements ScopedRegistry {
     return this.components.has(componentId);
   }
 
-  getManifest(componentId: ComponentId): ComponentManifestV1 | null {
+  getManifest(componentId: ComponentId): ComponentDeclaration | null {
     const entry = this.components.get(componentId);
     return entry ? entry.manifest : null;
   }
@@ -181,7 +181,7 @@ export function createScopeManager(options: ScopeManagerOptions = {}): ScopeMana
   function resolveInScope(
     capabilityId: CapabilityId,
     ctx: ScopeContext,
-  ): ComponentManifestV1 | null {
+  ): ComponentDeclaration | null {
     const registry = findRegistry(ctx);
     if (!registry || registry.isDisposed) return null;
     return registry.resolve(capabilityId);
@@ -220,7 +220,10 @@ export function createScopeManager(options: ScopeManagerOptions = {}): ScopeMana
       }
     },
 
-    resolveAcrossScopes(capabilityId: CapabilityId, ctx: ScopeContext): ComponentManifestV1 | null {
+    resolveAcrossScopes(
+      capabilityId: CapabilityId,
+      ctx: ScopeContext,
+    ): ComponentDeclaration | null {
       const contexts = buildResolutionContexts(ctx);
       for (const c of contexts) {
         const result = resolveInScope(capabilityId, c);
@@ -258,7 +261,7 @@ export function createScopeManager(options: ScopeManagerOptions = {}): ScopeMana
         );
       }
 
-      let manifest: ComponentManifestV1 | null = null;
+      let manifest: ComponentDeclaration | null = null;
       for (const registry of registries.values()) {
         if (registry.isDisposed) continue;
         const found = registry.getManifest(componentId);

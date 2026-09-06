@@ -10,7 +10,7 @@ import {
   type RuntimeReflectionV1,
 } from "../reflection.ts";
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   ComponentId,
   CapabilityId,
   ResolvedComponentSetV1,
@@ -26,13 +26,13 @@ function cid(id: string): ComponentId {
   return id as ComponentId;
 }
 
-function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentManifestV1 {
+function makeManifest(overrides: Partial<ComponentDeclaration> = {}): ComponentDeclaration {
   const componentId = overrides.componentId ?? "werkstatt/engine";
   return {
-    schema: "werkstatt/component-manifest@1",
+    schema: "werkstatt/component-declaration@1",
     componentId,
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     scope: "per-workshop",
     provides: [
       { capability: "werkstatt/kernel", version: "1.0.0", schemaHash: VALID_SHA as string },
@@ -42,6 +42,8 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
     effects: [],
     isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: componentId, lifecycle: "process" }],
+    priority: 0,
+    active: true,
     ...overrides,
   };
 }
@@ -52,7 +54,7 @@ function makeResolvedIdentity(
   return {
     componentId: cid("werkstatt/engine"),
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     ...overrides,
   };
 }
@@ -77,7 +79,7 @@ function makeResolvedSet(
 describe("createCapabilityCatalog", () => {
   it("creates a catalog with correct schema and hash binding", () => {
     const set = makeResolvedSet();
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
@@ -109,7 +111,7 @@ describe("createCapabilityCatalog", () => {
       setHash: ("sha256:" + "0".repeat(64)) as string,
     };
 
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
@@ -128,7 +130,7 @@ describe("createCapabilityCatalog", () => {
   it("maps lifecycle states to reflected states correctly", () => {
     const identity = makeResolvedIdentity();
     const _set = makeResolvedSet({ components: [identity] });
-    const _manifests = new Map<ComponentId, ComponentManifestV1>([
+    const _manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
 
@@ -155,7 +157,7 @@ describe("createCapabilityCatalog", () => {
   it("callable is false for non-active states", () => {
     const identity = makeResolvedIdentity();
     const set = makeResolvedSet({ components: [identity] });
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
 
@@ -188,7 +190,7 @@ describe("createCapabilityCatalog", () => {
     });
     const identity = makeResolvedIdentity();
     const set = makeResolvedSet({ components: [identity] });
-    const manifests = new Map<ComponentId, ComponentManifestV1>([["werkstatt/engine", manifest]]);
+    const manifests = new Map<ComponentId, ComponentDeclaration>([["werkstatt/engine", manifest]]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
       ["werkstatt/engine", { componentId: cid("werkstatt/engine"), lifecycleState: "active" }],
     ]);
@@ -241,11 +243,11 @@ describe("createCapabilityCatalog", () => {
         makeResolvedIdentity({ componentId: cid("werkstatt/alpha") }),
         makeResolvedIdentity({
           componentId: cid("werkstatt/beta"),
-          artifactHash: VALID_SHA as string,
+          artifactHash: VALID_SHA,
         }),
       ],
     });
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/alpha", manifestA],
       ["werkstatt/beta", manifestB],
     ]);
@@ -270,7 +272,7 @@ describe("createCapabilityCatalog", () => {
 
   it("catalog hash is deterministic for same inputs", () => {
     const set = makeResolvedSet();
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
@@ -297,7 +299,7 @@ describe("createCapabilityCatalog", () => {
 describe("assertNoForbiddenFields", () => {
   it("passes for a clean catalog", () => {
     const set = makeResolvedSet();
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
@@ -356,7 +358,7 @@ describe("assertNoForbiddenFields", () => {
 describe("negative: catalog must not leak private data", () => {
   it("catalog entries contain only allowed fields", () => {
     const set = makeResolvedSet();
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
@@ -383,7 +385,7 @@ describe("negative: catalog must not leak private data", () => {
 
   it("catalog top-level contains only allowed fields", () => {
     const set = makeResolvedSet();
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/engine", makeManifest()],
     ]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
@@ -415,7 +417,7 @@ const STUB_LAW_KERNEL: LawKernelSummary = {
 
 function makeTwoComponentSet(): {
   set: ResolvedComponentSetV1;
-  manifests: Map<ComponentId, ComponentManifestV1>;
+  manifests: Map<ComponentId, ComponentDeclaration>;
   observations: Map<ComponentId, LiveComponentObservation>;
 } {
   const manifestA = makeManifest({
@@ -446,7 +448,7 @@ function makeTwoComponentSet(): {
       makeResolvedIdentity({ componentId: cid("werkstatt/beta") }),
     ],
   });
-  const manifests = new Map<ComponentId, ComponentManifestV1>([
+  const manifests = new Map<ComponentId, ComponentDeclaration>([
     ["werkstatt/alpha", manifestA],
     ["werkstatt/beta", manifestB],
   ]);
@@ -541,7 +543,7 @@ describe("reflectRuntime", () => {
     const set = makeResolvedSet({
       components: [makeResolvedIdentity({ componentId: cid("werkstatt/alpha") })],
     });
-    const manifests = new Map<ComponentId, ComponentManifestV1>([["werkstatt/alpha", manifestA]]);
+    const manifests = new Map<ComponentId, ComponentDeclaration>([["werkstatt/alpha", manifestA]]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
       ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
     ]);
@@ -569,7 +571,7 @@ describe("reflectRuntime", () => {
     const set = makeResolvedSet({
       components: [makeResolvedIdentity({ componentId: cid("werkstatt/alpha") })],
     });
-    const manifests = new Map<ComponentId, ComponentManifestV1>([["werkstatt/alpha", manifestA]]);
+    const manifests = new Map<ComponentId, ComponentDeclaration>([["werkstatt/alpha", manifestA]]);
     const observations = new Map<ComponentId, LiveComponentObservation>([
       ["werkstatt/alpha", { componentId: cid("werkstatt/alpha"), lifecycleState: "active" }],
     ]);
@@ -592,7 +594,7 @@ describe("reflectRuntime", () => {
         makeResolvedIdentity({ componentId: cid("werkstatt/gamma") }),
       ],
     });
-    const manifests = new Map<ComponentId, ComponentManifestV1>([
+    const manifests = new Map<ComponentId, ComponentDeclaration>([
       ["werkstatt/alpha", manifestA],
       ["werkstatt/beta", manifestB],
       ["werkstatt/gamma", manifestC],

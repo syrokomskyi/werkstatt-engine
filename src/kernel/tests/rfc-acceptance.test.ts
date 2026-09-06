@@ -97,15 +97,17 @@ export default {
   modules: [{
     name: "fixture",
     version: "0.0.0",
-    register(registry) {
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "fixture.command",
         modulePath: "test",
         description: "fixture",
         scope: "workspace",
         execute() { return { exitCode: 0 }; },
-      });
-    },
+      },
+    ],
+    pipelines: [],
   }],
 };
 `,

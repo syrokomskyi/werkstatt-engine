@@ -16,22 +16,26 @@ import {
   getDefaultScopeManager,
 } from "../scope.ts";
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   ComponentScope,
   ScopeContext,
 } from "../../component/contracts.ts";
 import { SCOPE_ERROR_CODES } from "../../component/contracts.ts";
+import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+
+const VALID_SHA =
+  "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Sha256Digest;
 
 function makeManifest(
   componentId: string,
   scope: ComponentScope,
   capability?: string,
-): ComponentManifestV1 {
+): ComponentDeclaration {
   return {
-    schema: "werkstatt/component-manifest@1",
+    schema: "werkstatt/component-declaration@1",
     componentId: componentId as `${string}/${string}`,
     version: "1.0.0",
-    artifactHash: "sha256:abc",
+    artifactHash: VALID_SHA,
     scope,
     provides: capability
       ? [
@@ -47,6 +51,8 @@ function makeManifest(
     effects: [],
     isolation: { tier: 0, adapterId: null },
     resources: [],
+    priority: 0,
+    active: true,
   };
 }
 
@@ -153,9 +159,9 @@ describe("ScopeManager", () => {
         ...makeManifest("comp/a", "per-workshop", "cap/test"),
       };
       delete manifest.scope;
-      expect(() => r.register(manifest as unknown as ComponentManifestV1)).toThrow(ScopeError);
+      expect(() => r.register(manifest as unknown as ComponentDeclaration)).toThrow(ScopeError);
       try {
-        r.register(manifest as unknown as ComponentManifestV1);
+        r.register(manifest as unknown as ComponentDeclaration);
       } catch (e) {
         expect((e as ScopeError).code).toBe(SCOPE_ERROR_CODES.SCOPE_03);
       }

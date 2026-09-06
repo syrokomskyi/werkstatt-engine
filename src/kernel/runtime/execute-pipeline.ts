@@ -31,7 +31,7 @@ import { join, relative, sep } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
 import { deriveModuleBasePath } from "./registry.ts";
-import type { KernelRegistry } from "../registry.ts";
+import type { ActualState } from "../../runtime/desired-state.ts";
 import {
   batchAppendStepTelemetry,
   loadPipelineBudgets,
@@ -649,7 +649,7 @@ async function tryCacheWrite(
 
 async function executePipelineForSite(
   site: DiscoveredSiteWorkspace,
-  registry: KernelRegistry,
+  registry: ActualState,
   options: ExecuteKernelPipelineOptions,
   steps: KernelPipelineStep[],
 ): Promise<KernelPipelineReport> {
@@ -694,7 +694,7 @@ async function executePipelineForSite(
       concurrency,
       async (sStep: ScheduledStep) => {
         const { step, stepIndex } = sStep;
-        const command = registry.getCommand(step.command);
+        const command = registry.commands.get(step.command);
         if (!command) {
           throw new Error(
             `Kernel pipeline step \`${step.command}\` is not registered for site \`${site.name}\`.`,
@@ -910,7 +910,7 @@ async function executePipelineForSite(
 }
 
 async function executePipelineForWorkspace(
-  registry: KernelRegistry,
+  registry: ActualState,
   options: ExecuteKernelPipelineOptions,
   steps: KernelPipelineStep[],
 ): Promise<KernelPipelineReport> {
@@ -955,7 +955,7 @@ async function executePipelineForWorkspace(
       concurrency,
       async (sStep: ScheduledStep) => {
         const { step, stepIndex } = sStep;
-        const command = registry.getCommand(step.command);
+        const command = registry.commands.get(step.command);
         if (!command) {
           throw new Error(
             `Kernel pipeline step \`${step.command}\` is not registered for workspace pipeline \`${options.pipelineName}\`.`,
@@ -1179,7 +1179,7 @@ export async function executeKernelPipeline(
     progressLine(`[${site.name}] loading app runtime …`);
     const { registry } = await loadAppRuntime(options.workspaceRoot, site);
     progressLine(`[${site.name}] app runtime ready`);
-    const steps = registry.getPipeline(options.pipelineName);
+    const steps = registry.pipelines.get(options.pipelineName);
     if (!steps) {
       throw new Error(
         `Kernel pipeline \`${options.pipelineName}\` is not registered for site \`${site.name}\`.`,
@@ -1192,7 +1192,7 @@ export async function executeKernelPipeline(
     const wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot);
     if (wsRegistry) {
       progressLine(`pipeline ${options.pipelineName} — loading workspace registry …`);
-      const wsSteps = wsRegistry.getPipeline(options.pipelineName);
+      const wsSteps = wsRegistry.pipelines.get(options.pipelineName);
       if (wsSteps) {
         progressLine(`pipeline ${options.pipelineName} — workspace registry ready`);
         return executePipelineForWorkspace(wsRegistry, options, wsSteps);
@@ -1220,7 +1220,7 @@ export async function executeKernelPipeline(
     progressLine(`[${site.name}] loading app runtime …`);
     const { registry } = await loadAppRuntime(options.workspaceRoot, site);
     progressLine(`[${site.name}] app runtime ready`);
-    const steps = registry.getPipeline(options.pipelineName);
+    const steps = registry.pipelines.get(options.pipelineName);
     if (!steps) {
       throw new Error(
         `Kernel pipeline \`${options.pipelineName}\` is not registered for site \`${site.name}\`.`,

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createAgentReflectRoute } from "../reflect-route.ts";
 import type { ReflectionInput, LawKernelSummary } from "../../component-runtime/reflection.ts";
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   ComponentId,
   ResolvedComponentSetV1,
   ResolvedComponentIdentityV1,
@@ -16,13 +16,13 @@ function cid(id: string): ComponentId {
   return id as ComponentId;
 }
 
-function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentManifestV1 {
+function makeManifest(overrides: Partial<ComponentDeclaration> = {}): ComponentDeclaration {
   const componentId = overrides.componentId ?? "werkstatt/engine";
   return {
-    schema: "werkstatt/component-manifest@1",
+    schema: "werkstatt/component-declaration@1",
     componentId,
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     scope: "per-workshop",
     provides: [
       { capability: "werkstatt/kernel", version: "1.0.0", schemaHash: VALID_SHA as string },
@@ -32,6 +32,8 @@ function makeManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentMa
     effects: [],
     isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: componentId, lifecycle: "process" }],
+    priority: 0,
+    active: true,
     ...overrides,
   };
 }
@@ -42,7 +44,7 @@ function makeResolvedIdentity(
   return {
     componentId: cid("werkstatt/engine"),
     version: "1.0.0",
-    artifactHash: VALID_SHA as string,
+    artifactHash: VALID_SHA,
     ...overrides,
   };
 }
@@ -70,7 +72,7 @@ const STUB_LAW_KERNEL: LawKernelSummary = {
 function makeReflectionInput(): ReflectionInput {
   return {
     activeSet: makeResolvedSet(),
-    manifests: new Map<ComponentId, ComponentManifestV1>([["werkstatt/engine", makeManifest()]]),
+    manifests: new Map<ComponentId, ComponentDeclaration>([["werkstatt/engine", makeManifest()]]),
     observations: new Map([
       ["werkstatt/engine", { componentId: cid("werkstatt/engine"), lifecycleState: "active" }],
     ]),

@@ -72,17 +72,6 @@ export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegi
   }
   registry.currentModuleName = undefined;
 
-  if (config.pipelines) {
-    for (const [name, steps] of Object.entries(config.pipelines)) {
-      if (registry.pipelines.has(name)) {
-        throw new Error(`Kernel pipeline already registered: ${name}`);
-      }
-      registry.pipelines.set(name, [...steps]);
-    }
-  }
-
-  config.postBuildValidation?.(registry);
-
   return registry;
 }
 
@@ -135,17 +124,6 @@ export async function buildRegistryWithHandles(
   }
   registry.currentModuleName = undefined;
 
-  if (config.pipelines) {
-    for (const [name, steps] of Object.entries(config.pipelines)) {
-      if (registry.pipelines.has(name)) {
-        throw new Error(`Kernel pipeline already registered: ${name}`);
-      }
-      registry.pipelines.set(name, [...steps]);
-    }
-  }
-
-  config.postBuildValidation?.(registry);
-
   return { registry, handles };
 }
 
@@ -180,19 +158,6 @@ export async function buildRegistryForModule(
     }
   }
   registry.currentModuleName = undefined;
-
-  if (config.pipelines) {
-    for (const [name, steps] of Object.entries(config.pipelines)) {
-      if (registry.pipelines.has(name)) {
-        throw new Error(`Kernel pipeline already registered: ${name}`);
-      }
-      registry.pipelines.set(name, [...steps]);
-    }
-  }
-
-  // Note: postBuildValidation is NOT called here because only one module is
-  // loaded — the exempt list and cross-module checks would produce false
-  // positives. It runs only in buildRegistry (full registry assembly).
 
   return registry;
 }

@@ -20,14 +20,9 @@ replaces KernelModule.register().
 import type { Sha256Digest } from "../fingerprint/primitives.ts";
 import type {
   CapabilityId,
-  CapabilityProvideV1,
-  CapabilityRequireV1,
-  GrantRequestV1,
-  EffectDeclarationV1,
-  IsolationRequirementV1,
-  ResourceBoundV1,
   ComponentScope,
   ScopeContext,
+  ComponentDeclaration,
 } from "../component/contracts.ts";
 import type {
   KernelFlagSpec,
@@ -42,39 +37,20 @@ import type {
 
 /**
  * Unified component type — replaces ComponentManifestV1.
- * Contains all manifest fields plus desired-state fields (config, priority, active).
+ * Re-exported from contracts.ts for convenience.
  */
-export interface ComponentDeclaration {
-  schema: "werkstatt/component-declaration@1";
-  /** Stable component ID — survives reconfiguration without losing identity. */
-  componentId: `${string}/${string}`;
-  version: string;
-  artifactHash: Sha256Digest;
-  scope: ComponentScope;
-  provides: CapabilityProvideV1[];
-  requires: CapabilityRequireV1[];
-  requestedGrants: GrantRequestV1[];
-  effects: EffectDeclarationV1[];
-  isolation: IsolationRequirementV1;
-  resources: ResourceBoundV1[];
-  /** Configuration overrides for this component instance. */
-  config?: Record<string, unknown>;
-  /** Priority — higher priority components override lower for the same capability. */
-  priority: number;
-  /** Whether this component is desired to be active. */
-  active: boolean;
-}
+export type { ComponentDeclaration };
 
 export interface DesiredState {
   /** Stable component declarations keyed by componentId. Map for O(1) lookup. */
   components: Map<string, ComponentDeclaration>;
   /** Capability contracts that must be satisfied. */
   requiredCapabilities: string[];
-  /** Available artifacts for resolution (from ResolutionInputV1, merged). */
+  /** Available artifacts for resolution. */
   availableArtifacts: ReadonlyMap<string, Sha256Digest>;
-  /** Admitted grants for resolution (from ResolutionInputV1, merged). */
+  /** Admitted grants for resolution. */
   admittedGrants: ReadonlyArray<{ scope: string; resource: string }>;
-  /** Profile ID for resolution (from ResolutionInputV1, merged). */
+  /** Profile ID for resolution. */
   profileId: string;
 }
 

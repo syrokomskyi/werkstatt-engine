@@ -118,8 +118,9 @@ export default {
   modules: [{
     name: "workspace-fixture",
     version: "0.0.0",
-    register(registry) {
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "workspace.ok",
         modulePath: "test",
         description: "fixture",
@@ -129,8 +130,8 @@ export default {
         execute() {
           return { exitCode: 0, summary: "workspace.ok" };
         },
-      });
-      registry.registerCommand({
+      },
+      {
         name: "workspace.fail",
         modulePath: "test",
         description: "fixture",
@@ -138,8 +139,8 @@ export default {
         execute() {
           return { exitCode: 1, summary: "workspace.fail" };
         },
-      });
-      registry.registerCommand({
+      },
+      {
         name: "workspace.timeout",
         modulePath: "test",
         description: "fixture",
@@ -148,8 +149,8 @@ export default {
         execute() {
           return new Promise(() => {});
         },
-      });
-      registry.registerCommand({
+      },
+      {
         name: "app.only",
         modulePath: "test",
         description: "fixture",
@@ -157,16 +158,16 @@ export default {
         execute() {
           return { exitCode: 0, summary: "app.only" };
         },
-      });
-    },
+      },
+    ],
+    pipelines: [
+      { name: "workspace.good", steps: [{ command: "workspace.ok" }] },
+      { name: "workspace.fail", steps: [{ command: "workspace.fail" }] },
+      { name: "workspace.timeout", steps: [{ command: "workspace.timeout" }] },
+      { name: "workspace.skipped", steps: [{ command: "workspace.ok", skip: true, skipReason: "fixture skip" }] },
+      { name: "workspace.bad", steps: [{ command: "app.only" }] },
+    ],
   }],
-  pipelines: {
-    "workspace.good": [{ command: "workspace.ok" }],
-    "workspace.fail": [{ command: "workspace.fail" }],
-    "workspace.timeout": [{ command: "workspace.timeout" }],
-    "workspace.skipped": [{ command: "workspace.ok", skip: true, skipReason: "fixture skip" }],
-    "workspace.bad": [{ command: "app.only" }],
-  },
 };
 `,
     "utf8",

@@ -1,12 +1,13 @@
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   ComponentId,
   CapabilityId,
   CapabilityProvideV1,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
 } from "../component/contracts.ts";
-import { parseComponentManifestV1 } from "../component/schemas.ts";
+import type { DesiredState } from "../runtime/desired-state.ts";
+import { parseComponentDeclaration } from "../component/schemas.ts";
 import {
   computeSetHash,
   computeDependencyGraphHash,
@@ -26,13 +27,10 @@ export interface AdmittedGrantSetV1 {
   readonly admitted: ReadonlyArray<{ scope: string; resource: string }>;
 }
 
-export interface ResolutionInputV1 {
-  readonly profileId: string;
-  readonly desired: readonly ComponentManifestV1[];
-  readonly availableArtifacts: ComponentArtifactIndexV1;
-  readonly admittedGrants: AdmittedGrantSetV1;
-  readonly effectPolicyHash: string;
-  readonly isolationPolicyHash: string;
+export interface ResolveOptions {
+  readonly desiredState: DesiredState;
+  readonly effectPolicyHash?: string;
+  readonly isolationPolicyHash?: string;
 }
 
 export type ResolutionResultV1 =
@@ -79,9 +77,9 @@ function semverSatisfies(version: string, compatibility: string): boolean {
 
 function findProviders(
   capability: CapabilityId,
-  manifests: readonly ComponentManifestV1[],
-): Array<{ manifest: ComponentManifestV1; provide: CapabilityProvideV1 }> {
-  const providers: Array<{ manifest: ComponentManifestV1; provide: CapabilityProvideV1 }> = [];
+  manifests: readonly ComponentDeclaration[],
+): Array<{ manifest: ComponentDeclaration; provide: CapabilityProvideV1 }> {
+  const providers: Array<{ manifest: ComponentDeclaration; provide: CapabilityProvideV1 }> = [];
   for (const m of manifests) {
     for (const p of m.provides) {
       if (p.capability === capability) {
@@ -192,12 +190,14 @@ function topologicalSort(
   return { order, maxDepth };
 }
 
-export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
+export function resolve(options: ResolveOptions): ResolutionResultV1 {
+  const { desiredState } = options;
+  const desired = [...desiredState.components.values()];
   const violations: ResolutionViolationV1[] = [];
 
   // 1. Validate every manifest
-  for (const manifest of input.desired) {
-    const result = parseComponentManifestV1(manifest);
+  for (const manifest of desired) {
+    const result = parseComponentDeclaration(manifest);
     if (result.status === "fail") {
       for (const v of result.violations) {
         violations.push({
@@ -214,8 +214,8 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
   }
 
   // 2. Check artifact availability
-  for (const manifest of input.desired) {
-    const available = input.availableArtifacts.artifacts.get(manifest.componentId);
+  for (const manifest of desired) {
+    const available = desiredState.availableArtifacts.get(manifest.componentId);
     if (!available) {
       violations.push({
         code: "RESOLUTION-02",
@@ -237,8 +237,8 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
   }
 
   // 3. Check admitted grants
-  const admittedSet = new Set(input.admittedGrants.admitted.map((g) => `${g.scope}:${g.resource}`));
-  for (const manifest of input.desired) {
+  const admittedSet = new Set(desiredState.admittedGrants.map((g) => `${g.scope}:${g.resource}`));
+  for (const manifest of desired) {
     for (const grant of manifest.requestedGrants) {
       const key = `${grant.scope}:${grant.resource}`;
       if (!admittedSet.has(key)) {
@@ -257,9 +257,9 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
 
   // 4. Match required capabilities
   const edges: Edge[] = [];
-  for (const manifest of input.desired) {
+  for (const manifest of desired) {
     for (const req of manifest.requires) {
-      const providers = findProviders(req.capability, input.desired);
+      const providers = findProviders(req.capability, desired);
       if (providers.length === 0 && !req.optional) {
         violations.push({
           code: "RESOLUTION-04",
@@ -312,7 +312,7 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
   }
 
   // 5. Detect cycles
-  const componentIds = input.desired.map((m) => m.componentId);
+  const componentIds = desired.map((m) => m.componentId);
   const cycle = detectCycle(edges, componentIds);
   if (cycle) {
     violations.push({
@@ -340,7 +340,7 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
   // 7. Build resolved set
   const manifestMap = new Map(
     componentIds.map((id) => {
-      const m = input.desired.find((d) => d.componentId === id)!;
+      const m = desired.find((d) => d.componentId === id)!;
       return [id, m] as const;
     }),
   );
@@ -358,7 +358,7 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
     edges.map((e) => ({ from: e.from, to: e.to })),
   );
   const grantSetHash = computeGrantSetHash(
-    input.desired.flatMap((m) =>
+    desired.flatMap((m) =>
       m.requestedGrants.map((g) => ({
         componentId: m.componentId,
         scope: g.scope,
@@ -368,7 +368,7 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
     ),
   );
   const effectPolicyHash = computeEffectPolicyHash(
-    input.desired.flatMap((m) =>
+    desired.flatMap((m) =>
       m.effects.map((e) => ({
         componentId: m.componentId,
         effectClass: e.effectClass,
@@ -376,7 +376,7 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
     ),
   );
   const isolationPolicyHash = computeIsolationPolicyHash(
-    input.desired.map((m) => ({
+    desired.map((m) => ({
       componentId: m.componentId,
       tier: m.isolation.tier,
       adapterId: m.isolation.adapterId,
@@ -385,17 +385,17 @@ export function resolve(input: ResolutionInputV1): ResolutionResultV1 {
 
   const setWithoutHash: Omit<ResolvedComponentSetV1, "setHash"> = {
     schema: "werkstatt/resolved-component-set@1",
-    profileId: input.profileId,
+    profileId: desiredState.profileId,
     components: resolvedComponents,
     dependencyGraphHash,
     grantSetHash,
-    effectPolicyHash: input.effectPolicyHash || effectPolicyHash,
-    isolationPolicyHash: input.isolationPolicyHash || isolationPolicyHash,
+    effectPolicyHash: options.effectPolicyHash || effectPolicyHash,
+    isolationPolicyHash: options.isolationPolicyHash || isolationPolicyHash,
   };
 
   const setHash = computeSetHash(setWithoutHash);
   const set: ResolvedComponentSetV1 = { ...setWithoutHash, setHash };
-  const proof = createResolutionProof(input.profileId, set, edges.length, maxDepth);
+  const proof = createResolutionProof(desiredState.profileId, set, edges.length, maxDepth);
 
   return { status: "resolved", set, proof };
 }

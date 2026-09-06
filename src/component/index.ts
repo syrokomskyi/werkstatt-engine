@@ -22,7 +22,7 @@ export type {
   CompensationResult,
   IsolationRequirementV1,
   ResourceBoundV1,
-  ComponentManifestV1,
+  ComponentDeclaration,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
   ComponentContractViolation,
@@ -32,9 +32,9 @@ export type {
 export { SCOPE_ERROR_CODES } from "./contracts.ts";
 
 export {
-  parseComponentManifestV1,
+  parseComponentDeclaration,
   parseResolvedComponentSetV1,
-  componentManifestV1Schema,
+  componentDeclarationSchema,
   resolvedComponentSetV1Schema,
 } from "./schemas.ts";
 

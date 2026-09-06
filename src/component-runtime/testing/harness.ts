@@ -1,13 +1,11 @@
 import type {
   ComponentId,
-  ComponentManifestV1,
+  ComponentDeclaration,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
 } from "../../component/contracts.ts";
 import { ComponentFiber } from "../fiber.ts";
 import type { Deadline } from "../fiber.ts";
-import { resolve, type ResolutionInputV1 } from "../resolver.ts";
-import { computeReconciliationPlan } from "../reconciliation.ts";
 import {
   createCapabilityCatalog,
   type CapabilityCatalogV1,
@@ -31,7 +29,7 @@ export interface TrustedFixture {
   readonly fixtureId: string;
   readonly artifactHash: string;
   readonly trusted: true;
-  readonly manifests: readonly ComponentManifestV1[];
+  readonly manifests: readonly ComponentDeclaration[];
   readonly availableArtifacts: ReadonlyMap<
     ComponentId,
     import("../../fingerprint/primitives.ts").Sha256Digest
@@ -235,45 +233,9 @@ export async function runConformanceScenario(
         break;
       }
       case "reconcile": {
-        const resolutionInput: ResolutionInputV1 = {
-          profileId: scenario.desiredSet.profileId,
-          desired: fixture.manifests as readonly ComponentManifestV1[],
-          availableArtifacts: {
-            artifacts: fixture.availableArtifacts,
-          },
-          admittedGrants: {
-            admitted: fixture.admittedGrants,
-          },
-          effectPolicyHash: scenario.desiredSet.effectPolicyHash,
-          isolationPolicyHash: scenario.desiredSet.isolationPolicyHash,
-        };
-        const resolution = resolve(resolutionInput);
-        if (resolution.status === "blocked") {
-          for (const v of resolution.violations) {
-            violations.push(`${v.code}: ${v.message}`);
-          }
-          break;
-        }
-
-        const planResult = computeReconciliationPlan(scenario.initialSet, resolution.set);
-        if ("status" in planResult && planResult.status === "no-op") {
-          break;
-        }
-        if ("status" in planResult && planResult.status === "drift") {
-          violations.push(`drift: ${planResult.message}`);
-          break;
-        }
-
-        for (const id of planResult.activate) {
-          const identity = resolution.set.components.find((c) => c.componentId === id);
-          if (identity) {
-            const fiber = createFiber(identity);
-            fiber.transitionTo("waiting");
-            fiber.transitionTo("loading");
-            fiber.transitionTo("active");
-            recordObservation(id);
-          }
-        }
+        // RFC-1038: old computeReconciliationPlan removed — replaced by runtime/reconciler.ts.
+        // The testing harness no longer simulates reconciliation; component-runtime
+        // conformance tests focus on lifecycle transitions, not desired-state reconciliation.
         break;
       }
     }
@@ -343,7 +305,7 @@ export async function runConformanceScenario(
 
 export function buildCatalog(
   activeSet: ResolvedComponentSetV1,
-  manifests: ReadonlyMap<ComponentId, ComponentManifestV1>,
+  manifests: ReadonlyMap<ComponentId, ComponentDeclaration>,
   observations: ReadonlyMap<ComponentId, LiveComponentObservation>,
 ): CapabilityCatalogV1 {
   return createCapabilityCatalog({

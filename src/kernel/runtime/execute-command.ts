@@ -54,8 +54,8 @@ import { buildRegistryForModule, ensureTargetSites, loadAppRuntime } from "./reg
 import { getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { getFactoryTelemetryPusher, recordCommandTelemetry } from "./telemetry.ts";
 import { manifestFilePath, type CommandManifest } from "../command-manifest.ts";
-import type { KernelRegistry } from "../registry.ts";
 import type { GeneratorOwnershipEntry } from "../types.ts";
+import type { ActualState } from "../../runtime/desired-state.ts";
 import { getDefaultScopeManager } from "../../scope/scope.ts";
 
 /**
@@ -65,12 +65,12 @@ import { getDefaultScopeManager } from "../../scope/scope.ts";
  * or buildGeneratorOwnership is not yet exported.
  */
 export async function computeOwnershipMap(
-  registry: KernelRegistry,
+  registry: ActualState,
 ): Promise<GeneratorOwnershipEntry[] | undefined> {
   try {
     const siteChecksModule = "@warpgogol/werkstatt-site/checks";
     const mod = (await import(siteChecksModule)) as unknown as {
-      buildGeneratorOwnership?: (registry: KernelRegistry) => GeneratorOwnershipEntry[];
+      buildGeneratorOwnership?: (registry: ActualState) => GeneratorOwnershipEntry[];
     };
     return mod.buildGeneratorOwnership?.(registry);
   } catch (err) {
@@ -273,40 +273,6 @@ export async function executeRegisteredCommand(
     );
   }
 
-  // RFC-1026: check module state before execution. Reject commands from
-  // non-active modules with KERNEL-MODULE-02.
-  const moduleName = context.actualState.commandModules.get(command.name);
-  if (moduleName) {
-    const moduleState = context.actualState.getModuleState(moduleName);
-    if (moduleState && moduleState !== "active") {
-      const summary = `KERNEL-MODULE-02: command '${command.name}' belongs to module '${moduleName}' in state '${moduleState}' — wait for unload to complete or load the module again`;
-      logger.error(summary);
-      const logs = logger.getEvents();
-      return {
-        siteName: context.site?.name,
-        commandName: command.name,
-        data: {
-          command: command.name,
-          status: "fail",
-          diagnostics: [],
-          summary: { error: 1, warning: 0, info: 0 },
-        },
-        exitCode: 1,
-        ok: false,
-        summary,
-        metadata: command,
-        logs,
-        logSummary: summarizeLogs(logs),
-        timing: timing(false),
-        filesModified: [],
-      };
-    }
-  }
-
-  // RFC-1026: track in-flight execution. Release in finally to ensure
-  // the count is decremented even on failure or timeout.
-  const releaseInFlight = context.actualState.trackInFlight(command.name);
-
   // RFC-1036: create per-command scope registry for this invocation.
   const commandInvocationId = `${command.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const scopeManager = getDefaultScopeManager();
@@ -400,8 +366,6 @@ export async function executeRegisteredCommand(
 
     return errorReport;
   } finally {
-    // RFC-1026: always release the in-flight count, even on failure or timeout.
-    releaseInFlight();
     // RFC-1036: dispose per-command scope registry.
     try {
       scopeManager.disposeRegistry({ scope: "per-command", invocationId: commandInvocationId });
@@ -493,7 +457,7 @@ export async function executeKernelCommand(
   // resolved site context, avoiding a full site registry build that would eagerly
   // load all site modules via tsImport.
   let wsCommand: KernelCommandDefinition | undefined;
-  let wsRegistry: KernelRegistry | undefined;
+  let wsRegistry: ActualState | undefined;
   {
     const workspaceConfig = await loadWorkspaceConfig(options.workspaceRoot);
     if (workspaceConfig) {
@@ -512,13 +476,13 @@ export async function executeKernelCommand(
 
         if (moduleName) {
           wsRegistry = await buildRegistryForModule(workspaceConfig, moduleName);
-          wsCommand = wsRegistry.getCommand(options.commandName);
+          wsCommand = wsRegistry.commands.get(options.commandName);
         }
       }
 
       if (!wsCommand) {
         wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot);
-        wsCommand = wsRegistry?.getCommand(options.commandName);
+        wsCommand = wsRegistry?.commands.get(options.commandName);
       }
 
       if (wsCommand && wsCommand.scope === "workspace") {
@@ -634,28 +598,21 @@ export async function executeKernelCommand(
 
   for (const site of targetSites) {
     let command: KernelCommandDefinition | undefined;
-    let siteRegistry: KernelRegistry | undefined;
+    let siteRegistry: ActualState | undefined;
     const siteConfig = await loadKernelAppConfig(site);
 
     if (siteConfig.moduleLoaders && siteManifestModule) {
       siteRegistry = await buildRegistryForModule(siteConfig, siteManifestModule);
-      command = siteRegistry.getCommand(options.commandName);
+      command = siteRegistry.commands.get(options.commandName);
     }
 
     if (!command) {
       const { registry } = await loadAppRuntime(options.workspaceRoot, site);
       siteRegistry = registry;
-      command = registry.getCommand(options.commandName);
+      command = registry.commands.get(options.commandName);
     }
 
     if (!command) {
-      // RFC-1026: check if the command was previously registered but unloaded.
-      const disposedOrigin = siteRegistry?.disposedCommandOrigins.get(options.commandName);
-      if (disposedOrigin) {
-        throw new Error(
-          `KERNEL-MODULE-01: command \`${options.commandName}\` was registered by module \`${disposedOrigin}\` but the module has been unloaded. Load the module again to use this command.`,
-        );
-      }
       throw new Error(
         `Kernel command \`${options.commandName}\` is not registered for site \`${site.name}\`.${pipelineHint(options.commandName)}`,
       );

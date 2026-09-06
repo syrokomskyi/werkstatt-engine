@@ -31,8 +31,9 @@ export default {
   modules: [{
     name: "fixture",
     version: "0.0.0",
-    register(registry) {
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "fixture.mislabeled.command",
         modulePath: "test",
         description: "declares mutatesState: false but actually writes — the bug this test finds",
@@ -42,8 +43,8 @@ export default {
           await context.io.writeFile("${join(root, "should-not-exist.txt").replace(/\\/g, "\\\\")}", "oops");
           return { exitCode: 0 };
         },
-      });
-      registry.registerCommand({
+      },
+      {
         name: "fixture.honest.readonly.command",
         modulePath: "test",
         description: "correctly declares mutatesState: false and never writes",
@@ -53,8 +54,8 @@ export default {
           const exists = await context.io.exists("${join(root, "package.json").replace(/\\/g, "\\\\")}");
           return { exitCode: 0, data: { exists } };
         },
-      });
-      registry.registerCommand({
+      },
+      {
         name: "fixture.writes.file.command",
         modulePath: "test",
         description: "mutating command that writes via context.io, for RFC-0326 filesModified tests",
@@ -63,14 +64,12 @@ export default {
         async execute(_input, context) {
           const docs = "${join(root, "docs").replace(/\\/g, "\\\\")}";
           const target = "${join(root, "docs", "generated.txt").replace(/\\/g, "\\\\")}";
-          // Use a single writeFile call; createDefaultIO's writeFile already
-          // ensures parent directories exist (recursive mkdir), so we do not
-          // emit a separate mkdir intent.
           await context.io.writeFile(target, "generated content");
           return { exitCode: 0, data: { wrote: target } };
         },
-      });
-    },
+      },
+    ],
+    pipelines: [],
   }],
 };
 `,

@@ -60,7 +60,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `executeRegisteredCommand` checks module state before execution: rejects with `KERNEL-MODULE-02` if the owning module is not `active`.
 - `executeKernelCommand` checks `disposedCommandOrigins` when a command is not found: reports `KERNEL-MODULE-01` if the command was previously registered but its module was unloaded.
 - `clearModule(cacheKey, moduleName)` in `registry-cache.ts` incrementally invalidates a single module from a cached registry without clearing the entire cache. Removes the cache entry when no active modules remain.
-- `kernel-module.module.ts` registers `kernel.module.inspect`, `kernel.module.unload`, `kernel.module.load` commands for runtime lifecycle management.
+- `kernel-module.module.ts` deleted by RFC-1038 — `kernel.module.load`, `kernel.module.unload`, `kernel.module.inspect` commands removed. Module introspection is available via `composition.desired-state.inspect`. The reconciler is the only path to activate/deactivate components.
 - Tests: `src/kernel/tests/module-lifecycle.test.ts` covers states, unregister, drain, rollback, cache invalidation, trackInFlight.
 
 ## Evolution controller (RFC-1031)

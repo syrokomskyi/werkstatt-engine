@@ -165,7 +165,7 @@ test("dist/ exists with --skip-slow → slow steps skipped, fast steps run indiv
   ];
 
   mockLoadAppRuntime.mockResolvedValue({
-    actualState: {
+    registry: {
       getPipeline: vi.fn(() => pipelineSteps),
     },
   } as never);

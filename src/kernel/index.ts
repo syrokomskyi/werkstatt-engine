@@ -204,4 +204,4 @@ export type {
 } from "./swim/types.ts";
 
 // RFC-1026: kernel module lifecycle management
-export { kernelModuleModule } from "./kernel-module.module.ts";
+// RFC-1038: kernelModuleModule deleted — kernel.module.load/unload/inspect removed.

@@ -3,7 +3,7 @@ import type {
   CapabilityProvideV1,
   CapabilityRequireV1,
   ComponentId,
-  ComponentManifestV1,
+  ComponentDeclaration,
   EffectDeclarationV1,
   GrantRequestV1,
   ResolvedComponentSetV1,
@@ -37,7 +37,7 @@ export interface LiveComponentObservation {
 
 export interface ReflectionInput {
   readonly activeSet: ResolvedComponentSetV1;
-  readonly manifests: ReadonlyMap<ComponentId, ComponentManifestV1>;
+  readonly manifests: ReadonlyMap<ComponentId, ComponentDeclaration>;
   readonly observations: ReadonlyMap<ComponentId, LiveComponentObservation>;
   readonly observedAt?: string;
   readonly visibleCapabilities?: ReadonlySet<CapabilityId>;
@@ -236,7 +236,7 @@ export interface RuntimeReflectionV1 {
 }
 
 function buildDependencyEdges(
-  manifests: ReadonlyMap<ComponentId, ComponentManifestV1>,
+  manifests: ReadonlyMap<ComponentId, ComponentDeclaration>,
   componentIds: ReadonlySet<ComponentId>,
 ): RuntimeReflectionV1["dependencyEdges"] {
   const providerMap = new Map<CapabilityId, ComponentId[]>();
@@ -280,7 +280,7 @@ function buildDependencyEdges(
 
 function resolveRequirement(
   require: CapabilityRequireV1,
-  manifests: ReadonlyMap<ComponentId, ComponentManifestV1>,
+  manifests: ReadonlyMap<ComponentId, ComponentDeclaration>,
   activeComponentIds: ReadonlySet<ComponentId>,
 ): CapabilityRequireV1 & {
   resolvedBy?: ComponentId;

@@ -350,8 +350,9 @@ export function createModule() {
   return {
     name: "test-module",
     version: "0.1.0",
-    async register(registry) {
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "test.cmd",
         modulePath: "test",
         description: "test",
@@ -362,8 +363,9 @@ export function createModule() {
         async execute(): Promise<KernelCommandResult> {
           return { exitCode: 0, summary: "[test.cmd] OK" };
         },
-      });
-    },
+      },
+    ],
+    pipelines: [],
   };
 }
 

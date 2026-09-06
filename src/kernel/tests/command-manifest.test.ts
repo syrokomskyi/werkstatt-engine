@@ -58,8 +58,9 @@ export default {
   modules: [{
     name: "fixture",
     version: "0.0.0",
-    register(registry) {
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "fixture.generate",
         modulePath: "test",
         description: "fixture generator",
@@ -67,19 +68,19 @@ export default {
         mutatesState: true,
         writes: ["docs/fixture.generated.yaml"],
         execute() { return { exitCode: 0 }; },
-      });
-      registry.registerCommand({
+      },
+      {
         name: "fixture.validate",
         modulePath: "test",
         description: "fixture validator",
         scope: "workspace",
         execute() { return { exitCode: 0 }; },
-      });
-    },
+      },
+    ],
+    pipelines: [
+      { name: "fixture.check", steps: [{ command: "fixture.generate" }, { command: "fixture.validate" }] },
+    ],
   }],
-  pipelines: {
-    "fixture.check": [{ command: "fixture.generate" }, { command: "fixture.validate" }],
-  },
 };
 `,
     "utf8",
@@ -157,16 +158,18 @@ export default {
   modules: [{
     name: "fixture",
     version: "0.0.0",
-    register(registry) {
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "fixture.nowrites.generate",
         modulePath: "test",
         description: "fixture generator missing writes",
         scope: "workspace",
         mutatesState: true,
         execute() { return { exitCode: 0 }; },
-      });
-    },
+      },
+    ],
+    pipelines: [],
   }],
 };
 `,

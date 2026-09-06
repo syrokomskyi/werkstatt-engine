@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseComponentManifestV1, parseResolvedComponentSetV1 } from "../schemas.ts";
+import { parseComponentDeclaration, parseResolvedComponentSetV1 } from "../schemas.ts";
 import {
   computeManifestHash,
   computeSetHash,
@@ -11,18 +11,19 @@ import {
   computeIsolationPolicyHash,
 } from "../identity.ts";
 import type {
-  ComponentManifestV1,
+  ComponentDeclaration,
   IsolationTier,
   ResolvedComponentSetV1,
   ResolvedComponentIdentityV1,
 } from "../contracts.ts";
+import type { Sha256Digest } from "../../fingerprint/primitives.ts";
 
-const VALID_SHA = "sha256:" + "a".repeat(64);
-const VALID_SHA_2 = "sha256:" + "b".repeat(64);
+const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
+const VALID_SHA_2 = ("sha256:" + "b".repeat(64)) as Sha256Digest;
 
-function makeValidManifest(overrides: Partial<ComponentManifestV1> = {}): ComponentManifestV1 {
+function makeValidManifest(overrides: Partial<ComponentDeclaration> = {}): ComponentDeclaration {
   return {
-    schema: "werkstatt/component-manifest@1",
+    schema: "werkstatt/component-declaration@1",
     componentId: "werkstatt/engine",
     version: "1.0.0",
     artifactHash: VALID_SHA,
@@ -47,6 +48,8 @@ function makeValidManifest(overrides: Partial<ComponentManifestV1> = {}): Compon
     ],
     isolation: { tier: 0, adapterId: null },
     resources: [{ kind: "cpu", limit: "100ms", owner: "werkstatt/engine", lifecycle: "process" }],
+    priority: 0,
+    active: true,
     ...overrides,
   };
 }
@@ -77,17 +80,17 @@ function makeValidSet(
   };
 }
 
-describe("parseComponentManifestV1", () => {
+describe("parseComponentDeclaration", () => {
   it("accepts a valid manifest", () => {
     const manifest = makeValidManifest();
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("pass");
     expect(result.data).not.toBeNull();
     expect(result.violations).toHaveLength(0);
   });
 
   it("rejects unknown schema string", () => {
-    const result = parseComponentManifestV1({
+    const result = parseComponentDeclaration({
       ...makeValidManifest(),
       schema: "werkstatt/component-manifest@2",
     });
@@ -96,13 +99,13 @@ describe("parseComponentManifestV1", () => {
   });
 
   it("rejects unknown field", () => {
-    const result = parseComponentManifestV1({ ...makeValidManifest(), extraField: "bad" });
+    const result = parseComponentDeclaration({ ...makeValidManifest(), extraField: "bad" });
     expect(result.status).toBe("fail");
     expect(result.violations.some((v) => v.rule === "COMPONENT-CONTRACT-01")).toBe(true);
   });
 
   it("rejects invalid componentId (uppercase)", () => {
-    const result = parseComponentManifestV1({
+    const result = parseComponentDeclaration({
       ...makeValidManifest(),
       componentId: "Werkstatt/Engine",
     });
@@ -110,22 +113,22 @@ describe("parseComponentManifestV1", () => {
   });
 
   it("rejects invalid componentId (no namespace)", () => {
-    const result = parseComponentManifestV1({ ...makeValidManifest(), componentId: "engine" });
+    const result = parseComponentDeclaration({ ...makeValidManifest(), componentId: "engine" });
     expect(result.status).toBe("fail");
   });
 
   it("rejects invalid version (not semver)", () => {
-    const result = parseComponentManifestV1({ ...makeValidManifest(), version: "latest" });
+    const result = parseComponentDeclaration({ ...makeValidManifest(), version: "latest" });
     expect(result.status).toBe("fail");
   });
 
   it("rejects invalid artifactHash (not sha256)", () => {
-    const result = parseComponentManifestV1({ ...makeValidManifest(), artifactHash: "abc123" });
+    const result = parseComponentDeclaration({ ...makeValidManifest(), artifactHash: "abc123" });
     expect(result.status).toBe("fail");
   });
 
   it("rejects empty provides array", () => {
-    const result = parseComponentManifestV1({ ...makeValidManifest(), provides: [] });
+    const result = parseComponentDeclaration({ ...makeValidManifest(), provides: [] });
     expect(result.status).toBe("fail");
   });
 
@@ -136,7 +139,7 @@ describe("parseComponentManifestV1", () => {
         { capability: "werkstatt/kernel", version: "1.0.0", schemaHash: VALID_SHA },
       ],
     });
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("fail");
     expect(result.violations.some((v) => v.rule === "COMPONENT-CONTRACT-03")).toBe(true);
   });
@@ -145,7 +148,7 @@ describe("parseComponentManifestV1", () => {
     const manifest = makeValidManifest({
       requestedGrants: [{ scope: "certify", resource: "release", attenuated: false }],
     });
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("fail");
     expect(result.violations.some((v) => v.rule === "COMPONENT-CONTRACT-06")).toBe(true);
   });
@@ -154,7 +157,7 @@ describe("parseComponentManifestV1", () => {
     const manifest = makeValidManifest({
       requestedGrants: [{ scope: "administer", resource: "system", attenuated: false }],
     });
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("fail");
     expect(result.violations.some((v) => v.rule === "COMPONENT-CONTRACT-06")).toBe(true);
   });
@@ -163,7 +166,7 @@ describe("parseComponentManifestV1", () => {
     const manifest = makeValidManifest({
       resources: [{ kind: "cpu", limit: "100ms", owner: "werkstatt/other", lifecycle: "process" }],
     });
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("fail");
     expect(result.violations.some((v) => v.rule === "COMPONENT-CONTRACT-05")).toBe(true);
   });
@@ -179,7 +182,7 @@ describe("parseComponentManifestV1", () => {
         },
       ],
     });
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("fail");
   });
 
@@ -187,17 +190,17 @@ describe("parseComponentManifestV1", () => {
     const manifest = makeValidManifest({
       isolation: { tier: "partially-trusted" as never, adapterId: null },
     });
-    const result = parseComponentManifestV1(manifest);
+    const result = parseComponentDeclaration(manifest);
     expect(result.status).toBe("fail");
   });
 
   it("rejects null input", () => {
-    const result = parseComponentManifestV1(null);
+    const result = parseComponentDeclaration(null);
     expect(result.status).toBe("fail");
   });
 
   it("rejects array input", () => {
-    const result = parseComponentManifestV1([]);
+    const result = parseComponentDeclaration([]);
     expect(result.status).toBe("fail");
   });
 });
