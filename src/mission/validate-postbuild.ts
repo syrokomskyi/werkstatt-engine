@@ -162,7 +162,7 @@ export async function runValidatePostbuild(
 
   // Skip-slow mode: resolve steps from the registry and run individually.
   const { registry } = await loadAppRuntime(workspaceRoot, siteWorkspace);
-  const pipelineSteps = registry.getPipeline("sites-check.postbuild");
+  const pipelineSteps = registry.pipelines.get("sites-check.postbuild");
   if (!pipelineSteps) {
     throw new Error(`Pipeline "sites-check.postbuild" is not registered for site "${siteName}".`);
   }

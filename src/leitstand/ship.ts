@@ -106,7 +106,7 @@ async function runShipPhase(
   argv: string[],
 ): Promise<{ exitCode: number; data?: Record<string, unknown>; summary?: string }> {
   const registry = await getOrBuildWorkspaceRegistry(ctx.workspaceRoot);
-  const command = registry?.getCommand(commandName);
+  const command = registry?.commands.get(commandName);
   if (command) {
     const validFlags = new Set([
       ...Object.keys(KERNEL_UNIVERSAL_FLAGS),

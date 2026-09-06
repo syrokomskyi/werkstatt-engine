@@ -1,7 +1,7 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-Kernel registry assembly and app-target resolution: build a KernelRegistry from a loaded
+Kernel registry assembly and app-target resolution: build an ActualState from a loaded
 app/workspace config, list registered commands/pipelines across the workspace + every
 discovered app, and resolve which app(s) a CLI invocation targets.
 </purpose>
@@ -14,152 +14,95 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>ADR-0022: loadAppRuntime and list functions now use process-lifetime registry cache from registry-cache.ts.</item>
   <item>RFC-0960: buildRegistry and buildRegistryForModule call config.postBuildValidation after all modules are loaded.</item>
   <item>RFC-1026: buildRegistry and buildRegistryForModule set moduleStates (loading → active, failed on throw); rollback on register() failure; buildRegistryWithHandles returns KernelModuleHandle map.</item>
+  <item>RFC-1038: replace KernelRegistry with ActualState — buildRegistry uses buildActualState from reconciler.ts; remove lifecycle methods, buildRegistryWithHandles, rollbackModuleRegistrations.</item>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import process from "node:process";
 import { discoverSiteWorkspaces, loadKernelAppConfig } from "../discovery.ts";
-import { KernelRegistry } from "../registry.ts";
 import { getOrBuildRegistry, getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
+import { buildActualState } from "../../runtime/reconciler.ts";
 import type {
   DiscoveredSiteWorkspace,
   KernelAppConfig,
-  KernelModuleHandle,
+  KernelPipelineStep,
   SiteWorkspacesListResult,
   KernelCommandDefinition,
   KernelRegisteredCommandInfo,
-  KernelPipelineStep,
 } from "../types.ts";
-import type { ModuleExport } from "../../runtime/desired-state.ts";
+import type { ActualState, ModuleExport } from "../../runtime/desired-state.ts";
 
-function createModuleHandle(registry: KernelRegistry, moduleName: string): KernelModuleHandle {
-  return {
-    moduleName,
-    get state() {
-      return registry.getModuleState(moduleName) ?? "declared";
-    },
-    async dispose() {
-      await registry.unregisterModule(moduleName);
-    },
-  };
-}
-
-export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegistry> {
-  const registry = new KernelRegistry();
+export async function buildRegistry(config: KernelAppConfig): Promise<ActualState> {
+  const exports: ModuleExport[] = [];
 
   if (config.modules) {
     for (const mod of config.modules) {
       process.stderr.write(`  [registry] loading module ${mod.name} …\n`);
-      try {
-        registry.populateFromModule(mod);
-      } catch (err) {
-        rollbackModuleRegistrations(registry, mod.name);
-        throw err;
-      }
+      exports.push(mod);
     }
   } else if (config.moduleLoaders) {
     for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
       process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
       const mod = await loader();
-      try {
-        registry.populateFromModule(mod);
-      } catch (err) {
-        rollbackModuleRegistrations(registry, moduleName);
-        throw err;
+      exports.push(mod);
+    }
+  }
+
+  const actualState = buildActualState(exports);
+
+  if (config.pipelines) {
+    for (const [name, steps] of Object.entries(config.pipelines)) {
+      if (!actualState.pipelines.has(name)) {
+        (actualState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
       }
     }
   }
-  registry.currentModuleName = undefined;
 
-  return registry;
-}
-
-function rollbackModuleRegistrations(registry: KernelRegistry, moduleName: string): void {
-  const commandsToRemove = [...registry.commandModules.entries()]
-    .filter(([, mod]) => mod === moduleName)
-    .map(([cmd]) => cmd);
-  for (const cmd of commandsToRemove) {
-    registry.commands.delete(cmd);
-    registry.commandModules.delete(cmd);
-  }
-  const pipelinesToRemove = [...registry.pipelineModules.entries()]
-    .filter(([, mod]) => mod === moduleName)
-    .map(([pipe]) => pipe);
-  for (const pipe of pipelinesToRemove) {
-    registry.pipelines.delete(pipe);
-    registry.pipelineModules.delete(pipe);
-  }
-}
-
-export async function buildRegistryWithHandles(
-  config: KernelAppConfig,
-): Promise<{ registry: KernelRegistry; handles: Map<string, KernelModuleHandle> }> {
-  const handles = new Map<string, KernelModuleHandle>();
-  const registry = new KernelRegistry();
-
-  if (config.modules) {
-    for (const mod of config.modules) {
-      process.stderr.write(`  [registry] loading module ${mod.name} …\n`);
-      try {
-        registry.populateFromModule(mod);
-        handles.set(mod.name, createModuleHandle(registry, mod.name));
-      } catch (err) {
-        rollbackModuleRegistrations(registry, mod.name);
-        throw err;
-      }
-    }
-  } else if (config.moduleLoaders) {
-    for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
-      process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
-      const mod = await loader();
-      try {
-        registry.populateFromModule(mod);
-        handles.set(moduleName, createModuleHandle(registry, moduleName));
-      } catch (err) {
-        rollbackModuleRegistrations(registry, moduleName);
-        throw err;
-      }
-    }
-  }
-  registry.currentModuleName = undefined;
-
-  return { registry, handles };
+  return actualState;
 }
 
 export async function buildRegistryForModule(
   config: KernelAppConfig,
   moduleName: string,
-): Promise<KernelRegistry> {
-  const registry = new KernelRegistry();
-
+): Promise<ActualState> {
   if (config.moduleLoaders) {
     const loader = config.moduleLoaders[moduleName];
     if (!loader) {
       throw new Error(`No module loader registered for module \`${moduleName}\`.`);
     }
     const mod = await loader();
-    try {
-      registry.populateFromModule(mod);
-    } catch (err) {
-      rollbackModuleRegistrations(registry, moduleName);
-      throw err;
+    const actualState = buildActualState([mod]);
+    if (config.pipelines) {
+      for (const [name, steps] of Object.entries(config.pipelines)) {
+        if (!actualState.pipelines.has(name)) {
+          (actualState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
+        }
+      }
     }
+    return actualState;
   } else if (config.modules) {
     const mod = config.modules.find((m) => m.name === moduleName);
     if (!mod) {
       throw new Error(`No module named \`${moduleName}\` in config.`);
     }
-    try {
-      registry.populateFromModule(mod);
-    } catch (err) {
-      rollbackModuleRegistrations(registry, moduleName);
-      throw err;
+    const actualState = buildActualState([mod]);
+    if (config.pipelines) {
+      for (const [name, steps] of Object.entries(config.pipelines)) {
+        if (!actualState.pipelines.has(name)) {
+          (actualState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
+        }
+      }
+    }
+    return actualState;
+  }
+  const emptyState = buildActualState([]);
+  if (config.pipelines) {
+    for (const [name, steps] of Object.entries(config.pipelines)) {
+      (emptyState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
     }
   }
-  registry.currentModuleName = undefined;
-
-  return registry;
+  return emptyState;
 }
 
 export async function loadAppRuntime(workspaceRoot: string, site: DiscoveredSiteWorkspace) {
@@ -225,14 +168,14 @@ export async function listRegisteredKernelCommandNames(workspaceRoot: string): P
   const names = new Set<string>();
   const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
   if (wsRegistry) {
-    for (const commandName of wsRegistry.listCommandNames()) names.add(commandName);
+    for (const commandName of wsRegistry.commands.keys()) names.add(commandName);
   }
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
   for (const site of sites.filter((candidate) => candidate.configPath)) {
     try {
       const { registry } = await loadAppRuntime(workspaceRoot, site);
-      for (const commandName of registry.listCommandNames()) names.add(commandName);
+      for (const commandName of registry.commands.keys()) names.add(commandName);
     } catch (err) {
       process.stderr.write(
         `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -292,13 +235,11 @@ export async function listRegisteredKernelCommands(
 
   const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
   if (wsRegistry) {
-    for (const commandName of wsRegistry.listCommandNames()) {
-      const command = wsRegistry.getCommand(commandName);
-      if (command)
-        byKey.set(
-          `workspace:${commandName}`,
-          commandInfo(command, "workspace", undefined, wsRegistry.commandModules.get(commandName)),
-        );
+    for (const [commandName, command] of wsRegistry.commands) {
+      byKey.set(
+        `workspace:${commandName}`,
+        commandInfo(command, "workspace", undefined, wsRegistry.commandModules?.get(commandName)),
+      );
     }
   }
 
@@ -306,13 +247,11 @@ export async function listRegisteredKernelCommands(
   for (const site of sites.filter((candidate) => candidate.configPath)) {
     try {
       const { registry } = await loadAppRuntime(workspaceRoot, site);
-      for (const commandName of registry.listCommandNames()) {
-        const command = registry.getCommand(commandName);
-        if (command)
-          byKey.set(
-            `site:${site.name}:${commandName}`,
-            commandInfo(command, "site", site.name, registry.commandModules.get(commandName)),
-          );
+      for (const [commandName, command] of registry.commands) {
+        byKey.set(
+          `site:${site.name}:${commandName}`,
+          commandInfo(command, "site", site.name, registry.commandModules?.get(commandName)),
+        );
       }
     } catch (err) {
       process.stderr.write(

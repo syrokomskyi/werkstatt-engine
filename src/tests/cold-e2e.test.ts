@@ -76,7 +76,7 @@ function makeContext(workspaceRoot: string) {
     dryRun: false,
     outputFormat: "pretty" as const,
     io: {} as never,
-    registry: {} as never,
+    actualState: {} as never,
   };
 }
 

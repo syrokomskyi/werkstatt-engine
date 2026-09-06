@@ -368,7 +368,7 @@ describe("RFC-1038: buildActualState and buildDesiredState", () => {
     };
     const mod1 = makeModuleExport("mod-a", { commands: [cmd] });
     const mod2 = makeModuleExport("mod-b", {
-      commands: [{ ...cmd, modulePath: "test2" }],
+      commands: [{ ...cmd, modulePath: "test2", execute: async () => ({ exitCode: 1 }) }],
     });
     expect(() => buildActualState([mod1, mod2])).toThrow(/COMPOSITION-02/);
   });

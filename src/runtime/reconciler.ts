@@ -37,18 +37,75 @@ import type { ModuleFiberState, KernelPipelineStep } from "../kernel/types.ts";
 export function buildActualState(exports: ModuleExport[]): ActualState {
   const commands = new Map<string, CommandDeclaration>();
   const pipelines = new Map<string, KernelPipelineStep[]>();
+  const commandModules = new Map<string, string>();
 
   for (const mod of exports) {
-    for (const cmd of mod.commands) {
-      if (commands.has(cmd.name)) {
+    if (!mod || typeof mod !== "object") continue;
+    const commandsArray = mod.commands ?? [];
+    const pipelinesArray = mod.pipelines ?? [];
+
+    if (
+      commandsArray.length === 0 &&
+      pipelinesArray.length === 0 &&
+      typeof (mod as unknown as { register?: unknown }).register === "function"
+    ) {
+      const legacyCommands: CommandDeclaration[] = [];
+      const legacyPipelines: { name: string; steps: KernelPipelineStep[] }[] = [];
+      (
+        mod as unknown as {
+          register: (r: {
+            registerCommand: (c: CommandDeclaration) => void;
+            registerPipeline: (n: string, s: KernelPipelineStep[]) => void;
+          }) => void;
+        }
+      ).register({
+        registerCommand: (cmd) => legacyCommands.push(cmd),
+        registerPipeline: (name, steps) => legacyPipelines.push({ name, steps }),
+      });
+      for (const cmd of legacyCommands) {
+        const existing = commands.get(cmd.name);
+        if (existing) {
+          if (existing.execute === cmd.execute) continue;
+          throw new Error(
+            `COMPOSITION-02: Duplicate command "${cmd.name}" declared by module "${mod.name}" — already declared by another module.`,
+          );
+        }
+        commands.set(cmd.name, cmd);
+        commandModules.set(cmd.name, mod.name);
+      }
+      for (const pipe of legacyPipelines) {
+        if (pipelines.has(pipe.name)) {
+          const existing = pipelines.get(pipe.name)!;
+          if (
+            existing.length === pipe.steps.length &&
+            existing.every((s, i) => s === pipe.steps[i])
+          )
+            continue;
+          throw new Error(
+            `COMPOSITION-03: Duplicate pipeline "${pipe.name}" declared by module "${mod.name}" — already declared by another module.`,
+          );
+        }
+        pipelines.set(pipe.name, pipe.steps);
+      }
+      continue;
+    }
+
+    for (const cmd of commandsArray) {
+      const existing = commands.get(cmd.name);
+      if (existing) {
+        if (existing.execute === cmd.execute) continue;
         throw new Error(
           `COMPOSITION-02: Duplicate command "${cmd.name}" declared by module "${mod.name}" — already declared by another module.`,
         );
       }
       commands.set(cmd.name, cmd);
+      commandModules.set(cmd.name, mod.name);
     }
-    for (const pipe of mod.pipelines) {
+    for (const pipe of pipelinesArray) {
       if (pipelines.has(pipe.name)) {
+        const existing = pipelines.get(pipe.name)!;
+        if (existing.length === pipe.steps.length && existing.every((s, i) => s === pipe.steps[i]))
+          continue;
         throw new Error(
           `COMPOSITION-03: Duplicate pipeline "${pipe.name}" declared by module "${mod.name}" — already declared by another module.`,
         );
@@ -61,6 +118,7 @@ export function buildActualState(exports: ModuleExport[]): ActualState {
     components: new Map(),
     commands,
     pipelines,
+    commandModules,
   };
 }
 

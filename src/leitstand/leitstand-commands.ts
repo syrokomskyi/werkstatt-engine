@@ -2064,7 +2064,7 @@ async function runPhase(
   // This catches composite-command bugs (e.g. passing --release to release.prepare)
   // with a clear error message, before any pipeline work begins.
   const registry = await getOrBuildWorkspaceRegistry(workspaceRoot);
-  const command = registry?.getCommand(commandName);
+  const command = registry?.commands.get(commandName);
   if (command) {
     const validFlags = new Set([
       ...Object.keys(KERNEL_UNIVERSAL_FLAGS),

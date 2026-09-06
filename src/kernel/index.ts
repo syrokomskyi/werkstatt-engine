@@ -22,7 +22,7 @@ export {
   type SiteWorkspaceSource,
 } from "./site-workspace-resolver.ts";
 export { createKernelLogger } from "./logger.ts";
-export { KernelRegistry } from "./registry.ts";
+export { buildActualState } from "../runtime/reconciler.ts";
 export * from "./runtime.ts";
 export * from "./types.ts";
 export * from "../runtime/desired-state.ts";

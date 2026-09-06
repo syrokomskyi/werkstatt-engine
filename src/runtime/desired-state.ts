@@ -195,6 +195,11 @@ export interface ActualState {
    * Populated once at startup, never changes.
    */
   pipelines: ReadonlyMap<string, KernelPipelineStep[]>;
+  /**
+   * Map from command name to module name — used for command manifest generation.
+   * Populated once at startup alongside commands.
+   */
+  commandModules?: ReadonlyMap<string, string>;
 }
 
 /**

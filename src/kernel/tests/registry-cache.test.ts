@@ -97,8 +97,8 @@ test("clearRegistryCache forces a fresh build on next call", async () => {
 test("cached registry is functional — commands are registered", async () => {
   const registry = await getOrBuildRegistry("test-key-5", mockConfig);
 
-  expect(registry.listCommandNames()).toContain("test.ping");
-  expect(registry.getCommand("test.ping")?.description).toBe("Test command");
+  expect([...registry.commands.keys()]).toContain("test.ping");
+  expect(registry.commands.get("test.ping")?.description).toBe("Test command");
 });
 
 test("re-enabling cache after disable resumes caching", async () => {

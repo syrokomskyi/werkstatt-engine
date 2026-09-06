@@ -1,8 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-Process-lifetime singleton cache for KernelRegistry instances (ADR-0022).
-Avoids rebuilding the registry from scratch when executeKernelPipeline or
+Process-lifetime singleton cache for ActualState instances (ADR-0022).
+Avoids rebuilding the actual state from scratch when executeKernelPipeline or
 executeKernelCommand is called multiple times within the same Node.js process.
 </purpose>
 <non-goals>
@@ -13,29 +13,30 @@ executeKernelCommand is called multiple times within the same Node.js process.
 <CHANGE_SUMMARY>
   <item>ADR-0022: initial implementation — process-lifetime Map keyed by config source path.</item>
   <item>RFC-1026: add clearModule for incremental single-module invalidation without clearing the entire cache.</item>
+  <item>RFC-1038: cache ActualState instead of KernelRegistry; remove clearModule (no module unload in desired-state model).</item>
 </CHANGE_SUMMARY>
 */
 
 import type { KernelAppConfig } from "../types.ts";
-import type { KernelRegistry } from "../registry.ts";
+import type { ActualState } from "../../runtime/desired-state.ts";
 import { buildRegistry } from "./registry.ts";
 import { loadWorkspaceConfig } from "../discovery.ts";
 
-const registryCache = new Map<string, KernelRegistry>();
+const registryCache = new Map<string, ActualState>();
 let cacheEnabled = true;
 
 /**
- * Returns a cached KernelRegistry for the given cache key, or builds and caches
+ * Returns a cached ActualState for the given cache key, or builds and caches
  * a new one. The cache key must uniquely identify the config source within the
  * process (e.g. `workspace:<root>` or `site:<configPath>`).
  *
  * When the cache is disabled (via `setRegistryCacheEnabled(false)`), always
- * builds a fresh registry without reading from or writing to the cache.
+ * builds a fresh actual state without reading from or writing to the cache.
  */
 export async function getOrBuildRegistry(
   cacheKey: string,
   config: KernelAppConfig,
-): Promise<KernelRegistry> {
+): Promise<ActualState> {
   if (cacheEnabled) {
     const cached = registryCache.get(cacheKey);
     if (cached) {
@@ -54,12 +55,12 @@ export async function getOrBuildRegistry(
 }
 
 /**
- * Load workspace config and return a cached registry for it.
+ * Load workspace config and return a cached actual state for it.
  * Returns undefined when no workspace config exists.
  */
 export async function getOrBuildWorkspaceRegistry(
   workspaceRoot: string,
-): Promise<KernelRegistry | undefined> {
+): Promise<ActualState | undefined> {
   const config = await loadWorkspaceConfig(workspaceRoot);
   if (!config) return undefined;
   const cacheKey = `workspace:${workspaceRoot}`;
@@ -67,8 +68,8 @@ export async function getOrBuildWorkspaceRegistry(
 }
 
 /**
- * Clear all cached registries. Called by the `--no-registry-cache` CLI flag
- * and by tests that need a fresh registry between runs.
+ * Clear all cached actual states. Called by the `--no-registry-cache` CLI flag
+ * and by tests that need a fresh actual state between runs.
  */
 export function clearRegistryCache(): void {
   registryCache.clear();
@@ -76,7 +77,7 @@ export function clearRegistryCache(): void {
 
 /**
  * Enable or disable the registry cache. When disabled, `getOrBuildRegistry`
- * always builds a fresh registry and does not read from or write to the cache.
+ * always builds a fresh actual state and does not read from or write to the cache.
  * Calling with `false` also clears any existing cached entries.
  */
 export function setRegistryCacheEnabled(enabled: boolean): void {
@@ -91,22 +92,4 @@ export function setRegistryCacheEnabled(enabled: boolean): void {
  */
 export function isRegistryCacheEnabled(): boolean {
   return cacheEnabled;
-}
-
-/**
- * RFC-1026: Incrementally invalidate a single module from a cached registry.
- * Calls `unregisterModule` on the cached registry for the given cache key.
- * If the registry has no remaining active modules after unregister, the
- * cache entry is removed entirely to force a full rebuild on next access.
- */
-export async function clearModule(cacheKey: string, moduleName: string): Promise<void> {
-  const cached = registryCache.get(cacheKey);
-  if (!cached) return;
-
-  await cached.unregisterModule(moduleName);
-
-  const hasActiveModules = [...cached.moduleStates.values()].some((state) => state === "active");
-  if (!hasActiveModules) {
-    registryCache.delete(cacheKey);
-  }
 }

@@ -20,11 +20,8 @@ import type {
   CheckResult,
   Diagnostic,
 } from "@warpgogol/werkstatt-engine/kernel";
-import {
-  KernelRegistry,
-  createKernelLogger,
-  createDefaultIO,
-} from "@warpgogol/werkstatt-engine/kernel";
+import { createKernelLogger, createDefaultIO } from "@warpgogol/werkstatt-engine/kernel";
+import { buildActualState } from "@warpgogol/werkstatt-engine/kernel";
 
 const mockCheckState = vi.hoisted(() => ({
   ownershipViolations: 0,
@@ -85,17 +82,18 @@ function makeMockCheckCommand(name: string): KernelCommandDefinition {
 function makeContext(outputFormat: "pretty" | "json" = "pretty"): KernelRuntimeContext {
   const logger = createKernelLogger(outputFormat);
   const { io } = createDefaultIO();
-  const registry = new KernelRegistry();
-  registry.populateFromModule({
-    name: "test-mocks",
-    version: "0.0.0",
-    declarations: [],
-    pipelines: [],
-    commands: [
-      makeMockCheckCommand("ownership.sync.validate"),
-      makeMockCheckCommand("generated.stale.validate"),
-    ],
-  });
+  const actualState = buildActualState([
+    {
+      name: "test-mocks",
+      version: "0.0.0",
+      declarations: [],
+      pipelines: [],
+      commands: [
+        makeMockCheckCommand("ownership.sync.validate"),
+        makeMockCheckCommand("generated.stale.validate"),
+      ],
+    },
+  ]);
   return {
     workspaceRoot: tempRoot,
     siteExplicit: false,
@@ -103,7 +101,7 @@ function makeContext(outputFormat: "pretty" | "json" = "pretty"): KernelRuntimeC
     dryRun: false,
     outputFormat,
     io,
-    actualState: registry,
+    actualState,
   };
 }
 

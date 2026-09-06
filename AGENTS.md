@@ -49,19 +49,17 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - **Kernel commands MUST be registered in `*.module.ts` files, not in `index.ts` barrels.** The kernel loads modules via the `*-module` subpath export (e.g. `@warpgogol/werkstatt-engine/sternsystem-module` resolves to `sternsystem.module.ts`). A `createSternsystemModule` (or any `create*Module`) function in an `index.ts` barrel is dead code — the runtime never calls it. Commands registered there are invisible to `command.manifest.generate` and cause `RFC-CMD-02` validation errors. Discovered during RFC-0968: handover commands were added to `sternsystem/index.ts` instead of `sternsystem.module.ts`, making them invisible to the manifest generator.
 - **Before registering a new kernel command, grep for existing registrations across ALL packages.** The kernel registry rejects duplicate command names across modules with a fatal "Kernel command already registered" error that blocks ALL commands from loading. Commands like `mission.archive` are registered in `packages/forge/os/mission/mission.module.ts` — adding a second registration in `packages/werkstatt-engine/src/mission/mission.module.ts` crashes the entire kernel. Always run `grep -r 'name: "commandName"' packages/*/src/**/*.module.ts packages/*/os/**/*.module.ts` before adding a new `registry.registerCommand` call.
 
-## Kernel module lifecycle (RFC-1026)
+## Kernel runtime state (RFC-1038)
 
-- `KernelRegistry` implements `KernelLifecycleRegistry` with `unregisterModule`, `trackInFlight`, `getModuleState` for lifecycle-owned registrations.
-- `ModuleFiberState`: `declared` → `loading` → `active` → `draining` → `unloading` → `disposed` (or `failed` on registration error).
-- `buildRegistry` and `buildRegistryForModule` set module states during loading; rollback on `register()` failure removes all commands and pipelines owned by the failed module.
-- `buildRegistryWithHandles` returns a `Map<string, KernelModuleHandle>` alongside the registry — each handle exposes `dispose()` and live `state`.
-- `unregisterModule` drains in-flight commands (polling with `WERKSTATT_DRAIN_TIMEOUT_MS`, default 30s), then removes all commands/pipelines and sets state to `disposed`. Records disposed command origins in `disposedCommandOrigins` for `KERNEL-MODULE-01` error reporting.
-- `trackInFlight(commandName)` returns a release function — must be called in `finally` to ensure the count is decremented on failure or timeout.
-- `executeRegisteredCommand` checks module state before execution: rejects with `KERNEL-MODULE-02` if the owning module is not `active`.
-- `executeKernelCommand` checks `disposedCommandOrigins` when a command is not found: reports `KERNEL-MODULE-01` if the command was previously registered but its module was unloaded.
-- `clearModule(cacheKey, moduleName)` in `registry-cache.ts` incrementally invalidates a single module from a cached registry without clearing the entire cache. Removes the cache entry when no active modules remain.
-- `kernel-module.module.ts` deleted by RFC-1038 — `kernel.module.load`, `kernel.module.unload`, `kernel.module.inspect` commands removed. Module introspection is available via `composition.desired-state.inspect`. The reconciler is the only path to activate/deactivate components.
-- Tests: `src/kernel/tests/module-lifecycle.test.ts` covers states, unregister, drain, rollback, cache invalidation, trackInFlight.
+- `KernelRegistry` class is **deleted**. Runtime state is now `ActualState` — a frozen snapshot of commands, pipelines, and component states built once at startup.
+- `buildActualState(ModuleExport[])` in `runtime/reconciler.ts` replaces `KernelRegistry.populateFromModule()`. It iterates `mod.commands` and `mod.pipelines` arrays directly — no `register()` call needed.
+- Backward compatibility: legacy modules using `register(registry)` are still supported via a shim in `buildActualState`. The shim collects commands/pipelines into arrays, then processes them identically to `ModuleExport.commands`.
+- Idempotent re-registration (RFC-0816): same-execute duplicate command registration is a no-op. Only different `execute` functions for the same command name throw `COMPOSITION-02`.
+- Config-level pipelines: `KernelAppConfig.pipelines` (defined in `kernel.config.ts`) are merged into `ActualState.pipelines` after module pipelines in `buildRegistry()` and `buildRegistryForModule()`.
+- `registry-cache.ts` caches `ActualState` (not `KernelRegistry`). Cache is keyed by config source path. `clearModule` is removed — no module unload in desired-state model.
+- `kernel-module.module.ts` deleted — `kernel.module.load`, `kernel.module.unload`, `kernel.module.inspect` commands removed. Module introspection is available via `composition.desired-state.inspect`.
+- `KernelRuntimeContext.registry` is replaced by `KernelRuntimeContext.actualState: ActualState`.
+- `KernelLifecycleRegistry`, `KernelModuleHandle`, `KernelModuleRegistry` types are deleted from `kernel/types.ts`.
 
 ## Evolution controller (RFC-1031)
 
@@ -365,9 +363,9 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - Every `KernelCommandDefinition` MUST declare `modulePath`: a repo-relative path to the implementing source file (e.g. `packages/werkstatt-site/src/checks/robots.ts`). This is **required on ALL commands** — not just `.generate` commands. It is distinct from `modulePaths` (ADR-0024, relative to `src/`, for cache hashing).
 - Every `.generate` command and every command with non-empty `writes` MUST declare `generates: GeneratedArtifactSpec[]`. Commands with `writes` but no generated files declare `generates: []`. Each spec includes `path`, `phase` (`build.prepare` | `build.post` | `on-demand`), optional `conditional`, and optional `markerPolicy` override.
 - `validateRegistration(registry)` enforces completeness at registry build time via `config.postBuildValidation`. It checks: non-empty `modulePath`, `generates` on `.generate`/`writes` commands, exempt list consistency, and non-glob path uniqueness. Fail-closed: throws on any violation.
-- `KernelRuntimeContext` carries `registry: KernelRegistry` and `ownershipMap?: GeneratorOwnershipEntry[]` (pre-computed via `buildGeneratorOwnership`). Validators consume `context.ownershipMap` instead of a static constant.
+- `KernelRuntimeContext` carries `actualState: ActualState` and `ownershipMap?: GeneratorOwnershipEntry[]` (pre-computed via `buildGeneratorOwnership`). Validators consume `context.ownershipMap` instead of a static constant.
 - The static `GENERATOR_OWNERSHIP_MAP` is deleted. Ownership is derived by `buildGeneratorOwnership(registry)` from `generates[]` declarations. The derivation function lives in the site plugin (`@warpgogol/werkstatt-site/checks`).
-- `KernelAppConfig` has an optional `postBuildValidation?: (registry: KernelRegistry) => void` callback. The workspace `tools/kernel.config.ts` wires `validateRegistration` from the site plugin.
+- `KernelAppConfig` has an optional `postBuildValidation?: (actualState: ActualState) => void` callback. The workspace `tools/kernel.config.ts` wires `validateRegistration` from the site plugin.
 - **RFC-0963 (DNA-91):** Every validator command (name ending in `.validate`, `.check`, or `.lint`) MUST declare `contract: string` (validation domain) and `rules: string[]` (rule IDs it can emit, empty if non-emitting). `validateRegistration` emits warnings for missing fields. `validator.inventory.generate` fails closed if any validator lacks these fields (unless `--dry-run`).
 
 ## Mission git helpers

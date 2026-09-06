@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidatorInventoryGenerate } from "../validator-inventory.ts";
-import { KernelRegistry } from "../registry.ts";
+import { buildActualState } from "../../runtime/reconciler.ts";
 import type {
   KernelCommandInput,
   KernelRuntimeContext,
@@ -41,7 +41,6 @@ function makeContext(
   workspaceRoot: string,
   pipelines: [string, { command: string }[]][] = [],
 ): KernelRuntimeContext {
-  const registry = new KernelRegistry();
   const mod: ModuleExport = {
     name: "test-module",
     version: "1.0.0",
@@ -49,10 +48,10 @@ function makeContext(
     commands,
     pipelines: pipelines.map(([name, steps]) => ({ name, steps })),
   };
-  registry.populateFromModule(mod);
+  const actualState = buildActualState([mod]);
   return {
     workspaceRoot,
-    actualState: registry,
+    actualState,
     dryRun: false,
   } as unknown as KernelRuntimeContext;
 }

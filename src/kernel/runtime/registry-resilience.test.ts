@@ -48,9 +48,12 @@ function makeSiteDir(name: string): string {
 }
 
 function makeRegistry(commands: string[], pipelines: [string, { command: string }[]][] = []) {
+  const commandMap = new Map();
+  for (const name of commands) {
+    commandMap.set(name, { name, scope: "workspace" });
+  }
   return {
-    listCommandNames: () => commands,
-    getCommand: (name: string) => ({ name, scope: "workspace" }),
+    commands: commandMap,
     commandModules: new Map(),
     pipelines: new Map(pipelines),
   };

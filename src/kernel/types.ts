@@ -306,30 +306,8 @@ export interface KernelPipelineStep {
  */
 export type KernelModule = ModuleExport;
 
-/**
- * RFC-1038: KernelModuleRegistry is removed. Modules no longer call register().
- * This type is kept as an empty marker for migration purposes — it will be
- * deleted once all consumers are updated.
- */
-export interface KernelModuleRegistry {
-  registerCommand(command: KernelCommandDefinition): void;
-  registerPipeline(name: string, steps: KernelPipelineStep[]): void;
-}
-
 export type ModuleFiberState =
   "declared" | "loading" | "active" | "draining" | "unloading" | "disposed" | "failed";
-
-export interface KernelModuleHandle {
-  readonly moduleName: string;
-  readonly state: ModuleFiberState;
-  dispose(): Promise<void>;
-}
-
-export interface KernelLifecycleRegistry {
-  unregisterModule(moduleName: string): Promise<void>;
-  trackInFlight(commandName: string): () => void;
-  getModuleState(moduleName: string): ModuleFiberState | undefined;
-}
 
 export interface KernelAppConfig {
   name?: string;
@@ -338,6 +316,8 @@ export interface KernelAppConfig {
   modules?: ModuleExport[];
   /** Lazy module loaders — enables manifest-driven single-module loading. Functions are defined in kernel.config.ts so import() resolves from the workspace root. */
   moduleLoaders?: Record<string, () => Promise<ModuleExport>>;
+  /** Config-level pipelines — defined in kernel.config.ts, merged into ActualState after module pipelines. */
+  pipelines?: Record<string, KernelPipelineStep[]>;
 }
 export interface KernelExecutionReport<TData = unknown> {
   siteName?: string;

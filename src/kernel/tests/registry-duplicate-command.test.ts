@@ -1,19 +1,21 @@
 import { test, expect } from "vitest";
-import { KernelRegistry } from "../registry.ts";
-import type { KernelCommandDefinition, KernelCommandResult } from "../types.ts";
+import { buildActualState } from "../../runtime/reconciler.ts";
+import type { CommandDeclaration } from "../../runtime/desired-state.ts";
+import type { KernelCommandResult } from "../types.ts";
 import type { ModuleExport } from "../../runtime/desired-state.ts";
 
 /*
 <MODULE_CONTRACT>
   <purpose>
-    Verify KernelRegistry.populateFromModule duplicate command detection:
-    same command name across modules throws. Prevents pipeline crashes when two modules
+    Verify buildActualState duplicate command detection:
+    same command name across modules throws COMPOSITION-02. Prevents pipeline crashes when two modules
     accidentally register the same command (RFC-0816).
   </purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0816: initial regression test for duplicate command registration.</item>
   <item>RFC-1038: migrated from registerCommand to populateFromModule.</item>
+  <item>RFC-1038: migrated from KernelRegistry.populateFromModule to buildActualState.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -22,18 +24,18 @@ const noopExecute = async (): Promise<KernelCommandResult<unknown>> => ({
   summary: "noop",
 });
 
-function makeCmd(name: string): KernelCommandDefinition {
+function makeCmd(name: string): CommandDeclaration {
   return {
     name,
     modulePath: "test",
     description: `Test command ${name}`,
     scope: "workspace",
     flags: {},
-    execute: noopExecute as KernelCommandDefinition["execute"],
+    execute: noopExecute as CommandDeclaration["execute"],
   };
 }
 
-function makeModule(name: string, commands: KernelCommandDefinition[]): ModuleExport {
+function makeModule(name: string, commands: CommandDeclaration[]): ModuleExport {
   return {
     name,
     version: "1.0.0",
@@ -44,28 +46,40 @@ function makeModule(name: string, commands: KernelCommandDefinition[]): ModuleEx
 }
 
 test("duplicate command name across modules throws", () => {
-  const registry = new KernelRegistry();
-  registry.populateFromModule(makeModule("module-a", [makeCmd("test.ping")]));
-
-  expect(() => registry.populateFromModule(makeModule("module-b", [makeCmd("test.ping")]))).toThrow(
-    /already registered: test\.ping/,
-  );
+  const cmdA = makeCmd("test.ping");
+  const cmdB = makeCmd("test.ping");
+  cmdB.execute = (async () => ({
+    exitCode: 1,
+    summary: "different",
+  })) as CommandDeclaration["execute"];
+  expect(() =>
+    buildActualState([makeModule("module-a", [cmdA]), makeModule("module-b", [cmdB])]),
+  ).toThrow(/COMPOSITION-02.*test\.ping/);
 });
 
 test("different command names do not conflict", () => {
-  const registry = new KernelRegistry();
-  registry.populateFromModule(makeModule("module-a", [makeCmd("test.ping")]));
-  expect(() =>
-    registry.populateFromModule(makeModule("module-b", [makeCmd("test.pong")])),
-  ).not.toThrow();
-  expect(registry.listCommandNames()).toEqual(["test.ping", "test.pong"]);
+  const actual = buildActualState([
+    makeModule("module-a", [makeCmd("test.ping")]),
+    makeModule("module-b", [makeCmd("test.pong")]),
+  ]);
+  expect([...actual.commands.keys()].sort()).toEqual(["test.ping", "test.pong"]);
 });
 
-test("same command in same module is rejected", () => {
-  const registry = new KernelRegistry();
+test("same command with different execute in same module is rejected", () => {
+  const cmdA = makeCmd("test.ping");
+  const cmdB = makeCmd("test.ping");
+  cmdB.execute = (async () => ({
+    exitCode: 1,
+    summary: "different",
+  })) as CommandDeclaration["execute"];
+  expect(() => buildActualState([makeModule("module-a", [cmdA, cmdB])])).toThrow(
+    /COMPOSITION-02.*test\.ping/,
+  );
+});
+
+test("idempotent re-registration with same execute is a no-op (RFC-0816)", () => {
+  const cmd = makeCmd("test.ping");
   expect(() =>
-    registry.populateFromModule(
-      makeModule("module-a", [makeCmd("test.ping"), makeCmd("test.ping")]),
-    ),
-  ).toThrow(/already registered: test\.ping/);
+    buildActualState([makeModule("module-a", [cmd, makeCmd("test.ping")])]),
+  ).not.toThrow();
 });

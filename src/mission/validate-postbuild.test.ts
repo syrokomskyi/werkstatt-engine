@@ -166,7 +166,7 @@ test("dist/ exists with --skip-slow → slow steps skipped, fast steps run indiv
 
   mockLoadAppRuntime.mockResolvedValue({
     registry: {
-      getPipeline: vi.fn(() => pipelineSteps),
+      pipelines: new Map([["sites-check.postbuild", pipelineSteps]]),
     },
   } as never);
 

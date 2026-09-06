@@ -19,7 +19,7 @@ import {
   runRemediationCatalogGenerate,
   type RemediationCatalogGenerateResult,
 } from "../remediation-catalog-generate.ts";
-import { KernelRegistry } from "../../kernel/registry.ts";
+import { buildActualState } from "../../runtime/reconciler.ts";
 import type {
   CheckResult,
   KernelCommandInput,
@@ -47,7 +47,6 @@ function makeContext(
   commands: KernelCommandDefinition[],
   workspaceRoot: string,
 ): KernelRuntimeContext {
-  const registry = new KernelRegistry();
   const mod: ModuleExport = {
     name: "test-module",
     version: "1.0.0",
@@ -55,10 +54,10 @@ function makeContext(
     commands,
     pipelines: [],
   };
-  registry.populateFromModule(mod);
+  const actualState = buildActualState([mod]);
   return {
     workspaceRoot,
-    actualState: registry,
+    actualState,
     dryRun: false,
   } as unknown as KernelRuntimeContext;
 }
