@@ -6,7 +6,6 @@ forgePlugin: false
 projectDir: packages/werkstatt-engine
 destName: werkstatt-engine
 standalone: true
-versionBump: patch
 
 workspacePrefixes:
   - "@warpgogol/"
