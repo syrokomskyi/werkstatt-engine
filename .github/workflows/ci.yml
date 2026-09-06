@@ -14,18 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      - run: corepack enable
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
-
-      - run: corepack enable
-
-      - run: pnpm install --no-frozen-lockfile
-
+      - run: pnpm install --no-frozen-lockfile --config.dangerouslyAllowAllBuilds=true --config.minimumReleaseAge=0
       - run: pnpm run build:check || true
-
       - run: pnpm test || true
 
       - name: Publish

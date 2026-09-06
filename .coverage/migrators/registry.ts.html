@@ -1,0 +1,394 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for migrators/registry.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">migrators</a> registry.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>9/9</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>2/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>7/7</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>7/7</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">223x</span>
+<span class="cline-any cline-yes">223x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">92x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/*
+&lt;MODULE_CONTRACT&gt;
+&lt;purpose&gt;RFC-0479: the migrator registry — forward-only codemods keyed by RFC-id,
+ordered by RFC-id (numeric). Replaces the old RFC-0221 SemVer-based registry.&lt;/purpose&gt;
+&lt;non-goals&gt;
+  &lt;item&gt;Do not apply migrators here — selection only.&lt;/item&gt;
+  &lt;item&gt;Do not delete migrators — the registry is append-only.&lt;/item&gt;
+&lt;/non-goals&gt;
+&lt;/MODULE_CONTRACT&gt;
+&lt;CHANGE_SUMMARY&gt;
+  &lt;item&gt;RFC-0221: initial registry mechanism, seeded empty.&lt;/item&gt;
+  &lt;item&gt;RFC-0479: rewrite to RFC-id-keyed registry with bootstrapping migrator.&lt;/item&gt;
+  &lt;item&gt;RFC-0481: register rfc-0481 content migrator (PBP business singleton).&lt;/item&gt;
+  &lt;item&gt;RFC-0483: register rfc-0483 content migrator (reference migration + stopgap removal).&lt;/item&gt;
+  &lt;item&gt;RFC-0488: register rfc-0488 material credits provenance registry migrator.&lt;/item&gt;
+  &lt;item&gt;RFC-0492: register rfc-0492 industry dossier schema migrator.&lt;/item&gt;
+  &lt;item&gt;RFC-0495: register rfc-0495 no-op migrator (URL slug restructuring, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0496: register rfc-0496 no-op migrator (website-service surface, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0497: register rfc-0497 no-op migrator (intersection records, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0498: register rfc-0498 no-op migrator (structured data policy, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0500: register rfc-0500 content migrator (topics→articles collection rename + sections→prose conversion).&lt;/item&gt;
+  &lt;item&gt;RFC-0501: register rfc-0501 content migrator (set existing published articles to review-required).&lt;/item&gt;
+  &lt;item&gt;RFC-0502: register rfc-0502 content migrator (create initial author record file).&lt;/item&gt;
+  &lt;item&gt;RFC-0504: register rfc-0504 content migrator (articleSections/changelog fields + H1 stripping).&lt;/item&gt;
+  &lt;item&gt;RFC-0505: register rfc-0505 content migrator (claim sidecar to claim record transformation + sidecar deletion).&lt;/item&gt;
+  &lt;item&gt;RFC-0506: register rfc-0506 no-op migrator (ratgeber article JSON-LD C-contract change, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0508: register rfc-0508 content migrator (Person→Participant fields: participantType, status, visibility, relationshipType, consent).&lt;/item&gt;
+  &lt;item&gt;RFC-0512: register rfc-0512 no-op migrator (team JSON endpoints + Schema.org C-contract change, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0514: register rfc-0514 content migrator (send-message emailField + contactRequirementMessage removal).&lt;/item&gt;
+  &lt;item&gt;RFC-0572: register rfc-0572 content migrator (send-message emailField/phoneField removal + contactRequirementMessage re-add).&lt;/item&gt;
+  &lt;item&gt;RFC-0529: register rfc-0529 content migrator (brace-delimited to braceless content reference syntax migration).&lt;/item&gt;
+  &lt;item&gt;RFC-0548: register rfc-0548 migrator (backup AGENTS.md and regenerate with behavioral layer).&lt;/item&gt;
+  &lt;item&gt;RFC-0757: register rfc-0757 no-op migrator (send-message checklistItems generalization, advances cursor).&lt;/item&gt;
+  &lt;item&gt;RFC-0885: register rfc-0885 content migrator (consentStatus→consentScope, add default display to Nachweis evidence-source).&lt;/item&gt;
+&lt;/CHANGE_SUMMARY&gt;
+*/
+&nbsp;
+import type { Migrator } from "./types.ts";
+import { rfc0479Migrator } from "./rfc-0479.ts";
+import { rfc0481Migrator } from "./rfc-0481.ts";
+import { rfc0483Migrator } from "./rfc-0483.ts";
+import { rfc0488Migrator } from "./rfc-0488.ts";
+import { rfc0492Migrator } from "./rfc-0492.ts";
+import { rfc0495Migrator } from "./rfc-0495.ts";
+import { rfc0496Migrator } from "./rfc-0496.ts";
+import { rfc0497Migrator } from "./rfc-0497.ts";
+import { rfc0498Migrator } from "./rfc-0498.ts";
+import { rfc0500Migrator } from "./rfc-0500.ts";
+import { rfc0501Migrator } from "./rfc-0501.ts";
+import { rfc0502Migrator } from "./rfc-0502.ts";
+import { rfc0504Migrator } from "./rfc-0504.ts";
+import { rfc0505Migrator } from "./rfc-0505.ts";
+import { rfc0506Migrator } from "./rfc-0506.ts";
+import { rfc0508Migrator } from "./rfc-0508.ts";
+import { rfc0512Migrator } from "./rfc-0512.ts";
+import { rfc0514Migrator } from "./rfc-0514.ts";
+import { rfc0572Migrator } from "./rfc-0572.ts";
+import { rfc0529Migrator } from "./rfc-0529.ts";
+import { rfc0548Migrator } from "./rfc-0548.ts";
+import { rfc0757Migrator } from "./rfc-0757.ts";
+import { rfc0885Migrator } from "./rfc-0885.ts";
+&nbsp;
+export const migratorRegistry: readonly Migrator[] = [
+  rfc0479Migrator,
+  rfc0481Migrator,
+  rfc0483Migrator,
+  rfc0488Migrator,
+  rfc0492Migrator,
+  rfc0495Migrator,
+  rfc0496Migrator,
+  rfc0497Migrator,
+  rfc0498Migrator,
+  rfc0500Migrator,
+  rfc0501Migrator,
+  rfc0502Migrator,
+  rfc0504Migrator,
+  rfc0505Migrator,
+  rfc0506Migrator,
+  rfc0508Migrator,
+  rfc0512Migrator,
+  rfc0514Migrator,
+  rfc0529Migrator,
+  rfc0548Migrator,
+  rfc0572Migrator,
+  rfc0757Migrator,
+  rfc0885Migrator,
+];
+&nbsp;
+export function numericRfcId(id: string): number {
+  const match = id.match(/^rfc-(\d+)$/i);
+  return match ? parseInt(match[1], 10) : 0;
+}
+&nbsp;
+export function migratorsToApply(cursor: string[]): Migrator[] {
+  return migratorRegistry
+    .filter((m) =&gt; !cursor.includes(m.id))
+    .slice()
+    .sort((a, b) =&gt; numericRfcId(a.id) - numericRfcId(b.id));
+}
+&nbsp;
+export function allMigratorIds(): string[] {
+  return migratorRegistry.map((m) =&gt; m.id).sort((a, b) =&gt; numericRfcId(a) - numericRfcId(b));
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-09-06T13:08:26.113Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    
