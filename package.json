@@ -402,6 +402,7 @@
     "build": "pnpm exec tsc -p tsconfig.build.json",
     "build:check": "pnpm exec tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -465,6 +466,7 @@
     "sharp": "^0.35.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "8.68.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "vitest": "^4.1.11"
   }
 }
