@@ -376,6 +376,14 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `KernelAppConfig` has an optional `postBuildValidation?: (actualState: ActualState) => void` callback. The workspace `tools/kernel.config.ts` wires `validateRegistration` from the site plugin.
 - **RFC-0963 (DNA-91):** Every validator command (name ending in `.validate`, `.check`, or `.lint`) MUST declare `contract: string` (validation domain) and `rules: string[]` (rule IDs it can emit, empty if non-emitting). `validateRegistration` emits warnings for missing fields. `validator.inventory.generate` fails closed if any validator lacks these fields (unless `--dry-run`).
 
+## Pipeline cache output-existence guard (RFC-1057)
+
+- `tryCacheRead` in `execute-pipeline.ts` verifies that all files in `command.writes` exist on disk before returning a cached result. If any output file is missing, the cache is treated as a miss and the command re-executes.
+- This prevents stale cache hits when output files are deleted by failed prior runs, manual cleanup, or git operations.
+- Commands without `writes` or with empty `writes` are unaffected — the guard only checks declared output paths.
+- `tryCacheRead` is exported for testing. Tests: `src/kernel/tests/cache-output-existence.test.ts`.
+- `kernel.wire` has an integration test (`src/kernel/tests/wire-integration.test.ts`) that runs `runKernelWire` on a fixture and verifies the generated `kernel.config.ts` structure, module loader keys, and factory function calls.
+
 ## Mission git helpers
 
 - `commitWorkpieceIfDirty(workpieceDir, missionId)` (RFC-0644): auto-commits all dirty files in the workpiece via `git add -A` + `git commit --no-verify`. Returns `{ committed: boolean, commitSha: string | null }`. Used by `mission.reconcile` and `mission.close` (RFC-0797) to auto-commit dirty workpieces instead of throwing.

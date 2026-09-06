@@ -28,7 +28,7 @@ import { performance } from "node:perf_hooks";
 import process from "node:process";
 import os from "node:os";
 import { join, relative, sep } from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
 import { deriveModuleBasePath } from "./registry.ts";
 import type { ActualState } from "../../runtime/desired-state.ts";
@@ -474,7 +474,7 @@ async function getOrComputeModuleHash(
  * the tree index is available, compares current file metadata against stored
  * metadata. If identical, reuses the stored `inputsHash` without fingerprinting.
  */
-async function tryCacheRead(
+export async function tryCacheRead(
   cache: CacheLayer,
   command: KernelCommandDefinition,
   baseDir: string,
@@ -524,7 +524,24 @@ async function tryCacheRead(
   };
 
   const entry = await getCachedCommandResult(cache, key);
-  return entry?.report ?? null;
+  if (!entry?.report) return null;
+
+  // RFC-1057: verify output files still exist before trusting cache.
+  // If any declared write target is missing, treat as cache miss so the
+  // command re-executes and regenerates the missing file(s).
+  const writes = command.writes ?? [];
+  if (writes.length > 0) {
+    for (const writePath of writes) {
+      const abs = join(baseDir, writePath);
+      try {
+        await access(abs);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return entry.report;
 }
 
 /**
@@ -591,7 +608,22 @@ async function tryMtimeFastPath(
   };
 
   const entry = await getCachedCommandResult(cache, key);
-  return entry?.report ?? null;
+  if (!entry?.report) return null;
+
+  // RFC-1057: verify output files still exist before trusting cache.
+  const writes = command.writes ?? [];
+  if (writes.length > 0) {
+    for (const writePath of writes) {
+      const abs = join(baseDir, writePath);
+      try {
+        await access(abs);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return entry.report;
 }
 
 /**
