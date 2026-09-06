@@ -97,6 +97,10 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - Bordbuch entry kind `"isolation"` records sandbox lifecycle events (spawn, terminate, crash) with sandboxId, tier, componentId, action metadata.
 - Tests: `src/isolation/tests/isolation-manager.test.ts` covers AC-1 through AC-11 plus edge cases (24 tests).
 
+## Type deletion discipline
+
+- **When deleting types from `contracts.ts`, always grep for consumers first.** Commit `15cd5b4eb` (RFC-1035 step 7) deleted `IsolationManager`, `IsolationPolicy`, `SandboxHandle`, `SandboxState`, `CapabilityBridge` from `isolation/contracts.ts` and reverted `IsolationTier` from numeric union back to string union, but did not update `isolation-manager.ts`, `capability-bridge.ts`, `isolation-commands.ts`, or `component/schemas.ts` — resulting in 48 type errors. Before removing any exported type, run `grep -rn "TypeName" packages/werkstatt-engine/src/` to find all consumers and update them in the same commit.
+
 ## Scope controller (RFC-1036)
 
 - `scope.module.ts` registers 3 `scope.*` commands for component scope lifecycle management:
