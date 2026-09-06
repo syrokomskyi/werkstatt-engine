@@ -330,6 +330,10 @@
       "types": "./src/testing/e2e/index.ts",
       "default": "./src/testing/e2e/index.ts"
     },
+    "./testing/boot": {
+      "types": "./src/testing/boot/index.ts",
+      "default": "./src/testing/boot/index.ts"
+    },
     "./e2e": {
       "types": "./src/e2e/index.ts",
       "default": "./src/e2e/index.ts"
