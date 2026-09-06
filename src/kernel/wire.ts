@@ -209,6 +209,16 @@ function buildChangelogModuleFile(appName: string): string {
   );
 }
 
+function buildPipelinesModuleFile(appName: string): string {
+  return wireContent(
+    "tools/modules/pipelines.module.template.ts",
+    appName,
+    applyTokens(readTemplate("tools/modules/pipelines.module.template.ts"), {
+      APP_NAME: appName,
+    }),
+  );
+}
+
 function buildRuntimeReExport(appName: string, packageName: string, exportsList: string[]): string {
   return wireContent(
     "tools/runtime/re-export.template.ts",
@@ -371,6 +381,11 @@ export async function runKernelWire(
       ]),
     });
   }
+
+  files.push({
+    absolutePath: path.join(paths.appDirectory, "tools", "modules", "pipelines.module.ts"),
+    content: buildPipelinesModuleFile(manifest.app),
+  });
 
   for (const file of files) {
     const changed = await writeGeneratedFile(
