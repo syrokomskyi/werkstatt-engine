@@ -2,6 +2,7 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "mutate": ["src/integrity/**/*.ts", "!src/integrity/tests/**"],
   "testRunner": "vitest",
+  "mutator": {},
   "plugins": ["@stryker-mutator/vitest-runner"],
   "coverageAnalysis": "perTest",
   "thresholds": {
