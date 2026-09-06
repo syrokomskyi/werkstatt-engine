@@ -462,8 +462,8 @@
     "lighthouse": "13.4.1"
   },
   "devDependencies": {
-    "@stryker-mutator/typescript": "^8.7.1",
-    "@stryker-mutator/vitest-runner": "^8.7.1",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^26.2.0",
     "@types/semver": "^7.8.0",
     "eslint": "^10.9.0",
