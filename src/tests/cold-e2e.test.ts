@@ -120,14 +120,48 @@ describe("werkstatt.e2e.cold", () => {
     mockReaddir = vi.fn(async () => ["m000001"] as never);
     mockReadFile = vi.fn(async () => "" as never);
 
-    mockedExec.mockResolvedValue({
-      commandName: "sternsystem.register",
-      exitCode: 0,
-      ok: true,
-      data: { firstMissionId: "m000001" },
-      metadata: {} as never,
-      logs: [],
-      timing: {} as never,
+    mockedExec.mockImplementation((cmdInput: { commandName?: string }) => {
+      const name = cmdInput?.commandName ?? "";
+      if (name === "sternsystem.handover.prepare") {
+        return Promise.resolve({
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: {
+            dryRun: true,
+            signedAuthorization: { mock: true },
+            authorizationHash: "mock-hash",
+          },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        });
+      }
+      if (name === "sternsystem.handover.complete") {
+        return Promise.resolve({
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: {
+            dryRun: true,
+            newPassportHashPreview: "mock-hash-preview",
+            bordbuchEventPreview: { kind: "handover" },
+            registryTransferPreview: { previousOwner: "a", newOwner: "b" },
+          },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        });
+      }
+      return Promise.resolve({
+        commandName: name || "sternsystem.register",
+        exitCode: 0,
+        ok: true,
+        data: { firstMissionId: "m000001" },
+        metadata: {} as never,
+        logs: [],
+        timing: {} as never,
+      });
     });
 
     const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);

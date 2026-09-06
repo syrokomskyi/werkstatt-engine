@@ -126,6 +126,8 @@ function makeCtx(opId: string, workspaceRoot: string): DeployExecutionContext {
 
 function makeWorkspace(): string {
   const tmp = mkdtempSync(join(tmpdir(), "leitstand-test-"));
+  // Clean up any stale systems-cache from previous test runs
+  rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   const distDir = join(tmp, "releases", "r000001", "dist", "client");
   mkdirSync(distDir, { recursive: true });
   return tmp;
