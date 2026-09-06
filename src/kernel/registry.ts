@@ -12,3 +12,5 @@ any stale imports that may reference it directly.</purpose>
   <item>RFC-1038: delete KernelRegistry class — replaced by ActualState interface and buildActualState function in runtime/reconciler.ts.</item>
 </CHANGE_SUMMARY>
 */
+
+export const REGISTRY_STUB_REMOVED_BY_RFC_1038 = true as const;

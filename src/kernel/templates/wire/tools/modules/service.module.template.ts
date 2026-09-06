@@ -14,9 +14,8 @@
   <item>RFC-0570: added content.formula.migrate command.</item>
 </CHANGE_SUMMARY>
 */
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-engine/runtime/desired-state";
 import {
-import type { ModuleExport } from "../runtime/desired-state.ts";
   runCleanIcons,
   runGenerateIcons,
   runGenerateMaterialCreditsPage,
@@ -30,7 +29,7 @@ import type { ModuleExport } from "../runtime/desired-state.ts";
 export const serviceModule: ModuleExport = {
   name: "service",
   version: "0.1.0",
-    declarations: [],
+  declarations: [],
   commands: [
     {
       name: "icons.generate",
@@ -159,6 +158,5 @@ export const serviceModule: ModuleExport = {
       execute: runContentFormulaMigrate,
     }
   ],
-  pipelines: [
-
-  ]};
+  pipelines: [],
+};
