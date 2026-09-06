@@ -6,6 +6,8 @@
 
 Рушій надає kernel runtime, оркестрацію місій, управління дзеркалами Sternsystem, пайплайни релізів, оркестрацію розгортання Leitstand, Bordbuch-журнал змін, Notausgang аварійний експорт, сховище артефактів, синхронізацію evidence, цілісність, спостереження, fingerprint, agent-gate та операційні схеми. Специфічна для стеку логіка (Astro, Phaser, Godot) надається плагінами, що реалізують контракт `werkstatt/plugin@1` (RFC-0770).
 
+> Розроблено в [Warpgogol](https://warpgogol.com) · Опубліковано як open source.
+
 ---
 
 ## Що робить цей пакет
@@ -66,28 +68,28 @@ pnpm add -D @warpgogol/werkstatt @warpgogol/werkstatt-knowledge
 
 ## Точки входу
 
-| Експорт | Модуль |
-| --- | --- |
-| `@warpgogol/werkstatt` | `./src/index.ts` |
-| `@warpgogol/werkstatt/kernel` | `./src/kernel/index.ts` |
-| `@warpgogol/werkstatt/mission` | `./src/mission/index.ts` |
-| `@warpgogol/werkstatt/sternsystem` | `./src/sternsystem/index.ts` |
-| `@warpgogol/werkstatt/release` | `./src/release/index.ts` |
-| `@warpgogol/werkstatt/leitstand` | `./src/leitstand/index.ts` |
-| `@warpgogol/werkstatt/bordbuch` | `./src/bordbuch/index.ts` |
-| `@warpgogol/werkstatt/notausgang` | `./src/notausgang/index.ts` |
+| Експорт                               | Модуль                          |
+| ------------------------------------- | ------------------------------- |
+| `@warpgogol/werkstatt`                | `./src/index.ts`                |
+| `@warpgogol/werkstatt/kernel`         | `./src/kernel/index.ts`         |
+| `@warpgogol/werkstatt/mission`        | `./src/mission/index.ts`        |
+| `@warpgogol/werkstatt/sternsystem`    | `./src/sternsystem/index.ts`    |
+| `@warpgogol/werkstatt/release`        | `./src/release/index.ts`        |
+| `@warpgogol/werkstatt/leitstand`      | `./src/leitstand/index.ts`      |
+| `@warpgogol/werkstatt/bordbuch`       | `./src/bordbuch/index.ts`       |
+| `@warpgogol/werkstatt/notausgang`     | `./src/notausgang/index.ts`     |
 | `@warpgogol/werkstatt/artifact-store` | `./src/artifact-store/index.ts` |
-| `@warpgogol/werkstatt/evidence` | `./src/evidence/index.ts` |
-| `@warpgogol/werkstatt/integrity` | `./src/integrity/index.ts` |
-| `@warpgogol/werkstatt/signing` | `./src/signing/index.ts` |
-| `@warpgogol/werkstatt/observability` | `./src/observability/index.ts` |
-| `@warpgogol/werkstatt/fingerprint` | `./src/fingerprint/index.ts` |
-| `@warpgogol/werkstatt/agent-gate` | `./src/agent-gate/index.ts` |
-| `@warpgogol/werkstatt/changelog` | `./src/changelog/index.ts` |
-| `@warpgogol/werkstatt/schemas` | `./src/schemas/index.ts` |
-| `@warpgogol/werkstatt/certification` | `./src/certification/index.ts` |
-| `@warpgogol/werkstatt/component` | `./src/component/index.ts` |
-| `@warpgogol/werkstatt/handoff` | `./src/handoff/index.ts` |
+| `@warpgogol/werkstatt/evidence`       | `./src/evidence/index.ts`       |
+| `@warpgogol/werkstatt/integrity`      | `./src/integrity/index.ts`      |
+| `@warpgogol/werkstatt/signing`        | `./src/signing/index.ts`        |
+| `@warpgogol/werkstatt/observability`  | `./src/observability/index.ts`  |
+| `@warpgogol/werkstatt/fingerprint`    | `./src/fingerprint/index.ts`    |
+| `@warpgogol/werkstatt/agent-gate`     | `./src/agent-gate/index.ts`     |
+| `@warpgogol/werkstatt/changelog`      | `./src/changelog/index.ts`      |
+| `@warpgogol/werkstatt/schemas`        | `./src/schemas/index.ts`        |
+| `@warpgogol/werkstatt/certification`  | `./src/certification/index.ts`  |
+| `@warpgogol/werkstatt/component`      | `./src/component/index.ts`      |
+| `@warpgogol/werkstatt/handoff`        | `./src/handoff/index.ts`        |
 
 ---
 
@@ -99,24 +101,24 @@ pnpm add -D @warpgogol/werkstatt @warpgogol/werkstatt-knowledge
 
 ## Архітектура
 
-| Директорія | Призначення |
-| --- | --- |
-| `src/kernel/` | Kernel runtime, CLI, реєстр команд |
-| `src/mission/` | Оркестрація місій (materialize, validate, reconcile, close) |
-| `src/sternsystem/` | Дзеркала Sternsystem, синхронізація, валідація |
-| `src/release/` | Пайплайн релізів, evidence, розгортання |
-| `src/leitstand/` | Оркестрація розгортання (dev → Axiom → Alt → Main) |
-| `src/bordbuch/` | Append-only hash-chained журнал операцій |
-| `src/notausgang/` | Аварійний експорт |
-| `src/certification/` | Канонічна JSON-ідентичність, діагностика, авторитет розгортання |
-| `src/artifact-store/` | Content-addressed dossier-репозиторій |
-| `src/evidence/` | Синхронізація evidence |
-| `src/integrity/` | Fingerprint, підписування, верифікація |
-| `src/observability/` | Метрики, OTLP-конвертація |
-| `src/agent-gate/` | Перевірки безпеки для агентів |
-| `src/schemas/` | Операційні схеми (Diagnostic, тощо) |
-| `src/plugin-contract.ts` | Контракт `werkstatt/plugin@1` |
-| `src/plugin-registry.ts` | Реєстр плагінів |
+| Директорія               | Призначення                                                     |
+| ------------------------ | --------------------------------------------------------------- |
+| `src/kernel/`            | Kernel runtime, CLI, реєстр команд                              |
+| `src/mission/`           | Оркестрація місій (materialize, validate, reconcile, close)     |
+| `src/sternsystem/`       | Дзеркала Sternsystem, синхронізація, валідація                  |
+| `src/release/`           | Пайплайн релізів, evidence, розгортання                         |
+| `src/leitstand/`         | Оркестрація розгортання (dev → Axiom → Alt → Main)              |
+| `src/bordbuch/`          | Append-only hash-chained журнал операцій                        |
+| `src/notausgang/`        | Аварійний експорт                                               |
+| `src/certification/`     | Канонічна JSON-ідентичність, діагностика, авторитет розгортання |
+| `src/artifact-store/`    | Content-addressed dossier-репозиторій                           |
+| `src/evidence/`          | Синхронізація evidence                                          |
+| `src/integrity/`         | Fingerprint, підписування, верифікація                          |
+| `src/observability/`     | Метрики, OTLP-конвертація                                       |
+| `src/agent-gate/`        | Перевірки безпеки для агентів                                   |
+| `src/schemas/`           | Операційні схеми (Diagnostic, тощо)                             |
+| `src/plugin-contract.ts` | Контракт `werkstatt/plugin@1`                                   |
+| `src/plugin-registry.ts` | Реєстр плагінів                                                 |
 
 ---
 
@@ -150,3 +152,11 @@ pnpm exec repo-extract --config packages/werkstatt/extract.config.yaml --verbose
 ## Ліцензія
 
 Apache-2.0
+
+## Відкрита інженерія
+
+Цей пакет походить із виробничої інженерної роботи в [Warpgogol](https://warpgogol.com), інженерній студії в Німеччині.
+
+Ми публікуємо багаторазові частини нашої інфраструктури, коли вони можуть бути корисними поза нашими власними проєктами. Він публікується незалежно від будь-якого комерційного сервісу Warpgogol. Використання цього пакету не створює жодної залежності від Warpgogol.
+
+Створено для реальних систем. Поширюється відкрито.

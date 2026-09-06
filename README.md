@@ -6,6 +6,8 @@ Werkstatt engine — stack-agnostic lifecycle platform (RFC-0769/0772).
 
 The engine provides the kernel runtime, mission orchestration, Sternsystem mirror management, release pipelines, Leitstand deploy orchestration, Bordbuch changelog, Notausgang emergency export, artifact store, evidence sync, integrity, observability, fingerprint, agent-gate, and operations schemas. Stack-specific logic (Astro, Phaser, video rendering) is contributed by plugins implementing the `werkstatt/plugin@1` contract (RFC-0770).
 
+> Engineered at [Warpgogol](https://warpgogol.com) · Released as open source.
+
 ## Publication
 
 This package is published to private npm via `@warpgogol/repo-extract`. The extraction configuration lives at [`extract.config.yaml`](./extract.config.yaml). See the [publication runbook](../../docs/authoring/publication-runbook.md) for the full operator-facing procedure.
@@ -21,3 +23,11 @@ This package is published to private npm via `@warpgogol/repo-extract`. The extr
 ## Plugin contract
 
 The plugin contract is defined in `src/plugin-contract.ts` (`werkstatt/plugin@1`). A plugin declares `schema`, `id`, `profileId`, `moduleLoaders`, optional `pipelines`, `deployAdapters`, `hooks`, `paths`, and `invariants`. The engine refuses to start with zero or multiple plugins. Validation is via `werkstatt.plugin.validate` (PLUGIN-01..05 failure modes). See RFC-0770 for the full contract specification.
+
+## Open Engineering
+
+This package originated from production engineering work at [Warpgogol](https://warpgogol.com), an engineering studio in Germany.
+
+We publish reusable parts of our infrastructure when they can be useful beyond our own projects. It is published independently of any Warpgogol commercial service. Using this package does not create any dependency on Warpgogol.
+
+Built for real systems. Shared openly.
