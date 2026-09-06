@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   computeDelta,
   reconcile,
   buildActualState,
   buildDesiredState,
   resetReconciliationLock,
+  reconcileFromPersisted,
 } from "../reconciler.ts";
+import { persistDesiredState, loadPersistedDesiredState } from "../desired-state-persistence.ts";
 import { validateDeclarations } from "../validate-declarations.ts";
 import type {
   ComponentDeclaration,
@@ -461,5 +466,80 @@ describe("RFC-1038: validateDeclarations (AC-20)", () => {
     // The test command itself should not produce a warning.
     // (The exempt list check may warn about missing exempt commands — that's expected with a minimal map.)
     expect(warnings.some((w) => w.includes("test.generate"))).toBe(false);
+  });
+});
+
+describe("RFC-1038: crash recovery (AC-13)", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "reconciler-crash-"));
+    resetReconciliationLock();
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("loads persisted desired state, detects drift, and corrects it", async () => {
+    const declA = makeDeclaration("werkstatt/a");
+    const declB = makeDeclaration("werkstatt/b");
+    const desired = makeDesiredState([declA, declB]);
+
+    await persistDesiredState(desired, tempDir);
+
+    // Simulate crash: actual state has drift — extra component, missing component
+    const actual = makeActualState([declA]);
+    const extraDecl = makeDeclaration("werkstatt/extra");
+    actual.components.set("werkstatt/extra", { declaration: extraDecl, state: "active" });
+
+    const result = await reconcileFromPersisted(tempDir, [], actual, {
+      profileId: "test-profile",
+    });
+
+    // declB should be activated (was missing), werkstatt/extra should be deactivated (not in desired)
+    expect(result.applied).toBe(true);
+    expect(result.delta.toActivate.map((d) => d.componentId)).toContain("werkstatt/b");
+    expect(result.delta.toDeactivate).toContain("werkstatt/extra");
+
+    // Actual state should now match desired state
+    expect(actual.components.has("werkstatt/b")).toBe(true);
+    expect(actual.components.has("werkstatt/extra")).toBe(false);
+  });
+
+  it("builds desired state from module exports when no persisted state exists", async () => {
+    const decl = makeDeclaration("werkstatt/new");
+    const mod = makeModuleExport("test", { declarations: [decl] });
+    const actual = makeActualState();
+
+    const result = await reconcileFromPersisted(tempDir, [mod], actual, {
+      profileId: "test-profile",
+    });
+
+    expect(result.applied).toBe(true);
+    expect(actual.components.has("werkstatt/new")).toBe(true);
+
+    // Verify state was persisted
+    const persisted = await loadPersistedDesiredState(tempDir);
+    expect(persisted).not.toBeNull();
+    expect(persisted!.components.has("werkstatt/new")).toBe(true);
+  });
+
+  it("handles corrupt persisted file gracefully", async () => {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(join(tempDir, ".werkstatt"), { recursive: true });
+    await writeFile(join(tempDir, ".werkstatt", "desired-state.json"), "{ not valid json", "utf8");
+
+    const decl = makeDeclaration("werkstatt/fallback");
+    const mod = makeModuleExport("test", { declarations: [decl] });
+    const actual = makeActualState();
+
+    const result = await reconcileFromPersisted(tempDir, [mod], actual, {
+      profileId: "test-profile",
+    });
+
+    // Should fall back to building from exports, not crash
+    expect(result.applied).toBe(true);
+    expect(actual.components.has("werkstatt/fallback")).toBe(true);
   });
 });

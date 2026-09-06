@@ -77,6 +77,7 @@ import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import { getDefaultScopeManager } from "../scope/scope.ts";
+import { removeOverlay } from "../runtime/overlay-store.ts";
 
 // RFC-0597: Media cache directories to persist across missions
 const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
@@ -1282,6 +1283,13 @@ export async function buildCloseSteps(
       verify: async (c: unknown) => {
         const cc = c as CloseStepCtx;
         return existsSync(path.join(cc.workpieceDir, ".closed"));
+      },
+    },
+    {
+      name: "remove-mission-overlay",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        removeOverlay(`mission-${cc.missionId}`);
       },
     },
     {

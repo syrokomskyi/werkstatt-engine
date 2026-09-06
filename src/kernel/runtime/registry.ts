@@ -23,10 +23,10 @@ import process from "node:process";
 import { discoverSiteWorkspaces, loadKernelAppConfig } from "../discovery.ts";
 import { getOrBuildRegistry, getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { buildActualState } from "../../runtime/reconciler.ts";
+import { validateDeclarations } from "../../runtime/validate-declarations.ts";
 import type {
   DiscoveredSiteWorkspace,
   KernelAppConfig,
-  KernelPipelineStep,
   SiteWorkspacesListResult,
   KernelCommandDefinition,
   KernelRegisteredCommandInfo,
@@ -51,13 +51,7 @@ export async function buildRegistry(config: KernelAppConfig): Promise<ActualStat
 
   const actualState = buildActualState(exports);
 
-  if (config.pipelines) {
-    for (const [name, steps] of Object.entries(config.pipelines)) {
-      if (!actualState.pipelines.has(name)) {
-        (actualState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
-      }
-    }
-  }
+  validateDeclarations(actualState.commands);
 
   return actualState;
 }
@@ -73,13 +67,6 @@ export async function buildRegistryForModule(
     }
     const mod = await loader();
     const actualState = buildActualState([mod]);
-    if (config.pipelines) {
-      for (const [name, steps] of Object.entries(config.pipelines)) {
-        if (!actualState.pipelines.has(name)) {
-          (actualState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
-        }
-      }
-    }
     return actualState;
   } else if (config.modules) {
     const mod = config.modules.find((m) => m.name === moduleName);
@@ -87,21 +74,9 @@ export async function buildRegistryForModule(
       throw new Error(`No module named \`${moduleName}\` in config.`);
     }
     const actualState = buildActualState([mod]);
-    if (config.pipelines) {
-      for (const [name, steps] of Object.entries(config.pipelines)) {
-        if (!actualState.pipelines.has(name)) {
-          (actualState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
-        }
-      }
-    }
     return actualState;
   }
   const emptyState = buildActualState([]);
-  if (config.pipelines) {
-    for (const [name, steps] of Object.entries(config.pipelines)) {
-      (emptyState.pipelines as Map<string, KernelPipelineStep[]>).set(name, steps);
-    }
-  }
   return emptyState;
 }
 

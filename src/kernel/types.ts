@@ -316,8 +316,6 @@ export interface KernelAppConfig {
   modules?: ModuleExport[];
   /** Lazy module loaders — enables manifest-driven single-module loading. Functions are defined in kernel.config.ts so import() resolves from the workspace root. */
   moduleLoaders?: Record<string, () => Promise<ModuleExport>>;
-  /** Config-level pipelines — defined in kernel.config.ts, merged into ActualState after module pipelines. */
-  pipelines?: Record<string, KernelPipelineStep[]>;
 }
 export interface KernelExecutionReport<TData = unknown> {
   siteName?: string;

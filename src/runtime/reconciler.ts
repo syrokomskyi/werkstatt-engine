@@ -341,3 +341,92 @@ export async function reconcile(
 export function resetReconciliationLock(): void {
   reconciliationLock = false;
 }
+
+/**
+ * AC-13: Crash recovery — load persisted desired state from
+ * `.werkstatt/desired-state.json`, compare with actual state, and correct drift.
+ *
+ * If no persisted state exists, builds desired state from module exports.
+ * After reconciliation, persists the updated desired state.
+ */
+export async function reconcileFromPersisted(
+  workspaceRoot: string,
+  exports: ModuleExport[],
+  actual: MutableActualState,
+  options: {
+    profileId: string;
+    requiredCapabilities?: string[];
+    availableArtifacts?: ReadonlyMap<string, import("../fingerprint/primitives.ts").Sha256Digest>;
+    admittedGrants?: ReadonlyArray<{ scope: string; resource: string }>;
+    onActivate?: (decl: ComponentDeclaration) => Promise<void>;
+    onDeactivate?: (id: string) => Promise<void>;
+    onReconfigure?: (
+      id: string,
+      oldConfig: Record<string, unknown>,
+      newConfig: Record<string, unknown>,
+    ) => Promise<void>;
+  },
+): Promise<ReconciliationResult> {
+  const { loadPersistedDesiredState, persistDesiredState } =
+    await import("./desired-state-persistence.ts");
+
+  let desired = await loadPersistedDesiredState(workspaceRoot);
+
+  if (!desired) {
+    desired = buildDesiredState(exports, {
+      profileId: options.profileId,
+      requiredCapabilities: options.requiredCapabilities,
+      availableArtifacts: options.availableArtifacts,
+      admittedGrants: options.admittedGrants,
+    });
+  }
+
+  const result = await reconcile(desired, actual, {
+    onActivate: options.onActivate,
+    onDeactivate: options.onDeactivate,
+    onReconfigure: options.onReconfigure,
+  });
+
+  await persistDesiredState(desired, workspaceRoot);
+
+  return result;
+}
+
+/**
+ * Start periodic reconciliation for long-running modes (dev server, watch mode, daemon).
+ * Calls reconcile() every `intervalMs` (default 60s). NOT for CLI mode (process exits in seconds).
+ *
+ * @returns a `stop()` function that clears the interval.
+ */
+export function startPeriodicReconciler(
+  desired: DesiredState,
+  actual: MutableActualState,
+  options?: {
+    intervalMs?: number;
+    onActivate?: (decl: ComponentDeclaration) => Promise<void>;
+    onDeactivate?: (id: string) => Promise<void>;
+    onReconfigure?: (
+      id: string,
+      oldConfig: Record<string, unknown>,
+      newConfig: Record<string, unknown>,
+    ) => Promise<void>;
+  },
+): () => void {
+  const intervalMs = options?.intervalMs ?? 60_000;
+
+  const timer = setInterval(async () => {
+    try {
+      await reconcile(desired, actual, {
+        onActivate: options?.onActivate,
+        onDeactivate: options?.onDeactivate,
+        onReconfigure: options?.onReconfigure,
+      });
+    } catch (e) {
+      process.stderr.write(
+        `[periodic-reconciler] ERROR: ${e instanceof Error ? e.message : String(e)}\n`,
+      );
+    }
+  }, intervalMs);
+
+  return () => clearInterval(timer);
+}

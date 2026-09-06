@@ -11,98 +11,130 @@ reconciliation, and overlay management.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1038: initial implementation — composition.desired-state.inspect, composition.reconcile, composition.overlay.apply, composition.overlay.inspect commands.</item>
+  <item>RFC-1038 Phase 3: wire all commands to real actualState, desired state persistence, and overlay store.</item>
 </CHANGE_SUMMARY>
 */
 
-import type { KernelCommandInput, KernelExecutionReport, KernelRuntimeContext } from "../kernel/types.ts";
+import type {
+  KernelCommandInput,
+  KernelExecutionReport,
+  KernelRuntimeContext,
+} from "../kernel/types.ts";
 import { resolveOverlays, inspectOverlays } from "./overlay.ts";
-import { reconcile, computeDelta } from "./reconciler.ts";
-import type { DesiredState, DesiredStateOverlay } from "./desired-state.ts";
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import { reconcile, reconcileFromPersisted } from "./reconciler.ts";
+import { applyOverlay, getActiveOverlays, removeOverlay } from "./overlay-store.ts";
+import { loadPersistedDesiredState } from "./desired-state-persistence.ts";
+import type { DesiredStateOverlay, ModuleExport } from "./desired-state.ts";
+
+function makeReport(
+  commandName: string,
+  data: unknown,
+  ok: boolean,
+  exitCode: number,
+  summary: string,
+  context: KernelRuntimeContext,
+  durationMs: number,
+): KernelExecutionReport {
+  return {
+    commandName,
+    data,
+    exitCode,
+    ok,
+    summary,
+    metadata: { name: commandName } as any,
+    logs: context.logger.getEvents(),
+    filesModified: [],
+    timing: { durationMs, exceededTimeout: false },
+  };
+}
 
 async function runDesiredStateInspect(
   _input: KernelCommandInput,
-  _context: KernelRuntimeContext,
+  context: KernelRuntimeContext,
 ): Promise<KernelExecutionReport> {
+  const start = Date.now();
+
+  const desired = await loadPersistedDesiredState(context.workspaceRoot);
+  const activeOverlays = getActiveOverlays();
+
+  const effectiveDesired =
+    desired && activeOverlays.length > 0 ? resolveOverlays(desired, activeOverlays) : desired;
+
   const data = {
-    desired: {
-      components: [] as Array<[string, unknown]>,
-      requiredCapabilities: [] as string[],
-      profileId: "",
-    },
+    desired: effectiveDesired
+      ? {
+          components: Array.from(effectiveDesired.components.entries()) as Array<[string, unknown]>,
+          requiredCapabilities: effectiveDesired.requiredCapabilities,
+          profileId: effectiveDesired.profileId,
+        }
+      : null,
     actual: {
-      components: [] as Array<{ componentId: string; state: string }>,
+      components: Array.from(context.actualState.components.entries()).map(([id, entry]) => ({
+        componentId: id,
+        version: entry.declaration.version,
+        state: entry.state,
+      })),
     },
+    overlays: inspectOverlays(activeOverlays),
   };
 
-  return {
-    commandName: "composition.desired-state.inspect",
+  return makeReport(
+    "composition.desired-state.inspect",
     data,
-    exitCode: 0,
-    ok: true,
-    summary: "Desired and actual state inspection",
-    metadata: { name: "composition.desired-state.inspect" } as any,
-    logs: _context.logger.getEvents(),
-    filesModified: [],
-    timing: { durationMs: 0, exceededTimeout: false },
-  };
+    true,
+    0,
+    "Desired and actual state inspection",
+    context,
+    Date.now() - start,
+  );
 }
 
 async function runCompositionReconcile(
   _input: KernelCommandInput,
-  _context: KernelRuntimeContext,
+  context: KernelRuntimeContext,
 ): Promise<KernelExecutionReport> {
-  const emptyDesired: DesiredState = {
-    components: new Map(),
-    requiredCapabilities: [],
-    availableArtifacts: new Map(),
-    admittedGrants: [],
-    profileId: "",
-  };
-  const emptyActual = {
-    components: new Map(),
-    commands: new Map(),
-    pipelines: new Map(),
-  };
+  const start = Date.now();
 
-  const result = await reconcile(emptyDesired, emptyActual);
+  const result = await reconcileFromPersisted(
+    context.workspaceRoot,
+    [],
+    context.actualState as any,
+    { profileId: context.site?.name ?? "werkstatt" },
+  );
 
-  return {
-    commandName: "composition.reconcile",
-    data: result,
-    exitCode: result.applied ? 0 : 1,
-    ok: result.applied,
-    summary: result.applied
+  return makeReport(
+    "composition.reconcile",
+    result,
+    result.applied,
+    result.applied ? 0 : 1,
+    result.applied
       ? "Reconciliation applied"
       : `Reconciliation not applied: ${result.failures.map((f) => f.reason).join(", ")}`,
-    metadata: { name: "composition.reconcile" } as any,
-    logs: _context.logger.getEvents(),
-    filesModified: [],
-    timing: { durationMs: result.durationMs, exceededTimeout: false },
-  };
+    context,
+    Date.now() - start,
+  );
 }
 
 async function runOverlayApply(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelExecutionReport> {
+  const start = Date.now();
+
   const overlayId = input.flags["overlay-id"] as string | undefined;
   const scope = input.flags["scope"] as string | undefined;
-  const addComponent = input.flags["add"] as string | undefined;
   const removeComponent = input.flags["remove"] as string | undefined;
 
   if (!overlayId || !scope) {
-    return {
-      commandName: "composition.overlay.apply",
-      data: { error: "Missing required --overlay-id and --scope flags" },
-      exitCode: 1,
-      ok: false,
-      summary: "Missing required --overlay-id and --scope flags",
-      metadata: { name: "composition.overlay.apply" } as any,
-      logs: context.logger.getEvents(),
-      filesModified: [],
-      timing: { durationMs: 0, exceededTimeout: false },
-    };
+    return makeReport(
+      "composition.overlay.apply",
+      { error: "Missing required --overlay-id and --scope flags" },
+      false,
+      1,
+      "Missing required --overlay-id and --scope flags",
+      context,
+      Date.now() - start,
+    );
   }
 
   const overlay: DesiredStateOverlay = {
@@ -114,43 +146,52 @@ async function runOverlayApply(
     priority: 100,
   };
 
-  const baseDesired: DesiredState = {
-    components: new Map(),
-    requiredCapabilities: [],
-    availableArtifacts: new Map(),
-    admittedGrants: [],
-    profileId: "",
-  };
+  applyOverlay(overlay);
 
   try {
-    const resolved = resolveOverlays(baseDesired, [overlay]);
-    return {
-      commandName: "composition.overlay.apply",
-      data: {
+    const desired = await loadPersistedDesiredState(context.workspaceRoot);
+    const activeOverlays = getActiveOverlays();
+    const effectiveDesired = desired ? resolveOverlays(desired, activeOverlays) : null;
+
+    let reconciliation: { applied: boolean; failures: Array<{ id: string; reason: string }> } = {
+      applied: true,
+      failures: [],
+    };
+
+    if (effectiveDesired) {
+      const result = await reconcile(effectiveDesired, context.actualState as any);
+      reconciliation = {
+        applied: result.applied,
+        failures: result.failures,
+      };
+    }
+
+    return makeReport(
+      "composition.overlay.apply",
+      {
         overlayId,
+        scope,
         applied: true,
-        componentCount: resolved.components.size,
+        reconciliation,
+        effectiveComponentCount: effectiveDesired?.components.size ?? 0,
       },
-      exitCode: 0,
-      ok: true,
-      summary: `Overlay ${overlayId} applied`,
-      metadata: { name: "composition.overlay.apply" } as any,
-      logs: context.logger.getEvents(),
-      filesModified: [],
-      timing: { durationMs: 0, exceededTimeout: false },
-    };
+      true,
+      0,
+      `Overlay ${overlayId} applied`,
+      context,
+      Date.now() - start,
+    );
   } catch (e) {
-    return {
-      commandName: "composition.overlay.apply",
-      data: { error: e instanceof Error ? e.message : String(e) },
-      exitCode: 1,
-      ok: false,
-      summary: `Overlay apply failed: ${e instanceof Error ? e.message : String(e)}`,
-      metadata: { name: "composition.overlay.apply" } as any,
-      logs: context.logger.getEvents(),
-      filesModified: [],
-      timing: { durationMs: 0, exceededTimeout: false },
-    };
+    removeOverlay(overlayId);
+    return makeReport(
+      "composition.overlay.apply",
+      { error: e instanceof Error ? e.message : String(e) },
+      false,
+      1,
+      `Overlay apply failed: ${e instanceof Error ? e.message : String(e)}`,
+      context,
+      Date.now() - start,
+    );
   }
 }
 
@@ -158,27 +199,42 @@ async function runOverlayInspect(
   _input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelExecutionReport> {
-  const overlays: DesiredStateOverlay[] = [];
-  const summary = inspectOverlays(overlays);
+  const start = Date.now();
 
-  return {
-    commandName: "composition.overlay.inspect",
-    data: { overlays: summary },
-    exitCode: 0,
-    ok: true,
-    summary: `${overlays.length} overlay(s) active`,
-    metadata: { name: "composition.overlay.inspect" } as any,
-    logs: context.logger.getEvents(),
-    filesModified: [],
-    timing: { durationMs: 0, exceededTimeout: false },
+  const activeOverlays = getActiveOverlays();
+  const summary = inspectOverlays(activeOverlays);
+
+  const desired = await loadPersistedDesiredState(context.workspaceRoot);
+  const effectiveDesired =
+    desired && activeOverlays.length > 0 ? resolveOverlays(desired, activeOverlays) : desired;
+
+  const data = {
+    overlays: summary,
+    effectiveDesiredState: effectiveDesired
+      ? {
+          componentCount: effectiveDesired.components.size,
+          requiredCapabilities: effectiveDesired.requiredCapabilities,
+          profileId: effectiveDesired.profileId,
+        }
+      : null,
   };
+
+  return makeReport(
+    "composition.overlay.inspect",
+    data,
+    true,
+    0,
+    `${activeOverlays.length} overlay(s) active`,
+    context,
+    Date.now() - start,
+  );
 }
 
 export const compositionModule: ModuleExport = {
   name: "composition",
   version: "1.0.0",
 
-    declarations: [],
+  declarations: [],
   commands: [
     {
       name: "composition.desired-state.inspect",
@@ -205,8 +261,7 @@ export const compositionModule: ModuleExport = {
     {
       name: "composition.overlay.apply",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
-      description:
-        "RFC-1038: Apply an overlay to the desired state and trigger reconciliation.",
+      description: "RFC-1038: Apply an overlay to the desired state and trigger reconciliation.",
       scope: "workspace",
       mutatesState: true,
       cacheable: false,
@@ -235,15 +290,13 @@ export const compositionModule: ModuleExport = {
     {
       name: "composition.overlay.inspect",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
-      description:
-        "RFC-1038: Inspect active overlays and their effects on the desired state.",
+      description: "RFC-1038: Inspect active overlays and their effects on the desired state.",
       scope: "workspace",
       mutatesState: false,
       cacheable: false,
       flags: {},
       execute: runOverlayInspect,
-    }
+    },
   ],
-  pipelines: [
-
-  ]};
+  pipelines: [],
+};

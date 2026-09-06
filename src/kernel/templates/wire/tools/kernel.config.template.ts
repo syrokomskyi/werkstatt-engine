@@ -10,15 +10,6 @@
 </CHANGE_SUMMARY>
 */
 import { defineKernelConfig } from "@warpgogol/werkstatt-engine/kernel/types";
-import {
-  SITES_CHECK_PIPELINE,
-  STANDARD_COMPASS_PIPELINE,
-  SITES_BUILD_PREPARE_PIPELINE,
-  SITES_BUILD_PREPARE_DEV_PIPELINE,
-  SITES_BUILD_CHECK_PIPELINE,
-  SITES_BUILD_POST_PIPELINE,
-} from "@warpgogol/werkstatt-site/checks/pipelines";
-import { STANDARD_INTEGRITY_PIPELINE } from "@warpgogol/werkstatt-engine/integrity";
 
 // moduleLoaders: each module is loaded lazily via dynamic import(), so that
 // tsImport of this config file does not transitively import all module
@@ -51,14 +42,6 @@ export default defineKernelConfig({
       (await import("@warpgogol/werkstatt-site/onboarding")).createOnboardingModule(),
     testing: async () =>
       (await import("@warpgogol/werkstatt-site/testing/module")).createTestingModule(),
-  },
-  pipelines: {
-    "build.prepare": [...SITES_BUILD_PREPARE_PIPELINE],
-    "build.prepare.dev": [...SITES_BUILD_PREPARE_DEV_PIPELINE],
-    "build.check": [...SITES_BUILD_CHECK_PIPELINE],
-    "build.post": [...SITES_BUILD_POST_PIPELINE],
-    check: [...SITES_CHECK_PIPELINE],
-    compass: [...STANDARD_COMPASS_PIPELINE],
-    "integrity.release": [...STANDARD_INTEGRITY_PIPELINE],
+    pipelines: async () => (await import("./modules/pipelines.module")).pipelinesModule,
   },
 });

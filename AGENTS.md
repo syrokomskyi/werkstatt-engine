@@ -55,11 +55,19 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `buildActualState(ModuleExport[])` in `runtime/reconciler.ts` replaces `KernelRegistry.populateFromModule()`. It iterates `mod.commands` and `mod.pipelines` arrays directly — no `register()` call needed.
 - Backward compatibility: legacy modules using `register(registry)` are still supported via a shim in `buildActualState`. The shim collects commands/pipelines into arrays, then processes them identically to `ModuleExport.commands`.
 - Idempotent re-registration (RFC-0816): same-execute duplicate command registration is a no-op. Only different `execute` functions for the same command name throw `COMPOSITION-02`.
-- Config-level pipelines: `KernelAppConfig.pipelines` (defined in `kernel.config.ts`) are merged into `ActualState.pipelines` after module pipelines in `buildRegistry()` and `buildRegistryForModule()`.
+- Pipelines are declared in `ModuleExport.pipelines` only. `KernelAppConfig.pipelines` is deleted (RFC-1038 Phase 1, AC-21). `buildRegistry()` and `buildRegistryForModule()` no longer merge config-level pipelines.
 - `registry-cache.ts` caches `ActualState` (not `KernelRegistry`). Cache is keyed by config source path. `clearModule` is removed — no module unload in desired-state model.
 - `kernel-module.module.ts` deleted — `kernel.module.load`, `kernel.module.unload`, `kernel.module.inspect` commands removed. Module introspection is available via `composition.desired-state.inspect`.
 - `KernelRuntimeContext.registry` is replaced by `KernelRuntimeContext.actualState: ActualState`.
 - `KernelLifecycleRegistry`, `KernelModuleHandle`, `KernelModuleRegistry` types are deleted from `kernel/types.ts`.
+- `composition.module.ts` registers 4 `composition.*` commands: `composition.desired-state.inspect` (read actual + desired state), `composition.reconcile` (reconcile from persisted desired state), `composition.overlay.apply` (add overlay + reconcile), `composition.overlay.inspect` (inspect active overlays).
+- `overlay-store.ts` — in-memory overlay store with `applyOverlay()`, `getActiveOverlays()`, `removeOverlay()`, `clearOverlays()`. Used by composition commands, mission lifecycle, and evolution controller.
+- `desired-state-persistence.ts` — atomic persistence of desired state to `.werkstatt/desired-state.json` with schema versioning and graceful error handling.
+- `reconcileFromPersisted()` in `reconciler.ts` — loads persisted desired state (or builds from module exports if not found), reconciles drift, and persists updated state. Used by `composition.reconcile` and crash recovery.
+- `startPeriodicReconciler()` in `reconciler.ts` — setInterval-based periodic reconciliation for long-running modes (dev server, watch, daemon). Default interval 60s. Returns a `stop()` function.
+- Mission lifecycle: `mission.open` applies a per-mission overlay (`id: mission-{missionId}`, `scope: per-mission`, `priority: 100`). `mission.close` removes the overlay before disposing scope registry.
+- Evolution controller: `evolution.candidate.activate` applies an overlay (`id: evolution-{candidateId}`, `scope: per-workshop`, `priority: 200`). `evolution.candidate.rollback` removes the overlay.
+- `validateDeclarations()` in `runtime/validate-declarations.ts` replaces `validateRegistration` from werkstatt-site. Wired into `buildRegistry()` after `buildActualState()`.
 
 ## Evolution controller (RFC-1031)
 

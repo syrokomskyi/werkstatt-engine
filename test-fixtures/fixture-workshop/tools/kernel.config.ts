@@ -5,7 +5,7 @@ export default defineKernelConfig({
   description: "Minimal workshop fixture for tarball smoke testing (RFC-0773)",
   moduleLoaders: {
     "werkstatt-plugin": async () =>
-      (await import("@warpgogol/werkstatt-engine/os/werkstatt-plugin-module")).forgeWerkstattPluginModule,
+      (await import("@warpgogol/werkstatt-engine/os/werkstatt-plugin-module"))
+        .forgeWerkstattPluginModule,
   },
-  pipelines: {},
 });

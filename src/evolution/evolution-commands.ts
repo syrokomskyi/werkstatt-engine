@@ -22,6 +22,7 @@ import { createEvolutionController, type EvolutionControllerV1 } from "./control
 import type { CapabilityCandidateV1, CandidateEvidenceV1 } from "./contracts.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
 import { byteHash } from "../fingerprint/primitives.ts";
+import { applyOverlay, removeOverlay } from "../runtime/overlay-store.ts";
 
 let controller: EvolutionControllerV1 | null = null;
 
@@ -293,6 +294,14 @@ export async function runCandidateActivate(
   try {
     await ctl.activate(candidateId);
     const candidate = ctl.getCandidate(candidateId);
+    applyOverlay({
+      id: `evolution-${candidateId}`,
+      scope: "per-workshop",
+      context: { scope: "per-workshop" },
+      addOrReplace: new Map(),
+      remove: [],
+      priority: 200,
+    });
     await recordBordbuchCandidateEvent(
       context,
       candidateId,
@@ -369,6 +378,7 @@ export async function runCandidateRollback(
 
   try {
     await ctl.rollback(componentId);
+    removeOverlay(`evolution-${componentId}`);
     await recordBordbuchCandidateEvent(context, componentId, "rolled-back", "");
     return {
       data: { componentId, stage: "rolled-back" },

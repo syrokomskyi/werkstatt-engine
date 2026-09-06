@@ -61,6 +61,7 @@ import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import { getDefaultScopeManager } from "../scope/scope.ts";
+import { applyOverlay } from "../runtime/overlay-store.ts";
 
 export interface StaleEntryCheck {
   removedPaths: string[];
@@ -690,6 +691,20 @@ export async function buildOpenSteps(
         const cc = c as OpenStepCtx;
         const scopeManager = getDefaultScopeManager();
         scopeManager.getRegistry({ scope: "per-mission", missionId: cc.missionId });
+      },
+    },
+    {
+      name: "apply-mission-overlay",
+      run: async (c: unknown) => {
+        const cc = c as OpenStepCtx;
+        applyOverlay({
+          id: `mission-${cc.missionId}`,
+          scope: "per-mission",
+          context: { scope: "per-mission", missionId: cc.missionId },
+          addOrReplace: new Map(),
+          remove: [],
+          priority: 100,
+        });
       },
     },
     {
