@@ -1,3 +1,4 @@
+// test-adjacency: exempt — fixture file for fingerprint semantic tests
 /*
 <MODULE_CONTRACT>
 <purpose>Maintains packages/fingerprint/src/tests/fixtures/ts-comment.after.ts as an authored fingerprint test module so agents can evolve it without rediscovering local boundaries.</purpose>
