@@ -25,12 +25,12 @@ export default defineKernelConfig({
     deploy: async () => (await import("./modules/deploy.module")).deployModule,
     integrity: async () => (await import("./modules/integrity.module")).integrityModule,
     changelog: async () => (await import("./modules/changelog.module")).changelogModule,
-    rfc: async () => (await import("@warpgogol/forge")).forgeRfcModule,
-    workflow: async () => (await import("@warpgogol/forge")).forgeWorkflowModule,
+    rfc: async () => (await import("@warpgogol/forge")).createForgeRfcModule(),
+    workflow: async () => (await import("@warpgogol/forge")).createForgeWorkflowModule(),
     compass: async () => (await import("@warpgogol/forge")).forgeCompassModule,
-    naming: async () => (await import("@warpgogol/forge")).forgeNamingModule,
+    naming: async () => (await import("@warpgogol/forge")).createForgeNamingModule(),
     werkstatt: async () => (await import("@warpgogol/forge")).forgeWerkstattModule,
-    "change-impact": async () => (await import("@warpgogol/werkstatt-engine/kernel")).changeImpactModule,
+    "change-impact": async () => (await import("@warpgogol/werkstatt-engine/kernel")).createChangeImpactModule(),
     bordbuch: async () =>
       (await import("@warpgogol/werkstatt-engine/handoff")).createBordbuchModule(),
     nachweis: async () =>
