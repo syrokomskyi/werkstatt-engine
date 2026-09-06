@@ -5,6 +5,9 @@ import { join, resolve } from "node:path";
 const workspaceRoot = resolve(__dirname, "..", "..");
 const ledgerPath = join(workspaceRoot, ".flaky-tests.json");
 
+// Intentionally duplicated in packages/werkstatt-site/vitest.config.ts — vitest configs
+// must be self-contained (config-time, no workspace package imports) and the function is
+// small enough that a shared module + subpath export would add more complexity than it removes.
 function getQuarantinedExcludes(packageDir: string): string[] {
   try {
     const ledger = JSON.parse(readFileSync(ledgerPath, "utf-8"));
