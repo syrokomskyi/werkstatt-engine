@@ -45,7 +45,7 @@ function makeManifest(
     requires: [],
     requestedGrants: [],
     effects: [],
-    isolation: { tier: "trusted-in-process", adapterId: null },
+    isolation: { tier: 0, adapterId: null },
     resources: [],
   };
 }

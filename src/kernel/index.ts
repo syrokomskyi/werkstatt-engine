@@ -30,7 +30,7 @@ export { resolveCompassScanRoot } from "./resolve-compass-scan-root.ts";
 export { runKernelWire } from "./wire.ts";
 
 // Icons generation domain
-export { iconsModule } from "./icons/icons.module.ts";
+export { createIconsModule } from "./icons/icons.module.ts";
 export { runIconsGenerate } from "./icons/index.ts";
 
 // RFC governance domain — migrated to @warpgogol/forge (RFC-0374, RFC-0391)
@@ -124,7 +124,7 @@ export {
 } from "./generated-marker.ts";
 
 // RFC-0042: Semantic layer validation domain
-export { semanticModule } from "./semantic/semantic.module.ts";
+export { createSemanticModule } from "./semantic/semantic.module.ts";
 export { runSemanticPageValidate } from "./semantic/handlers.ts";
 
 // RFC-0075: Agent workflow discovery and linting domain — workflowModule migrated to @warpgogol/forge (RFC-0374)
@@ -141,7 +141,7 @@ export type {
 } from "./workflow/index.ts";
 
 // RFC-0265: commit message hygiene lint
-export { commitMessageModule } from "./commit-message.module.ts";
+export { createCommitMessageModule } from "./commit-message.module.ts";
 export {
   runCommitMessageLint,
   lintCommitSubject,
@@ -152,20 +152,20 @@ export {
 export type { CommitRecord, CommitMessageFinding } from "./commit-message-lint.ts";
 
 // RFC-0270: pipeline timing budgets derived from telemetry
-export { pipelineBudgetModule } from "./pipeline-budget.module.ts";
+export { createPipelineBudgetModule } from "./pipeline-budget.module.ts";
 // RFC-0963: validator inventory and consolidation
-export { validatorInventoryModule } from "./validator-inventory.module.ts";
+export { createValidatorInventoryModule } from "./validator-inventory.module.ts";
 // RFC-0332: change impact classifier and advisory check profiles
-export { changeImpactModule } from "./change-impact.module.ts";
+export { createChangeImpactModule } from "./change-impact.module.ts";
 export * from "./change-impact.ts";
 export * from "./pipeline-budgets.ts";
 
 // RFC-0266: single command manifest — generator core + generate command
-export { commandManifestModule } from "./command-manifest.module.ts";
+export { createCommandManifestModule } from "./command-manifest.module.ts";
 export * from "./command-manifest.ts";
 
 // RFC-0563: Git-mesh platform code replication
-export { gitmeshModule } from "./gitmesh/gitmesh-module.ts";
+export { createGitmeshModule } from "./gitmesh/gitmesh-module.ts";
 export type {
   GitMeshConfig,
   GitMeshRemote,
@@ -194,7 +194,7 @@ export { resolveMissionDir } from "./mission-resolver.ts";
 export { resolvePlatformSemanticHash } from "./platform-hash.ts";
 
 // RFC-0564: SWIM membership and CRDT genome
-export { swimModule } from "./swim/swim-module.ts";
+export { createSwimModule } from "./swim/swim-module.ts";
 export type {
   SwimMember,
   SwimMemberStatus,

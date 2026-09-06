@@ -42,7 +42,7 @@ function ctx(workspaceRoot: string): KernelRuntimeContext {
     dryRun: false,
     outputFormat: "json",
     io: createDefaultIO().io,
-    registry: undefined as never,
+    actualState: undefined as never,
   };
 }
 

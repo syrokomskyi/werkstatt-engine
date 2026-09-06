@@ -15,15 +15,17 @@ workspace commands. Provides cache diagnostics and explicit clearing.
 */
 
 import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const cacheModule: KernelModule = {
+export async function createCacheModule(): Promise<ModuleExport> {
+const { runKernelCacheStatus, runKernelCacheClear } = await import("./cache-handlers.ts");
+  return {
   name: "cache",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runKernelCacheStatus, runKernelCacheClear } = await import("./cache-handlers.ts");
-
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "kernel.cache.status",
       modulePath: "packages/werkstatt-engine/src/kernel/cache/cache-module.ts",
       description:
@@ -33,9 +35,8 @@ export const cacheModule: KernelModule = {
       flags: {},
       cacheable: false,
       execute: runKernelCacheStatus,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "kernel.cache.clear",
       modulePath: "packages/werkstatt-engine/src/kernel/cache/cache-module.ts",
       generates: [],
@@ -53,6 +54,10 @@ export const cacheModule: KernelModule = {
         },
       },
       execute: runKernelCacheClear,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

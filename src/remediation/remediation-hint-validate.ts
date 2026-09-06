@@ -64,7 +64,7 @@ export async function runRemediationHintValidate(
 
 function collectValidatorRuleIds(context: KernelRuntimeContext): Set<string> {
   const ruleIds = new Set<string>();
-  for (const cmd of context.registry.commands.values()) {
+  for (const cmd of context.actualState.commands.values()) {
     if (cmd.rules && VALIDATOR_NAME_PATTERN.test(cmd.name)) {
       for (const rule of cmd.rules) {
         ruleIds.add(rule);

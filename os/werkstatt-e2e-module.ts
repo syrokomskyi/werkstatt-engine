@@ -14,16 +14,17 @@
 import type {
   KernelCommandInput,
   KernelCommandResult,
-  KernelModule,
   KernelRuntimeContext,
 } from "../src/kernel/types.ts";
+import type { ModuleExport } from "../src/runtime/desired-state.ts";
 import { runColdE2e, type ColdRunReport } from "../src/e2e/cold.ts";
 
-export const werkstattE2eModule: KernelModule = {
+export const werkstattE2eModule: ModuleExport = {
   name: "werkstatt-e2e",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+  declarations: [],
+  commands: [
+    {
       name: "werkstatt.e2e.cold",
       contract: "werkstatt",
       rules: [],
@@ -61,6 +62,7 @@ export const werkstattE2eModule: KernelModule = {
       ): Promise<KernelCommandResult<ColdRunReport>> {
         return runColdE2e(input, context);
       },
-    });
-  },
+    },
+  ],
+  pipelines: [],
 };

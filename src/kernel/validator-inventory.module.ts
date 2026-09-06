@@ -14,15 +14,17 @@ contract/rules tags.
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "./types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const validatorInventoryModule: KernelModule = {
+export async function createValidatorInventoryModule(): Promise<ModuleExport> {
+const { runValidatorInventoryGenerate } = await import("./validator-inventory.ts");
+  return {
   name: "validator-inventory",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runValidatorInventoryGenerate } = await import("./validator-inventory.ts");
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "validator.inventory.generate",
       modulePath: "packages/werkstatt-engine/src/kernel/validator-inventory.module.ts",
       description:
@@ -45,6 +47,10 @@ export const validatorInventoryModule: KernelModule = {
         },
       },
       execute: runValidatorInventoryGenerate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

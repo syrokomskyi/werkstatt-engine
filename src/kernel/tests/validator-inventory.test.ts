@@ -9,6 +9,7 @@ import type {
   KernelRuntimeContext,
   KernelCommandDefinition,
 } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
 /*
 <MODULE_CONTRACT>
@@ -41,15 +42,17 @@ function makeContext(
   pipelines: [string, { command: string }[]][] = [],
 ): KernelRuntimeContext {
   const registry = new KernelRegistry();
-  for (const cmd of commands) {
-    registry.registerCommand(cmd);
-  }
-  for (const [name, steps] of pipelines) {
-    registry.registerPipeline(name, steps as any);
-  }
+  const mod: ModuleExport = {
+    name: "test-module",
+    version: "1.0.0",
+    declarations: [],
+    commands,
+    pipelines: pipelines.map(([name, steps]) => ({ name, steps })),
+  };
+  registry.populateFromModule(mod);
   return {
     workspaceRoot,
-    registry,
+    actualState: registry,
     dryRun: false,
   } as unknown as KernelRuntimeContext;
 }

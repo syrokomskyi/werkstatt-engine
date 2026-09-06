@@ -14,23 +14,25 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createReleaseModule(): KernelModule {
+export async function createReleaseModule(): Promise<ModuleExport> {
+  const {
+    runReleasePrepare,
+    runReleaseReady,
+    runReleaseValidate,
+    runReleaseList,
+    runReleaseStateValidate,
+    runDistDeterminismValidate,
+    runReleaseSign,
+  } = await import("./release-commands.ts");
+  const { runBootSmokeCommand } = await import("./boot-smoke.ts");
   return {
     name: "release",
     version: "0.1.0",
-    async register(registry) {
-      const {
-        runReleasePrepare,
-        runReleaseReady,
-        runReleaseValidate,
-        runReleaseList,
-        runReleaseStateValidate,
-        runDistDeterminismValidate,
-        runReleaseSign,
-      } = await import("./release-commands.ts");
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "release.prepare",
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         generates: [],
@@ -47,8 +49,8 @@ export function createReleaseModule(): KernelModule {
         reads: ["missions/{mission}/**", "systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runReleasePrepare,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "release.ready",
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         generates: [],
@@ -72,8 +74,8 @@ export function createReleaseModule(): KernelModule {
         ],
         cacheable: false,
         execute: runReleaseReady,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "release.validate",
         contract: "release",
         rules: [],
@@ -86,8 +88,8 @@ export function createReleaseModule(): KernelModule {
         },
         reads: ["releases/{release}/**"],
         execute: runReleaseValidate,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "release.list",
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "List releases, optionally filtered by site (RFC-0357). Flags: [--site].",
@@ -98,8 +100,8 @@ export function createReleaseModule(): KernelModule {
         },
         reads: ["releases/*/release.yaml", "systems-cache/*/system-config.yaml"],
         execute: runReleaseList,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "release.state.validate",
         contract: "release",
         rules: [],
@@ -125,8 +127,8 @@ export function createReleaseModule(): KernelModule {
           "systems-cache/{system}/bordbuch/events.ndjson",
         ],
         execute: runReleaseStateValidate,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "dist.determinism.validate",
         contract: "dist",
         rules: [],
@@ -149,8 +151,8 @@ export function createReleaseModule(): KernelModule {
           "missions/{mission}/distribution/dist/**",
         ],
         execute: runDistDeterminismValidate,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "release.sign",
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         generates: [],
@@ -170,9 +172,8 @@ export function createReleaseModule(): KernelModule {
         reads: ["releases/{release}/dist/**", "releases/{release}/.integrity/**"],
         cacheable: false,
         execute: runReleaseSign,
-      });
-      const { runBootSmokeCommand } = await import("./boot-smoke.ts");
-      registry.registerCommand({
+      },
+      {
         name: "release.boot-smoke",
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         generates: [],
@@ -206,7 +207,8 @@ export function createReleaseModule(): KernelModule {
         writes: ["boot-smoke.json"],
         reads: ["dist/**"],
         execute: runBootSmokeCommand,
-      });
-    },
+      },
+    ],
+    pipelines: [],
   };
 }

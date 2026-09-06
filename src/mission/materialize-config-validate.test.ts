@@ -42,7 +42,7 @@ function makeContext(workspaceRoot: string) {
     workspaceRoot,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
     io: {
-    registry: undefined as never,
+    actualState: undefined as never,
       readFile: fs.readFile,
       writeFile: fs.writeFile,
       readdir: fs.readdir,

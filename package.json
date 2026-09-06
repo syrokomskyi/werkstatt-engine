@@ -366,6 +366,10 @@
       "types": "./src/runtime/composition.module.ts",
       "default": "./src/runtime/composition.module.ts"
     },
+    "./runtime/desired-state": {
+      "types": "./src/runtime/desired-state.ts",
+      "default": "./src/runtime/desired-state.ts"
+    },
     "./scope": {
       "types": "./src/scope/scope.ts",
       "default": "./src/scope/scope.ts"

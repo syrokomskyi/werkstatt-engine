@@ -80,7 +80,7 @@ function inventoryFilePath(workspaceRoot: string): string {
  * if found. Returns null when the command is not in any registered pipeline.
  */
 function derivePipelinePhase(
-  registry: KernelRuntimeContext["registry"],
+  registry: KernelRuntimeContext["actualState"],
   commandName: string,
 ): string | null {
   for (const [pipelineName, steps] of registry.pipelines) {
@@ -94,10 +94,7 @@ function derivePipelinePhase(
 /**
  * Look up p95 timing for a validator from the committed budgets file.
  */
-async function lookupP95(
-  workspaceRoot: string,
-  commandName: string,
-): Promise<number | null> {
+async function lookupP95(workspaceRoot: string, commandName: string): Promise<number | null> {
   const budgets = await loadPipelineBudgets(workspaceRoot);
   if (!budgets) return null;
   const entry = budgets.budgets.find((b) => b.command === commandName);
@@ -110,10 +107,8 @@ export async function runValidatorInventoryGenerate(
 ): Promise<KernelCommandResult<ValidatorInventoryGenerateResult>> {
   const dryRun = context.dryRun || input.flags["dry-run"] === true;
 
-  const allCommands = [...context.registry.commands.values()] as KernelCommandDefinition[];
-  const validatorCommands = allCommands.filter((cmd) =>
-    VALIDATOR_NAME_PATTERN.test(cmd.name),
-  );
+  const allCommands = [...context.actualState.commands.values()] as KernelCommandDefinition[];
+  const validatorCommands = allCommands.filter((cmd) => VALIDATOR_NAME_PATTERN.test(cmd.name));
 
   // Check for untagged validators
   const untaggedCommands: string[] = [];
@@ -139,7 +134,8 @@ export async function runValidatorInventoryGenerate(
       summary: `[validator.inventory.generate] FAIL-CLOSED: ${untaggedCommands.length} validator(s) missing contract or rules: ${untaggedCommands.slice(0, 10).join(", ")}${untaggedCommands.length > 10 ? ` (and ${untaggedCommands.length - 10} more)` : ""}`,
       nextSteps: [
         {
-          action: "Tag all untagged validators with `contract` and `rules` fields, or re-run with --dry-run for a warning-only report",
+          action:
+            "Tag all untagged validators with `contract` and `rules` fields, or re-run with --dry-run for a warning-only report",
           kind: "required",
         },
       ],
@@ -162,7 +158,7 @@ export async function runValidatorInventoryGenerate(
   for (const [contract, validators] of contractsMap) {
     const entries: ValidatorEntry[] = [];
     for (const v of validators) {
-      const pipelinePhase = derivePipelinePhase(context.registry, v.name);
+      const pipelinePhase = derivePipelinePhase(context.actualState, v.name);
       const p95Ms = await lookupP95(context.workspaceRoot, v.name);
       entries.push({
         command: v.name,

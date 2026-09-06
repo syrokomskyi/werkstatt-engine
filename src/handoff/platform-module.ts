@@ -11,14 +11,16 @@
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createPlatformModule(): KernelModule {
+export async function createPlatformModule(): Promise<ModuleExport> {
+  const { runPlatformConsistencyValidate } = await import("./platform-consistency.ts");
   return {
     name: "platform",
     version: "0.1.0",
-    async register(registry) {
-      const { runPlatformConsistencyValidate } = await import("./platform-consistency.ts");
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "platform.consistency.validate",
         contract: "platform",
         rules: [],
@@ -50,7 +52,9 @@ export function createPlatformModule(): KernelModule {
           rules: ["PC-01", "PC-02", "PC-03"],
           blocks: ["release.prepare"],
         },
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

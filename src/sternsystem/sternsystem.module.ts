@@ -14,14 +14,10 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createSternsystemModule(): KernelModule {
-  return {
-    name: "sternsystem",
-    version: "0.1.0",
-    async register(registry) {
-      const { runSternsystemRegister } = await import("./sternsystem-register.ts");
+export async function createSternsystemModule(): Promise<ModuleExport> {
+  const { runSternsystemRegister } = await import("./sternsystem-register.ts");
       const { runSternsystemList } = await import("./sternsystem-list.ts");
       const { runSternsystemValidate } = await import("./sternsystem-validate.ts");
       const { runSternsystemPin } = await import("./sternsystem-pin.ts");
@@ -34,7 +30,12 @@ export function createSternsystemModule(): KernelModule {
       const { runSternsystemHandoverPrepare } = await import("./sternsystem-handover-prepare.ts");
       const { runSternsystemHandoverComplete } = await import("./sternsystem-handover-complete.ts");
       const { runSternsystemHandoverCancel } = await import("./sternsystem-handover-cancel.ts");
-      registry.registerCommand({
+  return {
+    name: "sternsystem",
+    version: "0.1.0",
+      declarations: [],
+  commands: [
+    {
         name: "sternsystem.register",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -85,8 +86,8 @@ export function createSternsystemModule(): KernelModule {
         reads: ["systems-cache/*/system-config.yaml", "onboarding/{id}/.input/00-brief.md"],
         cacheable: false,
         execute: runSternsystemRegister,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.list",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
@@ -96,8 +97,8 @@ export function createSternsystemModule(): KernelModule {
         flags: {},
         reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system.pin.json"],
         execute: runSternsystemList,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.validate",
         contract: "sternsystem",
         rules: ["HANDOVER-01"],
@@ -116,8 +117,8 @@ export function createSternsystemModule(): KernelModule {
           phase: "workspace",
           blocks: ["mission.materialize"],
         },
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.pin",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -134,8 +135,8 @@ export function createSternsystemModule(): KernelModule {
         reads: ["systems-cache/{id}/system-config.yaml", "systems-cache/{id}/system.pin.json"],
         cacheable: false,
         execute: runSternsystemPin,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.extract",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -152,8 +153,8 @@ export function createSternsystemModule(): KernelModule {
         reads: ["systems-cache/*/system-config.yaml", "missions/*/workpiece/**"],
         cacheable: false,
         execute: runSternsystemExtract,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.sync",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -177,8 +178,8 @@ export function createSternsystemModule(): KernelModule {
         reads: ["systems-cache/{id}/system-config.yaml"],
         cacheable: false,
         execute: runSternsystemSync,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.status",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
@@ -196,8 +197,8 @@ export function createSternsystemModule(): KernelModule {
           "missions/*/mission.yaml",
         ],
         execute: runSternsystemStatus,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.passport.generate",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -222,8 +223,8 @@ export function createSternsystemModule(): KernelModule {
         ],
         cacheable: false,
         execute: runSternsystemPassportGenerate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.passport.verify",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
@@ -246,8 +247,8 @@ export function createSternsystemModule(): KernelModule {
           "systems-cache/{id}/bordbuch/events.ndjson",
         ],
         execute: runSternsystemPassportVerify,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "surface.contract.validate",
         contract: "surface",
         rules: [],
@@ -275,8 +276,8 @@ export function createSternsystemModule(): KernelModule {
           surfaces: ["url-schema", "jsonld-types", "sitemap-shape"],
           blocks: ["release.prepare"],
         },
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.handover.prepare",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -306,8 +307,8 @@ export function createSternsystemModule(): KernelModule {
         writes: ["../systems-cache/{id}/handover-authorization.json"],
         cacheable: false,
         execute: runSternsystemHandoverPrepare,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.handover.complete",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -339,8 +340,8 @@ export function createSternsystemModule(): KernelModule {
         ],
         cacheable: false,
         execute: runSternsystemHandoverComplete,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "sternsystem.handover.cancel",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -355,7 +356,9 @@ export function createSternsystemModule(): KernelModule {
         writes: ["../systems-cache/{id}/handover-authorization.json"],
         cacheable: false,
         execute: runSternsystemHandoverCancel,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

@@ -11,18 +11,14 @@
 </CHANGE_SUMMARY>
 */
 
-import type {
-  KernelCommandInput,
-  KernelExecutionReport,
-  KernelModule,
-  KernelRuntimeContext,
-} from "./types.ts";
+import type { KernelCommandInput, KernelExecutionReport, KernelRuntimeContext } from "./types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
 async function runKernelModuleInspect(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelExecutionReport> {
-  const registry = context.registry;
+  const registry = context.actualState;
   const modules: Array<{
     name: string;
     state: string;
@@ -77,7 +73,7 @@ async function runKernelModuleUnload(
     };
   }
 
-  const state = context.registry.getModuleState(moduleName);
+  const state = context.actualState.getModuleState(moduleName);
   if (!state) {
     return {
       commandName: "kernel.module.unload",
@@ -92,7 +88,7 @@ async function runKernelModuleUnload(
     };
   }
 
-  await context.registry.unregisterModule(moduleName);
+  await context.actualState.unregisterModule(moduleName);
 
   return {
     commandName: "kernel.module.unload",
@@ -126,7 +122,7 @@ async function runKernelModuleLoad(
     };
   }
 
-  const existingState = context.registry.getModuleState(moduleName);
+  const existingState = context.actualState.getModuleState(moduleName);
   if (existingState === "active") {
     return {
       commandName: "kernel.module.load",
@@ -157,12 +153,13 @@ async function runKernelModuleLoad(
   };
 }
 
-export const kernelModuleModule: KernelModule = {
+export const kernelModuleModule: ModuleExport = {
   name: "kernel-module",
   version: "1.0.0",
 
-  async register(registry) {
-    registry.registerCommand({
+  declarations: [],
+  commands: [
+    {
       name: "kernel.module.inspect",
       modulePath: "packages/werkstatt-engine/src/kernel/kernel-module.module.ts",
       description:
@@ -172,9 +169,8 @@ export const kernelModuleModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runKernelModuleInspect,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "kernel.module.unload",
       modulePath: "packages/werkstatt-engine/src/kernel/kernel-module.module.ts",
       description:
@@ -190,9 +186,8 @@ export const kernelModuleModule: KernelModule = {
         },
       },
       execute: runKernelModuleUnload,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "kernel.module.load",
       modulePath: "packages/werkstatt-engine/src/kernel/kernel-module.module.ts",
       description:
@@ -208,6 +203,7 @@ export const kernelModuleModule: KernelModule = {
         },
       },
       execute: runKernelModuleLoad,
-    });
-  },
+    },
+  ],
+  pipelines: [],
 };

@@ -14,17 +14,17 @@ customdomain.register, redirect.register.
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createCustomdomainModule(): KernelModule {
+export async function createCustomdomainModule(): Promise<ModuleExport> {
+  const { runCustomdomainRegister } = await import("./customdomain-register.ts");
+      const { runRedirectRegister } = await import("./redirect-register.ts");
   return {
     name: "customdomain",
     version: "0.1.0",
-    async register(registry) {
-      const { runCustomdomainRegister } = await import("./customdomain-register.ts");
-      const { runRedirectRegister } = await import("./redirect-register.ts");
-
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "customdomain.register",
         modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
@@ -42,9 +42,8 @@ export function createCustomdomainModule(): KernelModule {
         reads: ["systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runCustomdomainRegister,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "redirect.register",
         modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
@@ -62,7 +61,9 @@ export function createCustomdomainModule(): KernelModule {
         reads: ["systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runRedirectRegister,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

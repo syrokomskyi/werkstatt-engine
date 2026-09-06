@@ -14,13 +14,13 @@
 
 import type {
   KernelCommandDefinition,
-  KernelModuleRegistry,
   KernelPipelineStep,
   ModuleFiberState,
   KernelLifecycleRegistry,
 } from "./types.ts";
+import type { ModuleExport, ActualState, CommandDeclaration } from "../runtime/desired-state.ts";
 // @ai-invariant: Command registry must keep command names unique and never bypass typed flag validation.
-export class KernelRegistry implements KernelModuleRegistry, KernelLifecycleRegistry {
+export class KernelRegistry implements KernelLifecycleRegistry, ActualState {
   readonly commands = new Map<string, KernelCommandDefinition>();
   readonly pipelines = new Map<string, KernelPipelineStep[]>();
   readonly commandModules = new Map<string, string>();
@@ -28,33 +28,47 @@ export class KernelRegistry implements KernelModuleRegistry, KernelLifecycleRegi
   readonly moduleStates = new Map<string, ModuleFiberState>();
   readonly inFlight = new Map<string, number>();
   readonly disposedCommandOrigins = new Map<string, string>();
+  readonly components = new Map<
+    string,
+    {
+      declaration: import("../runtime/desired-state.ts").ComponentDeclaration;
+      state: ModuleFiberState;
+    }
+  >();
   currentModuleName: string | undefined;
 
-  registerCommand(command: KernelCommandDefinition): void {
-    const existing = this.commands.get(command.name);
-    if (existing) {
-      if (existing.execute === command.execute) return;
-      throw new Error(
-        `Kernel command already registered: ${command.name} (conflict between modules)`,
-      );
+  populateFromModule(mod: ModuleExport): void {
+    this.currentModuleName = mod.name;
+    this.moduleStates.set(mod.name, "loading");
+    try {
+      for (const command of mod.commands) {
+        const existing = this.commands.get(command.name);
+        if (existing) {
+          throw new Error(
+            `Kernel command already registered: ${command.name} (conflict between modules)`,
+          );
+        }
+        this.commands.set(command.name, command);
+        this.commandModules.set(command.name, mod.name);
+      }
+      for (const pipeline of mod.pipelines) {
+        if (this.pipelines.has(pipeline.name)) {
+          throw new Error(`Kernel pipeline already registered: ${pipeline.name}`);
+        }
+        this.pipelines.set(pipeline.name, [...pipeline.steps]);
+        this.pipelineModules.set(pipeline.name, mod.name);
+      }
+      this.moduleStates.set(mod.name, "active");
+    } catch (err) {
+      this.moduleStates.set(mod.name, "failed");
+      throw err;
     }
-
-    this.commands.set(command.name, command);
-    if (this.currentModuleName) {
-      this.commandModules.set(command.name, this.currentModuleName);
-    }
+    this.currentModuleName = undefined;
+  }
+  getCommandDeclaration(name: string): CommandDeclaration | undefined {
+    return this.commands.get(name);
   }
 
-  registerPipeline(name: string, steps: KernelPipelineStep[]): void {
-    if (this.pipelines.has(name)) {
-      throw new Error(`Kernel pipeline already registered: ${name}`);
-    }
-
-    this.pipelines.set(name, [...steps]);
-    if (this.currentModuleName) {
-      this.pipelineModules.set(name, this.currentModuleName);
-    }
-  }
   getCommand(name: string): KernelCommandDefinition | undefined {
     return this.commands.get(name);
   }

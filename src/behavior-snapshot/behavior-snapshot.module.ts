@@ -11,16 +11,17 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createBehaviorSnapshotModule(): KernelModule {
+export async function createBehaviorSnapshotModule(): Promise<ModuleExport> {
+  const { runBehaviorSnapshotCapture, runBehaviorSnapshotDiff } =
+        await import("./behavior-snapshot-commands.ts");
   return {
     name: "behavior-snapshot",
     version: "0.1.0",
-    async register(registry) {
-      const { runBehaviorSnapshotCapture, runBehaviorSnapshotDiff } =
-        await import("./behavior-snapshot-commands.ts");
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "behavior.snapshot.capture",
         modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
@@ -40,8 +41,8 @@ export function createBehaviorSnapshotModule(): KernelModule {
         reads: ["missions/*/distribution/**", "releases/*/distribution/**"],
         cacheable: false,
         execute: runBehaviorSnapshotCapture,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "behavior.snapshot.diff",
         modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
@@ -57,7 +58,9 @@ export function createBehaviorSnapshotModule(): KernelModule {
           "missions/*/evidence/behavior-snapshot*.json",
         ],
         execute: runBehaviorSnapshotDiff,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

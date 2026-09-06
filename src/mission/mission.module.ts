@@ -14,14 +14,10 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createMissionModule(): KernelModule {
-  return {
-    name: "mission",
-    version: "0.2.0",
-    async register(registry) {
-      const { runMissionOpen } = await import("./mission-open.ts");
+export async function createMissionModule(): Promise<ModuleExport> {
+  const { runMissionOpen } = await import("./mission-open.ts");
       const { runMissionStatus } = await import("./mission-status.ts");
       const { runMissionClose } = await import("./mission-close.ts");
       const { runMissionAbort } = await import("./mission-abort.ts");
@@ -43,7 +39,12 @@ export function createMissionModule(): KernelModule {
         await import("./workpiece-config-presence-check.ts");
       const { runMissionPreflight } = await import("./mission-preflight.ts");
       const { runValidationStateInspect } = await import("./validation-state-inspect.ts");
-      registry.registerCommand({
+  return {
+    name: "mission",
+    version: "0.2.0",
+      declarations: [],
+  commands: [
+    {
         name: "mission.open",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -76,8 +77,8 @@ export function createMissionModule(): KernelModule {
         ],
         cacheable: false,
         execute: runMissionOpen,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.status",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Print mission manifest and Bordbuch entries (RFC-0355).",
@@ -88,8 +89,8 @@ export function createMissionModule(): KernelModule {
         },
         reads: ["missions/{mission}/**", "systems/{system}/bordbuch/events.ndjson"],
         execute: runMissionStatus,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.close",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -158,8 +159,8 @@ export function createMissionModule(): KernelModule {
         ],
         cacheable: false,
         execute: runMissionClose,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.abort",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -195,8 +196,8 @@ export function createMissionModule(): KernelModule {
         ],
         cacheable: false,
         execute: runMissionAbort,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.list",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "List missions, optionally filtered by system (RFC-0355).",
@@ -207,8 +208,8 @@ export function createMissionModule(): KernelModule {
         },
         reads: ["missions/*/mission.yaml", "systems-cache/*/system-config.yaml"],
         execute: runMissionList,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.materialize",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -231,8 +232,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/mission.yaml", "systems/{system}/system.pin.json"],
         cacheable: false,
         execute: runMissionMaterialize,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.migrate",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -257,8 +258,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/**", "systems/{system}/system.pin.json"],
         cacheable: false,
         execute: runMissionMigrate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.validate",
         contract: "mission",
         rules: [],
@@ -300,8 +301,8 @@ export function createMissionModule(): KernelModule {
           phase: "mission",
           blocks: ["mission.close", "release.prepare"],
         },
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.preview",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -322,8 +323,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/workpiece/**", "missions/{mission}/mission.yaml"],
         cacheable: false,
         execute: runMissionPreview,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.build",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -341,8 +342,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/workpiece/**"],
         cacheable: false,
         execute: runMissionBuild,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.diff",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Compute the data-set diff between Werkstück and pinned state (RFC-0356).",
@@ -353,8 +354,8 @@ export function createMissionModule(): KernelModule {
         },
         reads: ["missions/{mission}/workpiece/**", "systems/{system}/system.pin.json"],
         execute: runMissionDiff,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.reconcile",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -384,8 +385,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/**", "systems/{system}/system.pin.json"],
         cacheable: false,
         execute: runMissionReconcile,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.git.commit",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -401,8 +402,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/workpiece/**", "missions/{mission}/mission.yaml"],
         cacheable: false,
         execute: runMissionGitCommit,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.cleanup",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -437,8 +438,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/*/mission.yaml"],
         cacheable: false,
         execute: runMissionCleanup,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "workpiece.read",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Read a file from a mission workpiece with DNA-22 path validation (RFC-0555).",
@@ -451,8 +452,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/workpiece/**"],
         cacheable: false,
         execute: runWorkpieceRead,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "workpiece.write",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -470,8 +471,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/workpiece/src/content/system.md"],
         cacheable: false,
         execute: runWorkpieceWrite,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "materialize.config.validate",
         contract: "materialize",
         rules: [],
@@ -483,8 +484,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/*/workpiece/*", "missions/*/workpiece/src/*", "systems-cache/*/"],
         cacheable: false,
         execute: runMaterializeConfigValidate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "workpiece.config.presence.check",
         contract: "workpiece",
         rules: [],
@@ -499,8 +500,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/workpiece/*", "missions/{mission}/workpiece/src/*"],
         cacheable: false,
         execute: runWorkpieceConfigPresenceCheck,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "validate.postbuild",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
@@ -518,8 +519,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/**", "apps/{site}/**"],
         cacheable: false,
         execute: runValidatePostbuild,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.resume",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -542,8 +543,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/journal.jsonl", "missions/{mission}/mission.yaml"],
         cacheable: false,
         execute: runMissionResume,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.journal.show",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Show the operation journal for a mission (RFC-0958).",
@@ -557,8 +558,8 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/journal.jsonl"],
         cacheable: false,
         execute: runMissionJournalShow,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "mission.preflight",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -574,8 +575,8 @@ export function createMissionModule(): KernelModule {
         reads: ["systems-cache/{system}/public/**"],
         cacheable: false,
         execute: runMissionPreflight,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "validation.state.inspect",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -590,7 +591,9 @@ export function createMissionModule(): KernelModule {
         reads: ["missions/{mission}/.validation-state.json"],
         cacheable: false,
         execute: runValidationStateInspect,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

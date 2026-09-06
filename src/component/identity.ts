@@ -5,6 +5,7 @@ import {
 import { type Sha256Digest } from "../fingerprint/primitives.ts";
 import type {
   ComponentManifestV1,
+  IsolationTier,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
 } from "./contracts.ts";
@@ -147,7 +148,7 @@ export function computeEffectPolicyHash(
 }
 
 export function computeIsolationPolicyHash(
-  isolations: Array<{ componentId: string; tier: string; adapterId: string | null }>,
+  isolations: Array<{ componentId: string; tier: IsolationTier; adapterId: string | null }>,
 ): Sha256Digest {
   const sorted = sortByIdentity(isolations, (i) => `${i.componentId}:${i.tier}`);
   const payload = { isolations: sorted };

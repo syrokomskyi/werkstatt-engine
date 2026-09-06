@@ -11,6 +11,7 @@
 */
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
 import {
+import type { ModuleExport } from "../runtime/desired-state.ts";
   runIntegrityBackfillRevisions,
   runIntegrityBuildRecord,
   runIntegrityGenerateSigningKeypair,
@@ -21,11 +22,12 @@ import {
   runIntegrityVerifyRelease,
 } from "./../runtime/integrity";
 
-export const integrityModule: KernelModule = {
+export const integrityModule: ModuleExport = {
   name: "integrity",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "integrity.init",
       description: "Initialize integrity tracking.",
       scope: "app",
@@ -35,8 +37,8 @@ export const integrityModule: KernelModule = {
       reads: ["<app>/.integrity/**"],
       flags: {},
       execute: runIntegrityInit,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "integrity.update",
       description: "Update integrity manifests.",
       scope: "app",
@@ -46,9 +48,9 @@ export const integrityModule: KernelModule = {
       reads: ["<app>/.integrity/**"],
       flags: {},
       execute: runIntegrityUpdate,
-    });
-    registry.registerCommand({ name: "integrity.verify", description: "Verify integrity manifests.", scope: "app", flags: {}, reads: ["<app>/.integrity/**"], execute: runIntegrityVerify });
-    registry.registerCommand({
+    },
+    { name: "integrity.verify", description: "Verify integrity manifests.", scope: "app", flags: {}, reads: ["<app>/.integrity/**"], execute: runIntegrityVerify },
+    {
       name: "integrity.build-record",
       description: "Record build outputs.",
       scope: "app",
@@ -58,8 +60,8 @@ export const integrityModule: KernelModule = {
       reads: ["<app>/dist/**"],
       flags: {},
       execute: runIntegrityBuildRecord,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "integrity.sign",
       description: "Sign integrity artifacts.",
       scope: "app",
@@ -69,9 +71,9 @@ export const integrityModule: KernelModule = {
       reads: ["<app>/.integrity/**"],
       flags: {},
       execute: runIntegritySign,
-    });
-    registry.registerCommand({ name: "integrity.verify-release", description: "Verify release signatures.", scope: "app", requiresNetwork: true, flags: {}, reads: ["<app>/.integrity/**"], cacheable: false, execute: runIntegrityVerifyRelease });
-    registry.registerCommand({
+    },
+    { name: "integrity.verify-release", description: "Verify release signatures.", scope: "app", requiresNetwork: true, flags: {}, reads: ["<app>/.integrity/**"], cacheable: false, execute: runIntegrityVerifyRelease },
+    {
       name: "integrity.keys.generate",
       modulePath: "tools/modules/integrity.module.ts",
       description: "Generate integrity signing keys.",
@@ -85,8 +87,8 @@ export const integrityModule: KernelModule = {
       ],
       flags: {},
       execute: runIntegrityGenerateSigningKeypair,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "integrity.backfill-revisions",
       description: "Backfill integrity revision counters.",
       scope: "app",
@@ -96,6 +98,8 @@ export const integrityModule: KernelModule = {
       reads: ["<app>/.integrity/**"],
       flags: {},
       execute: runIntegrityBackfillRevisions,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

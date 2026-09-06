@@ -20,25 +20,23 @@ by a simple lock (DNA-51).
 import type {
   DesiredState,
   ActualState,
+  MutableActualState,
   ReconciliationDelta,
   ReconciliationResult,
   ComponentDeclaration,
   ModuleExport,
   CommandDeclaration,
-  PipelineDeclaration,
 } from "./desired-state.ts";
-import type { ModuleFiberState } from "../kernel/types.ts";
+import type { ModuleFiberState, KernelPipelineStep } from "../kernel/types.ts";
 
 /**
  * Build ActualState from ModuleExport[].
  * Commands and pipelines are populated once and never change.
  * Components start empty — the reconciler populates them.
  */
-export function buildActualState(
-  exports: ModuleExport[],
-): ActualState {
+export function buildActualState(exports: ModuleExport[]): ActualState {
   const commands = new Map<string, CommandDeclaration>();
-  const pipelines = new Map<string, PipelineDeclaration>();
+  const pipelines = new Map<string, KernelPipelineStep[]>();
 
   for (const mod of exports) {
     for (const cmd of mod.commands) {
@@ -55,7 +53,7 @@ export function buildActualState(
           `COMPOSITION-03: Duplicate pipeline "${pipe.name}" declared by module "${mod.name}" — already declared by another module.`,
         );
       }
-      pipelines.set(pipe.name, pipe);
+      pipelines.set(pipe.name, pipe.steps);
     }
   }
 
@@ -104,10 +102,7 @@ export function buildDesiredState(
 /**
  * Compute the delta between desired and actual state.
  */
-export function computeDelta(
-  desired: DesiredState,
-  actual: ActualState,
-): ReconciliationDelta {
+export function computeDelta(desired: DesiredState, actual: ActualState): ReconciliationDelta {
   const toActivate: ComponentDeclaration[] = [];
   const toDeactivate: string[] = [];
   const toReconfigure: ReconciliationDelta["toReconfigure"] = [];
@@ -198,11 +193,15 @@ let reconciliationLock = false;
  */
 export async function reconcile(
   desired: DesiredState,
-  actual: ActualState,
+  actual: MutableActualState,
   options?: {
     onActivate?: (decl: ComponentDeclaration) => Promise<void>;
     onDeactivate?: (id: string) => Promise<void>;
-    onReconfigure?: (id: string, oldConfig: Record<string, unknown>, newConfig: Record<string, unknown>) => Promise<void>;
+    onReconfigure?: (
+      id: string,
+      oldConfig: Record<string, unknown>,
+      newConfig: Record<string, unknown>,
+    ) => Promise<void>;
   },
 ): Promise<ReconciliationResult> {
   const start = Date.now();

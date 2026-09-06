@@ -26,6 +26,7 @@ import type {
   KernelRuntimeContext,
   KernelCommandDefinition,
 } from "../../kernel/types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
 function makeCommand(
   name: string,
@@ -47,12 +48,17 @@ function makeContext(
   workspaceRoot: string,
 ): KernelRuntimeContext {
   const registry = new KernelRegistry();
-  for (const cmd of commands) {
-    registry.registerCommand(cmd);
-  }
+  const mod: ModuleExport = {
+    name: "test-module",
+    version: "1.0.0",
+    declarations: [],
+    commands,
+    pipelines: [],
+  };
+  registry.populateFromModule(mod);
   return {
     workspaceRoot,
-    registry,
+    actualState: registry,
     dryRun: false,
   } as unknown as KernelRuntimeContext;
 }

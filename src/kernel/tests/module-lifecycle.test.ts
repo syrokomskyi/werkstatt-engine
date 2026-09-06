@@ -2,12 +2,8 @@ import { test, expect, beforeEach, afterEach } from "vitest";
 import { KernelRegistry } from "../registry.ts";
 import { buildRegistry, buildRegistryWithHandles } from "../runtime/registry.ts";
 import { clearRegistryCache, clearModule } from "../runtime/registry-cache.ts";
-import type {
-  KernelAppConfig,
-  KernelCommandDefinition,
-  KernelCommandResult,
-  KernelModule,
-} from "../types.ts";
+import type { KernelAppConfig, KernelCommandDefinition, KernelCommandResult } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
 /*
 <MODULE_CONTRACT>
@@ -38,29 +34,35 @@ function makeCmd(name: string): KernelCommandDefinition {
   };
 }
 
-const moduleA: KernelModule = {
+const moduleA: ModuleExport = {
   name: "module-a",
   version: "1.0.0",
-  register(registry) {
-    registry.registerCommand(makeCmd("a.ping"));
-    registry.registerCommand(makeCmd("a.pong"));
-  },
+  declarations: [],
+  commands: [makeCmd("a.ping"), makeCmd("a.pong")],
+  pipelines: [],
 };
 
-const moduleB: KernelModule = {
+const moduleB: ModuleExport = {
   name: "module-b",
   version: "1.0.0",
-  register(registry) {
-    registry.registerCommand(makeCmd("b.ping"));
-  },
+  declarations: [],
+  commands: [makeCmd("b.ping")],
+  pipelines: [],
 };
 
-const failingModule: KernelModule = {
+const failingModule: ModuleExport = {
   name: "failing-module",
   version: "1.0.0",
-  register() {
-    throw new Error("intentional registration failure");
-  },
+  declarations: [],
+  commands: [
+    {
+      ...makeCmd("failing.cmd"),
+      execute: () => {
+        throw new Error("intentional registration failure");
+      },
+    },
+  ],
+  pipelines: [],
 };
 
 const config: KernelAppConfig = { modules: [moduleA, moduleB] };
@@ -121,13 +123,12 @@ test("unregisterModule is idempotent for already-disposed modules", async () => 
   await expect(registry.unregisterModule("module-a")).resolves.not.toThrow();
 });
 
-const moduleWithPipeline: KernelModule = {
+const moduleWithPipeline: ModuleExport = {
   name: "module-pipeline",
   version: "1.0.0",
-  register(registry) {
-    registry.registerCommand(makeCmd("p.ping"));
-    registry.registerPipeline("p.pipeline", [{ command: "p.ping" }]);
-  },
+  declarations: [],
+  commands: [makeCmd("p.ping")],
+  pipelines: [{ name: "p.pipeline", steps: [{ command: "p.ping" }] }],
 };
 
 test("unregisterModule removes pipelines owned by the module", async () => {
@@ -165,10 +166,16 @@ test("trackInFlight does not go below zero", () => {
   expect(registry.inFlight.get("test.cmd")).toBe(0);
 });
 
-test("registerPipeline tracks currentModuleName in pipelineModules", () => {
+test("populateFromModule tracks currentModuleName in pipelineModules", () => {
   const registry = new KernelRegistry();
-  registry.currentModuleName = "test-module";
-  registry.registerPipeline("test.pipeline", [{ command: "test.cmd" }]);
+  const mod: ModuleExport = {
+    name: "test-module",
+    version: "1.0.0",
+    declarations: [],
+    commands: [],
+    pipelines: [{ name: "test.pipeline", steps: [{ command: "test.cmd" }] }],
+  };
+  registry.populateFromModule(mod);
   expect(registry.pipelineModules.get("test.pipeline")).toBe("test-module");
 });
 

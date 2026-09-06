@@ -11,16 +11,18 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "./types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const pipelineBudgetModule: KernelModule = {
+export async function createPipelineBudgetModule(): Promise<ModuleExport> {
+const { runPipelineBudgetGenerate } = await import("./pipeline-budgets.ts");
+    const { runPipelineBudgetValidate } = await import("./pipeline-budget-validate.ts");
+  return {
   name: "pipeline-budget",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runPipelineBudgetGenerate } = await import("./pipeline-budgets.ts");
-    const { runPipelineBudgetValidate } = await import("./pipeline-budget-validate.ts");
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "pipeline.budget.generate",
       modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
       description:
@@ -38,8 +40,8 @@ export const pipelineBudgetModule: KernelModule = {
         },
       },
       execute: runPipelineBudgetGenerate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "pipeline.budget.validate",
       contract: "pipeline",
       rules: [],
@@ -62,6 +64,10 @@ export const pipelineBudgetModule: KernelModule = {
         },
       },
       execute: runPipelineBudgetValidate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

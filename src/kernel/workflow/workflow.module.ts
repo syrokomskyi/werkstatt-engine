@@ -10,15 +10,17 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const workflowModule: KernelModule = {
+export async function createWorkflowModule(): Promise<ModuleExport> {
+const { runWorkflowLint, runWorkflowList, runWorkflowAmendList } =
+      await import("./handlers.ts");
+  return {
   name: "workflow",
   version: "0.1.0",
-  async register(registry) {
-    const { runWorkflowLint, runWorkflowList, runWorkflowAmendList } =
-      await import("./handlers.ts");
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "workflow.lint",
       contract: "workflow",
       rules: [],
@@ -31,8 +33,8 @@ export const workflowModule: KernelModule = {
       supportsAllSites: true,
       reads: [".agents/workflows/**/*.md", ".windsurf/workflows/**/*.md"],
       execute: runWorkflowLint,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "workflow.list",
       modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
       description:
@@ -42,8 +44,8 @@ export const workflowModule: KernelModule = {
       supportsAllSites: true,
       reads: [".agents/workflows/**/*.md", ".windsurf/workflows/**/*.md"],
       execute: runWorkflowList,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "workflow-amend.list",
       modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
       description:
@@ -53,6 +55,10 @@ export const workflowModule: KernelModule = {
       supportsAllSites: true,
       reads: [".agents/workflows-amend/**/*.md"],
       execute: runWorkflowAmendList,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

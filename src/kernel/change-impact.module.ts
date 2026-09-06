@@ -10,15 +10,17 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "./types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const changeImpactModule: KernelModule = {
+export async function createChangeImpactModule(): Promise<ModuleExport> {
+const { runChangeImpactDerive } = await import("./change-impact.ts");
+  return {
   name: "change-impact",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runChangeImpactDerive } = await import("./change-impact.ts");
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "change.impact.derive",
       modulePath: "packages/werkstatt-engine/src/kernel/change-impact.module.ts",
       description:
@@ -39,6 +41,10 @@ export const changeImpactModule: KernelModule = {
         },
       },
       execute: runChangeImpactDerive,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

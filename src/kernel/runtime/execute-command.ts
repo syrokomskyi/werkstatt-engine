@@ -275,9 +275,9 @@ export async function executeRegisteredCommand(
 
   // RFC-1026: check module state before execution. Reject commands from
   // non-active modules with KERNEL-MODULE-02.
-  const moduleName = context.registry.commandModules.get(command.name);
+  const moduleName = context.actualState.commandModules.get(command.name);
   if (moduleName) {
-    const moduleState = context.registry.getModuleState(moduleName);
+    const moduleState = context.actualState.getModuleState(moduleName);
     if (moduleState && moduleState !== "active") {
       const summary = `KERNEL-MODULE-02: command '${command.name}' belongs to module '${moduleName}' in state '${moduleState}' — wait for unload to complete or load the module again`;
       logger.error(summary);
@@ -305,7 +305,7 @@ export async function executeRegisteredCommand(
 
   // RFC-1026: track in-flight execution. Release in finally to ensure
   // the count is decremented even on failure or timeout.
-  const releaseInFlight = context.registry.trackInFlight(command.name);
+  const releaseInFlight = context.actualState.trackInFlight(command.name);
 
   // RFC-1036: create per-command scope registry for this invocation.
   const commandInvocationId = `${command.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -536,7 +536,7 @@ export async function executeKernelCommand(
           outputFormat,
           io,
           fileIntents: intents,
-          registry: wsRegistry!,
+          actualState: wsRegistry!,
           ownershipMap,
         };
         if (outputFormat === "pretty") {
@@ -604,7 +604,7 @@ export async function executeKernelCommand(
         outputFormat,
         io,
         fileIntents: intents,
-        registry: wsRegistry!,
+        actualState: wsRegistry!,
         ownershipMap,
       };
 
@@ -676,7 +676,7 @@ export async function executeKernelCommand(
       outputFormat,
       io,
       fileIntents: intents,
-      registry: siteRegistry!,
+      actualState: siteRegistry!,
       ownershipMap,
     };
 

@@ -12,18 +12,19 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createHandoffModule(): KernelModule {
-  return {
-    name: "handoff",
-    version: "0.2.0",
-    async register(registry) {
-      const { runHandoffAbsorb } = await import("./handoff-absorb.ts");
+export async function createHandoffModule(): Promise<ModuleExport> {
+  const { runHandoffAbsorb } = await import("./handoff-absorb.ts");
       const { runHandoffPack } = await import("./handoff-pack.ts");
       const { runHandoffValidate } = await import("./handoff-validate.ts");
       const { runMigratorRegistryValidate } = await import("./migrator-registry-validate.ts");
-      registry.registerCommand({
+  return {
+    name: "handoff",
+    version: "0.2.0",
+      declarations: [],
+  commands: [
+    {
         name: "handoff.validate",
         contract: "handoff",
         rules: [],
@@ -37,8 +38,8 @@ export function createHandoffModule(): KernelModule {
         },
         reads: ["handoff/**/*"],
         execute: runHandoffValidate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "migrator.registry.validate",
         contract: "migrator",
         rules: [],
@@ -50,8 +51,8 @@ export function createHandoffModule(): KernelModule {
         flags: {},
         reads: ["docs/rfcs/**/*.md"],
         execute: runMigratorRegistryValidate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "handoff.pack",
         modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         generates: [],
@@ -66,8 +67,8 @@ export function createHandoffModule(): KernelModule {
         writes: ["../handoff/{site}/**"],
         cacheable: false,
         execute: runHandoffPack,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "handoff.absorb",
         modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         generates: [],
@@ -88,7 +89,9 @@ export function createHandoffModule(): KernelModule {
         writes: ["apps/{targetApp}/**"],
         cacheable: false,
         execute: runHandoffAbsorb,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

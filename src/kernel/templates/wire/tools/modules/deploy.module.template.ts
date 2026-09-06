@@ -11,12 +11,14 @@
 */
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
 import { runClientExport } from "./../runtime/client-export";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const deployModule: KernelModule = {
+export const deployModule: ModuleExport = {
   name: "deploy",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "client.export",
       description: "Export the current app for client delivery.",
       scope: "app",
@@ -26,6 +28,8 @@ export const deployModule: KernelModule = {
       reads: ["<app>/dist/**"],
       flags: {},
       execute: runClientExport,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

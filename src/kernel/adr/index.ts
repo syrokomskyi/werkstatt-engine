@@ -16,7 +16,7 @@ Re-export barrel for the ADR domain. The ADR module has migrated to
 */
 
 export {
-  forgeAdrModule as adrModule,
+  createForgeAdrModule as createAdrModule,
   runAdrList,
   runAdrCreate,
   runAdrValidate,

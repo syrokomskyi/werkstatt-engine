@@ -13,26 +13,26 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../kernel/types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createIsolationModule(): KernelModule {
+export async function createIsolationModule(): Promise<ModuleExport> {
+  const {
+    runTierInspect,
+    runTierAssign,
+    runSandboxSpawn,
+    runSandboxInspect,
+    runSandboxTerminate,
+    runCapabilityBridge,
+  } = await import("./isolation-commands.ts");
+
+  const modulePath = "packages/werkstatt-engine/src/isolation/isolation.module.ts";
   return {
     name: "isolation",
     version: "0.1.0",
 
-    async register(registry) {
-      const {
-        runTierInspect,
-        runTierAssign,
-        runSandboxSpawn,
-        runSandboxInspect,
-        runSandboxTerminate,
-        runCapabilityBridge,
-      } = await import("./isolation-commands.ts");
-
-      const modulePath = "packages/werkstatt-engine/src/isolation/isolation.module.ts";
-
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "isolation.tier.inspect",
         modulePath,
         description:
@@ -46,9 +46,8 @@ export function createIsolationModule(): KernelModule {
           "component-id": { kind: "string", description: "Component ID to inspect." },
         },
         execute: runTierInspect,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "isolation.tier.assign",
         modulePath,
         description:
@@ -61,12 +60,11 @@ export function createIsolationModule(): KernelModule {
         generates: [],
         flags: {
           "component-id": { kind: "string", description: "Component ID to assign." },
-          "tier": { kind: "string", description: "Isolation tier (0, 1, 2, or 3)." },
+          tier: { kind: "string", description: "Isolation tier (0, 1, 2, or 3)." },
         },
         execute: runTierAssign,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "isolation.sandbox.spawn",
         modulePath,
         description:
@@ -78,19 +76,36 @@ export function createIsolationModule(): KernelModule {
         generates: [],
         flags: {
           "component-id": { kind: "string", description: "Component ID to sandbox." },
-          "tier": { kind: "string", description: "Isolation tier (1, 2, or 3)." },
-          "fs-read-paths": { kind: "string", description: "Comma-separated filesystem read paths." },
-          "fs-write-paths": { kind: "string", description: "Comma-separated filesystem write paths." },
-          "network-hosts": { kind: "string", description: "Comma-separated allowed network hosts." },
-          "granted-commands": { kind: "string", description: "Comma-separated granted capability commands." },
-          "timeout-ms": { kind: "string", description: "Call timeout in milliseconds (default: 30000)." },
-          "memory-limit-bytes": { kind: "string", description: "Memory limit in bytes (default: 256MB)." },
+          tier: { kind: "string", description: "Isolation tier (1, 2, or 3)." },
+          "fs-read-paths": {
+            kind: "string",
+            description: "Comma-separated filesystem read paths.",
+          },
+          "fs-write-paths": {
+            kind: "string",
+            description: "Comma-separated filesystem write paths.",
+          },
+          "network-hosts": {
+            kind: "string",
+            description: "Comma-separated allowed network hosts.",
+          },
+          "granted-commands": {
+            kind: "string",
+            description: "Comma-separated granted capability commands.",
+          },
+          "timeout-ms": {
+            kind: "string",
+            description: "Call timeout in milliseconds (default: 30000).",
+          },
+          "memory-limit-bytes": {
+            kind: "string",
+            description: "Memory limit in bytes (default: 256MB).",
+          },
           "cpu-limit-percent": { kind: "string", description: "CPU limit percent (default: 50)." },
         },
         execute: runSandboxSpawn,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "isolation.sandbox.inspect",
         modulePath,
         description:
@@ -104,9 +119,8 @@ export function createIsolationModule(): KernelModule {
           "sandbox-id": { kind: "string", description: "Sandbox ID to inspect." },
         },
         execute: runSandboxInspect,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "isolation.sandbox.terminate",
         modulePath,
         description:
@@ -118,12 +132,11 @@ export function createIsolationModule(): KernelModule {
         generates: [],
         flags: {
           "sandbox-id": { kind: "string", description: "Sandbox ID to terminate." },
-          "reason": { kind: "string", description: "Termination reason (default: manual)." },
+          reason: { kind: "string", description: "Termination reason (default: manual)." },
         },
         execute: runSandboxTerminate,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "isolation.capability.bridge",
         modulePath,
         description:
@@ -138,7 +151,8 @@ export function createIsolationModule(): KernelModule {
           "sandbox-id": { kind: "string", description: "Sandbox ID to bridge." },
         },
         execute: runCapabilityBridge,
-      });
-    },
+      },
+    ],
+    pipelines: [],
   };
 }

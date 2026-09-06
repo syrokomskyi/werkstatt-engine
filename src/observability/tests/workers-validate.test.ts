@@ -89,7 +89,7 @@ function contextFor(files: Record<string, string>): KernelRuntimeContext {
     dryRun: false,
     outputFormat: "json",
     io,
-    registry: undefined as never,
+    actualState: undefined as never,
   };
 }
 

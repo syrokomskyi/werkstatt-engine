@@ -86,8 +86,16 @@ function makeContext(outputFormat: "pretty" | "json" = "pretty"): KernelRuntimeC
   const logger = createKernelLogger(outputFormat);
   const { io } = createDefaultIO();
   const registry = new KernelRegistry();
-  registry.registerCommand(makeMockCheckCommand("ownership.sync.validate"));
-  registry.registerCommand(makeMockCheckCommand("generated.stale.validate"));
+  registry.populateFromModule({
+    name: "test-mocks",
+    version: "0.0.0",
+    declarations: [],
+    pipelines: [],
+    commands: [
+      makeMockCheckCommand("ownership.sync.validate"),
+      makeMockCheckCommand("generated.stale.validate"),
+    ],
+  });
   return {
     workspaceRoot: tempRoot,
     siteExplicit: false,
@@ -95,7 +103,7 @@ function makeContext(outputFormat: "pretty" | "json" = "pretty"): KernelRuntimeC
     dryRun: false,
     outputFormat,
     io,
-    registry,
+    actualState: registry,
   };
 }
 

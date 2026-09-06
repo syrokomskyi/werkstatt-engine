@@ -13,36 +13,31 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../kernel/types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createScopeModule(): KernelModule {
+export async function createScopeModule(): Promise<ModuleExport> {
+  const { runScopeInspect, runScopeResolve, runScopeLifecycleAdopt } =
+    await import("./scope-commands.ts");
+
+  const modulePath = "packages/werkstatt-engine/src/scope/scope.module.ts";
   return {
     name: "scope",
     version: "0.1.0",
 
-    async register(registry) {
-      const {
-        runScopeInspect,
-        runScopeResolve,
-        runScopeLifecycleAdopt,
-      } = await import("./scope-commands.ts");
-
-      const modulePath = "packages/werkstatt-engine/src/scope/scope.module.ts";
-
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "scope.inspect",
         modulePath,
-        description:
-          "Inspect all active scopes and their component counts and IDs (RFC-1036).",
+        description: "Inspect all active scopes and their component counts and IDs (RFC-1036).",
         scope: "workspace",
         mutatesState: false,
         cacheable: false,
         generates: [],
         flags: {},
         execute: runScopeInspect,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "scope.resolve",
         modulePath,
         description:
@@ -54,17 +49,23 @@ export function createScopeModule(): KernelModule {
         cacheable: false,
         generates: [],
         flags: {
-          "capability": { kind: "string", description: "Capability ID to resolve." },
-          "scope": { kind: "string", description: "Component scope (per-command, per-mission, per-session, per-workshop, per-fleet)." },
+          capability: { kind: "string", description: "Capability ID to resolve." },
+          scope: {
+            kind: "string",
+            description:
+              "Component scope (per-command, per-mission, per-session, per-workshop, per-fleet).",
+          },
           "mission-id": { kind: "string", description: "Mission ID (for per-mission scope)." },
           "session-id": { kind: "string", description: "Session ID (for per-session scope)." },
           "fleet-id": { kind: "string", description: "Fleet ID (for per-fleet scope)." },
-          "invocation-id": { kind: "string", description: "Command invocation ID (for per-command scope)." },
+          "invocation-id": {
+            kind: "string",
+            description: "Command invocation ID (for per-command scope).",
+          },
         },
         execute: runScopeResolve,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "scope.lifecycle.adopt",
         modulePath,
         description:
@@ -77,13 +78,17 @@ export function createScopeModule(): KernelModule {
         generates: [],
         flags: {
           "component-id": { kind: "string", description: "Component ID to adopt." },
-          "scope": { kind: "string", description: "Target scope (per-fleet or per-session only)." },
-          "mission-id": { kind: "string", description: "Mission ID (context for per-mission, not adoptable)." },
+          scope: { kind: "string", description: "Target scope (per-fleet or per-session only)." },
+          "mission-id": {
+            kind: "string",
+            description: "Mission ID (context for per-mission, not adoptable).",
+          },
           "session-id": { kind: "string", description: "Session ID (for per-session scope)." },
           "fleet-id": { kind: "string", description: "Fleet ID (for per-fleet scope)." },
         },
         execute: runScopeLifecycleAdopt,
-      });
-    },
+      },
+    ],
+    pipelines: [],
   };
 }

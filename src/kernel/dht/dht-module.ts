@@ -16,20 +16,22 @@ workshop-local files). Commands are added incrementally as they are implemented.
 */
 
 import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const dhtModule: KernelModule = {
-  name: "dht",
-  version: "0.1.0",
-
-  async register(registry) {
-    const { runDhtNodeInit } = await import("./init.ts");
+export async function createDhtModule(): Promise<ModuleExport> {
+const { runDhtNodeInit } = await import("./init.ts");
     const { runDhtLookup } = await import("./lookup.ts");
     const { runDhtRegister } = await import("./register.ts");
     const { runDhtCapacityPublish } = await import("./capacity.ts");
     const { runDhtPlacement } = await import("./placement.ts");
     const { runDhtStatus } = await import("./status.ts");
+  return {
+  name: "dht",
+  version: "0.1.0",
 
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "dht.node.init",
       modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
       generates: [],
@@ -43,9 +45,8 @@ export const dhtModule: KernelModule = {
       reads: ["werkstatt.identity.json"],
       writes: ["werkstatt.dht.json"],
       execute: runDhtNodeInit,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "dht.lookup",
       modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
       generates: [],
@@ -65,9 +66,8 @@ export const dhtModule: KernelModule = {
       ],
       writes: ["werkstatt.dht.cache.json"],
       execute: runDhtLookup,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "dht.register",
       modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
       generates: [],
@@ -81,9 +81,8 @@ export const dhtModule: KernelModule = {
       reads: ["werkstatt.dht.json", "werkstatt.identity.json"],
       writes: ["werkstatt.dht.cache.json"],
       execute: runDhtRegister,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "dht.capacity.publish",
       modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
       generates: [],
@@ -97,9 +96,8 @@ export const dhtModule: KernelModule = {
       reads: ["werkstatt.dht.json", "werkstatt.identity.json"],
       writes: [],
       execute: runDhtCapacityPublish,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "dht.placement",
       modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
       generates: [],
@@ -113,9 +111,8 @@ export const dhtModule: KernelModule = {
       reads: ["werkstatt.dht.json", "werkstatt.identity.json", "werkstatt.swim.json"],
       writes: [],
       execute: runDhtPlacement,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "dht.status",
       modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
       generates: [],
@@ -133,6 +130,10 @@ export const dhtModule: KernelModule = {
       ],
       writes: [],
       execute: runDhtStatus,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

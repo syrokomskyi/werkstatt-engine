@@ -13,15 +13,19 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../kernel/types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createFleetModule(): KernelModule {
+export async function createFleetModule(): Promise<ModuleExport> {
+  const { runFleetSitesGenerate } = await import("./fleet-sites-generate.ts");
+  const { runFleetApply } = await import("./apply.ts");
+  const { runFleetOwnershipRegister, runFleetOwnershipVerify, runFleetOwnershipTransfer } =
+    await import("./ownership-commands.ts");
   return {
     name: "fleet",
     version: "0.1.0",
-    async register(registry) {
-      const { runFleetSitesGenerate } = await import("./fleet-sites-generate.ts");
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "fleet.sites.generate",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
@@ -37,10 +41,8 @@ export function createFleetModule(): KernelModule {
           "../systems-cache/*/system-state.yaml",
         ],
         execute: runFleetSitesGenerate,
-      });
-
-      const { runFleetApply } = await import("./apply.ts");
-      registry.registerCommand({
+      },
+      {
         name: "fleet.apply",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
@@ -82,11 +84,8 @@ export function createFleetModule(): KernelModule {
           "../systems-cache/*/system-state.yaml",
         ],
         execute: runFleetApply,
-      });
-
-      const { runFleetOwnershipRegister, runFleetOwnershipVerify, runFleetOwnershipTransfer } =
-        await import("./ownership-commands.ts");
-      registry.registerCommand({
+      },
+      {
         name: "fleet.ownership.register",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
@@ -102,9 +101,8 @@ export function createFleetModule(): KernelModule {
         reads: ["../systems-cache/*/passport.json"],
         requiresNetwork: true,
         execute: runFleetOwnershipRegister,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "fleet.ownership.verify",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
@@ -120,9 +118,8 @@ export function createFleetModule(): KernelModule {
         reads: ["../systems-cache/*/passport.json"],
         requiresNetwork: true,
         execute: runFleetOwnershipVerify,
-      });
-
-      registry.registerCommand({
+      },
+      {
         name: "fleet.ownership.transfer",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
@@ -143,7 +140,8 @@ export function createFleetModule(): KernelModule {
         reads: ["../systems-cache/*/passport.json"],
         requiresNetwork: true,
         execute: runFleetOwnershipTransfer,
-      });
-    },
+      },
+    ],
+    pipelines: [],
   };
 }

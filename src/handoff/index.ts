@@ -118,16 +118,6 @@ export {
   runBordbuchStatus,
   type BordbuchViolation,
 } from "../bordbuch/index.ts";
-export { createArtifactStoreModule } from "../artifact-store/index.ts";
-export { createBehaviorSnapshotModule } from "../behavior-snapshot/index.ts";
-export { createReleaseModule } from "../release/index.ts";
-export { createLeitstandModule } from "../leitstand/index.ts";
-export { createSubdomainModule } from "../subdomain/index.ts";
-export { createCustomdomainModule } from "../customdomain/index.ts";
-export { createDnsModule } from "../dns/index.ts";
-export { createNotausgangModule } from "../notausgang/index.ts";
-export { createDeployModule } from "../deploy/index.ts";
-export { createEvidenceModule } from "../evidence/index.ts";
 export { createPlatformModule } from "./platform-module.ts";
 export {
   runPlatformConsistencyValidate,
@@ -136,73 +126,3 @@ export {
 } from "./platform-consistency.ts";
 
 /** RFC-0221/RFC-0479 command module: validate, migrator.registry.validate, pack, and version-aware absorb (materializes; --report-only/--as/--regen/--force). */
-export function createHandoffModule(): KernelModule {
-  return {
-    name: "handoff",
-    version: "0.2.0",
-    register(registry) {
-      registry.registerCommand({
-        name: "handoff.validate",
-        contract: "handoff",
-        rules: [],
-        modulePath: "packages/werkstatt-engine/src/handoff/index.ts",
-        description:
-          "Validate an internal site handoff bundle lock, manifest, and file hashes without absorbing it (RFC-0221).",
-        scope: "workspace",
-        supportsAllSites: false,
-        flags: {
-          bundle: { kind: "string", description: "Path to the handoff bundle directory." },
-        },
-        execute: runHandoffValidate,
-      });
-      registry.registerCommand({
-        name: "migrator.registry.validate",
-        contract: "migrator",
-        rules: [],
-        modulePath: "packages/werkstatt-engine/src/handoff/index.ts",
-        description:
-          "Validate the RFC-0479 migrator registry (id uniqueness, ordering, test coverage).",
-        scope: "workspace",
-        supportsAllSites: false,
-        flags: {},
-        execute: runMigratorRegistryValidate,
-      });
-      registry.registerCommand({
-        name: "handoff.pack",
-        modulePath: "packages/werkstatt-engine/src/handoff/index.ts",
-        generates: [],
-        description:
-          "Pack a thin, version-stamped internal handoff bundle: `handoff.pack --site <app>` (RFC-0221).",
-        scope: "workspace",
-        supportsAllSites: false,
-        mutatesState: true,
-        flags: {
-          site: { kind: "string", required: true, description: "App name to pack." },
-        },
-        writes: ["../handoff/{site}/**"],
-        execute: runHandoffPack,
-      });
-      registry.registerCommand({
-        name: "handoff.absorb",
-        modulePath: "packages/werkstatt-engine/src/handoff/index.ts",
-        generates: [],
-        description:
-          "Ingest a handoff bundle: report (version compare + capability diff), refuse downgrades, then materialize (inject authored + delegate regen). Flags: --report-only, --as <name>, --regen, --force (RFC-0221).",
-        scope: "workspace",
-        supportsAllSites: false,
-        mutatesState: true,
-        flags: {
-          bundle: { kind: "string", description: "Path to the handoff bundle directory." },
-          "report-only": {
-            kind: "boolean",
-            description: "Only print the catch-up report; do not materialize files.",
-          },
-          regen: { kind: "boolean", description: "Run delegated regeneration after absorb." },
-          as: { kind: "string", description: "Absorb into this target app name." },
-        },
-        writes: ["apps/{targetApp}/**"],
-        execute: runHandoffAbsorb,
-      });
-    },
-  };
-}

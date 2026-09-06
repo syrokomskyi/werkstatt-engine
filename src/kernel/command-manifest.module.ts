@@ -10,15 +10,17 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "./types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const commandManifestModule: KernelModule = {
+export async function createCommandManifestModule(): Promise<ModuleExport> {
+const { runCommandManifestGenerate } = await import("./command-manifest.ts");
+  return {
   name: "command-manifest",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runCommandManifestGenerate } = await import("./command-manifest.ts");
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "command.manifest.generate",
       modulePath: "packages/werkstatt-engine/src/kernel/command-manifest.module.ts",
       description:
@@ -37,6 +39,10 @@ export const commandManifestModule: KernelModule = {
         },
       },
       execute: runCommandManifestGenerate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

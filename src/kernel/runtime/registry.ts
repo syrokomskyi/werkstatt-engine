@@ -29,7 +29,9 @@ import type {
   SiteWorkspacesListResult,
   KernelCommandDefinition,
   KernelRegisteredCommandInfo,
+  KernelPipelineStep,
 } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
 function createModuleHandle(registry: KernelRegistry, moduleName: string): KernelModuleHandle {
   return {
@@ -47,30 +49,22 @@ export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegi
   const registry = new KernelRegistry();
 
   if (config.modules) {
-    for (const moduleDefinition of config.modules) {
-      process.stderr.write(`  [registry] loading module ${moduleDefinition.name} …\n`);
-      registry.currentModuleName = moduleDefinition.name;
-      registry.moduleStates.set(moduleDefinition.name, "loading");
+    for (const mod of config.modules) {
+      process.stderr.write(`  [registry] loading module ${mod.name} …\n`);
       try {
-        await moduleDefinition.register(registry);
-        registry.moduleStates.set(moduleDefinition.name, "active");
+        registry.populateFromModule(mod);
       } catch (err) {
-        registry.moduleStates.set(moduleDefinition.name, "failed");
-        rollbackModuleRegistrations(registry, moduleDefinition.name);
+        rollbackModuleRegistrations(registry, mod.name);
         throw err;
       }
     }
   } else if (config.moduleLoaders) {
     for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
       process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
-      const moduleDefinition = await loader();
-      registry.currentModuleName = moduleName;
-      registry.moduleStates.set(moduleName, "loading");
+      const mod = await loader();
       try {
-        await moduleDefinition.register(registry);
-        registry.moduleStates.set(moduleName, "active");
+        registry.populateFromModule(mod);
       } catch (err) {
-        registry.moduleStates.set(moduleName, "failed");
         rollbackModuleRegistrations(registry, moduleName);
         throw err;
       }
@@ -80,7 +74,10 @@ export async function buildRegistry(config: KernelAppConfig): Promise<KernelRegi
 
   if (config.pipelines) {
     for (const [name, steps] of Object.entries(config.pipelines)) {
-      registry.registerPipeline(name, steps);
+      if (registry.pipelines.has(name)) {
+        throw new Error(`Kernel pipeline already registered: ${name}`);
+      }
+      registry.pipelines.set(name, [...steps]);
     }
   }
 
@@ -113,32 +110,24 @@ export async function buildRegistryWithHandles(
   const registry = new KernelRegistry();
 
   if (config.modules) {
-    for (const moduleDefinition of config.modules) {
-      process.stderr.write(`  [registry] loading module ${moduleDefinition.name} …\n`);
-      registry.currentModuleName = moduleDefinition.name;
-      registry.moduleStates.set(moduleDefinition.name, "loading");
+    for (const mod of config.modules) {
+      process.stderr.write(`  [registry] loading module ${mod.name} …\n`);
       try {
-        await moduleDefinition.register(registry);
-        registry.moduleStates.set(moduleDefinition.name, "active");
-        handles.set(moduleDefinition.name, createModuleHandle(registry, moduleDefinition.name));
+        registry.populateFromModule(mod);
+        handles.set(mod.name, createModuleHandle(registry, mod.name));
       } catch (err) {
-        registry.moduleStates.set(moduleDefinition.name, "failed");
-        rollbackModuleRegistrations(registry, moduleDefinition.name);
+        rollbackModuleRegistrations(registry, mod.name);
         throw err;
       }
     }
   } else if (config.moduleLoaders) {
     for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
       process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
-      const moduleDefinition = await loader();
-      registry.currentModuleName = moduleName;
-      registry.moduleStates.set(moduleName, "loading");
+      const mod = await loader();
       try {
-        await moduleDefinition.register(registry);
-        registry.moduleStates.set(moduleName, "active");
+        registry.populateFromModule(mod);
         handles.set(moduleName, createModuleHandle(registry, moduleName));
       } catch (err) {
-        registry.moduleStates.set(moduleName, "failed");
         rollbackModuleRegistrations(registry, moduleName);
         throw err;
       }
@@ -148,7 +137,10 @@ export async function buildRegistryWithHandles(
 
   if (config.pipelines) {
     for (const [name, steps] of Object.entries(config.pipelines)) {
-      registry.registerPipeline(name, steps);
+      if (registry.pipelines.has(name)) {
+        throw new Error(`Kernel pipeline already registered: ${name}`);
+      }
+      registry.pipelines.set(name, [...steps]);
     }
   }
 
@@ -168,29 +160,21 @@ export async function buildRegistryForModule(
     if (!loader) {
       throw new Error(`No module loader registered for module \`${moduleName}\`.`);
     }
-    const moduleDefinition = await loader();
-    registry.currentModuleName = moduleName;
-    registry.moduleStates.set(moduleName, "loading");
+    const mod = await loader();
     try {
-      await moduleDefinition.register(registry);
-      registry.moduleStates.set(moduleName, "active");
+      registry.populateFromModule(mod);
     } catch (err) {
-      registry.moduleStates.set(moduleName, "failed");
       rollbackModuleRegistrations(registry, moduleName);
       throw err;
     }
   } else if (config.modules) {
-    const moduleDefinition = config.modules.find((m) => m.name === moduleName);
-    if (!moduleDefinition) {
+    const mod = config.modules.find((m) => m.name === moduleName);
+    if (!mod) {
       throw new Error(`No module named \`${moduleName}\` in config.`);
     }
-    registry.currentModuleName = moduleName;
-    registry.moduleStates.set(moduleName, "loading");
     try {
-      await moduleDefinition.register(registry);
-      registry.moduleStates.set(moduleName, "active");
+      registry.populateFromModule(mod);
     } catch (err) {
-      registry.moduleStates.set(moduleName, "failed");
       rollbackModuleRegistrations(registry, moduleName);
       throw err;
     }
@@ -199,7 +183,10 @@ export async function buildRegistryForModule(
 
   if (config.pipelines) {
     for (const [name, steps] of Object.entries(config.pipelines)) {
-      registry.registerPipeline(name, steps);
+      if (registry.pipelines.has(name)) {
+        throw new Error(`Kernel pipeline already registered: ${name}`);
+      }
+      registry.pipelines.set(name, [...steps]);
     }
   }
 

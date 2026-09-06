@@ -11,12 +11,10 @@
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const observabilityModule: KernelModule = {
-  name: "observability",
-  version: "0.1.0",
-  async register(registry) {
-    const { runObservabilityConventionsValidate } =
+export async function createObservabilityModule(): Promise<ModuleExport> {
+const { runObservabilityConventionsValidate } =
       await import("./commands/conventions-validate.ts");
     const { runObservabilityStackValidate } = await import("./commands/stack-validate.ts");
     const { runObservabilityStackHealth } = await import("./commands/stack-health.ts");
@@ -29,7 +27,12 @@ export const observabilityModule: KernelModule = {
     const { runObservabilityAlertsApply } = await import("./commands/alerts-apply.ts");
     const { runObservabilityDeliveryValidate } = await import("./commands/delivery-validate.ts");
     const { runObservabilityMcpValidate } = await import("./commands/mcp-validate.ts");
-    registry.registerCommand({
+  return {
+  name: "observability",
+  version: "0.1.0",
+    declarations: [],
+  commands: [
+    {
       name: "observability.conventions.validate",
       contract: "observability",
       rules: [],
@@ -44,8 +47,8 @@ export const observabilityModule: KernelModule = {
       ],
       flags: {},
       execute: runObservabilityConventionsValidate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.stack.validate",
       contract: "observability",
       rules: [],
@@ -56,8 +59,8 @@ export const observabilityModule: KernelModule = {
       reads: ["services/observability-stack/**"],
       flags: {},
       execute: runObservabilityStackValidate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.stack.health",
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
@@ -68,8 +71,8 @@ export const observabilityModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runObservabilityStackHealth,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.workers.validate",
       contract: "observability",
       rules: [],
@@ -84,8 +87,8 @@ export const observabilityModule: KernelModule = {
       ],
       flags: {},
       execute: runObservabilityWorkersValidate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.factory.smoke",
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
@@ -96,8 +99,8 @@ export const observabilityModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runObservabilityFactorySmoke,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "fleet.probe.targets.generate",
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
@@ -112,8 +115,8 @@ export const observabilityModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runFleetProbeTargetsGenerate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "fleet.probe.validate",
       contract: "fleet",
       rules: [],
@@ -129,8 +132,8 @@ export const observabilityModule: KernelModule = {
       ],
       flags: {},
       execute: runFleetProbeValidate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.alerts.generate",
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
@@ -143,8 +146,8 @@ export const observabilityModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runObservabilityAlertsGenerate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.alerts.validate",
       contract: "observability",
       rules: [],
@@ -158,8 +161,8 @@ export const observabilityModule: KernelModule = {
       ],
       flags: {},
       execute: runObservabilityAlertsValidate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.alerts.apply",
       modulePath: "packages/werkstatt-engine/src/observability/module.ts",
       description:
@@ -170,8 +173,8 @@ export const observabilityModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runObservabilityAlertsApply,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.delivery.validate",
       contract: "observability",
       rules: [],
@@ -185,8 +188,8 @@ export const observabilityModule: KernelModule = {
       ],
       flags: {},
       execute: runObservabilityDeliveryValidate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "observability.mcp.validate",
       contract: "observability",
       rules: [],
@@ -197,6 +200,10 @@ export const observabilityModule: KernelModule = {
       reads: [".mcp.json", "docs/observability/incidents/README.md"],
       flags: {},
       execute: runObservabilityMcpValidate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

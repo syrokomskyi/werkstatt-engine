@@ -17,16 +17,18 @@ cacheable (they depend on external network state and workshop-local files).
 */
 
 import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const swimModule: KernelModule = {
+export async function createSwimModule(): Promise<ModuleExport> {
+const { runSwimJoin, runSwimLeave, runSwimMembers, runSwimStatus } =
+      await import("./handlers.ts");
+  return {
   name: "swim",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runSwimJoin, runSwimLeave, runSwimMembers, runSwimStatus } =
-      await import("./handlers.ts");
-
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "swim.join",
       modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
       generates: [],
@@ -42,9 +44,8 @@ export const swimModule: KernelModule = {
       reads: ["werkstatt.identity.json"],
       writes: ["werkstatt.swim.json", "werkstatt.genome.log"],
       execute: runSwimJoin,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "swim.leave",
       modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
       generates: [],
@@ -57,9 +58,8 @@ export const swimModule: KernelModule = {
       reads: ["werkstatt.swim.json", "werkstatt.identity.json"],
       writes: ["werkstatt.genome.log"],
       execute: runSwimLeave,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "swim.members",
       modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
       description:
@@ -70,9 +70,8 @@ export const swimModule: KernelModule = {
       cacheable: false,
       reads: ["werkstatt.swim.json", "werkstatt.genome.log", "werkstatt.identity.json"],
       execute: runSwimMembers,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "swim.status",
       modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
       description:
@@ -83,6 +82,10 @@ export const swimModule: KernelModule = {
       cacheable: false,
       reads: ["werkstatt.swim.json", "werkstatt.genome.log", "werkstatt.identity.json"],
       execute: runSwimStatus,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

@@ -16,6 +16,7 @@
 */
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
 import {
+import type { ModuleExport } from "../runtime/desired-state.ts";
   runCleanIcons,
   runGenerateIcons,
   runGenerateMaterialCreditsPage,
@@ -26,11 +27,12 @@ import {
   runContentFormulaMigrate,
 } from "@warpgogol/werkstatt-site/codegen";
 
-export const serviceModule: KernelModule = {
+export const serviceModule: ModuleExport = {
   name: "service",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "icons.generate",
       modulePath: "tools/modules/service.module.ts",
       description: "Generate Astro icon wrappers from icon JSON assets.",
@@ -42,8 +44,8 @@ export const serviceModule: KernelModule = {
       flags: {},
       generates: [{ path: "src/components/icons/generated/**", phase: "build.prepare", conditional: true }],
       execute: runGenerateIcons,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "icons.clean",
       description: "Delete generated Astro icon wrappers.",
       scope: "app",
@@ -53,8 +55,8 @@ export const serviceModule: KernelModule = {
       reads: ["<app>/src/components/icons/generated/**"],
       flags: {},
       execute: runCleanIcons,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "open-source.generate",
       modulePath: "tools/modules/service.module.ts",
       description: "Generate the open-source disclosure page from production dependencies.",
@@ -79,8 +81,8 @@ export const serviceModule: KernelModule = {
         },
       },
       execute: runGenerateOpenSourcePage,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "material.credits.generate",
       modulePath: "tools/modules/service.module.ts",
       description: "Generate localized material credits pages from *.credits.yaml sidecars.",
@@ -98,8 +100,8 @@ export const serviceModule: KernelModule = {
       ],
       flags: {},
       execute: runGenerateMaterialCreditsPage,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "material.metadata.write",
       description:
         "Write IPTC/XMP metadata (title, copyright, creator, artist, comment, WebStatement, encoder) into derived image/video variants from manifests. Uses MaterialCredit sidecars with content reference resolution and SemanticSiteProfile fallback. Gracefully skips when exiftool is unavailable (RFC-0528).",
@@ -117,8 +119,8 @@ export const serviceModule: KernelModule = {
       ],
       flags: {},
       execute: runMaterialMetadataWrite,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "content.ref-index.generate",
       modulePath: "tools/modules/service.module.ts",
       description:
@@ -131,8 +133,8 @@ export const serviceModule: KernelModule = {
       flags: {},
       generates: [{ path: "src/content-ref-index.generated.yaml", phase: "build.prepare" }],
       execute: runContentRefIndexGenerate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "content.ref-migrate",
       description:
         "Migrate brace-delimited {collection.file.field} references to braceless syntax in src/content/ (RFC-0529). Idempotent.",
@@ -143,8 +145,8 @@ export const serviceModule: KernelModule = {
       reads: ["<app>/src/content/**/*.md", "<app>/src/content/**/*.yaml"],
       flags: {},
       execute: runContentRefMigrate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "content.formula.migrate",
       description:
         "Convert hardcoded arithmetic patterns next to content references to =(...) formula syntax in src/content/ (RFC-0570). Manual command — not in any pipeline. Idempotent.",
@@ -155,6 +157,8 @@ export const serviceModule: KernelModule = {
       reads: ["<app>/src/content/**/*.md"],
       flags: {},
       execute: runContentFormulaMigrate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

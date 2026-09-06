@@ -5,7 +5,8 @@ import {
   setRegistryCacheEnabled,
   isRegistryCacheEnabled,
 } from "../runtime/registry-cache.ts";
-import type { KernelAppConfig, KernelModule } from "../types.ts";
+import type { KernelAppConfig } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
 /*
 <MODULE_CONTRACT>
@@ -19,18 +20,21 @@ import type { KernelAppConfig, KernelModule } from "../types.ts";
 </CHANGE_SUMMARY>
 */
 
-const mockModule: KernelModule = {
+const mockModule: ModuleExport = {
   name: "test-module",
   version: "1.0.0",
-  register(registry) {
-    registry.registerCommand({
+  declarations: [],
+  commands: [
+    {
       name: "test.ping",
       modulePath: "test",
       description: "Test command",
       scope: "workspace",
+      flags: {},
       execute: async () => ({ exitCode: 0, ok: true, summary: "pong" }),
-    });
-  },
+    },
+  ],
+  pipelines: [],
 };
 
 const mockConfig: KernelAppConfig = {

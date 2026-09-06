@@ -17,16 +17,17 @@
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createEvidenceModule(): KernelModule {
+export async function createEvidenceModule(): Promise<ModuleExport> {
+  const { runEvidenceSync } = await import("./evidence-sync.ts");
+      const { runEvidenceFetch } = await import("./evidence-fetch.ts");
   return {
     name: "evidence",
     version: "0.1.0",
-    async register(registry) {
-      const { runEvidenceSync } = await import("./evidence-sync.ts");
-      const { runEvidenceFetch } = await import("./evidence-fetch.ts");
-
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "evidence.sync",
         modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
         generates: [],
@@ -63,9 +64,8 @@ export function createEvidenceModule(): KernelModule {
         ],
         writes: [],
         execute: runEvidenceSync,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "evidence.fetch",
         modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
         generates: [],
@@ -106,7 +106,9 @@ export function createEvidenceModule(): KernelModule {
         reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system-state.yaml"],
         writes: ["{--output-dir}/**"],
         execute: runEvidenceFetch,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

@@ -16,16 +16,16 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createSigningModule(): KernelModule {
+export async function createSigningModule(): Promise<ModuleExport> {
+  const { runSigningKeyGenerate } = await import("./signing-commands.ts");
   return {
     name: "signing",
     version: "0.1.0",
-    async register(registry) {
-      const { runSigningKeyGenerate } = await import("./signing-commands.ts");
-
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "signing.key.generate",
         modulePath: "packages/werkstatt-engine/src/signing/signing.module.ts",
         description:
@@ -51,7 +51,9 @@ export function createSigningModule(): KernelModule {
           },
         },
         execute: runSigningKeyGenerate,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

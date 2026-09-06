@@ -10,15 +10,17 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "./types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const commitMessageModule: KernelModule = {
+export async function createCommitMessageModule(): Promise<ModuleExport> {
+const { runCommitMessageLint } = await import("./commit-message-lint.ts");
+  return {
   name: "commit-message",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runCommitMessageLint } = await import("./commit-message-lint.ts");
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "commit.message.lint",
       contract: "commit",
       rules: [],
@@ -37,6 +39,10 @@ export const commitMessageModule: KernelModule = {
         },
       },
       execute: runCommitMessageLint,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

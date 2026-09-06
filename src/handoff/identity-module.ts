@@ -14,21 +14,22 @@
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createIdentityModule(): KernelModule {
-  return {
-    name: "identity",
-    version: "0.1.0",
-    async register(registry) {
-      const { runIdentityBootstrap } = await import("../identity/identity-bootstrap.ts");
+export async function createIdentityModule(): Promise<ModuleExport> {
+  const { runIdentityBootstrap } = await import("../identity/identity-bootstrap.ts");
       const { runIdentityCredentialIssue } =
         await import("../identity/identity-credential-issue.ts");
       const { runIdentityCredentialVerify } =
         await import("../identity/identity-credential-verify.ts");
       const { runIdentityCredentialRevoke } =
         await import("../identity/identity-credential-revoke.ts");
-
-      registry.registerCommand({
+  return {
+    name: "identity",
+    version: "0.1.0",
+      declarations: [],
+  commands: [
+    {
         name: "identity.bootstrap",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
@@ -52,9 +53,8 @@ export function createIdentityModule(): KernelModule {
         writes: ["werkstatt.identity.json"],
         cacheable: false,
         execute: runIdentityBootstrap,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "identity.credential.issue",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
@@ -91,9 +91,8 @@ export function createIdentityModule(): KernelModule {
         reads: ["werkstatt.identity.json"],
         cacheable: false,
         execute: runIdentityCredentialIssue,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "identity.credential.verify",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         description: "Verify a credential's signature, revocation status, and expiry (RFC-0558).",
@@ -109,9 +108,8 @@ export function createIdentityModule(): KernelModule {
         reads: ["werkstatt.identity.json"],
         cacheable: false,
         execute: runIdentityCredentialVerify,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "identity.credential.revoke",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
@@ -130,7 +128,9 @@ export function createIdentityModule(): KernelModule {
         reads: ["werkstatt.identity.json"],
         cacheable: false,
         execute: runIdentityCredentialRevoke,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

@@ -13,20 +13,21 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createBordbuchModule(): KernelModule {
-  return {
-    name: "bordbuch",
-    version: "0.1.0",
-    async register(registry) {
-      const { runBordbuchAppend } = await import("./bordbuch-append.ts");
+export async function createBordbuchModule(): Promise<ModuleExport> {
+  const { runBordbuchAppend } = await import("./bordbuch-append.ts");
       const { runBordbuchValidate } = await import("./bordbuch-validate.ts");
       const { runBordbuchStatus } = await import("./bordbuch-status.ts");
       const { runBordbuchGenerate } = await import("./bordbuch-generate.ts");
       const { runBordbuchRepair } = await import("./bordbuch-repair.ts");
       const { runBordbuchCommit } = await import("./bordbuch-commit.ts");
-      registry.registerCommand({
+  return {
+    name: "bordbuch",
+    version: "0.1.0",
+      declarations: [],
+  commands: [
+    {
         name: "bordbuch.append",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         generates: [],
@@ -53,8 +54,8 @@ export function createBordbuchModule(): KernelModule {
         reads: ["systems/{system}/bordbuch/events.ndjson"],
         cacheable: false,
         execute: runBordbuchAppend,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "bordbuch.validate",
         contract: "bordbuch",
         rules: [],
@@ -72,8 +73,8 @@ export function createBordbuchModule(): KernelModule {
         },
         reads: ["systems/{system}/bordbuch/events.ndjson"],
         execute: runBordbuchValidate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "bordbuch.status",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
@@ -89,8 +90,8 @@ export function createBordbuchModule(): KernelModule {
         },
         reads: ["systems/{system}/bordbuch/events.ndjson"],
         execute: runBordbuchStatus,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "bordbuch.generate",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
@@ -141,8 +142,8 @@ export function createBordbuchModule(): KernelModule {
         ],
         cacheable: false,
         execute: runBordbuchGenerate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "bordbuch.repair",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         generates: [],
@@ -165,8 +166,8 @@ export function createBordbuchModule(): KernelModule {
         reads: ["systems/{system}/bordbuch/events.ndjson"],
         cacheable: false,
         execute: runBordbuchRepair,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "bordbuch.commit",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
@@ -188,7 +189,9 @@ export function createBordbuchModule(): KernelModule {
         ],
         cacheable: false,
         execute: runBordbuchCommit,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

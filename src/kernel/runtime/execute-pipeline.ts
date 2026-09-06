@@ -719,7 +719,7 @@ async function executePipelineForSite(
           outputFormat: options.outputFormat ?? "pretty",
           io,
           fileIntents: intents,
-          registry,
+          actualState: registry,
           ownershipMap,
         };
 
@@ -985,7 +985,7 @@ async function executePipelineForWorkspace(
           outputFormat: options.outputFormat ?? "pretty",
           io,
           fileIntents: intents,
-          registry,
+          actualState: registry,
           ownershipMap,
         };
 

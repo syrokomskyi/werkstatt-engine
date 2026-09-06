@@ -10,7 +10,7 @@
 </CHANGE_SUMMARY>
 */
 
-export { observabilityModule } from "./module.ts";
+export { createObservabilityModule } from "./module.ts";
 export { runObservabilityConventionsValidate } from "./commands/conventions-validate.ts";
 export { runObservabilityStackValidate } from "./commands/stack-validate.ts";
 export { runObservabilityStackHealth } from "./commands/stack-health.ts";

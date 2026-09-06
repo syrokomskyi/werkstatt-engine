@@ -33,14 +33,10 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createNachweisModule(): KernelModule {
-  return {
-    name: "nachweis",
-    version: "0.1.0",
-    async register(registry) {
-      const { runNachweisIngest } = await import("./nachweis-ingest.ts");
+export async function createNachweisModule(): Promise<ModuleExport> {
+  const { runNachweisIngest } = await import("./nachweis-ingest.ts");
       const { runNachweisValidate } = await import("./nachweis-validate.ts");
       const { runNachweisManifestGenerate } = await import("./nachweis-manifest.ts");
       const { runNachweisConsentUpdate } = await import("./nachweis-consent.ts");
@@ -59,8 +55,12 @@ export function createNachweisModule(): KernelModule {
       const { runNachweisScreenshotUpload } = await import("./nachweis-screenshot-upload.ts");
       const { runNachweisScreenshotIngest } = await import("./nachweis-screenshot-ingest.ts");
       const { runNachweisScreenshotProcess } = await import("./nachweis-screenshot-process.ts");
-
-      registry.registerCommand({
+  return {
+    name: "nachweis",
+    version: "0.1.0",
+      declarations: [],
+  commands: [
+    {
         name: "nachweis.ingest",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -89,9 +89,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisIngest,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.validate",
         contract: "nachweis",
         rules: [],
@@ -110,9 +109,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisValidate,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.manifest.generate",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         description:
@@ -139,9 +137,8 @@ export function createNachweisModule(): KernelModule {
           { path: "public/nachweise/manifest.json", phase: "build.post", conditional: true },
         ],
         execute: runNachweisManifestGenerate,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.consent.update",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -173,9 +170,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisConsentUpdate,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.publish",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -193,9 +189,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisPublish,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.withdraw",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -214,9 +209,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisWithdraw,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.approve",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -248,9 +242,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisApprove,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.public-derivative",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -278,9 +271,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisPublicDerivative,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.key.ensure",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [
@@ -310,9 +302,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisKeyEnsure,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.sign",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -336,9 +327,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisSign,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.timestamp",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -367,9 +357,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisTimestamp,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.assessment.ingest",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -395,9 +384,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisAssessmentIngest,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.measure.lighthouse",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -445,9 +433,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisLighthouseMeasure,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.measure.cloudflare-agent-readiness",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -491,9 +478,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisCloudflareAgentReadinessMeasure,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.verify-signature",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -511,9 +497,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisVerifySignature,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.screenshot.upload",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -541,9 +526,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisScreenshotUpload,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.screenshot.ingest",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -578,9 +562,8 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisScreenshotIngest,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "nachweis.screenshot.process",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [
@@ -612,7 +595,9 @@ export function createNachweisModule(): KernelModule {
         reads: [],
         writes: [],
         execute: runNachweisScreenshotProcess,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

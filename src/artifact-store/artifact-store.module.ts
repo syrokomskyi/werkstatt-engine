@@ -11,20 +11,21 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createArtifactStoreModule(): KernelModule {
-  return {
-    name: "artifact-store",
-    version: "0.1.0",
-    async register(registry) {
-      const {
+export async function createArtifactStoreModule(): Promise<ModuleExport> {
+  const {
         runArtifactStorePut,
         runArtifactStoreGet,
         runArtifactStoreValidate,
         runArtifactStoreGc,
       } = await import("./artifact-store-commands.ts");
-      registry.registerCommand({
+  return {
+    name: "artifact-store",
+    version: "0.1.0",
+      declarations: [],
+  commands: [
+    {
         name: "artifact.store.put",
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
@@ -42,8 +43,8 @@ export function createArtifactStoreModule(): KernelModule {
         reads: ["releases/{release}/**"],
         cacheable: false,
         execute: runArtifactStorePut,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "artifact.store.get",
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
@@ -60,8 +61,8 @@ export function createArtifactStoreModule(): KernelModule {
         reads: [".werkstatt/artifacts/releases/{release}/**"],
         cacheable: false,
         execute: runArtifactStoreGet,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "artifact.store.validate",
         contract: "artifact",
         rules: [],
@@ -74,8 +75,8 @@ export function createArtifactStoreModule(): KernelModule {
         },
         reads: [".werkstatt/artifacts/releases/{release}/**"],
         execute: runArtifactStoreValidate,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "artifact.store.gc",
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
@@ -91,7 +92,9 @@ export function createArtifactStoreModule(): KernelModule {
         reads: [".werkstatt/artifacts/releases/**", "releases/*/release.yaml"],
         cacheable: false,
         execute: runArtifactStoreGc,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

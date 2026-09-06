@@ -15,16 +15,16 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createSichtpassModule(): KernelModule {
+export async function createSichtpassModule(): Promise<ModuleExport> {
+  const { runSichtpassGenerate } = await import("./sichtpass-generate.ts");
   return {
     name: "sichtpass",
     version: "0.1.0",
-    async register(registry) {
-      const { runSichtpassGenerate } = await import("./sichtpass-generate.ts");
-
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "sichtpass.generate",
         modulePath: "packages/werkstatt-engine/src/sichtpass/sichtpass.module.ts",
         description:
@@ -41,7 +41,9 @@ export function createSichtpassModule(): KernelModule {
         writes: [],
         generates: [],
         execute: runSichtpassGenerate,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

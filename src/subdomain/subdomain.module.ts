@@ -13,18 +13,18 @@ subdomain.register, subdomain.validate, subdomain.list.
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createSubdomainModule(): KernelModule {
+export async function createSubdomainModule(): Promise<ModuleExport> {
+  const { runSubdomainRegister } = await import("./subdomain-register.ts");
+      const { runSubdomainValidate } = await import("./subdomain-validate.ts");
+      const { runSubdomainList } = await import("./subdomain-list.ts");
   return {
     name: "subdomain",
     version: "0.1.0",
-    async register(registry) {
-      const { runSubdomainRegister } = await import("./subdomain-register.ts");
-      const { runSubdomainValidate } = await import("./subdomain-validate.ts");
-      const { runSubdomainList } = await import("./subdomain-list.ts");
-
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "subdomain.register",
         modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
@@ -42,9 +42,8 @@ export function createSubdomainModule(): KernelModule {
         reads: ["services/registry.yaml", "systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainRegister,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "subdomain.validate",
         contract: "subdomain",
         rules: [],
@@ -63,9 +62,8 @@ export function createSubdomainModule(): KernelModule {
         reads: ["services/registry.yaml", "systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainValidate,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "subdomain.list",
         modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
@@ -82,7 +80,9 @@ export function createSubdomainModule(): KernelModule {
         reads: ["systems-cache/*/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainList,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

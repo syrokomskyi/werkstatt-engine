@@ -20,11 +20,13 @@
   <item>RFC-1026: add ModuleFiberState, KernelModuleHandle, KernelLifecycleRegistry for lifecycle-owned kernel registrations with disposer pattern.</item>
   <item>RFC-1027: add RemediationHint interface and optional remediationHints field to KernelExecutionReport for agent-actionable fix suggestions.</item>
   <item>RFC-1028: add moduleBasePath to KernelRegisteredCommandInfo, derived from modulePath (RFC-0960) for dynamic moduleSrcDir resolution in the pipeline executor.</item>
+  <item>RFC-1038: replace KernelModule with ModuleExport, KernelCommandDefinition with CommandDeclaration, KernelRuntimeContext.registry with actualState, KernelAppConfig uses ModuleExport.</item>
 </CHANGE_SUMMARY>
 */
 
 import type { WorkspaceIO, WriteIntent } from "./workspace-io.ts";
 import type { KernelRegistry } from "./registry.ts";
+import type { ModuleExport, CommandDeclaration, ActualState } from "../runtime/desired-state.ts";
 // @ai-invariant: Kernel command contracts must stay explicit so agents cannot pass untyped command inputs.
 
 export type KernelOutputFormat = "pretty" | "json";
@@ -266,8 +268,8 @@ export interface KernelRuntimeContext {
    * `filesModified` on the execution report.
    */
   fileIntents?: WriteIntent[];
-  /** RFC-0960: the kernel registry, available to validators for derived projections like buildGeneratorOwnership. */
-  registry: KernelRegistry;
+  /** RFC-1038: the actual state (KernelRegistry instance implementing ActualState), available to validators for derived projections like buildGeneratorOwnership. */
+  actualState: KernelRegistry;
   /**
    * RFC-0960: pre-computed derived generator ownership map. Computed once by
    * the executor via dynamic import of buildGeneratorOwnership from the site
@@ -276,81 +278,13 @@ export interface KernelRuntimeContext {
   ownershipMap?: GeneratorOwnershipEntry[];
 }
 
-export interface KernelCommandDefinition<TData = unknown> extends KernelCommandMetadata {
-  name: string;
-  /**
-   * RFC-0260: declared flag schema. When present, unknown flags are rejected
-   * (KERNEL-FLAG-01), string/string[] flags without a value fail
-   * (KERNEL-FLAG-02), and missing `required` flags fail (KERNEL-FLAG-03) —
-   * all before `execute()` runs. Absent means the command stays on the
-   * legacy heuristic parser path (deprecated; see KERNEL_BOOLEAN_FLAGS).
-   */
-  flags?: Record<string, KernelFlagSpec>;
-  /**
-   * RFC-0266: workspace-root-relative path globs this command reads.
-   * RFC-0390: now the functional cache input declaration. When non-empty,
-   * the pipeline executor hashes matching files via @warpgogol/fingerprint
-   * and skips re-execution on cache hit. The literal token "<app>" stands
-   * in for the app-scoped root on app-scope commands.
-   */
-  reads?: string[];
-  /**
-   * RFC-0266: workspace-root-relative path globs this command writes. Should
-   * be non-empty whenever `mutatesState` is true (CMD-MAN-02).
-   */
-  writes?: string[];
-  /**
-   * RFC-0637: paths (files and/or directories) relative to the module's src/
-   * directory that this command's execute() depends on. When present,
-   * computeModuleHash fingerprints only these paths instead of the full src/.
-   * When absent, the full src/ directory is fingerprinted (backward compatible).
-   * Paths use POSIX forward slashes. Directories are fingerprinted recursively.
-   */
-  modulePaths?: string[];
-  /**
-   * RFC-0687: command names whose outputs this validator checks. When all
-   * listed commands were cache hits in the current or a recent pipeline run,
-   * this validator is transitively skipped (no reads[] hash computation).
-   * Only valid on cacheable, read-only validators. MUST NOT be set on
-   * `cacheable: false` commands. Not a replacement for `reads[]` — it is
-   * an additional skip signal on top of the existing cache mechanism.
-   */
-  validatesOutputs?: string[];
-  /**
-   * RFC-0960: repo-relative path to the implementing source file (e.g.
-   * "packages/werkstatt-site/src/checks/robots.ts"). Required on ALL engine
-   * and site-plugin commands. Forge commands (portable governance package)
-   * do not declare modulePath — validateRegistration skips them.
-   * Distinct from modulePaths (ADR-0024, relative to src/, for cache hashing).
-   */
-  modulePath?: string;
-  /**
-   * RFC-0960: declared generated artifacts. Required on every `.generate`
-   * command and every command with `writes`. Commands with `writes` but no
-   * generated files declare `generates: []` (empty array).
-   */
-  generates?: GeneratedArtifactSpec[];
-  /**
-   * RFC-0963: the single contract this validator enforces (e.g.
-   * "canonical-url", "image-delivery", "generated-files", "a11y").
-   * Required on validator commands (name matching *.validate|*.check|*.lint).
-   * Enforced fail-closed by `validator.inventory.generate`; warn-only by
-   * `validateRegistration` (same pattern as RFC-0960 modulePath/generates).
-   */
-  contract?: string;
-  /**
-   * RFC-0963: the rule IDs this validator enforces (e.g.
-   * ["CANON-01", "CANON-04"]). Declared at registration, not discovered at
-   * runtime. Enables `validator.inventory.generate` to produce a full
-   * contract → validators → rules mapping without source scanning.
-   * Required on validator commands.
-   */
-  rules?: string[];
-  execute(
-    input: KernelCommandInput,
-    context: KernelRuntimeContext,
-  ): Promise<void | KernelCommandResult<TData>> | void | KernelCommandResult<TData>;
-}
+/**
+ * RFC-1038: KernelCommandDefinition is now a type alias for CommandDeclaration.
+ * The generic parameter is preserved for backward compatibility with existing
+ * code that uses KernelCommandDefinition<TData>, but the underlying type is
+ * CommandDeclaration (which has the same structure).
+ */
+export type KernelCommandDefinition<TData = unknown> = CommandDeclaration;
 export interface KernelPipelineStep {
   command: string;
   args?: string[];
@@ -366,15 +300,21 @@ export interface KernelPipelineStep {
   dependsOn?: string[];
 }
 
+/**
+ * RFC-1038: KernelModule is now a type alias for ModuleExport.
+ * Modules export declarations, commands, and pipelines arrays instead of
+ * calling register(). The buildRegistry function reads these arrays directly.
+ */
+export type KernelModule = ModuleExport;
+
+/**
+ * RFC-1038: KernelModuleRegistry is removed. Modules no longer call register().
+ * This type is kept as an empty marker for migration purposes — it will be
+ * deleted once all consumers are updated.
+ */
 export interface KernelModuleRegistry {
   registerCommand(command: KernelCommandDefinition): void;
   registerPipeline(name: string, steps: KernelPipelineStep[]): void;
-}
-
-export interface KernelModule {
-  name: string;
-  version: string;
-  register(registry: KernelModuleRegistry): void | Promise<void>;
 }
 
 export type ModuleFiberState =
@@ -395,18 +335,19 @@ export interface KernelLifecycleRegistry {
 export interface KernelAppConfig {
   name?: string;
   description?: string;
-  /** Direct module objects — used when moduleLoaders is absent (legacy/full-registry path). */
-  modules?: KernelModule[];
+  /** Direct module objects — used when moduleLoaders is absent. */
+  modules?: ModuleExport[];
   /** Lazy module loaders — enables manifest-driven single-module loading. Functions are defined in kernel.config.ts so import() resolves from the workspace root. */
-  moduleLoaders?: Record<string, () => Promise<KernelModule>>;
+  moduleLoaders?: Record<string, () => Promise<ModuleExport>>;
   pipelines?: Record<string, KernelPipelineStep[]>;
   /**
-   * RFC-0960: callback invoked after all modules are loaded and commands are
-   * registered, before the registry is returned. Used by the site plugin to
-   * inject validateRegistration for fail-closed enforcement of modulePath and
-   * generates declarations. Engine calls the callback — does NOT import site code.
+   * RFC-0960/RFC-1038: callback invoked after all modules are loaded and
+   * declarations are collected, before the actual state is returned. Used by
+   * the site plugin to inject validateDeclarations for fail-closed enforcement
+   * of modulePath and generates declarations. Engine calls the callback —
+   * does NOT import site code.
    */
-  postBuildValidation?: (registry: KernelRegistry) => void;
+  postBuildValidation?: (actualState: KernelRegistry) => void;
 }
 export interface KernelExecutionReport<TData = unknown> {
   siteName?: string;

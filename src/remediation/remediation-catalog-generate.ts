@@ -103,7 +103,7 @@ export async function runRemediationCatalogGenerate(
 
 function collectValidatorRuleIds(context: KernelRuntimeContext): string[] {
   const ruleIds = new Set<string>();
-  for (const cmd of context.registry.commands.values()) {
+  for (const cmd of context.actualState.commands.values()) {
     if (cmd.rules) {
       for (const rule of cmd.rules) {
         ruleIds.add(rule);

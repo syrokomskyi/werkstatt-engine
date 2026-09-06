@@ -12,16 +12,18 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const iconsModule: KernelModule = {
+export async function createIconsModule(): Promise<ModuleExport> {
+const { runIconsGenerate } = await import("./index.ts");
+    // ── icons.generate ─────────────────────────────────────────────────────────;
+  return {
   name: "icons",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runIconsGenerate } = await import("./index.ts");
-    // ── icons.generate ─────────────────────────────────────────────────────────
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "icons.generate",
       modulePath: "packages/werkstatt-site/src/codegen/service.ts",
       generates: [{ path: "src/components/icons/gen/{id}/{name}.astro", conditional: true, phase: "build.post" }, { path: "src/components/icons/gen/index.ts", conditional: true, phase: "build.post" }],
@@ -34,6 +36,10 @@ export const iconsModule: KernelModule = {
       reads: ["packages/ui/src/assets/icons/lordicon/**/*.json"],
       cacheable: false,
       execute: runIconsGenerate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

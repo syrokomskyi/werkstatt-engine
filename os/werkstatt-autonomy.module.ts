@@ -11,22 +11,19 @@
 </CHANGE_SUMMARY>
 */
 
-import type {
-  KernelCommandInput,
-  KernelCommandResult,
-  KernelModule,
-  KernelRuntimeContext,
-} from "../src/kernel/types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../src/kernel/types.ts";
+import type { ModuleExport } from "../src/runtime/desired-state.ts";
 import {
   runAutonomyValidate,
   type AutonomyValidateResult,
 } from "../src/plugin/autonomy-validate.ts";
 
-export const werkstattAutonomyModule: KernelModule = {
+export const werkstattAutonomyModule: ModuleExport = {
   name: "werkstatt-autonomy",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "werkstatt.autonomy.validate",
       contract: "werkstatt",
       rules: [],
@@ -52,6 +49,8 @@ export const werkstattAutonomyModule: KernelModule = {
               : `Autonomy guard failed — ${result.violations.length} violation${result.violations.length === 1 ? "" : "s"} in ${result.scannedFiles} files`,
         };
       },
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

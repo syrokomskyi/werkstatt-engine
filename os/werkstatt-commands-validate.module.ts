@@ -12,22 +12,19 @@
 </CHANGE_SUMMARY>
 */
 
-import type {
-  KernelCommandInput,
-  KernelCommandResult,
-  KernelModule,
-  KernelRuntimeContext,
-} from "../src/kernel/types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../src/kernel/types.ts";
+import type { ModuleExport } from "../src/runtime/desired-state.ts";
 import {
   runCommandsValidate,
   type CommandsValidateResult,
 } from "../src/plugin/commands-validate.ts";
 
-export const werkstattCommandsValidateModule: KernelModule = {
+export const werkstattCommandsValidateModule: ModuleExport = {
   name: "werkstatt-commands-validate",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "werkstatt.commands.validate",
       contract: "werkstatt",
       rules: [],
@@ -62,6 +59,8 @@ export const werkstattCommandsValidateModule: KernelModule = {
         const mode = (input.flags.mode as "error" | "warning") ?? "error";
         return runCommandsValidate(context.workspaceRoot, mode);
       },
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

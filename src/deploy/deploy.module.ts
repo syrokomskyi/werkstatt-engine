@@ -11,14 +11,10 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createDeployModule(): KernelModule {
-  return {
-    name: "deploy",
-    version: "0.1.0",
-    async register(registry) {
-      const {
+export async function createDeployModule(): Promise<ModuleExport> {
+  const {
         runDeployArtifactBuild,
         runDeployArtifactVerify,
         runDeployAtomicSwap,
@@ -26,8 +22,12 @@ export function createDeployModule(): KernelModule {
         runDeployArtifactGc,
         runDeployStatus,
       } = await import("./index.ts");
-
-      registry.registerCommand({
+  return {
+    name: "deploy",
+    version: "0.1.0",
+      declarations: [],
+  commands: [
+    {
         name: "deploy.artifact.build",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -50,9 +50,8 @@ export function createDeployModule(): KernelModule {
         reads: ["packages/*/dist/**", "packages/*/package.json"],
         cacheable: false,
         execute: runDeployArtifactBuild,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "deploy.artifact.verify",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description: "Verify an artifact's content hash and signature (RFC-0566). Flags: --hash.",
@@ -64,9 +63,8 @@ export function createDeployModule(): KernelModule {
         reads: [".werkstatt/artifacts/platform/{hash}/**"],
         cacheable: false,
         execute: runDeployArtifactVerify,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "deploy.atomic.swap",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -81,9 +79,8 @@ export function createDeployModule(): KernelModule {
         reads: [".werkstatt/artifacts/platform/{hash}/**"],
         cacheable: false,
         execute: runDeployAtomicSwap,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "deploy.atomic.rollback",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -99,9 +96,8 @@ export function createDeployModule(): KernelModule {
         ],
         cacheable: false,
         execute: runDeployAtomicRollback,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "deploy.artifact.gc",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -118,9 +114,8 @@ export function createDeployModule(): KernelModule {
         reads: [".werkstatt/artifacts/platform/**"],
         cacheable: false,
         execute: runDeployArtifactGc,
-      });
-
-      registry.registerCommand({
+      },
+    {
         name: "deploy.status",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description:
@@ -134,7 +129,9 @@ export function createDeployModule(): KernelModule {
         ],
         cacheable: false,
         execute: runDeployStatus,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

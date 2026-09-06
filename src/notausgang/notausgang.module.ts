@@ -11,16 +11,17 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createNotausgangModule(): KernelModule {
+export async function createNotausgangModule(): Promise<ModuleExport> {
+  const { runNotausgangExport, runNotausgangValidate } =
+        await import("./notausgang-commands.ts");
   return {
     name: "notausgang",
     version: "0.1.0",
-    async register(registry) {
-      const { runNotausgangExport, runNotausgangValidate } =
-        await import("./notausgang-commands.ts");
-      registry.registerCommand({
+      declarations: [],
+  commands: [
+    {
         name: "notausgang.export",
         modulePath: "packages/werkstatt-engine/src/notausgang/notausgang.module.ts",
         generates: [],
@@ -50,8 +51,8 @@ export function createNotausgangModule(): KernelModule {
         ],
         cacheable: false,
         execute: runNotausgangExport,
-      });
-      registry.registerCommand({
+      },
+    {
         name: "notausgang.validate",
         contract: "notausgang",
         rules: [],
@@ -65,7 +66,9 @@ export function createNotausgangModule(): KernelModule {
         },
         reads: ["{--path}/**"],
         execute: runNotausgangValidate,
-      });
-    },
-  };
+      }
+  ],
+  pipelines: [
+
+  ]};
 }

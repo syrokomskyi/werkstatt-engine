@@ -11,19 +11,16 @@
 </CHANGE_SUMMARY>
 */
 
-import type {
-  KernelCommandInput,
-  KernelCommandResult,
-  KernelModule,
-  KernelRuntimeContext,
-} from "../src/kernel/types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../src/kernel/types.ts";
 import { runSharedValidate, type SharedValidateResult } from "../src/plugin/shared-validate.ts";
+import type { ModuleExport } from "../src/runtime/desired-state.ts";
 
-export const werkstattSharedValidateModule: KernelModule = {
+export const werkstattSharedValidateModule: ModuleExport = {
   name: "werkstatt-shared-validate",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "werkstatt.shared.validate",
       contract: "werkstatt",
       rules: [],
@@ -54,6 +51,8 @@ export const werkstattSharedValidateModule: KernelModule = {
               : `Shared boundary guard failed — ${failedChecks.map((c) => c.id).join(", ")}`,
         };
       },
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

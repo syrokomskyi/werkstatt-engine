@@ -57,7 +57,7 @@ const effectClassSchema = z.enum([
   "irreversible-emission",
 ]);
 
-const isolationTierSchema = z.enum(["trusted-in-process", "sandboxed"]);
+const isolationTierSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 
 const grantScopeSchema = z.enum(["read", "append", "deploy", "certify", "administer"]);
 

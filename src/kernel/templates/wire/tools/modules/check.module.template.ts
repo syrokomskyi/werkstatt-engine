@@ -10,14 +10,14 @@
   <item>RFC-0374: compass.* commands migrated to @warpgogol/forge — see packages/forge/os/compass/</item>
 </CHANGE_SUMMARY>
 */
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-engine/runtime/desired-state";
 import {
   createStandardCheckModule,
   runSemanticMirrorValidate,
 } from "@warpgogol/werkstatt-site/checks";
 // compass.* handlers migrated to @warpgogol/forge — see packages/forge/os/compass/
 
-export const checkModule: KernelModule = createStandardCheckModule({
+export const checkModule: ModuleExport = createStandardCheckModule({
   defaultLang: "de",
   extraCommands: [
     {

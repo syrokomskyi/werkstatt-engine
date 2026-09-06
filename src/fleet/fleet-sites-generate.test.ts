@@ -22,7 +22,7 @@ function makeContext(workspaceRoot: string): KernelRuntimeContext {
     dryRun: false,
     outputFormat: "text",
     io: { write: () => {}, read: () => "" },
-    registry: undefined,
+    actualState: undefined,
   } as unknown as KernelRuntimeContext;
 }
 

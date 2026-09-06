@@ -78,6 +78,8 @@ export const bordbuchEntryKindSchema = z.enum([
   "candidate",
   // RFC-1037: External-effect compensation verification
   "effect",
+  // RFC-1035: Isolation controller sandbox lifecycle events
+  "isolation",
 ]);
 
 export const bordbuchEntryStatusSchema = z.enum(["done", "failed", "waiting", "escalated"]);

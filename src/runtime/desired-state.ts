@@ -33,7 +33,7 @@ import type {
   KernelFlagSpec,
   GeneratedArtifactSpec,
   KernelPipelineStep,
-  KernelCommandDefinition,
+  KernelCommandMetadata,
   KernelCommandInput,
   KernelRuntimeContext,
   KernelCommandResult,
@@ -109,7 +109,7 @@ export interface ReconciliationResult {
  * Carries ALL metadata fields from KernelCommandDefinition plus the execute function.
  * Type safety is preserved: execute receives typed KernelCommandInput and KernelRuntimeContext.
  */
-export interface CommandDeclaration {
+export interface CommandDeclaration extends KernelCommandMetadata {
   /** Command name — e.g. "sternsystem.validate". */
   name: string;
   /** RFC-0260: declared flag schema. */
@@ -134,10 +134,7 @@ export interface CommandDeclaration {
   execute: (
     input: KernelCommandInput,
     context: KernelRuntimeContext,
-  ) =>
-    | Promise<void | KernelCommandResult>
-    | void
-    | KernelCommandResult;
+  ) => Promise<void | KernelCommandResult> | void | KernelCommandResult;
 }
 
 /**
@@ -211,10 +208,7 @@ export interface ModuleBuildContext {
  */
 export interface ActualState {
   /** Active components with their runtime fiber state, keyed by componentId. */
-  components: Map<
-    string,
-    { declaration: ComponentDeclaration; state: ModuleFiberState }
-  >;
+  components: ReadonlyMap<string, { declaration: ComponentDeclaration; state: ModuleFiberState }>;
   /**
    * All declared commands from all ModuleExport[], keyed by command name.
    * Populated once at startup, never changes.
@@ -224,7 +218,17 @@ export interface ActualState {
    * All declared pipelines from all ModuleExport[], keyed by pipeline name.
    * Populated once at startup, never changes.
    */
-  pipelines: ReadonlyMap<string, PipelineDeclaration>;
+  pipelines: ReadonlyMap<string, KernelPipelineStep[]>;
+}
+
+/**
+ * Mutable version of ActualState — used by the reconciler for component mutations.
+ * Commands and pipelines are still readonly (populated once at startup).
+ */
+export interface MutableActualState {
+  components: Map<string, { declaration: ComponentDeclaration; state: ModuleFiberState }>;
+  commands: ReadonlyMap<string, CommandDeclaration>;
+  pipelines: ReadonlyMap<string, KernelPipelineStep[]>;
 }
 
 /**

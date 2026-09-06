@@ -14,15 +14,11 @@ reconciliation, and overlay management.
 </CHANGE_SUMMARY>
 */
 
-import type {
-  KernelCommandInput,
-  KernelExecutionReport,
-  KernelModule,
-  KernelRuntimeContext,
-} from "../kernel/types.ts";
+import type { KernelCommandInput, KernelExecutionReport, KernelRuntimeContext } from "../kernel/types.ts";
 import { resolveOverlays, inspectOverlays } from "./overlay.ts";
 import { reconcile, computeDelta } from "./reconciler.ts";
 import type { DesiredState, DesiredStateOverlay } from "./desired-state.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
 async function runDesiredStateInspect(
   _input: KernelCommandInput,
@@ -178,12 +174,13 @@ async function runOverlayInspect(
   };
 }
 
-export const compositionModule: KernelModule = {
+export const compositionModule: ModuleExport = {
   name: "composition",
   version: "1.0.0",
 
-  async register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "composition.desired-state.inspect",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
@@ -193,9 +190,8 @@ export const compositionModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runDesiredStateInspect,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "composition.reconcile",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
@@ -205,9 +201,8 @@ export const compositionModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runCompositionReconcile,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "composition.overlay.apply",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
@@ -236,9 +231,8 @@ export const compositionModule: KernelModule = {
         },
       },
       execute: runOverlayApply,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "composition.overlay.inspect",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
@@ -248,6 +242,8 @@ export const compositionModule: KernelModule = {
       cacheable: false,
       flags: {},
       execute: runOverlayInspect,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

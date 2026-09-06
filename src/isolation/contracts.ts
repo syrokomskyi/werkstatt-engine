@@ -1,4 +1,9 @@
-import type { CapabilityId, GrantScope } from "../component/contracts.ts";
+import type {
+  CapabilityId,
+  ComponentId,
+  GrantScope,
+  IsolationTier,
+} from "../component/contracts.ts";
 import type { Sha256Digest } from "../fingerprint/primitives.ts";
 
 export type IsolationPropertyKind =
@@ -154,3 +159,47 @@ export const REQUIRED_PROPERTIES: readonly IsolationPropertyKind[] = [
   "bridge-confusion-replay",
   "host-compromise-assumptions",
 ];
+
+export interface IsolationPolicy {
+  readonly tier: IsolationTier;
+  readonly fsReadPaths: readonly string[];
+  readonly fsWritePaths: readonly string[];
+  readonly networkHosts: readonly string[];
+  readonly grantedCommands: readonly CapabilityId[];
+  readonly timeoutMs: number;
+  readonly memoryLimitBytes: number;
+  readonly cpuLimitPercent: number;
+}
+
+export type SandboxState = "active" | "crashed" | "terminated";
+
+export interface SandboxHandle extends SandboxedWorkloadV1 {
+  readonly sandboxId: string;
+  readonly componentId: ComponentId;
+  readonly tier: IsolationTier;
+  readonly policy: IsolationPolicy;
+  readonly state: SandboxState;
+  readonly memoryUsageBytes: number;
+  readonly cpuUsagePercent: number;
+  readonly crashReason: string | null;
+  readonly health: "healthy" | "degraded" | "unhealthy";
+}
+
+export interface CapabilityBridge {
+  call(command: CapabilityId, input: Uint8Array): Promise<CapabilityBridgeResponseV1>;
+  ping(): Promise<boolean>;
+  terminate(reason: string): Promise<TerminationReportV1>;
+}
+
+export interface IsolationManager {
+  spawn(
+    componentId: ComponentId,
+    tier: IsolationTier,
+    policy: IsolationPolicy,
+  ): Promise<SandboxHandle>;
+  inspect(sandboxId: string): SandboxHandle | null;
+  terminate(sandboxId: string, reason: string): Promise<TerminationReportV1>;
+  list(): readonly SandboxHandle[];
+  assignTier(componentId: ComponentId, tier: IsolationTier): void;
+  getTier(componentId: ComponentId): IsolationTier | undefined;
+}

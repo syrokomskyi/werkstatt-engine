@@ -16,67 +16,68 @@ verification.
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../kernel/types.ts";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export const effectsModule: KernelModule = {
-  name: "effects",
-  version: "0.1.0",
+export async function createEffectsModule(): Promise<ModuleExport> {
+  const { runEffectClassify, runEffectCompensationVerify, runEffectCompensationInspect } =
+    await import("./effect-commands.ts");
 
-  register: async (registry) => {
-    const { runEffectClassify, runEffectCompensationVerify, runEffectCompensationInspect } =
-      await import("./effect-commands.ts");
+  const modulePath = "packages/werkstatt-engine/src/component-runtime/effects.module.ts";
 
-    const modulePath = "packages/werkstatt-engine/src/component-runtime/effects.module.ts";
-
-    registry.registerCommand({
-      name: "effect.classify",
-      modulePath,
-      description:
-        "RFC-1037: Classify an operation into one of four effect classes (revertible, " +
-        "transactional, compensatable, irreversible-emission) before execution. " +
-        "Returns { operation, effectClass } as JSON.",
-      execute: runEffectClassify,
-      scope: "workspace",
-      mutatesState: false,
-      cacheable: false,
-      requiresNetwork: false,
-      reads: ["effect-registry"],
-      writes: [],
-      generates: [],
-    });
-
-    registry.registerCommand({
-      name: "effect.compensation.verify",
-      modulePath,
-      description:
-        "RFC-1037: Verify that a compensating action restored the system to an equivalent " +
-        "state. Runs all verification probes in parallel, stores the result in the " +
-        "compensation evidence store (SQLite), and returns CompensationResult as JSON. " +
-        "Exit code 0 if verified, 1 if verification failed.",
-      execute: runEffectCompensationVerify,
-      scope: "workspace",
-      mutatesState: true,
-      cacheable: false,
-      requiresNetwork: true,
-      reads: ["effect-registry", "compensation-evidence"],
-      writes: ["compensation-evidence", "file-system"],
-      generates: [],
-    });
-
-    registry.registerCommand({
-      name: "effect.compensation.inspect",
-      modulePath,
-      description:
-        "RFC-1037: Inspect stored compensation evidence for a given operation hash. " +
-        "Returns CompensationResult or null if no evidence exists.",
-      execute: runEffectCompensationInspect,
-      scope: "workspace",
-      mutatesState: false,
-      cacheable: false,
-      requiresNetwork: false,
-      reads: ["compensation-evidence"],
-      writes: [],
-      generates: [],
-    });
-  },
-};
+  return {
+    name: "effects",
+    version: "0.1.0",
+    declarations: [],
+    commands: [
+      {
+        name: "effect.classify",
+        modulePath,
+        description:
+          "RFC-1037: Classify an operation into one of four effect classes (revertible, " +
+          "transactional, compensatable, irreversible-emission) before execution. " +
+          "Returns { operation, effectClass } as JSON.",
+        execute: runEffectClassify,
+        scope: "workspace",
+        mutatesState: false,
+        cacheable: false,
+        requiresNetwork: false,
+        reads: ["effect-registry"],
+        writes: [],
+        generates: [],
+      },
+      {
+        name: "effect.compensation.verify",
+        modulePath,
+        description:
+          "RFC-1037: Verify that a compensating action restored the system to an equivalent " +
+          "state. Runs all verification probes in parallel, stores the result in the " +
+          "compensation evidence store (SQLite), and returns CompensationResult as JSON. " +
+          "Exit code 0 if verified, 1 if verification failed.",
+        execute: runEffectCompensationVerify,
+        scope: "workspace",
+        mutatesState: true,
+        cacheable: false,
+        requiresNetwork: true,
+        reads: ["effect-registry", "compensation-evidence"],
+        writes: ["compensation-evidence", "file-system"],
+        generates: [],
+      },
+      {
+        name: "effect.compensation.inspect",
+        modulePath,
+        description:
+          "RFC-1037: Inspect stored compensation evidence for a given operation hash. " +
+          "Returns CompensationResult or null if no evidence exists.",
+        execute: runEffectCompensationInspect,
+        scope: "workspace",
+        mutatesState: false,
+        cacheable: false,
+        requiresNetwork: false,
+        reads: ["compensation-evidence"],
+        writes: [],
+        generates: [],
+      },
+    ],
+    pipelines: [],
+  };
+}

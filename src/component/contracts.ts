@@ -6,7 +6,7 @@ export type CapabilityId = `${string}/${string}`;
 export type EffectClass =
   "revertible" | "transactional" | "compensatable" | "irreversible-emission";
 
-export type IsolationTier = "trusted-in-process" | "sandboxed";
+export type IsolationTier = 0 | 1 | 2 | 3;
 
 export type GrantScope = "read" | "append" | "deploy" | "certify" | "administer";
 

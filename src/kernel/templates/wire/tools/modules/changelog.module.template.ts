@@ -11,6 +11,7 @@
 */
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
 import {
+import type { ModuleExport } from "../runtime/desired-state.ts";
   runChangelogGenerate,
   runChangelogRebuildIndex,
   runChangelogBackfill,
@@ -39,11 +40,12 @@ const changelogFlags = {
   },
 } as const;
 
-export const changelogModule: KernelModule = {
+export const changelogModule: ModuleExport = {
   name: "changelog",
   version: "0.1.0",
-  register(registry) {
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "changelog.generate",
       modulePath: "tools/modules/changelog.module.ts",
       description: "Generate the changelog.",
@@ -62,8 +64,8 @@ export const changelogModule: KernelModule = {
       reads: ["<app>/src/content/**", "<app>/package.json"],
       flags: { ...changelogFlags },
       execute: runChangelogGenerate,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "changelog.rebuild-index",
       description: "Rebuild changelog index.",
       scope: "app",
@@ -73,8 +75,8 @@ export const changelogModule: KernelModule = {
       reads: ["<app>/CHANGELOG.md", "<app>/changelogs/**"],
       flags: { ...changelogFlags },
       execute: runChangelogRebuildIndex,
-    });
-    registry.registerCommand({
+    },
+    {
       name: "changelog.backfill",
       description: "Backfill changelog history.",
       scope: "app",
@@ -88,6 +90,8 @@ export const changelogModule: KernelModule = {
         end: { kind: "string", required: true, description: "Backfill end date (YYYY-MM-DD)." },
       },
       execute: runChangelogBackfill,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};

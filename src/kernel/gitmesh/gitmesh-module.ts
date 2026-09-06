@@ -16,17 +16,19 @@ and not cacheable (they depend on external git/network state).
 */
 
 import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const gitmeshModule: KernelModule = {
+export async function createGitmeshModule(): Promise<ModuleExport> {
+const { runGitMeshSync } = await import("./sync.ts");
+    const { runGitMeshStatus } = await import("./status.ts");
+    const { runGitMeshVerify } = await import("./verify.ts");
+  return {
   name: "gitmesh",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runGitMeshSync } = await import("./sync.ts");
-    const { runGitMeshStatus } = await import("./status.ts");
-    const { runGitMeshVerify } = await import("./verify.ts");
-
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "gitmesh.sync",
       modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
       generates: [],
@@ -41,9 +43,8 @@ export const gitmeshModule: KernelModule = {
       reads: ["werkstatt.gitmesh.json", "werkstatt.identity.json"],
       writes: [".git/gitmesh.lock", ".git/gitmesh.last-sync"],
       execute: runGitMeshSync,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "gitmesh.status",
       modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
       description:
@@ -54,9 +55,8 @@ export const gitmeshModule: KernelModule = {
       cacheable: false,
       reads: ["werkstatt.gitmesh.json", ".git/gitmesh.last-sync"],
       execute: runGitMeshStatus,
-    });
-
-    registry.registerCommand({
+    },
+    {
       name: "gitmesh.verify",
       modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
       generates: [],
@@ -70,6 +70,10 @@ export const gitmeshModule: KernelModule = {
       reads: ["werkstatt.gitmesh.json", "werkstatt.identity.json", ".git/gitmesh.last-verified"],
       writes: [".git/gitmesh.last-verified"],
       execute: runGitMeshVerify,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

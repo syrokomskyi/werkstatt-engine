@@ -11,16 +11,18 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../types.ts";
+import type { ModuleExport } from "../../runtime/desired-state.ts";
 
-export const semanticModule: KernelModule = {
+export async function createSemanticModule(): Promise<ModuleExport> {
+const { runSemanticPageValidate } = await import("./handlers.ts");
+    // ── semantic.page.validate ─────────────────────────────────────────────────;
+  return {
   name: "semantic",
   version: "0.1.0",
 
-  async register(registry) {
-    const { runSemanticPageValidate } = await import("./handlers.ts");
-    // ── semantic.page.validate ─────────────────────────────────────────────────
-    registry.registerCommand({
+    declarations: [],
+  commands: [
+    {
       name: "semantic.page.validate",
       contract: "semantic",
       rules: [],
@@ -34,6 +36,10 @@ export const semanticModule: KernelModule = {
       scope: "app",
       reads: ["<app>/dist/llms/**"],
       execute: runSemanticPageValidate,
-    });
-  },
-};
+    }
+  ],
+  pipelines: [
+
+  ]};
+}
+;

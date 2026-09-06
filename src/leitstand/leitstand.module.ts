@@ -21,27 +21,32 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
+import type { ModuleExport } from "../runtime/desired-state.ts";
 
-export function createLeitstandModule(): KernelModule {
+export async function createLeitstandModule(): Promise<ModuleExport> {
+  const {
+    runLeitstandDevDeploy,
+    runLeitstandPropagate,
+    runLeitstandPromote,
+    runLeitstandStatus,
+    runLeitstandRollback,
+    runLeitstandHealth,
+    runLeitstandPipelineCheck,
+    runLeitstandHotfixDevDeploy,
+    runLeitstandVerify,
+  } = await import("./leitstand-commands.ts");
+  const { runLeitstandCertify } = await import("./certify.ts");
+  const { runLeitstandShip } = await import("./ship.ts");
+  const { runLeitstandServiceDevDeploy } = await import("./service-dev-deploy.ts");
+  const { runLeitstandServicePromote } = await import("./service-promote.ts");
+  const { runLeitstandAccessProtect, runLeitstandAccessUnprotect, runLeitstandAccessStatus } =
+    await import("./access-commands.ts");
   return {
     name: "leitstand",
     version: "0.1.0",
-    async register(registry) {
-      const {
-        runLeitstandDevDeploy,
-        runLeitstandPropagate,
-        runLeitstandPromote,
-        runLeitstandStatus,
-        runLeitstandRollback,
-        runLeitstandHealth,
-        runLeitstandPipelineCheck,
-        runLeitstandHotfixDevDeploy,
-        runLeitstandVerify,
-      } = await import("./leitstand-commands.ts");
-      const { runLeitstandCertify } = await import("./certify.ts");
-      const { runLeitstandShip } = await import("./ship.ts");
-      registry.registerCommand({
+    declarations: [],
+    commands: [
+      {
         name: "leitstand.dev-deploy",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -97,8 +102,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandDevDeploy,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.propagate",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -150,8 +155,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandPropagate,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.promote",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -207,8 +212,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandPromote,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.status",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
@@ -230,8 +235,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandStatus,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.rollback",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -269,8 +274,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandRollback,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.health",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
@@ -287,8 +292,8 @@ export function createLeitstandModule(): KernelModule {
         },
         cacheable: false,
         execute: runLeitstandHealth,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.verify",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
@@ -324,8 +329,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandVerify,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.pipeline.check",
         contract: "leitstand",
         rules: [],
@@ -350,8 +355,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandPipelineCheck,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.certify",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -412,11 +417,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandCertify,
-      });
-
-      const { runLeitstandServiceDevDeploy } = await import("./service-dev-deploy.ts");
-      const { runLeitstandServicePromote } = await import("./service-promote.ts");
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.service.dev-deploy",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -439,8 +441,8 @@ export function createLeitstandModule(): KernelModule {
         writes: ["services/registry.yaml"],
         reads: ["services/registry.yaml", "services/{service}/**"],
         execute: runLeitstandServiceDevDeploy,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.service.promote",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -463,11 +465,8 @@ export function createLeitstandModule(): KernelModule {
         writes: ["services/registry.yaml"],
         reads: ["services/registry.yaml", "services/{service}/**"],
         execute: runLeitstandServicePromote,
-      });
-
-      const { runLeitstandAccessProtect, runLeitstandAccessUnprotect, runLeitstandAccessStatus } =
-        await import("./access-commands.ts");
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.access.protect",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -497,8 +496,8 @@ export function createLeitstandModule(): KernelModule {
           "systems-cache/{system}/system-state.yaml",
         ],
         execute: runLeitstandAccessProtect,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.access.unprotect",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -524,8 +523,8 @@ export function createLeitstandModule(): KernelModule {
           "systems-cache/{system}/system-state.yaml",
         ],
         execute: runLeitstandAccessUnprotect,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.hotfix.dev-deploy",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -570,8 +569,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandHotfixDevDeploy,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.access.status",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
@@ -592,8 +591,8 @@ export function createLeitstandModule(): KernelModule {
         },
         reads: ["systems-cache/{system}/system-state.yaml"],
         execute: runLeitstandAccessStatus,
-      });
-      registry.registerCommand({
+      },
+      {
         name: "leitstand.ship",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
@@ -645,7 +644,8 @@ export function createLeitstandModule(): KernelModule {
         ],
         cacheable: false,
         execute: runLeitstandShip,
-      });
-    },
+      },
+    ],
+    pipelines: [],
   };
 }
