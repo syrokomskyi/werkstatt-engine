@@ -13,8 +13,8 @@ import {
 describe("extractWorkersDevUrl", () => {
   it("extracts workers.dev URL from wrangler output", () => {
     const stdout =
-      "Uploaded lagebild-sync-dev (1.2 sec)\n  https://lagebild-sync-dev.syrokomskyi.workers.dev\n";
-    expect(extractWorkersDevUrl(stdout)).toBe("https://lagebild-sync-dev.syrokomskyi.workers.dev");
+      "Uploaded matomo-proxy-dev (1.2 sec)\n  https://matomo-proxy-dev.syrokomskyi.workers.dev\n";
+    expect(extractWorkersDevUrl(stdout)).toBe("https://matomo-proxy-dev.syrokomskyi.workers.dev");
   });
 
   it("returns undefined when no workers.dev URL found", () => {
@@ -58,8 +58,8 @@ describe("parseEnvFile", () => {
 
 describe("flagString", () => {
   it("returns string value", () => {
-    expect(flagString({ flags: { service: "lagebild-sync" } } as never, "service")).toBe(
-      "lagebild-sync",
+    expect(flagString({ flags: { service: "matomo-proxy" } } as never, "service")).toBe(
+      "matomo-proxy",
     );
   });
 
