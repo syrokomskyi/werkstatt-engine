@@ -12,6 +12,7 @@
 <item>RFC-0866 fix D-2: writeDeploymentEffectRecord accepts optional deploymentUrl for effect-record URL discovery.</item>
 <item>Fix hardcoded systems-cache paths: writeDeploymentEffectRecord and resolveGateDecisionPath now accept cacheCloneDir directly. writeDeploymentEffectRecord commits+pushes to cache clone git after write.</item>
 <item>RFC-0926: buildEffectRecord and writeDeploymentEffectRecord accept optional workerVersionId and releaseId for release-aware rollback.</item>
+<item>Improve loadGateDecision missing-file error with actionable certify command hint.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -86,9 +87,26 @@ export interface AuthorizeFailure {
 
 export type AuthorizeOutcome = AuthorizeResult | AuthorizeFailure;
 
+function formatGateDecisionMissingHint(filePath: string): string {
+  try {
+    const basename = path.basename(filePath, ".json");
+    const gateMatch = basename.match(/-(dev|alt|main)$/);
+    const gate = gateMatch?.[1];
+    if (!gate) return "";
+    const releaseId = basename.slice(0, -(gate.length + 1));
+    const gateDecisionsDir = path.dirname(filePath);
+    const cacheCloneDir = path.dirname(gateDecisionsDir);
+    const systemId = path.basename(cacheCloneDir);
+    return ` — run: pnpm exec werkstatt run leitstand.certify --site ${systemId} --release ${releaseId} --gate ${gate}`;
+  } catch {
+    return "";
+  }
+}
+
 export async function loadGateDecision(filePath: string): Promise<GateDecisionV1> {
   if (!existsSync(filePath)) {
-    throw new Error(`[deploy] gate decision file not found: ${filePath}`);
+    const hint = formatGateDecisionMissingHint(filePath);
+    throw new Error(`[deploy] gate decision file not found: ${filePath}${hint}`);
   }
   const content = await fs.readFile(filePath, "utf8");
   const parsed = JSON.parse(content);
