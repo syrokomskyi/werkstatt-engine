@@ -17,6 +17,7 @@
 <item>RFC-0929: skip gate decisions with status=fail in tryReuseEvidence — only reuse evidence from passing decisions.</item>
 <item>RFC-0929: add pre-flight accessPin check — fail early with clear message if site has PIN protection active. --force does not bypass this check.</item>
 <item>RFC-0938: auto-manage access PIN during certify — auto-remove before producers, auto-restore in finally block. --auto-manage-pin flag (default true).</item>
+<item>Add PIN_DELETION_PROPAGATION_DELAY_MS constant and wait after auto-unprotect to prevent 401 race condition.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -54,6 +55,8 @@ import { evidenceEnvelopeV1Schema } from "../certification/contracts/evidence.ts
 import type { ReleaseCandidateV1 } from "../certification/contracts/candidate.ts";
 import type { CertificationPolicyBundleV1 } from "../certification/contracts/policy-bundle.ts";
 import { gateDecisionV1Schema } from "../certification/contracts/decisions.ts";
+
+const PIN_DELETION_PROPAGATION_DELAY_MS = 5000;
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -308,6 +311,12 @@ export async function runLeitstandCertify(
       } as unknown as KernelCommandResult<CertifyResult>;
     }
     pinRemoved = true;
+    // Cloudflare Workers may retain the deleted secret for a few seconds.
+    // Wait before running discovery to avoid 401 race condition.
+    console.info(
+      `[leitstand.certify] waiting ${PIN_DELETION_PROPAGATION_DELAY_MS / 1000}s for PIN deletion to propagate…`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, PIN_DELETION_PROPAGATION_DELAY_MS));
   } else if (recordedPin !== null && !autoManagePin) {
     // RFC-0929: fail-early when auto-manage is disabled
     const msg =
