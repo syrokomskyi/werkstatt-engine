@@ -28,6 +28,7 @@ RFC-0790: add systemConfigSchema, systemStateSchema, servicesRegistrySchema for 
   <item>RFC-0964: add fleet.canary field to systemConfigSchema for wave orchestration.</item>
   <item>RFC-0966: add passportRequired to systemStateSchema for passport enforcement gating.</item>
   <item>RFC-0967: add ownershipRequired to systemStateSchema for ownership enforcement gating.</item>
+  <item>RFC-1065: add lagebild to systemStateSchema for Lagebild connection metadata.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -168,6 +169,17 @@ export const systemStateSchema = z.object({
   // RFC-0967: Controls OWNERSHIP-01 warning vs blocking. false during rollout,
   // set to true per-site when ready for blocking enforcement.
   ownershipRequired: z.boolean().default(false),
+  // RFC-1065: Lagebild connection metadata. Undefined when not connected.
+  lagebild: z
+    .object({
+      connected: z.boolean(),
+      apiUrl: z.string(),
+      tenantId: z.string(),
+      sourceSystemId: z.string(),
+      connectedAt: z.string(),
+      channel: z.string(),
+    })
+    .optional(),
 });
 
 export const servicesRegistrySchema = z.object({
