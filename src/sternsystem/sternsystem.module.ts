@@ -18,24 +18,24 @@ import type { ModuleExport } from "../runtime/desired-state.ts";
 
 export async function createSternsystemModule(): Promise<ModuleExport> {
   const { runSternsystemRegister } = await import("./sternsystem-register.ts");
-      const { runSternsystemList } = await import("./sternsystem-list.ts");
-      const { runSternsystemValidate } = await import("./sternsystem-validate.ts");
-      const { runSternsystemPin } = await import("./sternsystem-pin.ts");
-      const { runSternsystemExtract } = await import("./sternsystem-extract.ts");
-      const { runSternsystemSync } = await import("./sternsystem-sync.ts");
-      const { runSternsystemStatus } = await import("./sternsystem-status.ts");
-      const { runSternsystemPassportGenerate } = await import("./sternsystem-passport-generate.ts");
-      const { runSternsystemPassportVerify } = await import("./sternsystem-passport-verify.ts");
-      const { runSurfaceContractValidate } = await import("../handoff/surface-contract.ts");
-      const { runSternsystemHandoverPrepare } = await import("./sternsystem-handover-prepare.ts");
-      const { runSternsystemHandoverComplete } = await import("./sternsystem-handover-complete.ts");
-      const { runSternsystemHandoverCancel } = await import("./sternsystem-handover-cancel.ts");
+  const { runSternsystemList } = await import("./sternsystem-list.ts");
+  const { runSternsystemValidate } = await import("./sternsystem-validate.ts");
+  const { runSternsystemPin } = await import("./sternsystem-pin.ts");
+  const { runSternsystemExtract } = await import("./sternsystem-extract.ts");
+  const { runSternsystemSync } = await import("./sternsystem-sync.ts");
+  const { runSternsystemStatus } = await import("./sternsystem-status.ts");
+  const { runSternsystemPassportGenerate } = await import("./sternsystem-passport-generate.ts");
+  const { runSternsystemPassportVerify } = await import("./sternsystem-passport-verify.ts");
+  const { runSurfaceContractValidate } = await import("../handoff/surface-contract.ts");
+  const { runSternsystemHandoverPrepare } = await import("./sternsystem-handover-prepare.ts");
+  const { runSternsystemHandoverComplete } = await import("./sternsystem-handover-complete.ts");
+  const { runSternsystemHandoverCancel } = await import("./sternsystem-handover-cancel.ts");
   return {
     name: "sternsystem",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "sternsystem.register",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -87,7 +87,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemRegister,
       },
-    {
+      {
         name: "sternsystem.list",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
@@ -98,7 +98,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system.pin.json"],
         execute: runSternsystemList,
       },
-    {
+      {
         name: "sternsystem.validate",
         contract: "sternsystem",
         rules: ["HANDOVER-01"],
@@ -118,7 +118,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           blocks: ["mission.materialize"],
         },
       },
-    {
+      {
         name: "sternsystem.pin",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -136,7 +136,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemPin,
       },
-    {
+      {
         name: "sternsystem.extract",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -154,7 +154,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemExtract,
       },
-    {
+      {
         name: "sternsystem.sync",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -179,7 +179,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemSync,
       },
-    {
+      {
         name: "sternsystem.status",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
@@ -193,12 +193,13 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         },
         reads: [
           "systems-cache/*/system-config.yaml",
+          "systems-cache/{id}/system-state.yaml",
           "systems-cache/{id}/bordbuch/events.ndjson",
           "missions/*/mission.yaml",
         ],
         execute: runSternsystemStatus,
       },
-    {
+      {
         name: "sternsystem.passport.generate",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -224,7 +225,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemPassportGenerate,
       },
-    {
+      {
         name: "sternsystem.passport.verify",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
@@ -248,7 +249,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         ],
         execute: runSternsystemPassportVerify,
       },
-    {
+      {
         name: "surface.contract.validate",
         contract: "surface",
         rules: [],
@@ -277,7 +278,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           blocks: ["release.prepare"],
         },
       },
-    {
+      {
         name: "sternsystem.handover.prepare",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -308,7 +309,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemHandoverPrepare,
       },
-    {
+      {
         name: "sternsystem.handover.complete",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -341,7 +342,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSternsystemHandoverComplete,
       },
-    {
+      {
         name: "sternsystem.handover.cancel",
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
@@ -356,9 +357,8 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         writes: ["../systems-cache/{id}/handover-authorization.json"],
         cacheable: false,
         execute: runSternsystemHandoverCancel,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

@@ -10,6 +10,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0477: initial sternsystem.status command handler.</item>
+  <item>RFC-1063: add currentMission from system-state.yaml to status output.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -23,6 +24,7 @@ import type {
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
 import {
   readSystemConfig,
+  readSystemState,
   resolveMirrors,
   resolveMirrorPath,
   resolveCacheClonePath,
@@ -51,8 +53,17 @@ export interface SternsystemStatusLastMission {
   reconciledAt: string | null;
 }
 
+export interface SternsystemStatusCurrentMission {
+  missionId: string;
+  brief: string;
+  state: string;
+  openedAt: string;
+  openedBy: string;
+}
+
 export interface SternsystemStatusData {
   systemId: string;
+  currentMission: SternsystemStatusCurrentMission | null;
   git: SternsystemStatusGit;
   bordbuch: SternsystemStatusBordbuch;
   lastMission: SternsystemStatusLastMission | null;
@@ -147,6 +158,34 @@ async function statusForSystem(
     }
   }
 
+  // Current mission from system-state.yaml (authoritative)
+  let currentMission: SternsystemStatusCurrentMission | null = null;
+  try {
+    const state = await readSystemState(workspaceRoot, systemId);
+    if (state.currentMission) {
+      try {
+        const manifest = await readMissionManifest(workspaceRoot, state.currentMission);
+        currentMission = {
+          missionId: state.currentMission,
+          brief: manifest.brief,
+          state: manifest.state,
+          openedAt: manifest.openedAt,
+          openedBy: manifest.openedBy,
+        };
+      } catch {
+        currentMission = {
+          missionId: state.currentMission,
+          brief: "unknown",
+          state: "unknown",
+          openedAt: "",
+          openedBy: "",
+        };
+      }
+    }
+  } catch {
+    currentMission = null;
+  }
+
   // Bordbuch events
   const entries = await readBordbuch(workspaceRoot, systemId);
   const lastEvents = entries.slice(-6);
@@ -185,6 +224,7 @@ async function statusForSystem(
 
   return {
     systemId,
+    currentMission,
     git: {
       headSha,
       originSha,
@@ -223,6 +263,7 @@ export async function runSternsystemStatus(
       } catch {
         results.push({
           systemId: config.id,
+          currentMission: null,
           git: {
             headSha: null,
             originSha: null,
@@ -255,9 +296,12 @@ export async function runSternsystemStatus(
       : status.git.originVsMirror === "unknown"
         ? "mirror unknown"
         : `mirror ${status.git.originVsMirror}`;
+  const missionInfo = status.currentMission
+    ? `mission=${status.currentMission.missionId} (${status.currentMission.state})`
+    : "no active mission";
   return {
     data: status,
-    summary: `[sternsystem.status] ${id}: HEAD=${status.git.headVsOrigin} origin, ${mirrorInfo}`,
+    summary: `[sternsystem.status] ${id}: ${missionInfo}, HEAD=${status.git.headVsOrigin} origin, ${mirrorInfo}`,
     nextSteps:
       status.git.headVsOrigin !== "sync" || status.git.originVsMirror !== "sync"
         ? [
