@@ -226,6 +226,10 @@
       "types": "./src/fleet/fleet.module.ts",
       "default": "./src/fleet/fleet.module.ts"
     },
+    "./lagebild-module": {
+      "types": "./src/lagebild/lagebild.module.ts",
+      "default": "./src/lagebild/lagebild.module.ts"
+    },
     "./subdomain-module": {
       "types": "./src/subdomain/subdomain.module.ts",
       "default": "./src/subdomain/subdomain.module.ts"
