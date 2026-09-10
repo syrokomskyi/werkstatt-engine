@@ -19,10 +19,10 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0899: Initial access protection commands.</item>
+  <item>RFC-1065: extracted runWranglerSecretPut/Delete to wrangler-secrets.ts shared helper.</item>
 </CHANGE_SUMMARY>
 */
 
-import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
@@ -37,6 +37,7 @@ import {
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
 import { sourceDotenv, filterEnv } from "./adapters/index.ts";
+import { runWranglerSecretPut, runWranglerSecretDelete } from "./adapters/wrangler-secrets.ts";
 
 type ChannelName = "dev" | "alt";
 
@@ -55,74 +56,6 @@ function validatePin(pin: string): void {
 
 function generateRandomPin(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-async function runWranglerSecretPut(
-  workerName: string,
-  pin: string,
-  env: Record<string, string | undefined>,
-  cwd: string,
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(
-      "npx",
-      ["--yes", "wrangler", "secret", "put", "ACCESS_PIN", "--name", workerName],
-      {
-        cwd,
-        env: { ...process.env, ...env },
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("error", () => {
-      resolve({ exitCode: 1, stdout, stderr: "Failed to spawn wrangler" });
-    });
-    child.on("exit", (code) => {
-      resolve({ exitCode: code ?? 1, stdout, stderr });
-    });
-    child.stdin.write(pin + "\n");
-    child.stdin.end();
-  });
-}
-
-async function runWranglerSecretDelete(
-  workerName: string,
-  env: Record<string, string | undefined>,
-  cwd: string,
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(
-      "npx",
-      ["--yes", "wrangler", "secret", "delete", "ACCESS_PIN", "--name", workerName],
-      {
-        cwd,
-        env: { ...process.env, ...env },
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("error", () => {
-      resolve({ exitCode: 1, stdout, stderr: "Failed to spawn wrangler" });
-    });
-    child.on("exit", (code) => {
-      resolve({ exitCode: code ?? 1, stdout, stderr });
-    });
-    child.stdin.end();
-  });
 }
 
 function flagString(input: KernelCommandInput, name: string): string | undefined {
@@ -165,7 +98,7 @@ export async function runLeitstandAccessProtect(
   const results: ChannelSecretResult[] = [];
 
   for (const ch of channels) {
-    const result = await runWranglerSecretPut(ch.workerName, pin, env, workspaceRoot);
+    const result = await runWranglerSecretPut(ch.workerName, "ACCESS_PIN", pin, env, workspaceRoot);
     const channelResult: ChannelSecretResult = {
       channel: ch.channel,
       workerName: ch.workerName,
@@ -228,7 +161,7 @@ export async function runLeitstandAccessUnprotect(
   const results: ChannelSecretResult[] = [];
 
   for (const ch of channels) {
-    const result = await runWranglerSecretDelete(ch.workerName, env, workspaceRoot);
+    const result = await runWranglerSecretDelete(ch.workerName, "ACCESS_PIN", env, workspaceRoot);
     const channelResult: ChannelSecretResult = {
       channel: ch.channel,
       workerName: ch.workerName,
