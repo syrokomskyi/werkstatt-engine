@@ -1113,6 +1113,44 @@ export async function runMissionValidate(
     };
   }
 
+  // RFC-1074: Persist distribution after successful full build so release.prepare can reuse it.
+  // mission.build already does this (lines 1293-1325); mission.validate must too — otherwise
+  // release.prepare always rebuilds (duplicate build.prepare + astro build + build.post, ~7 min).
+  try {
+    const distSrc = path.join(workpieceDir, "dist");
+    const distDest = path.join(distributionDir, "dist");
+    if (existsSync(distSrc)) {
+      if (existsSync(distDest)) {
+        await fs.rm(distDest, { recursive: true, force: true });
+      }
+      await copyDir(distSrc, distDest);
+    }
+    const { buildInputHash } = await computeBuildInputHash(workspaceRoot, workpieceDir);
+    await atomicWriteFile(
+      path.join(distributionDir, "build-input-hash.json"),
+      JSON.stringify({ buildInputHash, computedAt: new Date().toISOString() }, null, 2) + "\n",
+    );
+    const buildManifest = {
+      builtAt: validateCtx.now,
+      missionId,
+      systemId: manifest.systemId,
+      succeeded: true,
+      routeCount: validateCtx.routeCount,
+      sitemapHash: validateCtx.sitemapHash,
+    };
+    await atomicWriteFile(
+      path.join(distributionDir, "build-manifest.json"),
+      JSON.stringify(buildManifest, null, 2) + "\n",
+    );
+    logger.info(
+      `  Distribution persisted to missions/${missionId}/distribution/ (reusable by release.prepare)`,
+    );
+  } catch (err) {
+    logger.warn(
+      `  Distribution persist failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   // RFC-0976: auto-commit generated artifacts after successful validation.
   const dirtyCheck = autoCommitAfterValidation(
     workpieceDir,

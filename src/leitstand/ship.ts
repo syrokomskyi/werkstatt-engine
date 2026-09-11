@@ -406,7 +406,7 @@ export function buildShipPlan(input: {
         // Best-effort: archive the mission after shipping. Non-fatal on failure.
         try {
           const result = await runShipPhase(ctx, "mission.archive", [
-            `--mission=${ctx.missionId}`,
+            `--site=${ctx.systemId}`,
             `--status=closed`,
           ]);
           if (result.exitCode !== 0) {
