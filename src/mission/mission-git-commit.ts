@@ -48,6 +48,8 @@ export interface MissionGitCommitData {
 export interface ValidatorMapping {
   prefix: string;
   validator: string;
+  /** When true, runPreCommitValidation passes --scope-files with the changed files matching prefix. */
+  scoped?: boolean;
 }
 
 export interface PreCommitValidationResult {
@@ -64,6 +66,7 @@ export const VALIDATOR_MAPPINGS: ValidatorMapping[] = [
   { prefix: "src/content/business-profile/", validator: "pbp.content.validate" },
   { prefix: "src/content/pages/", validator: "semantic.drift.validate" },
   { prefix: "src/content/faq/", validator: "faq.validate" },
+  { prefix: "src/content/", validator: "typography.validate", scoped: true },
 ];
 
 function matchesPrefix(filePath: string, prefix: string): boolean {
@@ -96,12 +99,18 @@ export async function runPreCommitValidation(
   const validatorsRun: string[] = [];
 
   for (const validatorName of validatorsToRun) {
+    const mapping = VALIDATOR_MAPPINGS.find((m) => m.validator === validatorName);
+    const scopedFiles = mapping?.scoped
+      ? changedFiles.filter((f) => matchesPrefix(f, mapping.prefix))
+      : [];
+    const argv = scopedFiles.length > 0 ? ["--scope-files", scopedFiles.join(",")] : undefined;
     try {
       const execResult = await executeKernelCommand({
         workspaceRoot,
         commandName: validatorName,
         siteName: systemId,
         siteExplicit: true,
+        argv,
       });
       const single = Array.isArray(execResult) ? execResult[0] : execResult;
       const ok = single?.ok ?? false;
