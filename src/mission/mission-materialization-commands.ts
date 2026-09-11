@@ -41,6 +41,7 @@
   <item>RFC-0973: --force auto-clears kernel cache DB, pipeline cache hits, journal, and validation report before pipeline execution.</item>
   <item>RFC-1020: delete stale validation-report.json at the start of runMissionValidate to prevent mission.reconcile from reading a failed report from a previous run.</item>
   <item>RFC-1028: write .validation-state.json after mission.validate completes (pass, fail, and distribution-reuse paths) with per-validator states for inspection.</item>
+  <item>RFC-1074: extract persistDistribution helper — shared by runMissionValidate and runMissionBuild to copy dist, write build-input-hash.json, and write build-manifest.json.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -156,6 +157,56 @@ async function copyDir(src: string, dest: string): Promise<void> {
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
   return typeof v === "string" ? v : undefined;
+}
+
+// RFC-1074: Shared distribution persistence — used by both runMissionValidate and runMissionBuild.
+// Copies workpiece/dist to distribution/dist, writes build-input-hash.json (on success),
+// and writes build-manifest.json. Best-effort: caller wraps in try/catch if needed.
+async function persistDistribution(params: {
+  workspaceRoot: string;
+  workpieceDir: string;
+  distributionDir: string;
+  missionId: string;
+  systemId: string;
+  succeeded: boolean;
+  routeCount: number;
+  sitemapHash: string;
+  builtAt: string;
+  error?: string;
+}): Promise<void> {
+  const distSrc = path.join(params.workpieceDir, "dist");
+  const distDest = path.join(params.distributionDir, "dist");
+  if (existsSync(distSrc)) {
+    if (existsSync(distDest)) {
+      await fs.rm(distDest, { recursive: true, force: true });
+    }
+    await copyDir(distSrc, distDest);
+  }
+
+  if (params.succeeded) {
+    const { buildInputHash } = await computeBuildInputHash(
+      params.workspaceRoot,
+      params.workpieceDir,
+    );
+    await atomicWriteFile(
+      path.join(params.distributionDir, "build-input-hash.json"),
+      JSON.stringify({ buildInputHash, computedAt: new Date().toISOString() }, null, 2) + "\n",
+    );
+  }
+
+  const buildManifest = {
+    builtAt: params.builtAt,
+    missionId: params.missionId,
+    systemId: params.systemId,
+    succeeded: params.succeeded,
+    routeCount: params.routeCount,
+    sitemapHash: params.sitemapHash,
+    ...(params.error ? { error: params.error } : {}),
+  };
+  await atomicWriteFile(
+    path.join(params.distributionDir, "build-manifest.json"),
+    JSON.stringify(buildManifest, null, 2) + "\n",
+  );
 }
 
 // RFC-0976: Shared auto-commit logic for both distribution-reuse and full-build success paths.
@@ -1114,34 +1165,19 @@ export async function runMissionValidate(
   }
 
   // RFC-1074: Persist distribution after successful full build so release.prepare can reuse it.
-  // mission.build already does this (lines 1293-1325); mission.validate must too — otherwise
-  // release.prepare always rebuilds (duplicate build.prepare + astro build + build.post, ~7 min).
+  // Shared with runMissionBuild via persistDistribution helper.
   try {
-    const distSrc = path.join(workpieceDir, "dist");
-    const distDest = path.join(distributionDir, "dist");
-    if (existsSync(distSrc)) {
-      if (existsSync(distDest)) {
-        await fs.rm(distDest, { recursive: true, force: true });
-      }
-      await copyDir(distSrc, distDest);
-    }
-    const { buildInputHash } = await computeBuildInputHash(workspaceRoot, workpieceDir);
-    await atomicWriteFile(
-      path.join(distributionDir, "build-input-hash.json"),
-      JSON.stringify({ buildInputHash, computedAt: new Date().toISOString() }, null, 2) + "\n",
-    );
-    const buildManifest = {
-      builtAt: validateCtx.now,
+    await persistDistribution({
+      workspaceRoot,
+      workpieceDir,
+      distributionDir,
       missionId,
       systemId: manifest.systemId,
       succeeded: true,
       routeCount: validateCtx.routeCount,
       sitemapHash: validateCtx.sitemapHash,
-    };
-    await atomicWriteFile(
-      path.join(distributionDir, "build-manifest.json"),
-      JSON.stringify(buildManifest, null, 2) + "\n",
-    );
+      builtAt: validateCtx.now,
+    });
     logger.info(
       `  Distribution persisted to missions/${missionId}/distribution/ (reusable by release.prepare)`,
     );
@@ -1328,26 +1364,24 @@ export async function runMissionBuild(
   if (preliminaryBuildIdentityPath) {
     await cleanupPreliminaryBuildIdentity(preliminaryBuildIdentityPath);
   }
-  // Copy dist/ from workpiece to distribution/
-  const distSrc = path.join(workpieceDir, "dist");
-  const distDest = path.join(distributionDir, "dist");
-  if (existsSync(distSrc)) {
-    if (existsSync(distDest)) {
-      await fs.rm(distDest, { recursive: true, force: true });
-    }
-    await copyDir(distSrc, distDest);
-  }
-
-  // Write build-input-hash.json so release.prepare can reuse this distribution
-  if (buildSucceeded) {
-    const { buildInputHash } = await computeBuildInputHash(workspaceRoot, workpieceDir);
-    await atomicWriteFile(
-      path.join(distributionDir, "build-input-hash.json"),
-      JSON.stringify({ buildInputHash, computedAt: new Date().toISOString() }, null, 2) + "\n",
-    );
-  }
-
+  // RFC-1074: Shared with runMissionValidate via persistDistribution helper.
   const now = new Date().toISOString();
+  const distDest = path.join(distributionDir, "dist");
+  await persistDistribution({
+    workspaceRoot,
+    workpieceDir,
+    distributionDir,
+    missionId,
+    systemId: manifest.systemId,
+    succeeded: buildSucceeded,
+    routeCount: buildRouteCount,
+    sitemapHash: buildSitemapHash,
+    builtAt: now,
+    error: buildError,
+  });
+
+  const evidenceDir = path.join(missionDir, "evidence");
+  await fs.mkdir(evidenceDir, { recursive: true });
   const buildManifest = {
     builtAt: now,
     missionId,
@@ -1357,13 +1391,6 @@ export async function runMissionBuild(
     sitemapHash: buildSitemapHash,
     ...(buildError ? { error: buildError } : {}),
   };
-  await atomicWriteFile(
-    path.join(distributionDir, "build-manifest.json"),
-    JSON.stringify(buildManifest, null, 2) + "\n",
-  );
-
-  const evidenceDir = path.join(missionDir, "evidence");
-  await fs.mkdir(evidenceDir, { recursive: true });
   await atomicWriteFile(
     path.join(evidenceDir, "build-report.json"),
     JSON.stringify(buildManifest, null, 2) + "\n",
