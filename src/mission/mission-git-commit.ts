@@ -73,7 +73,7 @@ function matchesPrefix(filePath: string, prefix: string): boolean {
   return filePath.startsWith(prefix);
 }
 
-function selectValidators(changedFiles: string[]): string[] {
+export function selectValidators(changedFiles: string[]): string[] {
   const validators = new Set<string>();
   for (const file of changedFiles) {
     for (const mapping of VALIDATOR_MAPPINGS) {
