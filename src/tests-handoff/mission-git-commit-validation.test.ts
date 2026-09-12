@@ -87,6 +87,7 @@ test("prefix matching — business-profile and pages trigger correct validators"
   mockState.validatorResults = {
     "pbp.content.validate": { ok: true, exitCode: 0, summary: "pass" },
     "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
   };
   const result = await runPreCommitValidation(
     ["src/content/business-profile/de/offerings/automation.md", "src/content/pages/de/index.md"],
@@ -96,19 +97,23 @@ test("prefix matching — business-profile and pages trigger correct validators"
   expect(result.passed).toBe(true);
   expect(result.validatorsRun).toContain("pbp.content.validate");
   expect(result.validatorsRun).toContain("semantic.drift.validate");
-  expect(result.validatorsRun).toHaveLength(2);
+  expect(result.validatorsRun).toContain("typography.validate");
+  expect(result.validatorsRun).toHaveLength(3);
 });
 
 test("unregistered validator — skipped with warning, commit proceeds", async () => {
   const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
   mockState.throwNotRegistered = "faq.validate";
+  mockState.validatorResults = {
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
   const result = await runPreCommitValidation(
     ["src/content/faq/de/general.md"],
     "test-system",
     tmpWorkspace,
   );
   expect(result.passed).toBe(true);
-  expect(result.validatorsRun).toEqual([]);
+  expect(result.validatorsRun).toEqual(["typography.validate"]);
   expect(result.failures).toEqual([]);
 });
 

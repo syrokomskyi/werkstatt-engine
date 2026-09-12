@@ -84,7 +84,7 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
           summary: "pinned",
         };
       }
-      return { exitCode: 0, data: {}, summary: "ok" };
+      return { ok: true, exitCode: 0, data: {}, summary: "ok" };
     }),
   };
 });

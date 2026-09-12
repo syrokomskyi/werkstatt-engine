@@ -100,7 +100,7 @@ test("initialize: returns the pinned protocol version + serverInfo", async () =>
   expect(body.result).toEqual({
     protocolVersion: "2025-06-18",
     capabilities: { tools: {}, resources: {} },
-    serverInfo: { name: "test-bundle agent surface", version: "1.0.0" },
+    serverInfo: { name: "test-bundle agent surface", version: "1.1.0" },
   });
 });
 
