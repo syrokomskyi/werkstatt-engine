@@ -72,6 +72,7 @@ import type {
 } from "./adapter.ts";
 import {
   createCloudflareWorkersAdapter,
+  createGitHubPagesAdapter,
   readBehaviorSnapshot,
   sourceDotenv,
   filterEnv,
@@ -174,6 +175,7 @@ const nullAdapter: DeploymentAdapter = {
 function resolveAdapter(name: string | undefined): DeploymentAdapter {
   if (!name || name === "null") return nullAdapter;
   if (name === "cloudflare-workers") return createCloudflareWorkersAdapter();
+  if (name === "github-pages") return createGitHubPagesAdapter();
   throw new Error(`[leitstand] adapter-not-implemented: '${name}' has no concrete implementation`);
 }
 

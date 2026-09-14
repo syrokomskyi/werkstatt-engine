@@ -174,6 +174,10 @@
       "types": "./src/leitstand/adapters/cloudflare-workers.ts",
       "default": "./src/leitstand/adapters/cloudflare-workers.ts"
     },
+    "./leitstand/adapters/github-pages": {
+      "types": "./src/leitstand/adapters/github-pages.ts",
+      "default": "./src/leitstand/adapters/github-pages.ts"
+    },
     "./notausgang": {
       "types": "./src/notausgang/index.ts",
       "default": "./src/notausgang/index.ts"
