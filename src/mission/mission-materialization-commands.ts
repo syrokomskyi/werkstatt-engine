@@ -425,6 +425,7 @@ export interface PreviousValidationReport {
     failedSteps: Array<{ name: string; exitCode: number }>;
   };
   distributionReused: boolean;
+  buildInputHash: string | null;
   fullBuildRan: boolean;
   validatedAt: string;
 }
@@ -700,8 +701,8 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
               sitemapHash: c.sitemapHash,
               failedSteps: [],
             },
-            distributionReused: false,
-            buildInputHash: null,
+            distributionReused: c.previousReport.distributionReused,
+            buildInputHash: c.previousReport.buildInputHash,
             fullBuildRan: false,
             validatedAt: c.now,
           };
