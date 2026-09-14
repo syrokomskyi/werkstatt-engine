@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0379: initial adapter registry re-export.</item>
+  <item>RFC-1091: re-export shared health-check helpers from health-helpers.ts.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -15,4 +16,7 @@ export {
   filterEnv,
   sourceDotenv,
   readBehaviorSnapshot,
+  verifyRedirectRoute,
 } from "./cloudflare-workers.ts";
+
+export { selectProbeRoutes, fetchWithRetry, createDefaultCommandRunner } from "./health-helpers.ts";
