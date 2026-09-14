@@ -29,6 +29,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", ...quarantinedExcludes],
     testTimeout: 30_000,
+    poolOptions: { forks: { maxWorkers: "50%" } },
     coverage: {
       provider: "v8",
       reporter: ["json", "json-summary", "text-summary", "html"],
