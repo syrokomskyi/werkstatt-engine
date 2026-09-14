@@ -165,6 +165,59 @@ describe("propagate", () => {
     const result = await adapter.propagate(input);
     expect(result.state).toBe("failed");
   });
+
+  test("propagate reads GH_TOKEN from secretsFilePath when process.env has none", async () => {
+    delete process.env.GH_TOKEN;
+    const secretsFile = join(tmpDir, ".env");
+    writeFileSync(secretsFile, "GH_TOKEN=token-from-secrets-file\n");
+    const mockRunner: CommandRunner = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      stdout: "Published",
+      stderr: "",
+    });
+    const adapter = createGitHubPagesAdapter(mockRunner);
+    const input: PropagateInput = {
+      systemId: "test-system",
+      releaseId: "rel-001",
+      channel: "main",
+      distPath,
+      workerName: "owner/repo",
+      url: "https://owner.github.io/repo",
+      secretsFilePath: secretsFile,
+      expectedBehaviorSnapshotHash: "",
+    };
+    const result = await adapter.propagate(input);
+    expect(result.state).toBe("succeeded");
+    expect(mockRunner).toHaveBeenCalled();
+    const [, , opts] = vi.mocked(mockRunner).mock.calls[0];
+    expect(opts?.env?.GH_TOKEN).toBe("token-from-secrets-file");
+  });
+
+  test("secretsFilePath overrides process.env GH_TOKEN", async () => {
+    process.env.GH_TOKEN = "env-token";
+    const secretsFile = join(tmpDir, ".env");
+    writeFileSync(secretsFile, "GH_TOKEN=secrets-file-token\n");
+    const mockRunner: CommandRunner = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      stdout: "Published",
+      stderr: "",
+    });
+    const adapter = createGitHubPagesAdapter(mockRunner);
+    const input: PropagateInput = {
+      systemId: "test-system",
+      releaseId: "rel-001",
+      channel: "main",
+      distPath,
+      workerName: "owner/repo",
+      url: "https://owner.github.io/repo",
+      secretsFilePath: secretsFile,
+      expectedBehaviorSnapshotHash: "",
+    };
+    const result = await adapter.propagate(input);
+    expect(result.state).toBe("succeeded");
+    const [, , opts] = vi.mocked(mockRunner).mock.calls[0];
+    expect(opts?.env?.GH_TOKEN).toBe("secrets-file-token");
+  });
 });
 
 describe("health", () => {

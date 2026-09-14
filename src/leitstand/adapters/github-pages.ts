@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1091: initial github-pages adapter with injectable CommandRunner, GH_TOKEN from filterEnv(process.env), health checks via shared health-helpers.</item>
+  <item>RFC-1091: source GH_TOKEN from secretsFilePath (workpiece .env) like cloudflare-workers adapter.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,6 +27,7 @@ import type {
 } from "../adapter.ts";
 import {
   filterEnv,
+  sourceDotenv,
   readBehaviorSnapshot,
   verifyRedirectRoute,
   selectProbeRoutes,
@@ -66,7 +68,8 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
     async propagate(input: PropagateInput): Promise<PropagationResult> {
       const now = new Date().toISOString();
 
-      const env = filterEnv(process.env);
+      const secretsEnv = input.secretsFilePath ? await sourceDotenv(input.secretsFilePath) : {};
+      const env = { ...filterEnv(process.env), ...secretsEnv };
       const token = env.GH_TOKEN;
       if (!token) {
         return {
