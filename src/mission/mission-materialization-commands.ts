@@ -480,6 +480,24 @@ export interface ValidateStepCtx {
   now: string;
 }
 
+// RFC-1086: create a minimally valid KernelPipelineReport for skipped phases
+function makeSkippedPipelineReport(pipelineName: string): KernelPipelineReport {
+  return {
+    pipelineName,
+    exitCode: 0,
+    ok: true,
+    steps: [],
+    timing: {
+      pipeline: pipelineName,
+      totalDurationMs: 0,
+      stepCount: 0,
+      slowestSteps: [],
+      timeoutCount: 0,
+      warningCount: 0,
+    },
+  };
+}
+
 // RFC-0958: buildValidateSteps — journaled steps for mission.validate build cycle
 export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<ValidateStepCtx>[] {
   return [
@@ -489,7 +507,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
         // RFC-1086: skip build.prepare if --fast and previous report shows it passed
         if (c.fast && c.previousReport && c.previousReport.contractFull.passed) {
           c.logger.info("  Skipping build.prepare (passed in previous run)");
-          c.prepareReport = { ok: true, steps: [] } as unknown as KernelPipelineReport;
+          c.prepareReport = makeSkippedPipelineReport("build.prepare");
           return;
         }
         c.cascadeRerun = true;
@@ -560,7 +578,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
           c.previousReport.build.failedSteps.length === 0
         ) {
           c.logger.info("  Skipping build.check (passed in previous run)");
-          c.pipelineReport = { ok: true, steps: [] } as unknown as KernelPipelineReport;
+          c.pipelineReport = makeSkippedPipelineReport("build.check");
           c.staticPassed = true;
           return;
         }
