@@ -14,12 +14,18 @@
   <item>RFC-0666: remove secretRefSchema and SecretRef (dead code); change secretsFile field to z.string().optional() for detection (sternsystem.validate rejects any value).</item>
   <item>RFC-0790: add deploymentStaticConfigSchema (adapter + channels only, no lastPropagated) for system-config.yaml.</item>
   <item>RFC-0926: add optional workerVersionId to propagationResultSchema and lastPropagatedChannelSchema for release-aware rollback.</item>
+  <item>RFC-1091: add github-pages to deploymentAdapterNameSchema enum.</item>
 </CHANGE_SUMMARY>
 */
 
 import { z } from "zod";
 
-export const deploymentAdapterNameSchema = z.enum(["cloudflare-workers", "netlify", "null"]);
+export const deploymentAdapterNameSchema = z.enum([
+  "cloudflare-workers",
+  "github-pages",
+  "netlify",
+  "null",
+]);
 
 export const deploymentChannelSchema = z.object({
   workerName: z.string(),
