@@ -110,7 +110,7 @@ describe("propagate", () => {
     };
     const result = await adapter.propagate(input);
     expect(mockRunner).toHaveBeenCalled();
-    const [cmd, args] = mockRunner.mock.calls[0];
+    const [cmd, args] = vi.mocked(mockRunner).mock.calls[0];
     expect(cmd).toBe("npx");
     expect(args).toContain("gh-pages");
     expect(args).toContain("-d");
