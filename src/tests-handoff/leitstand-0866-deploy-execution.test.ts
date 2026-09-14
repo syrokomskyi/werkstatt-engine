@@ -8,8 +8,8 @@
 </CHANGE_SUMMARY>
 */
 
-import { test, expect } from "vitest";
-import { mkdirSync, rmSync } from "node:fs";
+import { test, expect, vi } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,6 +22,17 @@ import type {
   RollbackResult,
   HealthInput,
 } from "../leitstand/adapter.ts";
+
+vi.mock("../leitstand/leitstand-commands.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../leitstand/leitstand-commands.ts")>();
+  return {
+    ...actual,
+    verifyFreshness: vi.fn().mockResolvedValue({
+      verified: false,
+      cdnDistTreeHash: null,
+    }),
+  };
+});
 import type { PropagationResult, HealthCheck } from "@warpgogol/werkstatt-engine/schemas";
 import type { AuthorizeResult } from "../leitstand/deploy-helpers.ts";
 import type { DeploymentStaticConfig } from "@warpgogol/werkstatt-engine/schemas";
@@ -131,6 +142,7 @@ function makeWorkspace(): string {
   const tmp = mkdtempSync(join(tmpdir(), "leitstand-test-"));
   // Clean up any stale systems-cache from previous test runs
   rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  writeFileSync(join(tmp, "package.json"), JSON.stringify({ version: "1.0.0" }) + "\n");
   const distDir = join(tmp, "releases", "r000001", "dist", "client");
   mkdirSync(distDir, { recursive: true });
   return tmp;
