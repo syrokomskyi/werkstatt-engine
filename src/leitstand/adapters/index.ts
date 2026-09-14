@@ -19,4 +19,6 @@ export {
   verifyRedirectRoute,
 } from "./cloudflare-workers.ts";
 
+export { createGitHubPagesAdapter } from "./github-pages.ts";
+
 export { selectProbeRoutes, fetchWithRetry, createDefaultCommandRunner } from "./health-helpers.ts";
