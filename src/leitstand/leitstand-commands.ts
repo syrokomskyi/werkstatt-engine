@@ -170,6 +170,9 @@ const nullAdapter: DeploymentAdapter = {
   getLimits() {
     return { maxTotalSize: Infinity, maxFileSize: Infinity };
   },
+  purgeCapable() {
+    return false;
+  },
 };
 
 function resolveAdapter(name: string | undefined): DeploymentAdapter {

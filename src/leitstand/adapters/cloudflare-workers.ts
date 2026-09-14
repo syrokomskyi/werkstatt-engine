@@ -196,6 +196,10 @@ export function createCloudflareWorkersAdapter(exec?: CommandRunner): Deployment
       return { maxTotalSize: 20 * 1024 * 1024 * 1024, maxFileSize: 25 * 1024 * 1024 };
     },
 
+    purgeCapable() {
+      return true;
+    },
+
     async health(
       input: HealthInput,
     ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }> {

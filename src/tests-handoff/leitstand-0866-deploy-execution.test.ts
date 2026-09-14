@@ -60,6 +60,9 @@ const nullAdapter: DeploymentAdapter = {
   getLimits() {
     return { maxTotalSize: 100 * 1024 * 1024, maxFileSize: 10 * 1024 * 1024 };
   },
+  purgeCapable() {
+    return false;
+  },
 };
 
 const systemConfig: DeploymentStaticConfig = {

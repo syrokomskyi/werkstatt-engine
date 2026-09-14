@@ -12,6 +12,7 @@
   <item>RFC-0587: add DeploymentLimits interface and getLimits() method for adapter-declared size limits.</item>
   <item>RFC-0627: extend channel type to include "dev" for the three-channel deployment chain.</item>
   <item>RFC-0926: add optional versionId to RollbackInput and rolledBackToVersionId to RollbackResult for release-aware rollback.</item>
+  <item>RFC-1092: add required purgeCapable() method to DeploymentAdapter for adapter-aware CDN purge.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -78,4 +79,5 @@ export interface DeploymentAdapter {
     input: HealthInput,
   ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }>;
   getLimits(): DeploymentLimits;
+  purgeCapable(): boolean;
 }

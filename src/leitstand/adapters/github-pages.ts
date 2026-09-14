@@ -155,7 +155,8 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
         startedAt: now,
         completedAt: new Date().toISOString(),
         stdout: "",
-        stderr: "GitHub Pages does not support version-level rollback. Re-deploy a previous release through the standard pipeline.",
+        stderr:
+          "GitHub Pages does not support version-level rollback. Re-deploy a previous release through the standard pipeline.",
       };
     },
 
@@ -164,6 +165,10 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
         maxTotalSize: 1 * 1024 * 1024 * 1024,
         maxFileSize: 100 * 1024 * 1024,
       };
+    },
+
+    purgeCapable() {
+      return false;
     },
 
     async health(

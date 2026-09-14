@@ -15,6 +15,7 @@
 <item>RFC-0925: read accessPin from system-state.yaml, build authHeaders, pass to verifyFreshness and health checks for access-protected staging channels.</item>
 <item>RFC-0931: insert signing phase between build-identity write and wrangler-deploy; add releaseSignResult to DeployExecutionResult.</item>
 <item>RFC-0948: add post-deploy feature smoke check — fetches a page from the deployed URL and checks for feature markers in HTML. Non-fatal, warnings only.</item>
+<item>RFC-1092: replace hardcoded github-pages purge skip with adapter-aware purgeCapable() check.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -440,9 +441,7 @@ export async function executeDeployPhases(
     const actualDeploymentUrl = propagateResult.deploymentUrl || deploymentUrl;
 
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
-      // RFC-1091: skip CDN purge for github-pages adapter (no CDN cache).
-      // Remove when RFC-1092 provides adapter-aware purge mechanism.
-      if (ctx.adapter.name !== "github-pages") {
+      if (ctx.adapter.purgeCapable()) {
         try {
           purgeResult = await runPurgeStep(
             ctx.workspaceRoot,
