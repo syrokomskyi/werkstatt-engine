@@ -42,6 +42,7 @@
   <item>RFC-1020: delete stale validation-report.json at the start of runMissionValidate to prevent mission.reconcile from reading a failed report from a previous run.</item>
   <item>RFC-1028: write .validation-state.json after mission.validate completes (pass, fail, and distribution-reuse paths) with per-validator states for inspection.</item>
   <item>RFC-1074: extract persistDistribution helper — shared by runMissionValidate and runMissionBuild to copy dist, write build-input-hash.json, and write build-manifest.json.</item>
+  <item>RFC-1086: add --fast flag to mission.validate for incremental validation — reads previous validation-report.json, skips passed phases, cascades re-run of downstream phases.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -409,6 +410,45 @@ function buildValidateNextSteps(
       ];
 }
 
+// RFC-1086: PreviousValidationReport — subset of validation-report.json read by --fast
+export interface PreviousValidationReport {
+  schemaVersion: string;
+  missionId: string;
+  contractFull: {
+    passed: boolean;
+    validators: Array<{ name: string; status: "pass" | "fail"; exitCode: number }>;
+  };
+  build: {
+    succeeded: boolean;
+    routeCount: number;
+    sitemapHash: string;
+    failedSteps: Array<{ name: string; exitCode: number }>;
+  };
+  distributionReused: boolean;
+  fullBuildRan: boolean;
+  validatedAt: string;
+}
+
+// RFC-1086: read and parse the previous validation-report.json
+export async function readPreviousValidationReport(
+  evidenceDir: string,
+): Promise<PreviousValidationReport | null> {
+  const reportPath = path.join(evidenceDir, "validation-report.json");
+  try {
+    const raw = await fs.readFile(reportPath, "utf8");
+    return JSON.parse(raw) as PreviousValidationReport;
+  } catch {
+    return null;
+  }
+}
+
+// RFC-1086: check if all 4 phases passed in the previous report
+export function isPreviousReportAllPassed(report: PreviousValidationReport): boolean {
+  return (
+    report.contractFull.passed && report.build.succeeded && report.build.failedSteps.length === 0
+  );
+}
+
 // RFC-0958: ValidateStepCtx — mutable context for journaled validate steps
 export interface ValidateStepCtx {
   workspaceRoot: string;
@@ -422,6 +462,9 @@ export interface ValidateStepCtx {
   skipContentRegression: boolean;
   autoAcceptRegression: boolean;
   force: boolean;
+  fast: boolean;
+  previousReport: PreviousValidationReport | null;
+  cascadeRerun: boolean;
   prepareReport: KernelPipelineReport | null;
   pipelineReport: KernelPipelineReport | null;
   staticPassed: boolean;
@@ -443,6 +486,13 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
     {
       name: "build-prepare",
       run: async (c: ValidateStepCtx) => {
+        // RFC-1086: skip build.prepare if --fast and previous report shows it passed
+        if (c.fast && c.previousReport && c.previousReport.contractFull.passed) {
+          c.logger.info("  Skipping build.prepare (passed in previous run)");
+          c.prepareReport = { ok: true, steps: [] } as KernelPipelineReport;
+          return;
+        }
+        c.cascadeRerun = true;
         c.logger.info(`  Running build.prepare pipeline for ${c.manifest.systemId}…`);
         const prepareResult = await executeKernelPipeline({
           workspaceRoot: c.workspaceRoot,
@@ -502,6 +552,19 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
     {
       name: "build-check",
       run: async (c: ValidateStepCtx) => {
+        // RFC-1086: skip build.check if --fast, no cascade, and previous report shows it passed
+        if (
+          c.fast &&
+          !c.cascadeRerun &&
+          c.previousReport &&
+          c.previousReport.build.failedSteps.length === 0
+        ) {
+          c.logger.info("  Skipping build.check (passed in previous run)");
+          c.pipelineReport = { ok: true, steps: [] } as KernelPipelineReport;
+          c.staticPassed = true;
+          return;
+        }
+        c.cascadeRerun = true;
         c.logger.info(`  Running build.check pipeline for ${c.manifest.systemId}…`);
         const pipelineFlags: Record<string, boolean> = {};
         if (c.skipContentRegression) pipelineFlags["skip-content-regression"] = true;
@@ -530,6 +593,16 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
       name: "astro-build",
       run: async (c: ValidateStepCtx) => {
         if (!c.staticPassed) return;
+
+        // RFC-1086: skip astro build if --fast, no cascade, and previous report shows it passed
+        if (c.fast && !c.cascadeRerun && c.previousReport && c.previousReport.build.succeeded) {
+          c.logger.info("  Skipping astro build (passed in previous run)");
+          c.buildSucceeded = true;
+          c.routeCount = c.previousReport.build.routeCount;
+          c.sitemapHash = c.previousReport.build.sitemapHash;
+          return;
+        }
+        c.cascadeRerun = true;
 
         // RFC-0615: clean stale dist/ before build to prevent false positives
         const distDir = path.join(c.workpieceDir, "dist");
@@ -591,6 +664,35 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
     {
       name: "build-post",
       run: async (c: ValidateStepCtx) => {
+        // RFC-1086: skip build.post if --fast, no cascade, and previous report shows build succeeded
+        if (c.fast && !c.cascadeRerun && c.previousReport && c.previousReport.build.succeeded) {
+          c.logger.info("  Skipping build.post (passed in previous run)");
+          // Still need to write the validation report
+          c.now = new Date().toISOString();
+          const report = {
+            schemaVersion: "1.0.0",
+            missionId: c.missionId,
+            contractFull: {
+              passed: true,
+              validators: c.previousReport.contractFull.validators,
+            },
+            build: {
+              succeeded: true,
+              routeCount: c.routeCount,
+              sitemapHash: c.sitemapHash,
+              failedSteps: [],
+            },
+            distributionReused: false,
+            buildInputHash: null,
+            fullBuildRan: false,
+            validatedAt: c.now,
+          };
+          await atomicWriteFile(
+            path.join(c.evidenceDir, "validation-report.json"),
+            JSON.stringify(report, null, 2) + "\n",
+          );
+          return;
+        }
         // RFC-0356: run build.post after astro build — only when static checks passed
         if (c.staticPassed) {
           if (c.buildSucceeded) {
@@ -742,12 +844,73 @@ export async function runMissionValidate(
   const distributionDir = path.join(missionDir, "distribution");
   await fs.mkdir(evidenceDir, { recursive: true });
 
+  // RFC-1086: parse --fast flag — mutually exclusive with --force
+  const fast = input.flags.fast === true;
+  const force = input.flags.force === true;
+  if (fast && force) {
+    return {
+      data: {
+        missionId,
+        contractFull: { passed: false, validators: [] },
+        build: { succeeded: false, routeCount: 0, sitemapHash: "sha256:invalid" },
+        distributionReused: false,
+        buildInputHash: null,
+        fullBuildRan: false,
+        validatedAt: new Date().toISOString(),
+      } as unknown as MissionValidateData,
+      exitCode: 1,
+      summary: "[mission.validate] --fast and --force are mutually exclusive",
+    };
+  }
+
+  // RFC-1086: read previous validation-report.json BEFORE deletion (when --fast is set)
+  let previousReport: PreviousValidationReport | null = null;
+  let effectiveFast = fast;
+  if (fast) {
+    previousReport = await readPreviousValidationReport(evidenceDir);
+    if (previousReport === null) {
+      logger.warn("  No previous validation report found — running full validation.");
+      effectiveFast = false;
+    } else if (previousReport.missionId !== missionId) {
+      logger.warn(
+        "  Previous validation report is for a different mission — running full validation.",
+      );
+      effectiveFast = false;
+      previousReport = null;
+    } else if (isPreviousReportAllPassed(previousReport)) {
+      // All phases passed — short-circuit, do NOT overwrite the existing report
+      logger.info("  All phases passed in previous report — skipping validation.");
+      const staleEntryWarnings = validateNoStaleMissionEntries(workspaceRoot);
+      if (staleEntryWarnings.length > 0) {
+        for (const w of staleEntryWarnings) {
+          logger.warn(`  [stale-entry] ${w.path}: ${w.message}`);
+        }
+      }
+      await writeValidationState(workspaceRoot, {
+        missionId,
+        lastValidatedAt: previousReport.validatedAt,
+        lastValidationStatus: "pass",
+        validatorStates: [],
+      });
+      return {
+        data: {
+          ...previousReport,
+          staleEntryWarnings,
+        } as unknown as MissionValidateData,
+        summary: `[mission.validate] ${missionId} validation passed (all phases passed in previous report — skipped)`,
+      };
+    }
+  }
+
   // RFC-1020: Delete stale validation report from any previous run.
   // This prevents mission.reconcile from reading a failed report after a successful re-validate.
   // The report is always rewritten by the validate step (success or failure), so deleting it
   // upfront is safe — a fresh report will be written by the end of this run.
+  // RFC-1086: guard deletion when --fast is active so the previous report can be read.
   const validationReportPath = path.join(evidenceDir, "validation-report.json");
-  await fs.unlink(validationReportPath).catch(() => {});
+  if (!effectiveFast) {
+    await fs.unlink(validationReportPath).catch(() => {});
+  }
 
   // RFC-0724: Auto-commit dirty bordbuch files on all paths (not just reuse).
   // This prevents dirty bordbuch projection files from blocking the pipeline.
@@ -766,8 +929,8 @@ export async function runMissionValidate(
 
   // RFC-0635: check if distribution can be reused by comparing build-input-hash.
   // If the hash matches and distribution/dist/ exists, skip the entire build cycle.
-  const force = input.flags.force === true;
-  if (!force) {
+  // RFC-1086: --fast skips distribution reuse — it needs to run the pipeline phases.
+  if (!force && !effectiveFast) {
     const distributionMetaPath = path.join(distributionDir, "build-input-hash.json");
     const distributionDistDir = path.join(distributionDir, "dist");
     if (existsSync(distributionMetaPath) && existsSync(distributionDistDir)) {
@@ -1000,6 +1163,9 @@ export async function runMissionValidate(
     skipContentRegression,
     autoAcceptRegression,
     force,
+    fast: effectiveFast,
+    previousReport,
+    cascadeRerun: false,
     prepareReport: null,
     pipelineReport: null,
     staticPassed: false,
