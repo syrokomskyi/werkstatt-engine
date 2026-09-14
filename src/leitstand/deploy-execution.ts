@@ -440,20 +440,24 @@ export async function executeDeployPhases(
     const actualDeploymentUrl = propagateResult.deploymentUrl || deploymentUrl;
 
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
-      try {
-        purgeResult = await runPurgeStep(
-          ctx.workspaceRoot,
-          ctx.releaseId ?? "",
-          actualDeploymentUrl,
-          ctx.secretsFilePath,
-        );
-        if (channel !== "dev" && !purgeResult.success) {
-          failingPhase = "cache-purge";
-          throw new Error(`CDN cache purge failed: ${purgeResult.error ?? "unknown"}`);
+      // RFC-1091: skip CDN purge for github-pages adapter (no CDN cache).
+      // Remove when RFC-1092 provides adapter-aware purge mechanism.
+      if (ctx.adapter.name !== "github-pages") {
+        try {
+          purgeResult = await runPurgeStep(
+            ctx.workspaceRoot,
+            ctx.releaseId ?? "",
+            actualDeploymentUrl,
+            ctx.secretsFilePath,
+          );
+          if (channel !== "dev" && !purgeResult.success) {
+            failingPhase = "cache-purge";
+            throw new Error(`CDN cache purge failed: ${purgeResult.error ?? "unknown"}`);
+          }
+        } catch (err) {
+          if (channel !== "dev") throw err;
+          // Dev channel: purge failure is non-fatal
         }
-      } catch (err) {
-        if (channel !== "dev") throw err;
-        // Dev channel: purge failure is non-fatal
       }
     }
 
