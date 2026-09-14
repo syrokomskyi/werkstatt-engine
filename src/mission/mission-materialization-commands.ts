@@ -489,7 +489,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
         // RFC-1086: skip build.prepare if --fast and previous report shows it passed
         if (c.fast && c.previousReport && c.previousReport.contractFull.passed) {
           c.logger.info("  Skipping build.prepare (passed in previous run)");
-          c.prepareReport = { ok: true, steps: [] } as KernelPipelineReport;
+          c.prepareReport = { ok: true, steps: [] } as unknown as KernelPipelineReport;
           return;
         }
         c.cascadeRerun = true;
@@ -560,7 +560,7 @@ export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<Validate
           c.previousReport.build.failedSteps.length === 0
         ) {
           c.logger.info("  Skipping build.check (passed in previous run)");
-          c.pipelineReport = { ok: true, steps: [] } as KernelPipelineReport;
+          c.pipelineReport = { ok: true, steps: [] } as unknown as KernelPipelineReport;
           c.staticPassed = true;
           return;
         }
