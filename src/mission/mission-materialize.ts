@@ -32,6 +32,7 @@
   <item>Increase pnpm install timeout from 120s to 300s — prevents ETIMEDOUT on workspaces with many packages.</item>
   <item>Add stop-stale-dev-servers step — SIGTERM astro dev processes under missions/ before pnpm install, preventing orphaned dev servers from previous missions.</item>
   <item>Add post-install-version-check step — verifies installed dep versions satisfy workpiece ~/^ pins after pnpm install. Catches stale lockfile entries where a caret pin in an archived mission pulled a newer version than the tilde pin in the active workpiece.</item>
+  <item>RFC-1093 (fo-fix): replace inline WG_ADAPTER_BLOCK IIFE with resolveAdapterBlock(stagingDir) from adapter-config.ts.</item>
 </CHANGE_SUMMARY>
 */
 
