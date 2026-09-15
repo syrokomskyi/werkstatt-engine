@@ -318,7 +318,7 @@ async function generateFullBoilerplate(
     generateWorkpiecePackageJson,
     readTemplateFields,
     resolveBasePath,
-    resolveDeployAdapter,
+    resolveAdapterBlock,
   } = onboardingMod;
   const { runEnvExampleGenerate } = checksMod;
 
@@ -374,19 +374,7 @@ async function generateFullBoilerplate(
               return base ? `  base: "${base}",` : "";
             })(),
           )
-          .replace(
-            "// WG_ADAPTER_BLOCK",
-            (() => {
-              const adapter = resolveDeployAdapter(stagingDir);
-              if (adapter === "github-pages" || adapter === "null") {
-                return "";
-              }
-              return `adapter: cloudflare({
-          imageService: "cloudflare",
-          prerenderEnvironment: "node",
-        }),`;
-            })(),
-          ),
+          .replace("// WG_ADAPTER_BLOCK", resolveAdapterBlock(stagingDir)),
         tokens,
       ),
     },
