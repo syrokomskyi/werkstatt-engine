@@ -318,6 +318,7 @@ async function generateFullBoilerplate(
     generateWorkpiecePackageJson,
     readTemplateFields,
     resolveBasePath,
+    resolveDeployAdapter,
   } = onboardingMod;
   const { runEnvExampleGenerate } = checksMod;
 
@@ -354,6 +355,7 @@ async function generateFullBoilerplate(
     workspaceRoot: context.workspaceRoot,
     siteId: systemId,
     templateFields: readTemplateFields(),
+    workpieceDir: stagingDir,
   });
   const templateFiles: Array<{ dest: string; content: string }> = [
     { dest: "package.json", content: generatedPkgJson },
@@ -370,6 +372,19 @@ async function generateFullBoilerplate(
             (() => {
               const base = resolveBasePath(stagingDir);
               return base ? `  base: "${base}",` : "";
+            })(),
+          )
+          .replace(
+            "// WG_ADAPTER_BLOCK",
+            (() => {
+              const adapter = resolveDeployAdapter(stagingDir);
+              if (adapter === "github-pages" || adapter === "null") {
+                return "";
+              }
+              return `adapter: cloudflare({
+          imageService: "cloudflare",
+          prerenderEnvironment: "node",
+        }),`;
             })(),
           ),
         tokens,
