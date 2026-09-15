@@ -317,6 +317,7 @@ async function generateFullBoilerplate(
     readRuntimeTemplate,
     generateWorkpiecePackageJson,
     readTemplateFields,
+    resolveBasePath,
   } = onboardingMod;
   const { runEnvExampleGenerate } = checksMod;
 
@@ -359,10 +360,18 @@ async function generateFullBoilerplate(
     {
       dest: "astro.config.mjs",
       content: applyTokens(
-        readRuntimeTemplate("astro.config.template.mjs").replace(
-          "// WG_SITE_LINE",
-          domain ? `  site: "https://${domain}",` : "  // site: omitted (no domain configured)",
-        ),
+        readRuntimeTemplate("astro.config.template.mjs")
+          .replace(
+            "// WG_SITE_LINE",
+            domain ? `  site: "https://${domain}",` : "  // site: omitted (no domain configured)",
+          )
+          .replace(
+            "// WG_BASE_LINE",
+            (() => {
+              const base = resolveBasePath(stagingDir);
+              return base ? `  base: "${base}",` : "";
+            })(),
+          ),
         tokens,
       ),
     },
