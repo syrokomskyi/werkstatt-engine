@@ -11,6 +11,7 @@
   <item>RFC-0560: add --actor-from-auth flag to mission.open, mission.close, mission.abort, mission.reconcile; change actor default from 'agent' to 'unknown'.</item>
   <item>ADR-0041: mission.module.ts is the single source of truth for command flag registration. mission/index.ts is now a pure re-export barrel with no command registrations.</item>
   <item>RFC-1028: add validation.state.inspect command for read-only validation cache state inspection.</item>
+  <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
 </CHANGE_SUMMARY>
 */
 
@@ -18,33 +19,32 @@ import type { ModuleExport } from "../runtime/desired-state.ts";
 
 export async function createMissionModule(): Promise<ModuleExport> {
   const { runMissionOpen } = await import("./mission-open.ts");
-      const { runMissionStatus } = await import("./mission-status.ts");
-      const { runMissionClose } = await import("./mission-close.ts");
-      const { runMissionAbort } = await import("./mission-abort.ts");
-      const { runMissionList } = await import("./mission-list.ts");
-      const { runMissionMaterialize } = await import("./mission-materialize.ts");
-      const { runMissionMigrate } = await import("./mission-migrate.ts");
-      const { runMissionGitCommit } = await import("./mission-git-commit.ts");
-      const { runMissionPreview } = await import("./mission-preview.ts");
-      const { runMissionCleanup } = await import("./mission-cleanup.ts");
-      const { runMissionValidate, runMissionBuild, runMissionDiff, runMissionReconcile } =
-        await import("./mission-materialization-commands.ts");
-      const { runValidatePostbuild } = await import("./validate-postbuild.ts");
-      const { runMissionResume } = await import("./mission-resume.ts");
-      const { runMissionJournalShow } = await import("./mission-journal-show.ts");
-      const { runWorkpieceRead } = await import("../workpiece/workpiece-read.ts");
-      const { runWorkpieceWrite } = await import("../workpiece/workpiece-write.ts");
-      const { runMaterializeConfigValidate } = await import("./materialize-config-validate.ts");
-      const { runWorkpieceConfigPresenceCheck } =
-        await import("./workpiece-config-presence-check.ts");
-      const { runMissionPreflight } = await import("./mission-preflight.ts");
-      const { runValidationStateInspect } = await import("./validation-state-inspect.ts");
+  const { runMissionStatus } = await import("./mission-status.ts");
+  const { runMissionClose } = await import("./mission-close.ts");
+  const { runMissionAbort } = await import("./mission-abort.ts");
+  const { runMissionList } = await import("./mission-list.ts");
+  const { runMissionMaterialize } = await import("./mission-materialize.ts");
+  const { runMissionMigrate } = await import("./mission-migrate.ts");
+  const { runMissionGitCommit } = await import("./mission-git-commit.ts");
+  const { runMissionPreview } = await import("./mission-preview.ts");
+  const { runMissionCleanup } = await import("./mission-cleanup.ts");
+  const { runMissionValidate, runMissionBuild, runMissionDiff, runMissionReconcile } =
+    await import("./mission-materialization-commands.ts");
+  const { runValidatePostbuild } = await import("./validate-postbuild.ts");
+  const { runMissionResume } = await import("./mission-resume.ts");
+  const { runMissionJournalShow } = await import("./mission-journal-show.ts");
+  const { runWorkpieceRead } = await import("../workpiece/workpiece-read.ts");
+  const { runWorkpieceWrite } = await import("../workpiece/workpiece-write.ts");
+  const { runMaterializeConfigValidate } = await import("./materialize-config-validate.ts");
+  const { runWorkpieceConfigPresenceCheck } = await import("./workpiece-config-presence-check.ts");
+  const { runMissionPreflight } = await import("./mission-preflight.ts");
+  const { runValidationStateInspect } = await import("./validation-state-inspect.ts");
   return {
     name: "mission",
     version: "0.2.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "mission.open",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -78,7 +78,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionOpen,
       },
-    {
+      {
         name: "mission.status",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Print mission manifest and Bordbuch entries (RFC-0355).",
@@ -90,7 +90,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         reads: ["missions/{mission}/**", "systems/{system}/bordbuch/events.ndjson"],
         execute: runMissionStatus,
       },
-    {
+      {
         name: "mission.close",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -160,7 +160,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionClose,
       },
-    {
+      {
         name: "mission.abort",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -197,7 +197,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionAbort,
       },
-    {
+      {
         name: "mission.list",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "List missions, optionally filtered by system (RFC-0355).",
@@ -209,7 +209,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         reads: ["missions/*/mission.yaml", "systems-cache/*/system-config.yaml"],
         execute: runMissionList,
       },
-    {
+      {
         name: "mission.materialize",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -233,7 +233,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionMaterialize,
       },
-    {
+      {
         name: "mission.migrate",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -259,7 +259,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionMigrate,
       },
-    {
+      {
         name: "mission.validate",
         contract: "mission",
         rules: [],
@@ -302,7 +302,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
           blocks: ["mission.close", "release.prepare"],
         },
       },
-    {
+      {
         name: "mission.preview",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -324,7 +324,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionPreview,
       },
-    {
+      {
         name: "mission.build",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -343,7 +343,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionBuild,
       },
-    {
+      {
         name: "mission.diff",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Compute the data-set diff between Werkstück and pinned state (RFC-0356).",
@@ -355,7 +355,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         reads: ["missions/{mission}/workpiece/**", "systems/{system}/system.pin.json"],
         execute: runMissionDiff,
       },
-    {
+      {
         name: "mission.reconcile",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -386,7 +386,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionReconcile,
       },
-    {
+      {
         name: "mission.git.commit",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -397,13 +397,23 @@ export async function createMissionModule(): Promise<ModuleExport> {
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
           message: { kind: "string", required: true, description: "Commit message." },
+          rfc: {
+            kind: "string",
+            description:
+              "RFC id to reference — records CHANGE_SUMMARY items and writes X-RFC trailer (RFC-1095).",
+          },
+          adr: {
+            kind: "string",
+            description:
+              "ADR id to reference — records CHANGE_SUMMARY items and writes X-ADR trailer (RFC-1095).",
+          },
         },
         writes: ["missions/{mission}/workpiece/**"],
         reads: ["missions/{mission}/workpiece/**", "missions/{mission}/mission.yaml"],
         cacheable: false,
         execute: runMissionGitCommit,
       },
-    {
+      {
         name: "mission.cleanup",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -439,7 +449,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionCleanup,
       },
-    {
+      {
         name: "workpiece.read",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Read a file from a mission workpiece with DNA-22 path validation (RFC-0555).",
@@ -453,7 +463,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runWorkpieceRead,
       },
-    {
+      {
         name: "workpiece.write",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -472,7 +482,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runWorkpieceWrite,
       },
-    {
+      {
         name: "materialize.config.validate",
         contract: "materialize",
         rules: [],
@@ -485,7 +495,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMaterializeConfigValidate,
       },
-    {
+      {
         name: "workpiece.config.presence.check",
         contract: "workpiece",
         rules: [],
@@ -501,7 +511,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runWorkpieceConfigPresenceCheck,
       },
-    {
+      {
         name: "validate.postbuild",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
@@ -520,7 +530,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runValidatePostbuild,
       },
-    {
+      {
         name: "mission.resume",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -544,7 +554,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionResume,
       },
-    {
+      {
         name: "mission.journal.show",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Show the operation journal for a mission (RFC-0958).",
@@ -559,7 +569,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionJournalShow,
       },
-    {
+      {
         name: "mission.preflight",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -576,7 +586,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runMissionPreflight,
       },
-    {
+      {
         name: "validation.state.inspect",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
@@ -591,9 +601,8 @@ export async function createMissionModule(): Promise<ModuleExport> {
         reads: ["missions/{mission}/.validation-state.json"],
         cacheable: false,
         execute: runValidationStateInspect,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

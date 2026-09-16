@@ -7,16 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0480: initial mission.git.commit command handler.</item>
-  <item>RFC-0480: add isWorkpieceDirty() shared helper for dirty workpiece guards.</item>
-  <item>RFC-0522: extend WorkpieceDirtyResult with files[] for cache clone guard error messages.</item>
-  <item>RFC-0560: integrate Ed25519 signed commits via createSignedCommit when PASSPORT_SIGNING_KEY is set.</item>
-  <item>RFC-0568: add investigateUntrackedFiles helper and UntrackedFileReport type for cache clone untracked file origin analysis.</item>
-  <item>RFC-0594: add pre-commit content validation via runPreCommitValidation based on changed file paths.</item>
   <item>RFC-0644: add commitWorkpieceIfDirty helper for auto-committing dirty workpiece before mission.reconcile.</item>
   <item>RFC-0797: add commitCacheCloneIfDirty helper for auto-committing all dirty files in cache clone before reconcile dirty guard.</item>
   <item>RFC-0820: add noChanges field to MissionGitCommitData and prominent stderr warning when no changes to commit.</item>
   <item>RFC-0878: add .closed sentinel check to commitWorkpieceIfDirty — refuse to commit closed workpieces (defence-in-depth, since --no-verify bypasses the hook).</item>
+  <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
+  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594</history>
 </CHANGE_SUMMARY>
 */
 
@@ -29,6 +25,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
+import { runCompassSummaryRecord, stripConventionalPrefix } from "@warpgogol/forge/os/compass";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
 import { createSignedCommit } from "./signed-commit.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
@@ -433,6 +430,8 @@ export async function runMissionGitCommit(
   const { workspaceRoot } = context;
   const missionId = flagString(input, "mission");
   const message = flagString(input, "message");
+  const rfcId = flagString(input, "rfc");
+  const adrId = flagString(input, "adr");
 
   if (!missionId) throw new Error("[mission.git.commit] --mission is required");
   if (!message) throw new Error("[mission.git.commit] --message is required");
@@ -495,6 +494,44 @@ export async function runMissionGitCommit(
     };
   }
 
+  // RFC-1095: record CHANGE_SUMMARY items when the commit carries a governance
+  // ID. Runs after staging, before validation and commit; non-fatal — a header
+  // miss never blocks a commit, the next compass.validate surfaces the gap.
+  const governanceId = rfcId ?? adrId;
+  if (governanceId) {
+    try {
+      const staged = git(workpieceDir, "diff --cached --name-only").split("\n").filter(Boolean);
+      const recordResult = await runCompassSummaryRecord(
+        {
+          argv: [],
+          flags: {
+            id: governanceId,
+            files: staged,
+            text: stripConventionalPrefix(message),
+            workpiece: workpieceDir,
+          },
+        },
+        context,
+      );
+      const recorded = recordResult.data?.recorded ?? [];
+      if (recorded.length > 0) {
+        git(workpieceDir, `add ${recorded.map((f) => JSON.stringify(f)).join(" ")}`);
+      }
+      for (const reminder of recordResult.data?.keyDecisionsReminders ?? []) {
+        process.stderr.write(`[mission.git.commit] review KEY_DECISIONS in ${reminder}\n`);
+      }
+    } catch (err) {
+      process.stderr.write(
+        `[mission.git.commit] compass.summary.record failed (non-fatal): ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+  }
+
+  // RFC-1095: governance trailer matching ecosystem.commit's X-RFC convention.
+  const commitMessage = governanceId
+    ? `${message}\n\n${rfcId ? `X-RFC: ${rfcId}` : `X-ADR: ${adrId}`}`
+    : message;
+
   // RFC-0594: run targeted content validators based on changed file paths
   const dirtyResult = isWorkpieceDirty(workpieceDir);
   const preCommitValidation = await runPreCommitValidation(
@@ -534,7 +571,7 @@ export async function runMissionGitCommit(
   const actorId = manifest.openedBy ?? "unknown";
 
   if (signingKey) {
-    const result = await createSignedCommit(workpieceDir, message, actorId, signingKey);
+    const result = await createSignedCommit(workpieceDir, commitMessage, actorId, signingKey);
 
     const data: MissionGitCommitData = {
       missionId,
@@ -558,7 +595,7 @@ export async function runMissionGitCommit(
   // No signing key — produce unsigned commit
   process.stderr.write(`[warn] PASSPORT_SIGNING_KEY not set — producing unsigned commit.\n`);
 
-  const commitSha = git(workpieceDir, `commit -m ${JSON.stringify(message)}`);
+  const commitSha = git(workpieceDir, `commit -m ${JSON.stringify(commitMessage)}`);
 
   const data: MissionGitCommitData = {
     missionId,
