@@ -6,11 +6,16 @@
   <item>Do not handle raw content parsing or transport orchestration.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>Backfills module contract to enhance navigability and maintainability of kernel and RFC exports.</item>
   <item>RFC-0258: export writeFileAtomic — the atomic write primitive for workspace-shared kernel-command outputs.</item>
   <item>RFC-0260: export resolveCommandFlags, KERNEL_UNIVERSAL_FLAGS, and the KernelFlagSpec type.</item>
   <item>RFC-0264 cleanup: delegate complete domains to their subpath barrels and keep the root entrypoint thin.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

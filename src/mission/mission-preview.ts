@@ -9,8 +9,10 @@
 <CHANGE_SUMMARY>
   <item>RFC-0480: extracted mission.preview to its own file; blocking astro dev/preview server; works for closed/aborted missions.</item>
   <item>ADR-0007: run content.ref-index.generate before dev server start to ensure fresh content reference index.</item>
-  <item>Pre-dev critical file check: verify content-ref-index, derived-prices, and video-manifest exist before starting dev. Auto-generate missing files via executeKernelCommand. Block with actionable error if generation fails. --skip-prepare flag for fast restarts.</item>
   <item>RFC-0817: enforce materialization gate — auto-run mission.materialize when materializedAt is null and mission state is open. --skip-prepare does NOT bypass materialization.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

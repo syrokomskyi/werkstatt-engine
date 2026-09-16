@@ -1,19 +1,17 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0566 deploy.artifact.gc — garbage-collect old platform artifacts not referenced by symlinks.</purpose>
-  <keywords>deploy, artifact, gc, garbage-collect, retention</keywords>
-  <responsibilities>
-    <item>Scan platform artifact directory for artifact directories.</item>
-    <item>Never delete artifacts referenced by current or previous symlinks.</item>
-    <item>Retain at least last 5 artifacts by default.</item>
-    <item>Support --dry-run to report candidates without deleting.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not delete release artifacts — those are managed by artifact.store.gc.</item>
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy.artifact.gc handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

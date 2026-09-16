@@ -4,14 +4,8 @@
 Provides SitePassportV1 and SignedSitePassport types, buildPassportPayload,
 signPassport, and verifyPassport functions. Uses canonical-JSON hashing
 (RFC-0849) and Ed25519 signing (RFC-0931/RFC-0921 helpers).</purpose>
-<keywords>passport, sternsystem, identity, ed25519, canonical-json, signing</keywords>
-<responsibilities>
-  <item>buildPassportPayload reads system-config.yaml, system.pin.json, .env.example, bordbuch ledger, and mission count to assemble SitePassportV1.</item>
-  <item>signPassport computes canonicalJsonHashV1 over the payload and signs the hash bytes with Ed25519.</item>
-  <item>verifyPassport recomputes the payload hash and verifies the signature against the embedded creator.publicKey.</item>
-  <item>Mirror locators are sanitized to strip embedded credentials per RFC-0574 rules.</item>
-  <item>Secret names are parsed from .env.example KEY= lines — values are never read.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not perform file IO for writing passport.json — use readPassport/writePassport in registry-io.ts.</item>
   <item>Does not manage key lifecycle or rotation — see RFC-0966 Key rotation section.</item>
@@ -20,6 +14,9 @@ signPassport, and verifyPassport functions. Uses canonical-JSON hashing
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0966: initial passport types, builder, signer, verifier.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

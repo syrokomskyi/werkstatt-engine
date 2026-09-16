@@ -7,12 +7,13 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-0865: initial deploy authorization helper.</item>
-<item>RFC-0866 fix: add resolveGateDecisionPath helper for conventional gate-decision path resolution.</item>
-<item>RFC-0866 fix D-2: writeDeploymentEffectRecord accepts optional deploymentUrl for effect-record URL discovery.</item>
-<item>Fix hardcoded systems-cache paths: writeDeploymentEffectRecord and resolveGateDecisionPath now accept cacheCloneDir directly. writeDeploymentEffectRecord commits+pushes to cache clone git after write.</item>
-<item>RFC-0926: buildEffectRecord and writeDeploymentEffectRecord accept optional workerVersionId and releaseId for release-aware rollback.</item>
-<item>Improve loadGateDecision missing-file error with actionable certify command hint.</item>
+  <item>RFC-0865: initial deploy authorization helper.</item>
+  <item>RFC-0866 fix: add resolveGateDecisionPath helper for conventional gate-decision path resolution.</item>
+  <item>RFC-0866 fix D-2: writeDeploymentEffectRecord accepts optional deploymentUrl for effect-record URL discovery.</item>
+  <item>RFC-0926: buildEffectRecord and writeDeploymentEffectRecord accept optional workerVersionId and releaseId for release-aware rollback.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -3,15 +3,8 @@
 <purpose>RFC-0968: Sternsystem handover protocol — authorization types, signing/verification,
 and file IO helpers for cross-werkstatt site transfer. Uses canonical-JSON hashing (RFC-0849)
 and Ed25519 signing (RFC-0931 helpers), same patterns as passport.ts.</purpose>
-<keywords>handover, sternsystem, transfer, ed25519, canonical-json, authorization</keywords>
-<responsibilities>
-  <item>HandoverAuthorizationV1 and SignedHandoverAuthorization types for the signed transfer authorization.</item>
-  <item>computeAuthorizationHash canonicalizes and hashes the authorization payload.</item>
-  <item>signAuthorization signs the authorization hash with the sender's Ed25519 private key.</item>
-  <item>verifyAuthorization verifies the signature against the sender's public key and recomputes the hash.</item>
-  <item>readAuthorization/writeAuthorization/removeAuthorization manage the handover-authorization.json file in the cache clone.</item>
-  <item>HandoverCompleteResult and HandoverEventMetadata types for the bordbuch event and command output.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement command logic — that lives in sternsystem-handover-prepare/complete/cancel.ts.</item>
   <item>Does not enforce HANDOVER validation rules — that lives in sternsystem-validate.ts.</item>
@@ -21,6 +14,9 @@ and Ed25519 signing (RFC-0931 helpers), same patterns as passport.ts.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover authorization types, signing/verification, and file IO helpers.</item>
   <item>RFC-0988: add Zod schema and parseAuthorizationData for --dry-run --authorization-data CLI input validation.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -1,17 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1065: lagebild.connect command — push 4 LAGEBILD_* secrets to a channel's Worker, health check, record state, merge into .env.</purpose>
-  <keywords>lagebild, connect, secret, wrangler, worker, RFC-1065</keywords>
-  <responsibilities>
-    <item>Validate --api-key is non-empty (AC-4).</item>
-    <item>Read system-config.yaml — throw "Site not found" if missing (AC-11).</item>
-    <item>Resolve workerName for the specified channel.</item>
-    <item>Push 4 LAGEBILD_* secrets via runWranglerSecretPut (AC-1).</item>
-    <item>Best-effort GET /health (non-blocking).</item>
-    <item>Write lagebild block to system-state.yaml (AC-12).</item>
-    <item>Merge LAGEBILD_* values into .env file in cache clone.</item>
-    <item>Return per-secret pushed: boolean (AC-2).</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not log the API key value — only the secret name appears in output.</item>
     <item>Do not write LAGEBILD_* to .env.example — that is a separate DNA-40 step.</item>
@@ -20,6 +11,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: initial lagebild.connect command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

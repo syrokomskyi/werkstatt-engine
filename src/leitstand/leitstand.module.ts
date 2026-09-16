@@ -7,17 +7,14 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Lazy loading refactor: extracted from leitstand/index.ts to use dynamic imports inside async register().</item>
-  <item>RFC-0627: add leitstand.deploy; update rollback (auto-detect channel); update status/health for dev channel.</item>
-  <item>RFC-0628: replace leitstand.deploy with workpiece-based leitstand.dev-deploy; propagate gate checks published + commitSha + missionId; rollback auto-step removes dev-deployed.</item>
-  <item>RFC-0700: add --release flag to leitstand.dev-deploy for deploying existing releases to dev without open mission; update reads to include releases/{release}/**.</item>
-  <item>RFC-0842: add leitstand.pipeline.check command for release pipeline state inspection.</item>
-  <item>RFC-0866: add leitstand.certify command; add --gate-decision, --candidate-id, --artifact-hash flags to dev-deploy, propagate, promote.</item>
-  <item>Fix description flags for dev-deploy, propagate, promote to include --site (KERNEL-FLAG-06).</item>
   <item>RFC-0899: add leitstand.access.protect, unprotect, status commands for dev/alt subdomain PIN access protection.</item>
   <item>RFC-0927: add leitstand.hotfix.dev-deploy composite command chaining commit → validate.postbuild → reconcile → close → release → certify → deploy.</item>
   <item>RFC-0930: add leitstand.verify command for live deployment verification across channels.</item>
   <item>RFC-0962: add leitstand.ship composite command — resumable full-pipeline deployment via RFC-0958 operation journal.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866</history>
 </CHANGE_SUMMARY>
 */
 

@@ -1,23 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0873: nachweis.assessment.ingest command handler — validates an AssessmentBundleV1, hashes artifacts, uploads to R2, writes PBP evidence-source, appends Bordbuch entry. Implements ADR-0054: generic normalized assessment contract between provider adapters and PBP/Bordbuch.</purpose>
-<keywords>nachweis, assessment, ingest, r2, bordbuch, evidence-source, technical-assessment</keywords>
-<responsibilities>
-  <item>Validates bundle via assessmentBundleV1Schema (Zod runtime validation).</item>
-  <item>Validates path safety: slug, seriesId, observationId, artifact keys reject path traversal and symlinks.</item>
-  <item>Validates at least one canonical raw-result artifact (enforced by Zod schema refine).</item>
-  <item>Validates all artifact files exist and are inside the bundle directory.</item>
-  <item>Hashes all artifacts via computeSourceSha256.</item>
-  <item>Idempotent by (seriesId, observationId) + artifact hashes — returns alreadyIngested: true on match.</item>
-  <item>Conflicts on same (seriesId, observationId) with different hashes — fails with ASSESSMENT_OBSERVATION_CONFLICT.</item>
-  <item>New observation in existing series preserves old artifacts (immutable observation history).</item>
-  <item>Uploads missing artifacts to R2 under {systemId}/private/assessments/{seriesId}/{observationId}/{key}.{ext}.</item>
-  <item>Writes/updates PBP evidence-source entity with kind=technical-assessment and assessment metadata.</item>
-  <item>Appends nachweis-record Bordbuch entry with verificationLevel N1.</item>
-  <item>Scans bundle JSON for known credential patterns — fails if detected.</item>
-  <item>Supports --dry-run (no R2 upload, no PBP write, no Bordbuch append).</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not publish or approve — use nachweis.publish and nachweis.approve for gate progression.</item>
   <item>Does not create public derivatives — use nachweis.public-derivative.</item>
@@ -26,6 +11,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0873: initial nachweis.assessment.ingest command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -9,18 +9,18 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Do not introduce app-specific runtime composition or deployment behavior into this reusable package source file.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0303: split out of runtime.ts (Phase 3 file-size split, hot-path file 8/8).</item>
-  <item>RFC-0326: pass fileIntents from createDefaultIO() to step contexts; aggregate filesModified across step reports into KernelPipelineReport.</item>
-  <item>Add stderr progress lines for every pipeline step (start + finish + duration) so operators see live progress even in --json mode.</item>
-  <item>RFC-0390: integrate command-result cache — skip re-execution on cache hit, store only ok:true results, respect --force and --dry-run.</item>
-  <item>RFC-0637: moduleHashCache key includes modulePaths; computeModuleHash receives command.modulePaths for granular per-command hashing.</item>
-  <item>RFC-0686: refactor executePipelineForSite and executePipelineForWorkspace to use pipeline-scheduler for dependency-aware parallel execution; add telemetry mutex; add summedDurationMs to timing summary; --concurrency 1 activates full sequential mode.</item>
-  <item>RFC-0687: add transitive cache skip for validator chains — shouldTransitiveSkip checks validatesOutputs against cacheHitCommands; cross-pipeline persistence via .cache/pipeline-cache-hits.json with 30-minute TTL.</item>
   <item>ADR-0022: workspace registry now uses process-lifetime cache via getOrBuildWorkspaceRegistry.</item>
   <item>ADR-0023: reuse CacheLayer SQLite connection across pipeline steps; batch telemetry writes to a single append at pipeline completion; close cache after pipeline run.</item>
   <item>RFC-0809: add collect-errors mode — aggregate all independent step failures instead of stopping at first failure. Extract aggregateCollectErrors pure function for testability.</item>
   <item>RFC-1028: replace hardcoded moduleSrcDir with dynamic per-command resolution from command.modulePath via deriveModuleBasePath. Fixes stale cache keys caused by deleted packages/os/site-kernel-checks path.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687</history>
 </CHANGE_SUMMARY>
 */
 

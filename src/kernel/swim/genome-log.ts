@@ -13,8 +13,14 @@ reporting for the 10MB threshold warning.
   <item>Do not implement compaction — that is a future RFC.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-0564: initial implementation — G-Set genome log with Ed25519 signing, signature verification on read, set-union merge, and membership view derivation.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

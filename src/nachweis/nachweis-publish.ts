@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707: nachweis.publish command handler — enforces publication gate and transitions record to published.</purpose>
-<keywords>nachweis, publish, gate, public, bordbuch</keywords>
-<responsibilities>
-  <item>Checks publication gate preconditions using policy-driven V2 gate (RFC-0872).</item>
-  <item>Requires N3 verification level (RFC-0715: --pilot-n2-exception removed, N2 grandfathering for existing records).</item>
-  <item>Sets publication.visibility: public on EvidenceSource entity.</item>
-  <item>Appends nachweis-record Bordbuch entry.</item>
-  <item>Calls nachweis.manifest.generate to regenerate manifest.</item>
-  <item>Fails without modifying state if any gate condition is not met.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not create EvidenceSource entities — that is done during ingest/content authoring.</item>
 </non-goals>
@@ -20,6 +12,9 @@
   <item>RFC-0715: remove --pilot-n2-exception flag, require N3 only. N2 grandfathering: existing N2-published records remain valid.</item>
   <item>RFC-0872: replace legacy boolean gate with policy-driven V2 gate.</item>
   <item>RFC-0888: pass --skip-bordbuch to manifest.generate and append sichtpass Bordbuch entry after manifest regeneration.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

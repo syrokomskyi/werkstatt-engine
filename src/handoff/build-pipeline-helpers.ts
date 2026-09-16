@@ -8,7 +8,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0008: extracted runPipelinePhase and computeBuildInputHash from mission-materialization-commands.ts and release-commands.ts to eliminate 5x duplicated pipeline execution pattern and 2x duplicated build-input-hash computation.</item>
-  <item>Fix: add writePreliminaryBuildIdentity/cleanupPreliminaryBuildIdentity helpers so mission.build and mission.validate write build-identity.json before astro build, enabling the open-source-registry-section component to embed deployment metadata at build time.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 import path from "node:path";

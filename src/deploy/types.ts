@@ -1,11 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>TypeScript contracts for RFC-0566 immutable platform deploy with atomic rollback.</purpose>
-  <keywords>deploy, artifact, atomic, rollback, symlink, platform</keywords>
-  <responsibilities>
-    <item>Define types for platform artifacts, manifests, deploy status, and atomic swap results.</item>
-    <item>Define Phase 4 two-phase commit types (stubs — not exercised in pilot).</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not implement command logic — this file is types only.</item>
     <item>Do not define Leitstand types — those live in the leitstand module.</item>
@@ -13,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy type contracts.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

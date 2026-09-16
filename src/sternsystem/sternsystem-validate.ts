@@ -6,18 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0354: initial validate command handler.</item>
-  <item>RFC-0480: add Bordbuch-vs-git-log consistency check for external edit detection.</item>
-  <item>RFC-0520: extract Bordbuch-vs-git-log check into evaluateExternalEditGate pure function.</item>
-  <item>RFC-0561: add owner-format-invalid check and missing-owner notice warning.</item>
-  <item>RFC-0648: add branch-convention rule enforcing main as default branch for cache clone and bare repo.</item>
-  <item>RFC-0792: add yaml-syntax-error rule for top-level YAML file syntax checking in systems-cache.</item>
-  <item>RFC-0822: add ENV-PERSIST-01 warning when cache clone lacks .env* but active workpiece has them.</item>
   <item>RFC-0870: add STERN-MANIFEST-01 check for missing committed generated manifests in cache clone HEAD.</item>
   <item>RFC-0902: add STERN-ID-TLD rule rejecting IDs ending in a known TLD suffix.</item>
   <item>RFC-0966: add PASSPORT-01 (missing passport), PASSPORT-02 (invalid signature), PASSPORT-03 (resource drift) rules.</item>
   <item>RFC-0968: add HANDOVER-01/02/03/04/05 rules for sternsystem handover protocol.</item>
-  <item>Fix: checkBundleContract uses git ls-files instead of filesystem scan, excludes COMMITTED_MANIFEST_PATHS from generated file check.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822</history>
 </CHANGE_SUMMARY>
 */
 

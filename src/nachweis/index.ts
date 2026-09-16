@@ -6,12 +6,14 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0707: initial nachweis barrel exports.</item>
-  <item>RFC-0714: add nachweis.approve and nachweis.public-derivative exports.</item>
   <item>RFC-0873: add assessment bundle types, Zod schema, and nachweis.assessment.ingest handler export.</item>
   <item>RFC-0874: add nachweis.measure.lighthouse handler and type exports.</item>
   <item>RFC-0875: add nachweis.measure.cloudflare-agent-readiness handler and type exports.</item>
   <item>RFC-0891: add nachweis.screenshot.process handler and NachweisScreenshotProcessResult type export.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0707, RFC-0714</history>
 </CHANGE_SUMMARY>
 */
 

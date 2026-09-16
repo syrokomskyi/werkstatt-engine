@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0566 deploy.atomic.swap — atomic symlink swap to deploy a new platform artifact.</purpose>
-  <keywords>deploy, atomic, swap, symlink, current, previous</keywords>
-  <responsibilities>
-    <item>Verify artifact hash before swapping (abort on mismatch).</item>
-    <item>Atomically swap current symlink to new artifact via rename(2).</item>
-    <item>Update previous symlink to old current target.</item>
-    <item>Handle first-deploy case (no existing current symlink).</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not build artifacts — that is deploy.artifact.build's job.</item>
     <item>Do not implement two-phase commit — Phase 4 is deferred.</item>
@@ -15,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy.atomic.swap handler with current+previous symlink management.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

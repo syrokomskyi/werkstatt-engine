@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1065: Shared wrangler secret helpers — parameterized runWranglerSecretPut and runWranglerSecretDelete for provisioning secrets on Cloudflare Workers via wrangler CLI.</purpose>
-  <keywords>wrangler, secret, put, delete, cloudflare, worker, RFC-1065, RFC-0899</keywords>
-  <responsibilities>
-    <item>runWranglerSecretPut: spawn npx wrangler secret put <secretName> --name <workerName>, pipe value to stdin.</item>
-    <item>runWranglerSecretDelete: spawn npx wrangler secret delete <secretName> --name <workerName>.</item>
-    <item>Both return exitCode, stdout, stderr — callers handle success/failure.</item>
-    <item>Never log the secret value — only the secret name appears in stdout/stderr.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not interpret results or decide retry logic — that is the caller's responsibility.</item>
     <item>Do not create temporary wrangler.jsonc — the caller sets cwd appropriately.</item>
@@ -15,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: extracted from access-commands.ts as parameterized shared helpers for reuse by lagebild commands.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

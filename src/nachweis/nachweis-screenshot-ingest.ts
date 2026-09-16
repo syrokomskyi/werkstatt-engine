@@ -1,19 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0890: nachweis.screenshot.ingest command handler — ingests a raw full-page screenshot to R2 private storage and cache clone local directory.</purpose>
-<keywords>nachweis, screenshot, ingest, raw, r2, evidence-source, sharp</keywords>
-<responsibilities>
-  <item>Reads a raw screenshot file from --file path, computes SHA-256.</item>
-  <item>Detects image metadata (mediaType, width, height) via dynamic import("sharp").</item>
-  <item>Parses capturedAt from CaptureX filename pattern; --captured-at flag overrides.</item>
-  <item>Uploads to R2 private at {systemId}/screenshots/{slug}/raw/{originalFilename}.</item>
-  <item>Copies file to cache clone at trust/evidence/screenshots/{slug}/raw/{originalFilename}.</item>
-  <item>Updates EvidenceSource.websiteScreenshot.rawArtifact with metadata.</item>
-  <item>Appends nachweis-record Bordbuch entry with raw artifact metadata.</item>
-  <item>Idempotent by SHA-256: re-ingest of same hash skips upload and Bordbuch.</item>
-  <item>Supports --dry-run to compute metadata without copying or uploading.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not crop, resize, or convert the raw screenshot — that belongs to RFC-0891.</item>
   <item>Does not upload a public display variant — use nachweis.screenshot.upload for that.</item>
@@ -21,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0890: initial nachweis.screenshot.ingest command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

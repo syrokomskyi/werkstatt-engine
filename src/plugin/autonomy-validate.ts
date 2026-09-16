@@ -4,7 +4,7 @@
 for @warpgogol/* import specifiers that indicate stack-plugin coupling. Excludes
 self-imports (@warpgogol/werkstatt-engine) and shared infrastructure packages (@warpgogol/werkstatt-shared/*)
 which are not stack plugins.</purpose>
-<keywords>autonomy, guard, RFC-0772, DNA-64, plugin boundary</keywords>
+
 <non-goals>
   <item>Do not scan test files — tests may import from any package.</item>
   <item>Do not scan node_modules — only engine source is checked.</item>
@@ -14,6 +14,9 @@ which are not stack plugins.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0772: initial autonomy guard implementation modeled on forge.doctor precedent.</item>
   <item>RFC-0868: refactor to use shared import-scan-util.ts, removing duplicated scanning logic.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

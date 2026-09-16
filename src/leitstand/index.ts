@@ -6,16 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0358: initial leitstand module.</item>
-  <item>RFC-0379: add --channel flag to all four commands; rollback requires --channel.</item>
-  <item>RFC-0608: propagate always alt (removes --channel); add leitstand.promote for alt→main with build-identity verification; rollback transitions release state.</item>
-  <item>RFC-0627: add leitstand.deploy for dev channel with Axiom gate; rollback auto-detects channel and auto-steps release state; status/health support dev channel.</item>
-  <item>RFC-0628: replace leitstand.deploy with workpiece-based leitstand.dev-deploy; propagate gate checks published + commitSha + missionId; rollback auto-step removes dev-deployed.</item>
-  <item>RFC-0751: add leitstand.service.deploy for shared Cloudflare Worker services.</item>
   <item>RFC-0806: replace leitstand.service.deploy with dev-deploy, promote, and rollback commands.</item>
   <item>RFC-0842: add leitstand.pipeline.check command for release pipeline state inspection.</item>
   <item>RFC-0866: add leitstand.certify command and shared deploy-execution pipeline.</item>
   <item>RFC-0927: add leitstand.hotfix.dev-deploy composite command export.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0358, RFC-0379, RFC-0608, RFC-0627, RFC-0628, RFC-0751</history>
 </CHANGE_SUMMARY>
 */
 

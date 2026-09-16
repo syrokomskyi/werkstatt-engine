@@ -7,11 +7,13 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Lazy loading refactor: extracted from mission/index.ts to use dynamic imports inside async register().</item>
   <item>RFC-0560: add --actor-from-auth flag to mission.open, mission.close, mission.abort, mission.reconcile; change actor default from 'agent' to 'unknown'.</item>
   <item>ADR-0041: mission.module.ts is the single source of truth for command flag registration. mission/index.ts is now a pure re-export barrel with no command registrations.</item>
   <item>RFC-1028: add validation.state.inspect command for read-only validation cache state inspection.</item>
   <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

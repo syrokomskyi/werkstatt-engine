@@ -11,15 +11,14 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0354: initial registry IO helpers.</item>
-  <item>RFC-0574: add resolveMirrors() and resolveCachePath() for parameterized mirror topology.</item>
-  <item>RFC-0751: add findServiceEntry() helper for service registry lookups.</item>
-  <item>RFC-0790: replace registry IO with convention-based discovery. Add resolveCacheClonePath, readSystemConfig, readSystemState, writeSystemState, discoverSystems, readServicesRegistry. Remove readRegistry, writeRegistry, findEntry, findEntryByStar, resolveCachePath, registryExists, resolveRegistryPath. Change resolveMirrors to accept SystemConfig.</item>
-  <item>ADR-0040: add JSDoc return-type contracts to path-returning functions (resolveCacheClonePath, resolveWorkpiecePath, resolveMirrorPath).</item>
   <item>RFC-0794: push system-state.yaml commit to bare repo in writeSystemState to survive syncCacheClone resets.</item>
   <item>RFC-0966: add readPassport, writePassport, resolvePassportPath helpers and passportRequired to default state.</item>
   <item>RFC-0967: add ownershipRequired to default state.</item>
   <item>RFC-0981: fix writeSystemState push to use symbolic-ref and fully-qualified refspec HEAD:refs/heads/{branch} instead of broken rev-parse --abbrev-ref HEAD in detached HEAD state.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790</history>
 </CHANGE_SUMMARY>
 */
 

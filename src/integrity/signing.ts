@@ -7,9 +7,11 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Migrated sha256StringHex from deleted ./hash.ts to byteHash from @warpgogol/fingerprint directly.</item>
   <item>RFC-0921: delegate signing/verification/keygen to shared signing core. Remove node:crypto sign/verify imports and canonicalJson function.</item>
   <item>RFC-0931: add signBuildIdentity, writeReleasePublicKey, verifyBuildIdentitySignature for Ed25519 signing of build-identity.json in deploy pipeline.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 
 /**

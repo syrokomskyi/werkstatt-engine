@@ -1,15 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0715/RFC-0921: nachweis.key.ensure command handler — generates an Ed25519 keypair for Nachweis operator signatures via shared signing core.</purpose>
-<keywords>nachweis, key, ed25519, signing, crypto</keywords>
-<responsibilities>
-  <item>Generates a new Ed25519 keypair using the shared signing core (RFC-0921).</item>
-  <item>Writes private key as hex to the specified key file path (outside repo).</item>
-  <item>Writes public key as hex to <path>.pub.</item>
-  <item>Computes keyId as SHA-256 of the public key bytes.</item>
-  <item>Refuses to overwrite existing key file without --force.</item>
-  <item>Publishes public key JSON to public/.well-known/nachweis-pubkey.json when resolvable.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement key rotation — that is a future RFC.</item>
   <item>Does not use multibase encoding — intentionally hex for simplicity (differs from passport).</item>
@@ -19,6 +12,9 @@
   <item>RFC-0715: initial nachweis.key.ensure command handler.</item>
   <item>RFC-0715 review fix: import flagString/flagBool from nachweis-n3-types.ts.</item>
   <item>RFC-0921: delegate key generation to shared signing core (generateKeyPair, toHex). Remove @noble/ed25519 import.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

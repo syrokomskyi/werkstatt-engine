@@ -7,7 +7,7 @@ packages/werkstatt-shared/src/ for command handler return statements and
 enforces DNA-82: explicit exitCode, [command.name]-prefixed summary, and
 nextSteps on failure paths.
 </purpose>
-<keywords>validate, commands, RFC-0903, DNA-82, static-analysis, exitCode, summary, nextSteps</keywords>
+
 <non-goals>
   <item>Does not execute commands — pure static analysis of return statements.</item>
   <item>Does not modify files — produces diagnostics only.</item>
@@ -17,6 +17,9 @@ nextSteps on failure paths.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0903: initial implementation of werkstatt.commands.validate static analysis.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

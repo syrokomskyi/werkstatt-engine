@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0715/RFC-0871/RFC-0921: nachweis.verify-signature command handler — verifies the Ed25519 operator signature and RFC 3161 timestamp for a Nachweis record, reporting timestamp assurance metadata via shared signing core.</purpose>
-<keywords>nachweis, verify, signature, ed25519, timestamp, rfc3161</keywords>
-<responsibilities>
-  <item>Reads the nachweis-signed and nachweis-timestamped Bordbuch entries for the slug.</item>
-  <item>Reconstructs the canonical record payload from the EvidenceSource entity.</item>
-  <item>Verifies the Ed25519 signature against the published public key.</item>
-  <item>Reports timestamp token presence (does not cryptographically verify the TSA token — deferred).</item>
-  <item>RFC-0871: reports timestampAssurance from Bordbuch metadata, defaults to rfc3161 for legacy entries.</item>
-  <item>Read-only command — does not modify state.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not cryptographically verify the RFC 3161 timestamp token against the TSA certificate chain — that requires TSA trust anchor configuration and is deferred to a future RFC.</item>
 </non-goals>
@@ -20,6 +12,9 @@
   <item>RFC-0715 review fix: import flagString from nachweis-n3-types.ts.</item>
   <item>RFC-0871: report timestampAssurance and qualificationEvidenceRef from Bordbuch metadata, default rfc3161 for legacy entries.</item>
   <item>RFC-0921: delegate verification to shared signing core (verify, canonicalBytes, fromHex). Remove @noble/ed25519 import. Remove canonicalRecordPayload import.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

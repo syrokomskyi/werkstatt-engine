@@ -1,12 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0566 deploy.artifact.build — build immutable platform artifact from local git clone.</purpose>
-  <keywords>deploy, artifact, build, turbo, platform</keywords>
-  <responsibilities>
-    <item>Run turbo run build to build all packages.</item>
-    <item>Copy dist/ trees into content-addressed artifact directory.</item>
-    <item>Compute SHA-256 content hash and write signed manifest.json.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not deploy or swap symlinks — that is deploy.atomic.swap's job.</item>
     <item>Do not verify artifacts — that is deploy.artifact.verify's job.</item>
@@ -14,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy.artifact.build handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

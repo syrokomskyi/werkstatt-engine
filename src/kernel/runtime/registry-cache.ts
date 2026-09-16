@@ -10,10 +10,16 @@ executeKernelCommand is called multiple times within the same Node.js process.
   <item>Do not cache single-module registries built by buildRegistryForModule — only full registries are cached.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>ADR-0022: initial implementation — process-lifetime Map keyed by config source path.</item>
   <item>RFC-1026: add clearModule for incremental single-module invalidation without clearing the entire cache.</item>
   <item>RFC-1038: cache ActualState instead of KernelRegistry; remove clearModule (no module unload in desired-state model).</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

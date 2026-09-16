@@ -8,8 +8,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0583: initial bordbuch.repair command handler.</item>
-  <item>Bug fix: auto-commit repaired bordbuch to prevent dirty cache clone blocking mission.open; throw on commit failure.</item>
-  <item>Make unmatched-mission-open repairable: insert mission-close events for orphaned opens and clear stale currentMission in system-state.yaml.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

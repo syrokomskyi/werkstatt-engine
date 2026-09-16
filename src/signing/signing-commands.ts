@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0921: signing.key.generate command handler — generates Ed25519 keypairs and saves them to disk.</purpose>
-<keywords>signing, key, generate, ed25519</keywords>
-<responsibilities>
-  <item>Generates an Ed25519 keypair using the shared signing core.</item>
-  <item>Saves private and public keys to the specified output directory.</item>
-  <item>Supports hex and PEM encodings.</item>
-  <item>Refuses to overwrite existing keys without --force.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not publish keys — that is a consumer concern (Nachweis, Integrity).</item>
   <item>Does not compute key IDs — that is domain-specific.</item>
@@ -15,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0921: initial signing.key.generate command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

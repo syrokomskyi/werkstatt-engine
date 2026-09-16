@@ -1,12 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1065: Shared helpers for lagebild commands — resolve worker name from system-config, read lagebild state, and define secret name constants.</purpose>
-  <keywords>lagebild, helper, resolveWorkerName, systemState, RFC-1065</keywords>
-  <responsibilities>
-    <item>resolveWorkerName: extract workerName for a given channel from SystemConfig deployment channels.</item>
-    <item>readLagebildState: return the lagebild block from SystemState or undefined if not connected.</item>
-    <item>LAGEBILD_SECRET_NAMES: constant array of 4 LAGEBILD_* secret names.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not perform file IO — use passed-in SystemConfig/SystemState objects only.</item>
     <item>Do not make network calls.</item>
@@ -14,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: initial lagebild helpers for connect, validate, and status commands.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

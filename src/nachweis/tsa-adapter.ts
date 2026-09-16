@@ -1,14 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0715: TSA adapter for RFC 3161 timestamp queries — encodes TimeStampReq via pkijs/asn1js, sends HTTP POST, returns DER-encoded TimeStampResp.</purpose>
-<keywords>tsa, rfc3161, timestamp, pkijs, asn1js, freetsa</keywords>
-<responsibilities>
-  <item>Defines TsaAdapter interface with timestamp(message: Uint8Array) → Uint8Array.</item>
-  <item>Implements FreeTsaAdapter targeting freetsa.org.</item>
-  <item>Encodes TimeStampReq using pkijs + asn1js (SHA-256 messageImprint, nonce, certReq=true).</item>
-  <item>Sends HTTP POST with application/timestamp-query content type.</item>
-  <item>Returns DER-encoded TimeStampResp bytes.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not verify the timestamp token — that is nachweis.verify-signature.</item>
   <item>Does not implement retry logic — caller handles transient failures.</item>
@@ -17,6 +11,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0715: initial TSA adapter with FreeTSA.org implementation.</item>
   <item>RFC-0715 review fix: use byteHash from @warpgogol/fingerprint (DNA-53). Replace FreeTsaAdapter class + createCustomTsaAdapter with HttpTsaAdapter class.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

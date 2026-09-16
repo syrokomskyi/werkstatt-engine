@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>Shared utilities for RFC-0566 deploy commands — artifact paths, hashing, symlink management.</purpose>
-  <keywords>deploy, artifact, symlink, hash, platform</keywords>
-  <responsibilities>
-    <item>Resolve platform artifact directory paths.</item>
-    <item>Hash artifact directories using @warpgogol/fingerprint.</item>
-    <item>Read and write artifact manifests.</item>
-    <item>Manage current and previous symlinks atomically.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not implement command handlers — those live in separate files.</item>
     <item>Do not define types — those live in types.ts.</item>
@@ -15,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy utilities — artifact paths, hashing, symlink management.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

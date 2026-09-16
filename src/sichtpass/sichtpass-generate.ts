@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0947: sichtpass.generate command handler — produces a site-wide visibility snapshot with deduplication.</purpose>
-<keywords>sichtpass, visibility, snapshot, bordbuch, deduplication, composite hash</keywords>
-<responsibilities>
-  <item>Reads contributing data sources: content-regression snapshot, behavior snapshot, nachweis manifest, system-state, system-config, bordbuch status, coverage ledger.</item>
-  <item>Computes a composite hash via snapshotCanonicalJsonObjectV1 + canonicalJsonHashV1, excluding deployedAt timestamps.</item>
-  <item>Appends a sichtpass Bordbuch entry with slug __site__ when composite hash differs from the last sichtpass entry.</item>
-  <item>Deduplicates: skips Bordbuch append when composite hash is unchanged.</item>
-  <item>Handles missing data sources gracefully (null/0/empty array, log warning).</item>
-  <item>Handles Bordbuch read/append failures as fail-open (non-fatal, warning in summary).</item>
-  <item>Acquires system and bordbuch locks during Bordbuch operations.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not define W3C Verifiable Credential issuance.</item>
   <item>Does not build a UI for the Sichtpass.</item>
@@ -20,6 +12,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0947: initial sichtpass.generate command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

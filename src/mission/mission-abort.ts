@@ -6,14 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0355: initial mission.abort command handler.</item>
-  <item>RFC-0477: commit and push bordbuch after appending mission-abort entry.</item>
-  <item>RFC-0480: preserve workpiece/distribution; create git bundle in evidence/ before aborting.</item>
   <item>RFC-0480: add non-blocking dirty workpiece warning to mission.abort.</item>
-  <item>Block mission.abort on dirty workpiece and unreconciled operator commits to prevent silent loss of changes.</item>
   <item>RFC-0560: use resolveActor(input) for actor resolution with --actor-from-auth flag.</item>
   <item>RFC-0580: auto-commit werkstatt side-effects (registry.yaml, mission.yaml) after writeRegistry.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0355, RFC-0477, RFC-0480</history>
 </CHANGE_SUMMARY>
 */
 

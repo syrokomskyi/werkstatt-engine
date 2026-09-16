@@ -1,10 +1,13 @@
 /*
 <MODULE_CONTRACT>
 <purpose>Shared test helpers for sternsystem.validate unit tests (RFC-0574, RFC-0792).</purpose>
-<keywords>test-helpers, sternsystem, validate, mirror, yaml</keywords>
+
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0792: extracted shared test helpers from mirror-validate.test.ts.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

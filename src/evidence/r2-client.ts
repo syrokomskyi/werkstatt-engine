@@ -1,14 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>S3-compatible R2 client wrapper for evidence sync and fetch commands (RFC-0651).</purpose>
-<keywords>r2, s3, evidence, cloudflare, storage</keywords>
-<responsibilities>
-  <item>Configures S3Client with R2 endpoint from R2_AXIOM_ACCOUNT_ID.</item>
-  <item>Provides putObject, getObject, listObjectsV2 methods.</item>
-  <item>Reads credentials from R2_AXIOM_ACCESS_KEY_ID and R2_AXIOM_SECRET_ACCESS_KEY env vars.</item>
-  <item>Supports envPrefix for per-bucket credential isolation (R2_AXIOM_ for axiom-evidence, R2_NACHWEIS_ for nachweis).</item>
-  <item>Throws MISSING_ENV diagnostic when env vars are unset.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement Iceberg REST catalog — deferred to a future RFC.</item>
   <item>Does not implement multipart uploads — individual files are under the 5 MB threshold.</item>
@@ -18,6 +12,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial R2 client wrapper with putObject, getObject, listObjectsV2.</item>
   <item>RFC-0713: added envPrefix parameter to resolveR2ConfigFromEnv for per-bucket credential isolation. Default prefix changed from R2_ to R2_AXIOM_ for symmetry with R2_NACHWEIS_.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

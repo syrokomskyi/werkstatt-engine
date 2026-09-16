@@ -7,20 +7,18 @@
   <item>Do not manage application lifecycle or state outside of defined commands.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Kernel command contracts must stay explicit so agents cannot pass untyped command inputs.</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0260: add KernelFlagSpec and the optional `flags` schema on KernelCommandDefinition / KernelRegisteredCommandInfo.</item>
-  <item>RFC-0267: add the WorkspaceIO port field to KernelRuntimeContext.</item>
-  <item>RFC-0326: add fileIntents to KernelRuntimeContext; add filesModified to KernelExecutionReport and KernelPipelineReport.</item>
-  <item>RFC-0390: add cacheable to KernelCommandMetadata; add cached to KernelExecutionReport; add force to ExecuteKernelPipelineOptions; update reads JSDoc.</item>
-  <item>RFC-0518: add GateMetadata, GateSeverity, GatePhase, GateConditional types and optional gate field to KernelCommandMetadata.</item>
-  <item>RFC-0579: add KernelNextStep interface and optional nextSteps field to KernelCommandResult and KernelExecutionReport.</item>
-  <item>RFC-0686: add dependsOn to KernelPipelineStep and concurrency to ExecuteKernelPipelineOptions for parallel step execution.</item>
-  <item>RFC-0960: add GeneratedArtifactSpec, GeneratorOwnershipEntry, modulePath + generates on KernelCommandDefinition, registry + ownershipMap on KernelRuntimeContext, postBuildValidation on KernelAppConfig.</item>
-  <item>RFC-0960 fo-fix: make modulePath optional (modulePath?: string) — forge commands don't declare it; validateRegistration skips undefined modulePath.</item>
   <item>RFC-1026: add ModuleFiberState, KernelModuleHandle, KernelLifecycleRegistry for lifecycle-owned kernel registrations with disposer pattern.</item>
   <item>RFC-1027: add RemediationHint interface and optional remediationHints field to KernelExecutionReport for agent-actionable fix suggestions.</item>
   <item>RFC-1028: add moduleBasePath to KernelRegisteredCommandInfo, derived from modulePath (RFC-0960) for dynamic moduleSrcDir resolution in the pipeline executor.</item>
   <item>RFC-1038: replace KernelModule with ModuleExport, KernelCommandDefinition with CommandDeclaration, KernelRuntimeContext.registry with actualState, KernelAppConfig uses ModuleExport.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0260, RFC-0267, RFC-0326, RFC-0390, RFC-0518, RFC-0579, RFC-0686, RFC-0960</history>
 </CHANGE_SUMMARY>
 */
 

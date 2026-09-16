@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1065: lagebild.validate command — check 4 LAGEBILD_* secrets via wrangler secret list, verify .env key presence, best-effort GET /health.</purpose>
-  <keywords>lagebild, validate, secret, wrangler, list, health, RFC-1065</keywords>
-  <responsibilities>
-    <item>Resolve workerName from system-config.yaml for the specified channel.</item>
-    <item>Spawn wrangler secret list --name <workerName> and parse output (AC-5).</item>
-    <item>Check all 4 LAGEBILD_* secret names are present.</item>
-    <item>Read .env from cache clone — check LAGEBILD_API_KEY presence (presence check only).</item>
-    <item>Best-effort GET <api-url>/health (unauthenticated, non-blocking).</item>
-    <item>Return allSecretsPresent: boolean (AC-6).</item>
-    <item>Exit non-zero if not all secrets present.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not use the API key for authenticated requests — GET /health only.</item>
     <item>Do not block on health check failure — best-effort, non-blocking.</item>
@@ -19,6 +11,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: initial lagebild.validate command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

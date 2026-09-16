@@ -6,33 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0355: initial mission.close command handler.</item>
-  <item>RFC-0477: add reconciledAt guard, bordbuch commit+push, and close-report.json evidence.</item>
-  <item>RFC-0480: create git bundle in evidence/ before closing; preserve workpiece for mission.preview.</item>
-  <item>RFC-0480: add dirty workpiece guard to mission.close.</item>
-  <item>RFC-0522: resolve releaseId with flag→manifest precedence; add warnings[] to CloseReport.</item>
-  <item>RFC-0560: use resolveActor(input) for actor resolution with --actor-from-auth flag.</item>
-  <item>RFC-0580: auto-commit werkstatt side-effects (registry.yaml, mission.yaml) after writeRegistry.</item>
-  <item>RFC-0593: add mission.validate inline gate before lock acquisition; re-check state inside locks.</item>
-  <item>RFC-0597: write .materialization-state.json and copy .cache/ from workpiece to cache clone as final step.</item>
-  <item>ADR-0010: stop any running dev/preview server for the workpiece before closing the mission.</item>
-  <item>RFC-0652: mandatory evidence.sync to R2 before writing close-report.json; --skip-evidence-sync escape hatch with Bordbuch audit entry.</item>
-  <item>RFC-0655: add releaseId to CloseReport interface; pass releaseId as top-level option to appendBordbuchEntry.</item>
-  <item>RFC-0658: validate bordbuch before appending close event (defense-in-depth for distribution-reuse skip path).</item>
-  <item>RFC-0703: auto-pin platform version via sternsystem.pin after registry update, before werkstatt commit.</item>
-  <item>RFC-0705: move mirror status gathering before state transition; add blocking check when external mirrors are desynced.</item>
-  <item>RFC-0734: add CREG-05 enforcement — warn when content drift exists and no apply-result.json; add --skip-content-regression flag. ADR-0050: changed from blocking throw to non-blocking warning.</item>
-  <item>RFC-0762: extend CloseReportMirror with synced/syncError; add post-close sternsystem.sync call before state file write.</item>
-  <item>Bug fix: push cache clone to origin before mirror sync check to prevent false "out of sync" when commits were created between reconcile and close.</item>
-  <item>RFC-0801: remove auto-archive from mission.close; remove CloseReportArchive interface and --skip-auto-archive flag.</item>
-  <item>RFC-0797: replace dirty workpiece guard with commitWorkpieceIfDirty auto-commit; add pre-mirror-check sternsystem.sync inside lock with --skip-auto-sync flag.</item>
-  <item>RFC-0820: add zero operator commit guard — block close when no commits since materialization; add --allow-no-op override flag.</item>
-  <item>RFC-0822: persist .env* files to cache clone as final close step.</item>
-  <item>RFC-0878: write .closed sentinel file to workpiece as final step before returning.</item>
   <item>RFC-0913: add reconcile-freshness gate — compare workpiece HEAD against workpieceHeadAtReconcile from reconciliation report; fail-closed on missing report; add --skip-reconcile-check escape hatch.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal — each step records to journal.jsonl for crash-safe resume.</item>
   <item>RFC-0991: add behavior-snapshot-refresh step to buildCloseSteps for auto-generating behavior snapshot during mission close.</item>
   <item>RFC-0992: behavior-snapshot-refresh now updates workpieceHeadAtReconcile in reconciliation-report.json after commit, preventing false unreconciled-commit freshness-check failure.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878</history>
 </CHANGE_SUMMARY>
 */
 

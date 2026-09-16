@@ -6,19 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0355: initial mission.open command handler.</item>
-  <item>RFC-0477: commit and push bordbuch after appending mission-open entry.</item>
-  <item>RFC-0560: use resolveActor(input) for actor resolution with --actor-from-auth flag.</item>
-  <item>RFC-0580: auto-commit werkstatt side-effects (registry.yaml, mission.yaml) after writeRegistry.</item>
-  <item>RFC-0593: add bordbuch.validate pre-flight gate before lock acquisition.</item>
   <item>ADR-0030: verify commitAndPushBordbuch succeeded — throw on commit failure (commitSha null) and push failure (pushed false) with distinct error messages.</item>
-  <item>Bug fix: auto-repair orphan-mission-close bordbuch violations before lock acquisition; commit and push repaired bordbuch to avoid dirty cache clone blocking mission.reconcile.</item>
   <item>RFC-0796: add cleanupStaleMissionEntries pre-flight cleanup before createMissionDirectories; trash stale symlinks and empty dirs, skip non-empty real dirs with warning.</item>
-  <item>Bug fix: clean up mission directories on bordbuch push/commit failure to prevent stale entries on retry.</item>
-  <item>Bug fix: list available systems on unknown --system ID for better agent self-correction.</item>
-  <item>Bug fix: bordbuch.repair now auto-commits, removed redundant commitAndPushBordbuch call from auto-repair path.</item>
   <item>RFC-0951: auto-materialize workpiece during mission.open with forward-only rollback on failure.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593</history>
 </CHANGE_SUMMARY>
 */
 

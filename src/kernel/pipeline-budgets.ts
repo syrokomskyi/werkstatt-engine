@@ -15,10 +15,16 @@ prefers a budget-file entry over the inline expectedDurationMs when both exist.
   <item>Do not gate builds on budgets — they are advisory telemetry, never a failure.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-0270: initial implementation.</item>
   <item>ADR-0023: add batchAppendStepTelemetry for batched telemetry writes at pipeline completion.</item>
   <item>RFC-0963: filter telemetry by registered sites from fleet/fleet.sites.yaml — removes stale entries for retired apps.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

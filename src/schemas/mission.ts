@@ -7,13 +7,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0355: initial Mission and Bordbuch schemas.</item>
-  <item>RFC-0473: add pseo and indexnow.submit kinds for runtime operational events.</item>
-  <item>RFC-0479: add mission-migrate kind for migration step bordbuch entries.</item>
   <item>RFC-0480: add rfcId to mission manifest for C-surface regression check traceability.</item>
   <item>RFC-0517: add preflight-skipped kind for preflight gate bypass audit trail.</item>
   <item>RFC-0706: add nachweis-record and nachweis-consent kinds for Nachweisregister trust lifecycle (ADR-0028).</item>
   <item>RFC-0715: add nachweis-signed and nachweis-timestamped kinds for N3 cryptographic verification.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0355, RFC-0473, RFC-0479</history>
 </CHANGE_SUMMARY>
 */
 

@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0921: Shared Ed25519 sign/verify primitives — canonicalization, raw byte signing, and convenience wrappers.</purpose>
-<keywords>ed25519, sign, verify, canonical, bytes</keywords>
-<responsibilities>
-  <item>canonicalBytes delegates to CanonicalJsonObjectV1 from @warpgogol/werkstatt-engine/fingerprint (RFC-0849 / DNA-53).</item>
-  <item>signBytes and verifyBytes are low-level Ed25519 primitives operating on raw Uint8Array messages.</item>
-  <item>sign and verify are convenience wrappers that canonicalize a SignablePayload before signing/verifying.</item>
-  <item>All @noble/ed25519 usage in the ecosystem is confined to this module and key.ts.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement key generation or loading — those live in key.ts.</item>
   <item>Does not implement multibase encoding — that is a Cosmic Passport concern.</item>
@@ -16,6 +11,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0921: initial signing primitives module.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

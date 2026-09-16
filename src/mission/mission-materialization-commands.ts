@@ -6,43 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0356: initial mission validate/preview/build/diff/reconcile command handlers.</item>
-  <item>RFC-0480: rewrite reconcile with git format-patch + git am; add preReconcileSha idempotency.</item>
-  <item>RFC-0480: integrate astro build into mission.validate — static checks + build must both pass.</item>
-  <item>RFC-0480: add dirty workpiece guard to mission.reconcile.</item>
-  <item>RFC-0480: add dirty workpiece warning to mission.validate.</item>
-  <item>RFC-0522: add dirty cache clone guard to mission.reconcile inside existsSync(gitDir) block.</item>
-  <item>RFC-0522: add git am --3way fallback to patch application loop.</item>
-  <item>Add --whitespace=fix to git am calls and auto-resolve add/add conflicts on generated files by taking theirs (workpiece version).</item>
-  <item>RFC-0522: add dirty cache clone warning to mission.validate.</item>
-  <item>RFC-0560: use resolveActor(input) in mission.reconcile for actor resolution with --actor-from-auth flag.</item>
-  <item>RFC-0568: replace git format-patch + git am with git merge --no-ff; remove 3-way fallback and auto-resolve; add untracked file investigation; use dynamic branch name; add push retry with exponential backoff.</item>
-  <item>RFC-0578: add structured BUILD-01 diagnostic with pattern matching for common Astro build failures in mission.validate.</item>
-  <item>RFC-0579: populate nextSteps in mission.validate for pass, fail, and dirty-workpiece states.</item>
-  <item>RFC-0580: auto-commit werkstatt side-effects (mission.yaml) after writeMissionManifest in mission.reconcile.</item>
-  <item>ADR-0008: run full three-phase build pipeline (build.prepare → astro build → build.post) in mission.build and mission.validate; write build-input-hash.json in mission.build; delegate to shared runPipelinePhase and computeBuildInputHash helpers.</item>
-  <item>RFC-0635: reuse distribution in mission.validate when build-input-hash matches — skip build cycle, copy dist/ from distribution, add distributionReused/buildInputHash/fullBuildRan to MissionValidateData; add build.check phase to mission.build.</item>
-  <item>RFC-0644: replace isWorkpieceDirty blocking guard with commitWorkpieceIfDirty auto-commit call before git fetch; add workpieceAutoCommitted/workpieceCommitSha to MissionReconcileData; update mission.validate dirty warnings.</item>
-  <item>RFC-0689: extract shared autoRegenerateSnapshotOnSnap01 helper into snapshot-auto-regen.ts for reuse by leitstand.dev-deploy.</item>
-  <item>RFC-0697: refactor mission.validate SNAP-01 path to use shared orchestrateSnap01Recovery helper; dirtyBeforeBuildPost check remains caller-side.</item>
-  <item>RFC-0702: add commitBordbuchProjections cleanup call in distribution reuse path to clean dirty bordbuch files from previous runs.</item>
-  <item>RFC-0705: add non-fatal sternsystem.sync call after git push origin in reconcile when external mirrors exist; add mirrorSync to MissionReconcileData and reconciliation-report.json.</item>
-  <item>RFC-0749: add post-validation commitBordbuchProjections cleanup call in mission.validate to commit bordbuch projections that were regenerated during build.prepare but not committed by bordbuch.commit due to transient git failure.</item>
-  <item>RFC-0763: add commitBordbuchProjections cleanup on build.prepare failure and validation failure early-return paths to clean bordbuch projections from cache clone on all exit paths. Extract cleanupBordbuchOnFailure helper to avoid duplication.</item>
-  <item>Bug fix: post-merge guard — restore system-config.yaml/system-state.yaml if merge silently removed them; commit restored files to avoid leaving cache clone dirty.</item>
-  <item>RFC-0796: add validateNoStaleMissionEntries workspace-level advisory check — warns about stale symlinks or terminal-state dirs in missions/ root (non-blocking).</item>
-  <item>RFC-0797: add commitCacheCloneIfDirty auto-commit before dirty cache clone guard in mission.reconcile; replace commitBordbuchProjections with commitCacheCloneIfDirty in post-validate cleanup.</item>
-  <item>RFC-0820: add zero-transfer warning in mission.reconcile when transferredCommits is zero; add zeroTransferWarning field to reconciliation report.</item>
-  <item>RFC-0913: add post-merge .gitignore restoration and untrackForbiddenGeneratedFiles call; add workpieceHeadAtReconcile, gitignoreRestored, forbiddenFilesUntracked to reconciliation report.</item>
-  <item>RFC-0918: add post-push divergence check in mission.reconcile comparing cache clone HEAD against origin/main; add divergenceWarning to reconciliation report.</item>
-  <item>ADR-0060: split bordbuch auto-resolution conflicted paths into tracked (git checkout HEAD) and untracked generated (git add only) — CACHE_CLONE_GENERATED_PATTERNS files are not in HEAD, so git checkout HEAD fails for them.</item>
-  <item>RFC-0958: wrap mission.reconcile post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
-  <item>RFC-0958: wrap mission.validate build cycle in runOperation with journal for crash-safe resume.</item>
-  <item>RFC-0973: --force auto-clears kernel cache DB, pipeline cache hits, journal, and validation report before pipeline execution.</item>
   <item>RFC-1020: delete stale validation-report.json at the start of runMissionValidate to prevent mission.reconcile from reading a failed report from a previous run.</item>
   <item>RFC-1028: write .validation-state.json after mission.validate completes (pass, fail, and distribution-reuse paths) with per-validator states for inspection.</item>
   <item>RFC-1074: extract persistDistribution helper — shared by runMissionValidate and runMissionBuild to copy dist, write build-input-hash.json, and write build-manifest.json.</item>
   <item>RFC-1086: add --fast flag to mission.validate for incremental validation — reads previous validation-report.json, skips passed phases, cascades re-run of downstream phases.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973</history>
 </CHANGE_SUMMARY>
 */
 

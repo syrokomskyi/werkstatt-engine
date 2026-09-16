@@ -1,15 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707: nachweis.ingest command handler — hashes a PDF, uploads to R2, appends Bordbuch entry.</purpose>
-<keywords>nachweis, ingest, r2, bordbuch, sha256, evidence</keywords>
-<responsibilities>
-  <item>Validates input file exists and is a PDF.</item>
-  <item>Computes SHA-256 via @warpgogol/fingerprint byteHashFile.</item>
-  <item>Uploads to R2 bucket nachweise under {systemId}/private/{recordId}/v{version}/source.pdf.</item>
-  <item>Appends nachweis-record Bordbuch entry with writer-role nachweis.</item>
-  <item>Supports --dry-run (no R2 upload, no Bordbuch append).</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not create PBP entities — that is a manual content authoring step.</item>
   <item>Does not implement R2 download or cleanup.</item>
@@ -17,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0707: initial nachweis.ingest command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

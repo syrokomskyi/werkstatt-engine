@@ -1,20 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0891: nachweis.screenshot.process command handler — transforms a raw full-page screenshot into a 16:9 display variant (1280x720, WebP) and uploads to R2 public.</purpose>
-<keywords>nachweis, screenshot, process, crop, resize, webp, r2, display, sharp</keywords>
-<responsibilities>
-  <item>Reads websiteScreenshot.rawArtifact from the evidence-source entity.</item>
-  <item>Resolves the raw file from cache clone local copy or R2 private storage (fallback).</item>
-  <item>Computes a 16:9 crop region from the top of the raw image via sharp metadata.</item>
-  <item>Crops, resizes to 1280x720, and converts to WebP via sharp pipeline.</item>
-  <item>Uploads the display variant to R2 public at {systemId}/screenshots/{slug}/website-screenshot.webp.</item>
-  <item>Updates EvidenceSource.websiteScreenshot with display variant metadata, preserving rawArtifact.</item>
-  <item>Propagates capturedAt from rawArtifact.capturedAt to the display variant.</item>
-  <item>Appends nachweis-record Bordbuch entry with processing metadata.</item>
-  <item>Supports --dry-run to compute crop dimensions without uploading.</item>
-  <item>Supports --crop-offset to adjust the vertical crop position.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not ingest raw screenshots — use nachweis.screenshot.ingest (RFC-0890).</item>
   <item>Does not upload pre-processed files — use nachweis.screenshot.upload (RFC-0886).</item>
@@ -23,6 +11,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0891: initial nachweis.screenshot.process command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

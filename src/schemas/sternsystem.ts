@@ -16,19 +16,14 @@ RFC-0790: add systemConfigSchema, systemStateSchema, servicesRegistrySchema for 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0354: initial Sternsystem schemas (SystemPin, FleetRegistryEntry, FleetRegistry).</item>
-  <item>RFC-0479: migratorCursor changed from SemVer string to string[] (migrator-id list).</item>
-  <item>RFC-0561: add optional owner field (did:web VC subject id) to fleetRegistryEntrySchema.</item>
-  <item>RFC-0574: replace repo/mirror with mirrors[] array (mirrorEntrySchema, mirrorStorageTypeSchema).</item>
-  <item>RFC-0752: add cloudflareZoneId to fleetRegistryEntrySchema, serviceSubdomainSchema + serviceEntrySchema + services[] to fleetRegistrySchema.</item>
-  <item>RFC-0751: extend serviceEntrySchema with kind, url, publicEndpoints, routes, upstreams, lastDeployed, healthCheckPath.</item>
-  <item>RFC-0790: add systemConfigSchema, systemStateSchema, servicesRegistrySchema for convention-based discovery.</item>
-  <item>RFC-0806: add lastDevDeployed to serviceEntrySchema, add cloudflare-worker to kind enum.</item>
-  <item>RFC-0902: update kebabRe error messages to mention "no TLD suffix".</item>
   <item>RFC-0964: add fleet.canary field to systemConfigSchema for wave orchestration.</item>
   <item>RFC-0966: add passportRequired to systemStateSchema for passport enforcement gating.</item>
   <item>RFC-0967: add ownershipRequired to systemStateSchema for ownership enforcement gating.</item>
   <item>RFC-1065: add lagebild to systemStateSchema for Lagebild connection metadata.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0354, RFC-0479, RFC-0561, RFC-0574, RFC-0751, RFC-0752, RFC-0790, RFC-0806, RFC-0902</history>
 </CHANGE_SUMMARY>
 */
 

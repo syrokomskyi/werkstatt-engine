@@ -4,7 +4,7 @@
 SHARED-01: @warpgogol/werkstatt-shared is declared as a dependency in packages/werkstatt/package.json
 SHARED-02: No @warpgogol/werkstatt-site/* exemptions remain in EXEMPT_PREFIXES in autonomy-validate.ts
 SHARED-03: No @warpgogol/werkstatt-site/* imports remain in packages/werkstatt/src/** non-test files</purpose>
-<keywords>shared, validate, RFC-0868, boundary guard, SHARED-01, SHARED-02, SHARED-03</keywords>
+
 <non-goals>
   <item>Does not scan werkstatt-shared source — that is the shared package's own boundary, not the engine's.</item>
   <item>Does not replace werkstatt.autonomy.validate — SHARED-03 is a cross-check, not a replacement.</item>
@@ -13,6 +13,9 @@ SHARED-03: No @warpgogol/werkstatt-site/* imports remain in packages/werkstatt/s
 <CHANGE_SUMMARY>
   <item>RFC-0868: initial shared-validate implementing SHARED-01/02/03 per RFC spec.</item>
   <item>RFC-0868: use shared import-scan-util to avoid duplication with autonomy-validate.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

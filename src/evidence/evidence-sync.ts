@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>evidence.sync command handler — uploads evidence artifacts from missions/{mission}/evidence/axiom/ to R2 (RFC-0651).</purpose>
-<keywords>evidence, sync, r2, upload, axiom</keywords>
-<responsibilities>
-  <item>Reads evidence-metadata.json to resolve runTimestamp.</item>
-  <item>Walks evidence/axiom/ recursively and uploads all files to R2.</item>
-  <item>Supports --dry-run mode that makes no R2 API calls.</item>
-  <item>Resolves systemId from system-config.yaml by matching missionId to currentMission.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not integrate with mission.close or leitstand.dev-deploy — that is RFC-0652.</item>
   <item>Does not implement content-addressed deduplication — rejected for simplicity (RFC-0650).</item>
@@ -17,7 +12,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial evidence.sync command handler.</item>
   <item>ADR-0025: add periodic progress logging (30s heartbeat) during R2 upload loop.</item>
-  <item>Replace sequential upload with concurrency pool (10 parallel) — 10x faster for 1576 files.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

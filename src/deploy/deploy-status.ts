@@ -1,18 +1,17 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0566 deploy.status — report current platform deployment status.</purpose>
-  <keywords>deploy, status, current, previous, git-sha</keywords>
-  <responsibilities>
-    <item>Read current and previous symlink targets.</item>
-    <item>Read manifest.json for current git SHA and deployment time.</item>
-    <item>Return DeployStatus with current/previous hashes and git SHA.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not mutate symlinks or artifacts.</item>
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy.status handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

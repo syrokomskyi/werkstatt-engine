@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0899: Leitstand access protection commands — protect, unprotect, status. Manages 4-digit PIN secrets for dev/alt subdomain Workers via wrangler secret put/delete.</purpose>
-  <keywords>leitstand, access, protect, unprotect, pin, wrangler, secret, RFC-0899</keywords>
-  <responsibilities>
-    <item>leitstand.access.protect: set ACCESS_PIN secret on dev and alt channel Workers, update system-state.yaml.</item>
-    <item>leitstand.access.unprotect: delete ACCESS_PIN secret from dev and alt channel Workers, clear system-state.yaml.</item>
-    <item>leitstand.access.status: report PIN protection status from system-state.yaml.</item>
-    <item>Use spawn("npx", ["--yes", "wrangler", "secret", "put/delete", ...]) pattern matching service-deploy-helpers.ts.</item>
-    <item>Create temporary wrangler.jsonc in temp directory for worker name context.</item>
-    <item>Pipe PIN to stdin for wrangler secret put.</item>
-    <item>Best-effort: dev failure does not block alt; per-channel status reported.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not set secrets on the main channel Worker — main domain is never protected.</item>
     <item>Do not store the PIN in git — system-state.yaml stores only null or the 4-digit string.</item>
@@ -20,6 +12,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0899: Initial access protection commands.</item>
   <item>RFC-1065: extracted runWranglerSecretPut/Delete to wrangler-secrets.ts shared helper.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

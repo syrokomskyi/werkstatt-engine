@@ -7,10 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Lazy loading refactor: extracted from sternsystem/index.ts to use dynamic imports inside async register().</item>
   <item>RFC-0477: add sternsystem.status command registration.</item>
   <item>RFC-0966: add sternsystem.passport.generate and sternsystem.passport.verify command registrations.</item>
   <item>RFC-0968: add sternsystem.handover.prepare/complete/cancel command registrations and HANDOVER-01 rule declaration.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

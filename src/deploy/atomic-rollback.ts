@@ -1,19 +1,17 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0566 deploy.atomic.rollback — atomic symlink swap back to the previous platform artifact.</purpose>
-  <keywords>deploy, atomic, rollback, symlink, previous</keywords>
-  <responsibilities>
-    <item>Read previous symlink target to determine previous artifact hash.</item>
-    <item>Fail with no-previous-artifact if no previous symlink exists.</item>
-    <item>Verify previous artifact hash before swapping.</item>
-    <item>Atomically swap current symlink back to previous artifact.</item>
-  </responsibilities>
+
+
   <non-goals>
     <item>Do not rebuild from source — rollback swaps to existing previous symlink target.</item>
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy.atomic.rollback handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -1,15 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0715/RFC-0921: nachweis.sign command handler — signs the core evidence fields of a Nachweis record with an Ed25519 operator key via shared signing core.</purpose>
-<keywords>nachweis, sign, ed25519, operator, signature, bordbuch</keywords>
-<responsibilities>
-  <item>Reads the EvidenceSource entity and extracts core evidence fields {recordId, slug, kind, name, items}.</item>
-  <item>Canonicalizes the payload via the shared signing core (CanonicalJsonObjectV1, RFC-0849 / DNA-53).</item>
-  <item>Signs the canonical bytes with the shared signing core using the operator private key.</item>
-  <item>Appends nachweis-signed Bordbuch entry with signature metadata.</item>
-  <item>Idempotent: if a nachweis-signed entry already exists for the slug, returns the existing signature.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not timestamp — that is nachweis.timestamp.</item>
   <item>Does not verify — that is nachweis.verify-signature.</item>
@@ -19,6 +12,9 @@
   <item>RFC-0715: initial nachweis.sign command handler.</item>
   <item>RFC-0715 review fix: use byteHash from @warpgogol/fingerprint for payloadHash (DNA-53). Import flagString/flagBool from nachweis-n3-types.ts.</item>
   <item>RFC-0921: delegate signing to shared signing core (sign, canonicalBytes, fromHex). Remove @noble/ed25519 and stableStringify imports. Remove canonicalRecordPayload function.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

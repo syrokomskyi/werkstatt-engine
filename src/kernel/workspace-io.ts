@@ -20,10 +20,16 @@ capture intents, just from different adapters.
   <item>Do not enforce IO at the module-import level — that is kernel.io.lint's static check.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-0267: initial implementation.</item>
   <item>RFC-0267 follow-up: add readdir(path): Promise&lt;DirEntry[]&gt; to complete the port so directory-listing commands (e.g. sitemap.generate) migrate mechanically without importing node:fs for Dirent.</item>
   <item>RFC-0326: createDefaultIO returns { io, intents } — writes touch real disk AND record WriteIntent[] for filesModified reporting.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

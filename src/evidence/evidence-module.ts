@@ -1,11 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>Lazy-loading kernel module for RFC-0651 evidence commands: evidence.sync and evidence.fetch.</purpose>
-<keywords>evidence, sync, fetch, r2, module</keywords>
-<responsibilities>
-  <item>Registers evidence.sync and evidence.fetch kernel commands.</item>
-  <item>Uses dynamic imports inside async register() for lazy loading.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not re-export types or utilities — the barrel index.ts remains the public API surface.</item>
   <item>Does not integrate with mission.close or leitstand.dev-deploy — that is RFC-0652.</item>
@@ -13,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial evidence module with evidence.sync and evidence.fetch commands.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -1,30 +1,22 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707: nachweis.validate command handler — validates PBP trust entities and enforces publication gate.</purpose>
-<keywords>nachweis, validate, publication, gate, consent, evidence, bordbuch</keywords>
-<responsibilities>
-  <item>Reads PBP EvidenceSource, Consent, and Claim entities from the cache clone.</item>
-  <item>Checks EvidenceSource items for sha256 on Nachweis kinds.</item>
-  <item>Checks Consent entities with consentScope.document.status granted have grantedAt set.</item>
-  <item>Checks Claim entities for valid BCP 47 statementLang tags.</item>
-  <item>Enforces publication gate: no published record without all conditions met.</item>
-  <item>Delegates bordbuch hash-chain validation to bordbuch.validate.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-  <item>RFC-0872: policy-driven gate V2, technical-assessment validation, locale drift check.</item>
-  <item>ADR-0054: enforces the technical-assessment evidence profile decision — canonical raw artifact, assessment metadata, authorization basis, no dummy consent.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not modify any state — read-only validation.</item>
   <item>Does not validate PBP schema conformance — that is the PBP compiler's job.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0707: initial nachweis.validate command handler.</item>
-  <item>RFC-0715: add N3 artifact check — verify nachweis-signed and nachweis-timestamped entries exist for N3 records.</item>
   <item>RFC-0871: add n3-timestamp-qualification-evidence-missing violation for eidas-qualified records without qualificationEvidenceRef.</item>
   <item>RFC-0872: replace evaluateGate with policy-driven evaluateGateV2, add technical-assessment validation, locale drift check.</item>
   <item>RFC-0880: add NACHWEIS-SLUG-01 check for mandatory slug in Nachweis evidence records.</item>
   <item>RFC-0886: add NACHWEIS-DISPLAY-CONSENT-01 check for display↔consent consistency (warning, not hard failure).</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0707, RFC-0715</history>
 </CHANGE_SUMMARY>
 */
 

@@ -7,7 +7,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0362: initial atomic write helpers (atomicWriteFile, atomicMoveDir).</item>
-  <item>Windows EBUSY: atomicMoveDir uses rename-to-trash instead of fs.rm for replace operations — rename succeeds where deletion fails on Windows.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

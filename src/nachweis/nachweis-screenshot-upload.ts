@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0886: nachweis.screenshot.upload command handler — uploads a website screenshot to R2 and updates EvidenceSource.websiteScreenshot.</purpose>
-<keywords>nachweis, screenshot, upload, r2, evidence-source, website</keywords>
-<responsibilities>
-  <item>Reads a screenshot file from --file path, computes SHA-256, infers mediaType from extension.</item>
-  <item>Uploads to R2 at {systemId}/screenshots/{slug}/website-screenshot.{ext}.</item>
-  <item>Updates EvidenceSource.websiteScreenshot field with { sha256, mediaType, storage: "public", url }.</item>
-  <item>Appends nachweis-record Bordbuch entry with metadata { slug, screenshotSha256, mediaType }.</item>
-  <item>Acquires system and bordbuch locks before modifying state.</item>
-  <item>Supports --dry-run to skip R2 upload and entity update.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not validate screenshot content or dimensions — only uploads and records the hash.</item>
   <item>Does not generate screenshots — use external tooling or nachweis.measure.* commands.</item>
@@ -18,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0886: initial nachweis.screenshot.upload command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

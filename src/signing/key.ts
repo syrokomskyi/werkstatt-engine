@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0921: Shared Ed25519 key management — generation, loading, saving, and encoding helpers.</purpose>
-<keywords>ed25519, key, generate, hex, pem, encoding</keywords>
-<responsibilities>
-  <item>Generates Ed25519 keypairs using @noble/ed25519.</item>
-  <item>Loads private and public keys from hex strings, PEM strings, or file paths.</item>
-  <item>Saves keypairs to disk in hex or PEM encoding.</item>
-  <item>Provides encoding helpers: toHex, fromHex, toPem, fromPem.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement signing or verification — those live in sign.ts.</item>
   <item>Does not manage key publication or key rotation — domain-specific concerns belong in consumers.</item>
@@ -15,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0921: initial signing key management module.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

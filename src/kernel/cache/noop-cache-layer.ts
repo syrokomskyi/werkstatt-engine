@@ -9,9 +9,15 @@ get() always returns null. Commands continue to work by parsing files directly.
   <item>Do not implement any real caching — this is the fallback when SQLite is unavailable.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-0382: initial implementation — NoopCacheLayer fallback.</item>
   <item>ADR-0023: add close() no-op for CacheLayer interface parity.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -8,16 +8,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-0866: initial certify module with CertifyInput, CertifyResult, and runLeitstandCertify().</item>
-<item>RFC-0866 fix A-2/C-3: use writeFileIfChanged instead of fs.writeFile for gate-decision JSON.</item>
-<item>RFC-0866 fix D-2: read dev deployment URL from effect records, accept --base-url flag fallback.</item>
-<item>RFC-0866 audit: wire baseUrl into astro-mission-check producer handler — calls mission.check with --base-url when available, skips with warning when not.</item>
-<item>Fix hardcoded systems-cache paths: use resolveCacheClonePath for gate-decisions output and resolveDevBaseUrl. Commit gate-decision JSON to cache clone git.</item>
-<item>RFC-0867: add tryReuseEvidence — skip producer execution when prior gate evidence for same artifact hash is fresh. Write evidence sidecar {release}-evidence.json after producer execution.</item>
-<item>RFC-0929: skip gate decisions with status=fail in tryReuseEvidence — only reuse evidence from passing decisions.</item>
-<item>RFC-0929: add pre-flight accessPin check — fail early with clear message if site has PIN protection active. --force does not bypass this check.</item>
-<item>RFC-0938: auto-manage access PIN during certify — auto-remove before producers, auto-restore in finally block. --auto-manage-pin flag (default true).</item>
-<item>Add PIN_DELETION_PROPAGATION_DELAY_MS constant and wait after auto-unprotect to prevent 401 race condition.</item>
+  <item>RFC-0867: add tryReuseEvidence — skip producer execution when prior gate evidence for same artifact hash is fresh. Write evidence sidecar {release}-evidence.json after producer execution.</item>
+  <item>RFC-0929: skip gate decisions with status=fail in tryReuseEvidence — only reuse evidence from passing decisions.</item>
+  <item>RFC-0929: add pre-flight accessPin check — fail early with clear message if site has PIN protection active. --force does not bypass this check.</item>
+  <item>RFC-0938: auto-manage access PIN during certify — auto-remove before producers, auto-restore in finally block. --auto-manage-pin flag (default true).</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0866</history>
 </CHANGE_SUMMARY>
 */
 

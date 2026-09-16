@@ -1,13 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>evidence.fetch command handler — downloads historical evidence runs from R2 and lists available runs via ListObjectsV2 (RFC-0651).</purpose>
-<keywords>evidence, fetch, r2, download, list, axiom</keywords>
-<responsibilities>
-  <item>Downloads all objects under {systemId}/{missionId}/{runTimestamp}/ to --output-dir.</item>
-  <item>Lists available runs via ListObjectsV2 with prefix {systemId}/{missionId}/.</item>
-  <item>Downloads evidence-metadata.json per run in --list mode to extract commitSha.</item>
-  <item>Supports --no-raw to skip raw/ artifacts during fetch.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement Iceberg REST catalog listing — ListObjectsV2 is the primary mechanism.</item>
   <item>Does not support partial fetch or resumable downloads.</item>
@@ -15,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial evidence.fetch command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

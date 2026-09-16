@@ -1,11 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0921: Signing kernel module — registers signing.key.generate command.</purpose>
-<keywords>signing, module, kernel, command, registration</keywords>
-<responsibilities>
-  <item>Registers signing.key.generate for Ed25519 keypair generation.</item>
-  <item>Uses dynamic imports for lazy loading (same pattern as nachweis.module.ts).</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement command handlers — those live in signing-commands.ts.</item>
   <item>Does not register domain-specific signing commands (nachweis.sign, integrity.sign) — those belong to their respective modules.</item>
@@ -13,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0921: initial signing kernel module with signing.key.generate registration.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

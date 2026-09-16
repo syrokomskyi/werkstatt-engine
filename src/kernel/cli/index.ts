@@ -7,12 +7,17 @@
   <item>Do not implement business logic for commands executed.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>CLI execution must route through registered kernel commands and preserve typed flag parsing.</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>Return a JSON error envelope for top-level CLI exceptions when --json is requested.</item>
   <item>RFC-0686: add --concurrency flag for pipeline execution.</item>
   <item>ADR-0022: add --no-registry-cache flag to disable process-lifetime registry cache.</item>
   <item>RFC-0870: add pipeline hint to Unknown command and not-registered error messages.</item>
   <item>RFC-0972: global --json exit code policy — always exit 0 when outputFormat is json.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

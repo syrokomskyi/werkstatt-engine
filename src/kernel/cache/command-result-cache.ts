@@ -12,10 +12,16 @@ helpers for storing and retrieving KernelExecutionReport objects in the
   <item>Do not validate `reads` declarations — that lives in command.reads.validate.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-0390: initial implementation — COMMAND_RESULT_CACHE_NAMESPACE, CommandResultCacheKey, buildCommandResultCacheKey, computeInputsHash, computeModuleHash, getCachedCommandResult, setCachedCommandResult.</item>
   <item>RFC-0637: add modulePaths parameter to computeModuleHash for granular per-command module hashing.</item>
   <item>RFC-0685: add tree index support to expandGlobs, byte-mode selection per extension in computeInputsHash, inputsMetadata sidecar in cache entries, wrapper format for getCachedCommandResult/setCachedCommandResult.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

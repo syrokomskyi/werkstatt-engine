@@ -1,21 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0874: nachweis.measure.lighthouse command handler — runs five sequential canonical Lighthouse runs, parses LHR JSON, aggregates categories, builds AssessmentBundleV1, delegates to nachweis.assessment.ingest.</purpose>
-<keywords>nachweis, lighthouse, measure, assessment, adapter, LHR, canonical-run, median</keywords>
-<responsibilities>
-  <item>Runs Lighthouse CLI five times sequentially against a target URL.</item>
-  <item>Preserves raw LHR JSON for every successful canonical run as a canonical artifact.</item>
-  <item>Validates canonical run: Lighthouse exits successfully, LHR parses, no fatal runtime error, requested/final URL exists.</item>
-  <item>Fails with LIGHTHOUSE_CANONICAL_BATCH_INCOMPLETE if any of the five runs is invalid.</item>
-  <item>Fails with LIGHTHOUSE_CHROME_NOT_FOUND if Chrome/Chromium is not installed before any runs begin.</item>
-  <item>Aggregates numeric categories via median (index 2 for 5 sorted samples), preserves min/max/samples.</item>
-  <item>Preserves non-numeric categories (e.g. Agentic Browsing) as numerator/denominator/status — never coerces to 0-100.</item>
-  <item>Builds AssessmentBundleV1 and delegates to nachweis.assessment.ingest core function.</item>
-  <item>Does not duplicate R2 upload, SHA-256 hashing, PBP persistence, or Bordbuch append logic.</item>
-  <item>Does not sign, approve, timestamp, or publish — ends at N1 capture.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-  <item>observedAt is deterministic from first canonical run fetchTime, not new Date().</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not publish or approve — use nachweis.publish and nachweis.approve for gate progression.</item>
   <item>Does not create public derivatives — use nachweis.public-derivative.</item>
@@ -26,6 +13,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0874: initial nachweis.measure.lighthouse command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

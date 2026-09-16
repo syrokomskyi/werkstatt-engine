@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0714: nachweis.public-derivative command handler — uploads a public-derivative PDF to R2 and updates the evidence-source entity.</purpose>
-<keywords>nachweis, public, derivative, r2, upload, evidence-source, gate</keywords>
-<responsibilities>
-  <item>Uploads a public-derivative PDF to R2 under a public/ path prefix.</item>
-  <item>Updates evidence-source entity items.public to { sha256, storage: "public", mediaType: "application/pdf" }.</item>
-  <item>Satisfies publication gate condition: publicDerivativeReady.</item>
-  <item>Idempotent by SHA-256 — returns alreadyUploaded: true no-op when the same hash is already recorded.</item>
-  <item>Acquires system and bordbuch locks before modifying state.</item>
-  <item>Supports --dry-run to skip R2 upload and entity update.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not redact private data — the operator is responsible for the public-derivative content.</item>
   <item>Does not validate the PDF content — only uploads and records the hash.</item>
@@ -18,6 +10,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0714: initial nachweis.public-derivative command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

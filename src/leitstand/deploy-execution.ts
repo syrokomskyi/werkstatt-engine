@@ -8,14 +8,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-0866: initial deploy-execution module with DeployExecutionContext, DeployExecutionResult, and executeDeployPhases().</item>
-<item>RFC-0866: implement full 13-phase executeDeployPhases function with channel-specific behavior.</item>
-<item>RFC-0866 fix: populate HealthInput.releaseId and workspaceRoot from ctx, PropagateInput.expectedBehaviorSnapshotHash from localDistTreeHash.</item>
-<item>RFC-0866 fix: capture error message in outer catch and add errorMessage to DeployExecutionResult.</item>
-<item>RFC-0925: read accessPin from system-state.yaml, build authHeaders, pass to verifyFreshness and health checks for access-protected staging channels.</item>
-<item>RFC-0931: insert signing phase between build-identity write and wrangler-deploy; add releaseSignResult to DeployExecutionResult.</item>
-<item>RFC-0948: add post-deploy feature smoke check — fetches a page from the deployed URL and checks for feature markers in HTML. Non-fatal, warnings only.</item>
-<item>RFC-1092: replace hardcoded github-pages purge skip with adapter-aware purgeCapable() check.</item>
+  <item>RFC-0925: read accessPin from system-state.yaml, build authHeaders, pass to verifyFreshness and health checks for access-protected staging channels.</item>
+  <item>RFC-0931: insert signing phase between build-identity write and wrangler-deploy; add releaseSignResult to DeployExecutionResult.</item>
+  <item>RFC-0948: add post-deploy feature smoke check — fetches a page from the deployed URL and checks for feature markers in HTML. Non-fatal, warnings only.</item>
+  <item>RFC-1092: replace hardcoded github-pages purge skip with adapter-aware purgeCapable() check.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0866</history>
 </CHANGE_SUMMARY>
 */
 

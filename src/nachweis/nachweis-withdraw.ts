@@ -1,16 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707: nachweis.withdraw command handler — revokes consent (conditional on policy), sets withdrawn status, regenerates manifest.</purpose>
-<keywords>nachweis, withdraw, revoke, consent, bordbuch, manifest</keywords>
-<responsibilities>
-  <item>Sets record_status: withdrawn, publication.visibility: private.</item>
-  <item>RFC-0872: conditionally revokes consent only for attestation-v1 policy records.</item>
-  <item>Appends nachweis-consent (if applicable) and nachweis-record Bordbuch entries.</item>
-  <item>Regenerates manifest to remove withdrawn record from public output.</item>
-  <item>Idempotent: if already withdrawn, returns no-op result.</item>
-  <item>Does NOT delete R2 object — personal data persists as audit trail.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement data retention policy — deferred to future RFC.</item>
 </non-goals>
@@ -19,6 +11,9 @@
   <item>RFC-0707: initial nachweis.withdraw command handler.</item>
   <item>RFC-0872: conditionally revoke consent based on publication policy (only attestation-v1).</item>
   <item>RFC-0888: pass --skip-bordbuch to manifest.generate and append sichtpass Bordbuch entry with withdrawn: true after manifest regeneration.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

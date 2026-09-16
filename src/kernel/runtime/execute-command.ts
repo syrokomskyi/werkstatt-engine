@@ -10,18 +10,18 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>Do not introduce app-specific runtime composition or deployment behavior into this reusable package source file.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>TODO: record current design decisions</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0303: split out of runtime.ts (Phase 3 file-size split, hot-path file 8/8).</item>
-  <item>RFC-0326: extract intents from createDefaultIO() and surface as filesModified on the execution report for both real and dry runs.</item>
-  <item>RFC-0579: propagate nextSteps from KernelCommandResult to KernelExecutionReport and render as "Next steps:" block in pretty mode.</item>
-  <item>RFC-0635: inject force from context into input.flags.force so command handlers can read --force without declaring it in their flag schema.</item>
-  <item>ADR-0022: workspace registry now uses process-lifetime cache via getOrBuildWorkspaceRegistry.</item>
-  <item>RFC-0842: add assertAllSitesAllowed guard — rejects --all for commands where supportsAllSites is not true (covers false and undefined).</item>
-  <item>RFC-0870: add pipeline hint to not-registered and no-target-site error messages.</item>
   <item>RFC-0960: inject registry and ownershipMap into KernelRuntimeContext at all 3 construction sites.</item>
   <item>RFC-0960 fo-fix: add console.warn to computeOwnershipMap catch block for agent-facing clarity on import failures.</item>
   <item>RFC-1026: add module state check before execute (KERNEL-MODULE-02 for non-active modules), trackInFlight with try/finally release, KERNEL-MODULE-01 for disposed commands.</item>
   <item>RFC-1027: aggregate remediationHints from CheckResult diagnostics into KernelExecutionReport, capped at 3 entries sorted by occurrence count.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>ADR-0022, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870</history>
 </CHANGE_SUMMARY>
 */
 

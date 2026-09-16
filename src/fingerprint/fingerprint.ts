@@ -8,10 +8,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Split from primitives: byteHash/stableStringify/stableJsonHash moved to primitives.ts. This module now imports byteHash from there.</item>
-  <item>Fix silent error swallowing in fingerprintTree: emit warnings when falling back to byte hash on parse failure.</item>
   <item>RFC-0380: fingerprintTree combined input uses paths relative to tree root, making hashes portable across machines.</item>
   <item>RFC-0656: add mode: "stable" — byte hashing with targeted normalization for PDF, source map, and JSON timestamp fields.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

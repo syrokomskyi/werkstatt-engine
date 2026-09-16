@@ -6,21 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0357: initial release command handlers.</item>
-  <item>RFC-0381: resolve platformVersion, commitSha, and platformSemanticHash from ecosystem instead of hardcoding unknown.</item>
-  <item>RFC-0480: add C-surface regression check to release.prepare; block on C-surface regression without breaksC: true.</item>
-  <item>RFC-0520: extract C-surface regression check into evaluateCSurfaceGate pure function.</item>
-  <item>RFC-0522: write releaseId to mission manifest via writeMissionManifest after successful release preparation.</item>
-  <item>RFC-0585: restore production build, behavior snapshot capture + diff, and real hash computation in release.prepare; add distTreeHash guard to release.publish.</item>
-  <item>ADR-0008: run full three-phase build pipeline (build.prepare → astro build → build.post) in release.prepare fresh build path; delegate to shared runPipelinePhase and computeBuildInputHash helpers.</item>
-  <item>RFC-0596: call storeArtifactCore (lock-free) inside release.publish before state transition; extend ReleasePublishData with distArtifactHash; extend release.validate to check artifact field for published releases.</item>
-  <item>RFC-0608: write build-identity.json into dist/client/.well-known/ after hash computation.</item>
-  <item>RFC-0655: sync close-report.json releaseId after writing mission.yaml; add release.state.validate command.</item>
   <item>RFC-0656: add dist.determinism.validate command; switch release.prepare distTreeHash to mode: "stable".</item>
-  <item>Fix: correct resolveStagingDir call to use workspaceRoot instead of releasesBase; write release.yaml directly into stagingDir and remove redundant re-write after atomicMoveDir.</item>
   <item>RFC-0845: add Playwright Chromium pre-flight check before build.prepare (after distribution-reuse check) — fail fast with actionable error when Chromium is not installed.</item>
   <item>RFC-0931: add runReleaseSign command handler for Ed25519 signing of build-identity.json and signed-manifest.json production.</item>
   <item>RFC-0948: add entitlement diff logging — compares workpiece entitlements against previous release and logs added/removed features.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):

@@ -1,27 +1,22 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707: nachweis.manifest.generate command handler — generates public/nachweise/manifest.json from published records.</purpose>
-<keywords>nachweis, manifest, generate, public, published, deterministic</keywords>
-<responsibilities>
-  <item>Reads PBP EvidenceSource entities and filters by publication.visibility: public.</item>
-  <item>Builds NachweisManifest with generatedAt: null (RFC-0602) and expiresAt: null.</item>
-  <item>Writes to {cachePath}/public/nachweise/manifest.json using writeFileIfChanged.</item>
-  <item>Writes empty manifest (records: []) when no published records exist.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-  <item>RFC-0872: include observation identity fields for technical-assessment records.</item>
-  <item>RFC-0886: include display and websiteUrl fields in manifest entries for Nachweis evidence kinds.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not publish records — that is nachweis.publish.</item>
   <item>Does not validate gate conditions — that is nachweis.validate.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0707: initial nachweis.manifest.generate command handler.</item>
   <item>RFC-0871: read Bordbuch to resolve timestampAssurance per record, default rfc3161 for legacy entries.</item>
   <item>RFC-0872: add technical-assessment kind, include observation identity fields in manifest entries.</item>
   <item>RFC-0886: include display and websiteUrl fields in manifest entries.</item>
   <item>RFC-0888: append sichtpass Bordbuch entry after manifest file is written (unless --skip-bordbuch is set).</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0707</history>
 </CHANGE_SUMMARY>
 */
 

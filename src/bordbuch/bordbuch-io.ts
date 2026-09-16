@@ -6,17 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0355: initial Bordbuch hash-chain helpers.</item>
-  <item>RFC-0473: add runtime writer-role for pseo and indexnow.submit kinds.</item>
-  <item>RFC-0477: add commitAndPushBordbuch helper for git commit+push after bordbuch append.</item>
-  <item>RFC-0574: resolveBordbuchPath uses resolveCachePath (mirrors[0].path) instead of hardcoded systems/<id>/.</item>
-  <item>RFC-0580: extract gitExec into shared werkstatt/git-exec.ts with allowNonZero option.</item>
-  <item>RFC-0583: export computeEntryHash for reuse by bordbuch.repair.</item>
   <item>RFC-0706: add nachweis writer-role for nachweis-record and nachweis-consent kinds (ADR-0028).</item>
   <item>RFC-0715: add nachweis-signed and nachweis-timestamped to nachweis writer-role for N3 crypto verification.</item>
   <item>RFC-0724: add DEPRECATED_KIND_MIGRATIONS for forward-only kind renames (release-published -> release-ready).</item>
-  <item>Bug fix: guard against duplicate mission-close/abort events for the same missionId in appendBordbuchEntry.</item>
   <item>RFC-0994: add redactForBordbuch to strip git remote URLs before sensitive payload check.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0355, RFC-0473, RFC-0477, RFC-0574, RFC-0580, RFC-0583</history>
 </CHANGE_SUMMARY>
 */
 

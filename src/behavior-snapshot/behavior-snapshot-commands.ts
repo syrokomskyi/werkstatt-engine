@@ -6,12 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0357: initial behavior snapshot capture and diff handlers.</item>
-  <item>RFC-0379: add per-route contentHash via @warpgogol/fingerprint HTML normalization.</item>
   <item>RFC-0585: return full snapshot wrapper from capture so release.prepare can write it to disk for diff.</item>
   <item>RFC-0588: exclude redirected routes (301, 308) from snapshot via _redirects parsing.</item>
   <item>RFC-0592: fix wildcard matching so /de/* matches /de (directory root without trailing slash).</item>
   <item>RFC-0595: detect redirect pages, set contentHash: null + redirectTarget.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0357, RFC-0379</history>
 </CHANGE_SUMMARY>
 */
 

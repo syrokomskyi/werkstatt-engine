@@ -1,34 +1,22 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707: I/O layer for Nachweis kernel module — R2 upload, SHA-256 hashing, record ID generation.</purpose>
-<keywords>nachweis, r2, sha256, hash, record, evidence, bordbuch</keywords>
-<responsibilities>
-  <item>Provides uploadToR2 for private evidence storage in the nachweise bucket.</item>
-  <item>Computes SHA-256 hashes via @warpgogol/fingerprint byteHashFile.</item>
-  <item>Generates deterministic record IDs in nr_{slug}_{YYYYMMDD} format.</item>
-  <item>Resolves R2 storage paths for private and public document storage.</item>
-  <item>Reads resolved entitlements to check for the nachweis feature.</item>
-  <item>RFC-0872: provides policy-driven publication gate V2 types and policy resolution.</item>
-  <item>RFC-0873: provides AssessmentBundleV1 types, Zod schema, and assessment R2 path resolution.</item>
-  <item>ADR-0054: implements the technical-assessment evidence profile decision — policy-driven gate, assessment metadata, canonical raw artifact requirement.</item>
-  <item>RFC-0886: adds display-consent-consistent gate condition, per-aspect consent evaluation, screenshot R2 path helper, NachweisScreenshotUploadResult interface.</item>
-  <item>RFC-0890: adds raw screenshot R2/local path helpers, CaptureX filename parser, sharp-based image metadata detection, NachweisScreenshotIngestResult interface.</item>
-  <item>RFC-0891: adds display screenshot R2 path helper, R2 download helper, NachweisScreenshotProcessResult interface.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement command handlers — those live in nachweis-*.ts files.</item>
   <item>Does not implement multipart uploads — individual files are under the 5 MB threshold.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0707: initial nachweis I/O layer with R2 upload, hash computation, record ID generation.</item>
-  <item>RFC-0713: uploadToR2 passes R2_NACHWEIS envPrefix for per-bucket credential isolation.</item>
-  <item>RFC-0714: add NachweisApproveResult, NachweisPublicDerivativeResult interfaces and resolveNachweisPublicR2Path helper.</item>
-  <item>RFC-0872: add NachweisPublicationGateV2, policy resolution, extend NachweisManifestEntry, replace legacy NachweisPublicationGate.</item>
   <item>RFC-0873: add AssessmentBundleV1, assessmentBundleV1Schema, AssessmentIngestResult, resolveAssessmentR2Path, mediaTypeToExt, extend uploadToR2 with optional contentType.</item>
   <item>RFC-0886: add display-consent-consistent gate condition, per-aspect consent evaluation in evaluateGateV2, resolveNachweisScreenshotR2Path, NachweisScreenshotUploadResult, extend NachweisConsentUpdateResult with scope, extend NachweisManifestEntry with display and websiteUrl.</item>
   <item>RFC-0890: add resolveNachweisRawScreenshotR2Path, resolveNachweisRawScreenshotLocalPath, parseCaptureXFilename, detectImageMetadata, NachweisScreenshotIngestResult.</item>
   <item>RFC-0891: add resolveNachweisScreenshotDisplayR2Path, downloadFromR2, NachweisScreenshotProcessResult.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0707, RFC-0713, RFC-0714, RFC-0872</history>
 </CHANGE_SUMMARY>
 */
 

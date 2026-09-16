@@ -1,14 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707/RFC-0886: nachweis.consent.update command handler — updates PBP Consent entity's consentScope[scope] and appends Bordbuch entry.</purpose>
-<keywords>nachweis, consent, update, bordbuch, pbp, scope, granular</keywords>
-<responsibilities>
-  <item>Updates PBP Consent entity's consentScope[scope] field in cache clone (RFC-0886: granular per-aspect consent).</item>
-  <item>Accepts --scope flag (document|screenshot|websiteLink) to select which consent aspect to update.</item>
-  <item>Appends nachweis-consent Bordbuch entry with metadata (consentId, scope, previous/new status, method, actor).</item>
-  <item>Acquires system and bordbuch locks before modifying state.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not validate consent text or legal sufficiency — that is a human review step.</item>
 </non-goals>
@@ -17,6 +11,9 @@
   <item>RFC-0707: initial nachweis.consent.update command handler.</item>
   <item>RFC-0885: update consentScope instead of consentStatus (document aspect only).</item>
   <item>RFC-0886: add --scope flag for granular per-aspect consent (document|screenshot|websiteLink).</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

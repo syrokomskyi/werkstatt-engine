@@ -6,33 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0356: initial mission.materialize command handler.</item>
-  <item>RFC-0389: replace minimal inline stubs with full boilerplate generation using @warpgogol/site-kernel-codegen generators and @warpgogol/site-kernel-onboarding templates.</item>
-  <item>RFC-0388: generate .env.example via env.example.generate and copy to .env (DNA-40 env-and-deploy contract).</item>
-  <item>RFC-0480: add paused status guard; init git in workpiece and commit materialized state.</item>
-  <item>RFC-0517: add preflight content quality gate between atomicMoveDir and git init.</item>
-  <item>Run build.prepare pipeline after atomicMoveDir to generate all derived artifacts (surface, sitemap, video/image variants, etc.) before git init.</item>
-  <item>Set PUBLIC_IMAGE_PROVIDER=build-portable in workpiece .env files so image.variants.generate produces responsive variants.</item>
-  <item>RFC-0647: replace inline ensurePlaywrightChromium with ensureChromium from @warpgogol/site-kernel-checks (launch verification + PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD support).</item>
-  <item>RFC-0568: replace git init with git clone from cache clone; stage only data paths in materialize commit (DNA-44 compliance).</item>
-  <item>Run pnpm install after atomicMoveDir to link workpiece workspace deps before build.prepare (fixes workpiece.imports.validate failure on fresh workpiece).</item>
-  <item>RFC-0580: auto-commit werkstatt side-effects (mission.yaml, pnpm-lock.yaml) after writeMissionManifest.</item>
-  <item>RFC-0597: skip preflight on unchanged cache clone HEAD, run build.prepare.dev instead of build.prepare, warm .cache/video/ and .cache/video-live/ from cache clone.</item>
-  <item>RFC-0620: replace hardcoded bordbuch file removal with ownership-map-driven filter that excludes all workspace-absolute generated files from STERNSYSTEM_DATA_PATHS copy.</item>
-  <item>RFC-0659: add workpiece artifact cache — skip codegen on repeated materialization when cache key (cacheCloneHead + platformVersion + platformSemanticHash) matches.</item>
-  <item>Preserve operator-filled .env from old workpiece before atomicMoveDir and restore after — prevents secret loss (CLOUDFLARE_API_TOKEN, R2 keys) on re-materialization.</item>
-  <item>RFC-0796: add checkWorkspaceGlobsForStalePackages pre-flight guard before pnpm install — detects stale package.json workspace references to missing packages.</item>
-  <item>RFC-0822: replace old-workpiece .env preservation with restoreEnvFilesFromCacheClone — cache clone is the canonical inter-mission store for secrets.</item>
-  <item>RFC-0870: restore registry-only generated files from git after atomicMoveDir — prevents silent loss of committed manifests when staging dir lacks them.</item>
-  <item>Hardcode production domain in SITE_LINE — remove PUBLIC_SITE_URL override that allowed .env to bake dev domain into build artifacts.</item>
-  <item>RFC-0952: add defensive guards — actionable error for missing mission.yaml, auto-set currentMission in system-state.yaml when null or mismatched.</item>
   <item>RFC-0954: rescue uncommitted/unpushed workpiece edits before atomicMoveDir — commit dirty changes, merge workpiece HEAD into cache clone, backup on merge failure.</item>
   <item>RFC-0954: fail-closed guard blocks re-materialization when workpiece has uncommitted changes — operator must commit or reconcile first. --force bypasses with rescue.</item>
   <item>RFC-0958: rewire runMissionMaterializeInternal onto runOperation with granular journaled steps for crash-safe resumable materialization.</item>
-  <item>Increase pnpm install timeout from 120s to 300s — prevents ETIMEDOUT on workspaces with many packages.</item>
-  <item>Add stop-stale-dev-servers step — SIGTERM astro dev processes under missions/ before pnpm install, preventing orphaned dev servers from previous missions.</item>
-  <item>Add post-install-version-check step — verifies installed dep versions satisfy workpiece ~/^ pins after pnpm install. Catches stale lockfile entries where a caret pin in an archived mission pulled a newer version than the tilde pin in the active workpiece.</item>
   <item>RFC-1093 (fo-fix): replace inline WG_ADAPTER_BLOCK IIFE with resolveAdapterBlock(stagingDir) from adapter-config.ts.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952</history>
 </CHANGE_SUMMARY>
 */
 

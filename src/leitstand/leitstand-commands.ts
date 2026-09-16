@@ -6,37 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0358: initial leitstand command handlers.</item>
-  <item>RFC-0379: channel model — alt/main channels, preflight, resolveAdapter throws for unimplemented, per-channel lastPropagated with operational state, --channel flag on all commands.</item>
-  <item>RFC-0379 post-review: complete preflight (artifact hash, wrangler availability, dist size limit); add artifact-store rehydration for propagate and rollback.</item>
-  <item>RFC-0587: adapter-declared size limits via getLimits() passed through runPreflight to checkDistSize; remove hardcoded limit constants.</item>
-  <item>RFC-0608: leitstand.propagate always deploys to alt (removes --channel); adds leitstand.promote for alt→main with build-identity verification; rollback transitions release state.</item>
-  <item>RFC-0624: add post-deploy CDN cache purge step to propagate, promote, and rollback; record purgeResult in lastPropagated; display in status.</item>
-  <item>RFC-0627: add dev channel, leitstand.deploy command, Axiom evidence gate in propagate, auto-step rollback.</item>
-  <item>RFC-0628: replace leitstand.deploy with workpiece-based leitstand.dev-deploy; remove dev-deployed state; propagate gate checks published + commitSha + missionId + errors===0; rollback auto-step removes dev-deployed.</item>
-  <item>RFC-0629: propagate gate reads evidence-metadata.json + study-run.json (native Axiom format); dev-deploy passes --commit-sha to mission.check (no evidence post-processing); JSON.parse wrapped with error handling.</item>
-  <item>RFC-0634: dev-deploy writes preliminary + final build-identity.json (preliminary in public/.well-known/ before build, final in dist/client/.well-known/ after hash computation with dist cleanup); propagate verifies dev build-identity before deploying to alt; release.prepare uses workpiece HEAD for commitSha.</item>
-  <item>RFC-0649: dev-deploy treats CDN purge as fatal for cloudflare-workers adapter (checks purgeResult.success); adds verifyFreshness function that fetches build-identity.json from CDN URL and compares distTreeHash; skips purge + freshness check for null adapter; freshness mismatch stops pipeline before Axiom gate.</item>
-  <item>RFC-0653: dev-deploy implements build-skip cache — skips pnpm build when commitSha + platformVersion + platformSemanticHash match .dev-deploy-build-cache.json and dist/ exists. --force-build bypasses the cache. buildSkipped field added to DevDeployResult.</item>
-  <item>RFC-0652: best-effort evidence.sync after axiom.report; --skip-evidence-sync flag; evidenceSynced/evidenceSyncError in output.</item>
-  <item>RFC-0656: switch distTreeHash from mode: "byte" to mode: "stable" for deterministic hashing of non-deterministic build artifacts.</item>
-  <item>RFC-0657: replace single-fetch verifyFreshness with retry loop (5 attempts, exponential backoff 3s/6s/12s/24s); remove fixed 6s sleep after purge; add attempts field to FreshnessResult.</item>
-  <item>RFC-0665: add methodologies.validate pre-flight to dev-deploy; fail fast on invalid methodologies config before build+deploy cycle.</item>
-  <item>RFC-0668: wrap mission.check call with 15-min per-attempt timeout (MISSION_CHECK_TIMEOUT_MS) and one-time retry on infrastructure errors (exit 2 or any non-0/non-1); pass --max-duration to mission.check; worst-case total 30 min with retry.</item>
-  <item>Add --no-report flag (default true) to runMissionCheckWithResilience to suppress report.html generation in mission.check; axiom.report is auto-invoked separately in leitstand.dev-deploy, preventing double-write.</item>
-  <item>RFC-0689: clear Axiom browser evidence cache before mission.check; auto-regenerate behavior snapshot on SNAP-01 when pnpm build fails; check stale snapshot when build is skipped (RFC-0653).</item>
-  <item>RFC-0697: log cache dir file count and total size before clearing; extract shared orchestrateSnap01Recovery helper for SNAP-01 detect → regenerate → (optional) rebuild orchestration.</item>
-  <item>RFC-0698: auto-commit workpiece via mission.git.commit after pnpm build completes and before distTreeHash computation; re-read commitSha from workpiece HEAD after auto-commit; fatal abort on commit failure; move build-skip cache write to after auto-commit with post-commit commitSha.</item>
-  <item>RFC-0700: add --release flag to leitstand.dev-deploy for deploying existing releases to dev without open mission; skips build, axiom checks, and auto-commit; resolves secrets from releases/&lt;id&gt;/.env; resolves wrangler from workspace root node_modules/.bin; adds releaseDeployed field to DevDeployResult.</item>
-  <item>RFC-0747: add retry loop (3 attempts, 3s/6s backoff) to alt health check in leitstand.promote to handle CDN propagation delays.</item>
-  <item>RFC-0829: add test evidence gates (L4+L5) to propagate and promote via shared runTestEvidenceGate helper.</item>
-  <item>RFC-0842: add target channel + URL logging to dev-deploy, propagate, and promote before lock acquisition.</item>
-  <item>RFC-0866: wire executeDeployPhases into dev-deploy, propagate, promote; add failingPhase to result types.</item>
-  <item>RFC-0866 audit: resolve missionId + commitSha from system-state + workpiece git HEAD; pass to executeDeployPhases so mission.check and Axiom evidence gate actually run.</item>
   <item>RFC-0866 audit: add alt health check before main deploy in executeDeployPhases for channel=main.</item>
   <item>RFC-0927: add runLeitstandHotfixDevDeploy composite command handler chaining 7 phases via executeKernelCommand.</item>
   <item>RFC-0930: add runLeitstandVerify command handler — fetches build-identity.json from live CDN URLs for all configured channels, compares distTreeHash cross-channel, optionally compares against local system-state.yaml records.</item>
   <item>RFC-0948: add channel drift warning to runLeitstandDevDeploy — compares dev releaseId against alt/main lastPropagated and emits non-fatal warning when they differ.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866</history>
 </CHANGE_SUMMARY>
 */
 

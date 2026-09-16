@@ -1,35 +1,21 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0707/RFC-0714/RFC-0715/RFC-0873/RFC-0886: Nachweis kernel module — registers 14 nachweis.* commands with lazy-loaded handlers.</purpose>
-<keywords>nachweis, module, kernel, commands, registration</keywords>
-<responsibilities>
-  <item>Registers nachweis.ingest, nachweis.validate, nachweis.manifest.generate, nachweis.consent.update, nachweis.publish, nachweis.withdraw, nachweis.approve, nachweis.public-derivative.</item>
-  <item>RFC-0873: Registers nachweis.assessment.ingest for technical-assessment bundle ingestion.</item>
-  <item>RFC-0874: Registers nachweis.measure.lighthouse for reproducible Lighthouse assessment measurement.</item>
-  <item>RFC-0875: Registers nachweis.measure.cloudflare-agent-readiness for Cloudflare URL Scanner Agent Readiness assessment.</item>
-  <item>RFC-0715: Registers nachweis.key.ensure, nachweis.sign, nachweis.timestamp, nachweis.verify-signature.</item>
-  <item>RFC-0886: Registers nachweis.screenshot.upload for website screenshot upload to R2.</item>
-  <item>RFC-0890: Registers nachweis.screenshot.ingest for raw screenshot ingestion to R2 private + cache clone.</item>
-  <item>RFC-0891: Registers nachweis.screenshot.process for raw-to-display screenshot processing (crop, resize, WebP).</item>
-  <item>Uses dynamic imports for lazy loading (same pattern as evidence-module.ts and bordbuch.module.ts).</item>
-  <item>Declares correct scopes, flags, reads/writes for each command.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not implement command handlers — those live in nachweis-*.ts files.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0707: initial nachweis kernel module with 6 command registrations.</item>
-  <item>RFC-0714: add nachweis.approve and nachweis.public-derivative command registrations.</item>
-  <item>RFC-0715: add nachweis.key.ensure, nachweis.sign, nachweis.timestamp, nachweis.verify-signature. Remove --pilot-n2-exception from nachweis.publish.</item>
-  <item>RFC-0871: add --timestamp-assurance and --qualification-evidence-ref flags to nachweis.timestamp.</item>
-  <item>RFC-0872: update nachweis.validate, nachweis.publish, nachweis.withdraw descriptions to reflect policy-driven V2 gates.</item>
-  <item>RFC-0873: add nachweis.assessment.ingest command registration.</item>
-  <item>RFC-0874: add nachweis.measure.lighthouse command registration.</item>
   <item>RFC-0875: add nachweis.measure.cloudflare-agent-readiness command registration.</item>
   <item>RFC-0886: add nachweis.screenshot.upload command registration, add --scope flag to nachweis.consent.update.</item>
   <item>RFC-0890: add nachweis.screenshot.ingest command registration.</item>
   <item>RFC-0891: add nachweis.screenshot.process command registration.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <history>RFC-0707, RFC-0714, RFC-0715, RFC-0871, RFC-0872, RFC-0873, RFC-0874</history>
 </CHANGE_SUMMARY>
 */
 

@@ -1,18 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0715/RFC-0871: nachweis.timestamp command handler — obtains an RFC 3161 timestamp token for a signed Nachweis record, with optional eIDAS qualified assurance metadata.</purpose>
-<keywords>nachweis, timestamp, rfc3161, tsa, bordbuch</keywords>
-<responsibilities>
-  <item>Enforces sign-before-timestamp ordering: fails with SIGNATURE_NOT_FOUND if no nachweis-signed entry exists.</item>
-  <item>Reads the signature from the nachweis-signed Bordbuch entry.</item>
-  <item>Queries the TSA adapter (FreeTSA.org by default) with the signature bytes.</item>
-  <item>Stores the RFC 3161 timestamp token (DER-encoded, base64) in Bordbuch metadata.</item>
-  <item>RFC-0871: stores timestampAssurance and qualificationEvidenceRef in Bordbuch metadata.</item>
-  <item>RFC-0871: validates eidas-qualified assurance requires qualificationEvidenceRef.</item>
-  <item>Appends nachweis-timestamped Bordbuch entry.</item>
-  <item>Idempotent: if a nachweis-timestamped entry already exists for the slug, returns the existing token.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not sign — that is nachweis.sign.</item>
   <item>Does not verify the timestamp token — that is nachweis.verify-signature.</item>
@@ -22,6 +12,9 @@
   <item>RFC-0715: initial nachweis.timestamp command handler.</item>
   <item>RFC-0715 review fix: use HttpTsaAdapter for custom TSA URLs. Import flagString/flagBool from nachweis-n3-types.ts.</item>
   <item>RFC-0871: add --timestamp-assurance and --qualification-evidence-ref flags, default rfc3161, fail eidas-qualified without evidence.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

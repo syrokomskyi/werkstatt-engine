@@ -1,11 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0715: Shared types and re-exports for N3 cryptographic verification commands.</purpose>
-<keywords>nachweis, n3, crypto, signature, timestamp, types</keywords>
-<responsibilities>
-  <item>Defines result interfaces for nachweis.sign, nachweis.timestamp, nachweis.verify-signature.</item>
-  <item>Re-exports common helpers from nachweis-io.ts to avoid circular imports.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not define command handlers — those live in nachweis-*.ts files.</item>
 </non-goals>
@@ -14,6 +11,9 @@
   <item>RFC-0715: initial N3 shared types module.</item>
   <item>RFC-0715 review fix: add shared flagString/flagBool helpers to eliminate duplication across command files.</item>
   <item>RFC-0871: add TimestampAssurance type, extend NachweisTimestampResult and NachweisVerifySignatureResult with assurance metadata.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -1,15 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0714: nachweis.approve command handler — records human approval, verification level, and legal content check in a Bordbuch entry.</purpose>
-<keywords>nachweis, approve, verification, legal, bordbuch, gate</keywords>
-<responsibilities>
-  <item>Appends nachweis-record Bordbuch entry with approval metadata (verificationLevel, legalContentCheckPassed, approved).</item>
-  <item>Satisfies publication gate conditions: recordApproved, verificationLevelMet, legalContentCheckPassed.</item>
-  <item>Acquires system and bordbuch locks before modifying state.</item>
-  <item>Emits logger.warn if no evidence-source file is found for the slug (non-blocking, informational).</item>
-  <item>Supports --dry-run to skip Bordbuch write.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not read or modify the evidence-source entity — approval is recorded only in the Bordbuch audit trail.</item>
   <item>Does not validate the verification level — the operator is responsible for passing the correct level.</item>
@@ -18,6 +11,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0714: initial nachweis.approve command handler.</item>
   <item>RFC-0715: add N3 gate — verify nachweis-signed and nachweis-timestamped Bordbuch entries exist before approving at N3.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 

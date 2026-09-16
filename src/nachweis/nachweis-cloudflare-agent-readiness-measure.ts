@@ -1,23 +1,8 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0875: nachweis.measure.cloudflare-agent-readiness command handler — submits an Unlisted scan to the Cloudflare URL Scanner API, polls for completion, parses Agent Readiness dimensions, builds AssessmentBundleV1, delegates to nachweis.assessment.ingest.</purpose>
-<keywords>nachweis, cloudflare, agent-readiness, url-scanner, measure, assessment, adapter, provider-run</keywords>
-<responsibilities>
-  <item>Submits an Unlisted URL Scanner scan with agentReadiness enabled via Cloudflare API.</item>
-  <item>Polls the result endpoint at 15-second intervals until completion or 5-minute timeout.</item>
-  <item>Preserves raw submission response and final result as canonical artifacts.</item>
-  <item>Parses Agent Readiness dimensions using explicit field paths from fixture-backed parser.</item>
-  <item>Fails with ASSESSMENT_SCHEMA_UNSUPPORTED if raw result schema does not match expected paths.</item>
-  <item>Fails with CLOUDFLARE_SCAN_TIMEOUT if polling exceeds 5-minute maximum elapsed time.</item>
-  <item>Fails with CLOUDFLARE_SCAN_FAILED if provider reports task.success === false.</item>
-  <item>Maps not-checked dimensions to status: not-checked — never coerces to score 0.</item>
-  <item>Builds AssessmentBundleV1 and delegates to nachweis.assessment.ingest core function.</item>
-  <item>Does not duplicate R2 upload, SHA-256 hashing, PBP persistence, or Bordbuch append logic.</item>
-  <item>Does not sign, approve, timestamp, or publish — ends at N1 capture.</item>
-  <item>Skips silently when nachweis entitlement is not resolved.</item>
-  <item>observedAt comes from provider result scan timestamp, not new Date().</item>
-  <item>Uses fetch() (Node 18+ built-in) for HTTP calls — no external HTTP library dependencies.</item>
-</responsibilities>
+
+
 <non-goals>
   <item>Does not publish or approve — use nachweis.publish and nachweis.approve for gate progression.</item>
   <item>Does not create public derivatives — use nachweis.public-derivative.</item>
@@ -29,6 +14,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0875: initial nachweis.measure.cloudflare-agent-readiness command handler.</item>
+  <item>RFC-1097: step 6 — compass.migrate codemod run
+
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
 </CHANGE_SUMMARY>
 */
 
