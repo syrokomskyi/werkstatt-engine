@@ -31,6 +31,7 @@ import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
 import { writeFileAtomic } from "./fs-atomic.ts";
 import { loadPipelineBudgets } from "./pipeline-budgets.ts";
+import { getOrBuildWorkspaceRegistry } from "./runtime/registry-cache.ts";
 import type {
   KernelCommandInput,
   KernelCommandDefinition,
@@ -116,7 +117,12 @@ export async function runValidatorInventoryGenerate(
 ): Promise<KernelCommandResult<ValidatorInventoryGenerateResult>> {
   const dryRun = context.dryRun || input.flags["dry-run"] === true;
 
-  const allCommands = [...context.actualState.commands.values()] as KernelCommandDefinition[];
+  // The manifest fast-path hands this command a single-module actualState
+  // (only validator-inventory itself). The inventory needs the FULL workspace
+  // registry, so build it explicitly — cached, so cheap inside pipelines too.
+  const registry =
+    (await getOrBuildWorkspaceRegistry(context.workspaceRoot)) ?? context.actualState;
+  const allCommands = [...registry.commands.values()] as KernelCommandDefinition[];
   const validatorCommands = allCommands.filter((cmd) => VALIDATOR_NAME_PATTERN.test(cmd.name));
 
   // Check for untagged validators
@@ -167,7 +173,7 @@ export async function runValidatorInventoryGenerate(
   for (const [contract, validators] of contractsMap) {
     const entries: ValidatorEntry[] = [];
     for (const v of validators) {
-      const pipelinePhase = derivePipelinePhase(context.actualState, v.name);
+      const pipelinePhase = derivePipelinePhase(registry, v.name);
       const p95Ms = await lookupP95(context.workspaceRoot, v.name);
       entries.push({
         command: v.name,

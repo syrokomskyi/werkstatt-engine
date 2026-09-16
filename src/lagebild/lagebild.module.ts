@@ -31,15 +31,25 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem ID." },
           "api-url": { kind: "string", required: true, description: "Lagebild API URL." },
-          "api-key": { kind: "string", required: true, description: "Lagebild API key (piped to stdin, never logged)." },
+          "api-key": {
+            kind: "string",
+            required: true,
+            description: "Lagebild API key (piped to stdin, never logged).",
+          },
           "tenant-id": { kind: "string", required: true, description: "Lagebild tenant ID." },
-          "source-system-id": { kind: "string", description: "Source system ID (default: site_<id>)." },
+          "source-system-id": {
+            kind: "string",
+            description: "Source system ID (default: site_<id>).",
+          },
           channel: { kind: "string", description: "Deployment channel (default: main)." },
         },
         mutatesState: true,
         writes: ["../systems-cache/{system}/system-state.yaml", "../systems-cache/{system}/.env"],
         generates: [],
-        reads: ["../systems-cache/{system}/system-config.yaml", "../systems-cache/{system}/system-state.yaml"],
+        reads: [
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+        ],
         requiresNetwork: true,
         execute: runLagebildConnect,
       },
@@ -48,6 +58,8 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
           "Check 4 LAGEBILD_* secrets via wrangler secret list, verify .env key presence, best-effort GET /health (RFC-1065).",
+        contract: "lagebild",
+        rules: [],
         scope: "workspace",
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem ID." },
