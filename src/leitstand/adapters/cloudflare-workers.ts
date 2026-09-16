@@ -7,14 +7,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0595: verify redirect routes by HTTP status + Location header.</item>
   <item>RFC-0623: add runWranglerDeployWithRetry helper with transient error detection for wrangler deploy.</item>
   <item>ADR-0027: sourceDotenv skips empty values to allow process.env fallback for placeholder entries.</item>
   <item>RFC-1091: extract shared health-check helpers to health-helpers.ts, import and re-export for backward compatibility.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>RFC-0379, RFC-0587</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>RFC-0379, RFC-0587, RFC-0595</history>
 </CHANGE_SUMMARY>
 */
 

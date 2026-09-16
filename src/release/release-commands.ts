@@ -6,14 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0656: add dist.determinism.validate command; switch release.prepare distTreeHash to mode: "stable".</item>
   <item>RFC-0845: add Playwright Chromium pre-flight check before build.prepare (after distribution-reuse check) — fail fast with actionable error when Chromium is not installed.</item>
   <item>RFC-0931: add runReleaseSign command handler for Ed25519 signing of build-identity.json and signed-manifest.json production.</item>
   <item>RFC-0948: add entitlement diff logging — compares workpiece entitlements against previous release and logs added/removed features.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):

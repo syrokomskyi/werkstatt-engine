@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Facilitates command-line interactions for managing kernel applications and executing commands within a workspace.</purpose>
+<purpose>cli index — command-line interactions for managing kernel applications and executing commands.</purpose>
 <non-goals>
   <item>Do not handle raw input validation beyond flag parsing.</item>
   <item>Do not manage application lifecycle or orchestration.</item>
@@ -11,13 +11,16 @@
   <item>CLI execution must route through registered kernel commands and preserve typed flag parsing.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0686: add --concurrency flag for pipeline execution.</item>
   <item>ADR-0022: add --no-registry-cache flag to disable process-lifetime registry cache.</item>
   <item>RFC-0870: add pipeline hint to Unknown command and not-registered error messages.</item>
   <item>RFC-0972: global --json exit code policy — always exit 0 when outputFormat is json.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>RFC-0686</history>
 </CHANGE_SUMMARY>
 */
 

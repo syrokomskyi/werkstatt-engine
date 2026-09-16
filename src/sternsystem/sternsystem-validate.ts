@@ -6,14 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0870: add STERN-MANIFEST-01 check for missing committed generated manifests in cache clone HEAD.</item>
   <item>RFC-0902: add STERN-ID-TLD rule rejecting IDs ending in a known TLD suffix.</item>
   <item>RFC-0966: add PASSPORT-01 (missing passport), PASSPORT-02 (invalid signature), PASSPORT-03 (resource drift) rules.</item>
   <item>RFC-0968: add HANDOVER-01/02/03/04/05 rules for sternsystem handover protocol.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870</history>
 </CHANGE_SUMMARY>
 */
 

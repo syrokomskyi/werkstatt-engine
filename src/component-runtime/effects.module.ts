@@ -1,10 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>
-RFC-1037: Registers effect.classify, effect.compensation.verify, and
-effect.compensation.inspect kernel commands for external-effect compensation
-verification.
-</purpose>
+<purpose>effects.module — registers the effect.classify, effect.compensation.verify, and effect.compensation.execute kernel commands with the registry (RFC-1037).</purpose>
 <non-goals>
   <item>Does not implement classification logic — that lives in effect-classifier.ts.</item>
   <item>Does not implement probe execution — that lives in compensation-verifier.ts.</item>
@@ -13,6 +9,9 @@ verification.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1037: initial implementation — registers 3 effect.* commands.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

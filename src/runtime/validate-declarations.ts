@@ -1,11 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>
-RFC-1038: Declaration-time validation for kernel commands and components.
-Replaces validateRegistration from werkstatt-site. Enforces fail-closed rules:
-modulePath required on engine/site-plugin commands, generates required on
-.generate commands, contract and rules required on validator commands.
-</purpose>
+<purpose>validate-declarations — declaration-time validation for kernel commands and components (RFC-1038).</purpose>
 <non-goals>
   <item>Does not validate generated file existence or staleness — that is the validators' job.</item>
   <item>Does not validate pipeline membership — that is ownership.sync.validate's job.</item>
@@ -13,6 +8,9 @@ modulePath required on engine/site-plugin commands, generates required on
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1038: initial implementation — extracted from validateRegistration, adapted for CommandDeclaration[] instead of KernelRegistry.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

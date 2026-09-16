@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0480: surface.contract.validate — validate generated C-surfaces against declarative contract.</purpose>
+<purpose>surface.contract.validate — validate generated C-surfaces against their declarative contracts (RFC-0480).</purpose>
 <non-goals>
   <item>Does not generate C-surfaces — only validates them against the contract.</item>
   <item>Does not modify the contract — contracts are declarative in @warpgogol/werkstatt-shared/ontology/external-surfaces.</item>
@@ -10,6 +10,9 @@
   <item>RFC-0480: initial surface.contract.validate command handler.</item>
   <item>RFC-0498: add per-depth JSON-LD type policy checks — verify surfacePolicy is present and no required/prohibited overlap.</item>
   <item>RFC-0499: add mediaLeakagePolicy checks — verify policy is present and structurally valid.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

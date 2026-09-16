@@ -1,8 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1036: ScopeManager implementation — manages scoped component registries
-with lifecycle-owned creation and disposal. Five scopes: per-command, per-mission,
-per-session, per-workshop, per-fleet. Resolution searches innermost-first.</purpose>
+<purpose>scope — ScopeManager implementation managing scoped component registries with lifecycle (RFC-1036).</purpose>
 <non-goals>
   <item>Does not implement distributed fleet-wide synchronization — per-fleet uses local registry with HTTP fetch extension point.</item>
   <item>Does not implement periodic sweep — sweep is a future extension for long-running modes.</item>
@@ -10,7 +8,10 @@ per-session, per-workshop, per-fleet. Resolution searches innermost-first.</purp
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-1036: initial implementation of ScopeManager, ScopedRegistry, ScopeError.</item>
+  <item>RFC-1036: initial implementation of ScopeManager, ScopedRegistry, ScopeError.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

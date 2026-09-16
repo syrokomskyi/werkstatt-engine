@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Operation journal type definitions — JournalRecord, OperationStep, OperationDefinition (RFC-0958).</purpose>
+  <purpose>journal types — operation journal type definitions: JournalRecord, OperationStep, OperationDefinition (RFC-0958).</purpose>
   <non-goals>
     <item>Do not import mission-specific types — the journal is pure infrastructure.</item>
     <item>Do not implement journal I/O or step execution — those live in jsonl.ts and runner.ts.</item>
@@ -9,6 +9,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial journal type definitions — JournalRecord discriminated union, OperationStep, OperationDefinition.</item>
   <item>RFC-0962 fo-fix: OperationStep.run returns optional metadata, StepResult interface added, RunOperationResult includes stepResults.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

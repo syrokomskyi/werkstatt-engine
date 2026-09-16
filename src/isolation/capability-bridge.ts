@@ -1,14 +1,16 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1035: CapabilityBridge implementation — client-side proxy that delegates to
-CapabilityBrokerV1 with sandbox-specific policy enforcement (timeout, memory, violation tracking).</purpose>
+<purpose>capability-bridge — client-side proxy that delegates to CapabilityBroker providers (RFC-1035).</purpose>
 <non-goals>
   <item>Does not implement the broker itself — that lives in broker/broker.ts.</item>
   <item>Does not implement sandbox spawning — that lives in isolation-manager.ts.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-1035: initial implementation of CapabilityBridge extending CapabilityBrokerV1.</item>
+  <item>RFC-1035: initial implementation of CapabilityBridge extending CapabilityBrokerV1.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

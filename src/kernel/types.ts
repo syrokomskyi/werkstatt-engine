@@ -11,14 +11,16 @@
   <item>Kernel command contracts must stay explicit so agents cannot pass untyped command inputs.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1026: add ModuleFiberState, KernelModuleHandle, KernelLifecycleRegistry for lifecycle-owned kernel registrations with disposer pattern.</item>
   <item>RFC-1027: add RemediationHint interface and optional remediationHints field to KernelExecutionReport for agent-actionable fix suggestions.</item>
   <item>RFC-1028: add moduleBasePath to KernelRegisteredCommandInfo, derived from modulePath (RFC-0960) for dynamic moduleSrcDir resolution in the pipeline executor.</item>
   <item>RFC-1038: replace KernelModule with ModuleExport, KernelCommandDefinition with CommandDeclaration, KernelRuntimeContext.registry with actualState, KernelAppConfig uses ModuleExport.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>RFC-0260, RFC-0267, RFC-0326, RFC-0390, RFC-0518, RFC-0579, RFC-0686, RFC-0960</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>RFC-0260, RFC-0267, RFC-0326, RFC-0390, RFC-0518, RFC-0579, RFC-0686, RFC-0960, RFC-1026</history>
 </CHANGE_SUMMARY>
 */
 

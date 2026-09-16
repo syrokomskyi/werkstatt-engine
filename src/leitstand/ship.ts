@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0962: leitstand.ship — resumable full-pipeline deployment composite command.</purpose>
+  <purpose>leitstand.ship — resumable full-pipeline deployment composite command for the leitstand surface (RFC-0962).</purpose>
   <non-goals>
     <item>Do not re-implement underlying command logic — delegate via executeKernelCommand.</item>
     <item>Do not bypass certification authority — certify/deploy steps call the existing commands.</item>
@@ -11,6 +11,9 @@
   <item>RFC-0962: initial leitstand.ship composite command — buildShipPlan, runLeitstandShip, ShipContext/ShipResult types.</item>
   <item>RFC-0962 fo-fix: --until validation, releaseId restoration from journal on resume, step metadata + durationMs tracking via StepResult, removed duplicate ShipStepResult type.</item>
   <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check; auto-sync after release-prepare and certify-* steps; --force-with-lease in cache-to-bare push.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
 </CHANGE_SUMMARY>
 */
 

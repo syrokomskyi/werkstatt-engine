@@ -6,14 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0913: add reconcile-freshness gate — compare workpiece HEAD against workpieceHeadAtReconcile from reconciliation report; fail-closed on missing report; add --skip-reconcile-check escape hatch.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal — each step records to journal.jsonl for crash-safe resume.</item>
   <item>RFC-0991: add behavior-snapshot-refresh step to buildCloseSteps for auto-generating behavior snapshot during mission close.</item>
   <item>RFC-0992: behavior-snapshot-refresh now updates workpieceHeadAtReconcile in reconciliation-report.json after commit, preventing false unreconciled-commit freshness-check failure.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913</history>
 </CHANGE_SUMMARY>
 */
 

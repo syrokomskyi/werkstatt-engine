@@ -10,17 +10,19 @@ discovered app, and resolve which app(s) a CLI invocation targets.
 </non-goals>
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
-  <item>TODO: record current design decisions</item>
+  <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>ADR-0022: loadAppRuntime and list functions now use process-lifetime registry cache from registry-cache.ts.</item>
   <item>RFC-0960: buildRegistry and buildRegistryForModule call config.postBuildValidation after all modules are loaded.</item>
   <item>RFC-1026: buildRegistry and buildRegistryForModule set moduleStates (loading → active, failed on throw); rollback on register() failure; buildRegistryWithHandles returns KernelModuleHandle map.</item>
   <item>RFC-1038: replace KernelRegistry with ActualState — buildRegistry uses buildActualState from reconciler.ts; remove lifecycle methods, buildRegistryWithHandles, rollbackModuleRegistrations.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>RFC-0303</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>ADR-0022, RFC-0303</history>
 </CHANGE_SUMMARY>
 */
 

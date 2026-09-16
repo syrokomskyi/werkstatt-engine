@@ -6,14 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0666: remove secretRefSchema and SecretRef (dead code); change secretsFile field to z.string().optional() for detection (sternsystem.validate rejects any value).</item>
   <item>RFC-0790: add deploymentStaticConfigSchema (adapter + channels only, no lastPropagated) for system-config.yaml.</item>
   <item>RFC-0926: add optional workerVersionId to propagationResultSchema and lastPropagatedChannelSchema for release-aware rollback.</item>
   <item>RFC-1091: add github-pages to deploymentAdapterNameSchema enum.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>RFC-0358, RFC-0379, RFC-0595, RFC-0624, RFC-0627</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>RFC-0358, RFC-0379, RFC-0595, RFC-0624, RFC-0627, RFC-0666</history>
 </CHANGE_SUMMARY>
 */
 

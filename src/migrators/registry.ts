@@ -8,14 +8,16 @@ ordered by RFC-id (numeric). Replaces the old RFC-0221 SemVer-based registry.</p
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0529: register rfc-0529 content migrator (brace-delimited to braceless content reference syntax migration).</item>
   <item>RFC-0548: register rfc-0548 migrator (backup AGENTS.md and regenerate with behavioral layer).</item>
   <item>RFC-0757: register rfc-0757 no-op migrator (send-message checklistItems generalization, advances cursor).</item>
   <item>RFC-0885: register rfc-0885 content migrator (consentStatus→consentScope, add default display to Nachweis evidence-source).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into <history>, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <history>RFC-0221, RFC-0479, RFC-0481, RFC-0483, RFC-0488, RFC-0492, RFC-0495, RFC-0496, RFC-0497, RFC-0498, RFC-0500, RFC-0501, RFC-0502, RFC-0504, RFC-0505, RFC-0506, RFC-0508, RFC-0512, RFC-0514, RFC-0572</history>
+Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
+  <item>RFC-1097: sweep — werkstatt-engine clean
+
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <history>RFC-0221, RFC-0479, RFC-0481, RFC-0483, RFC-0488, RFC-0492, RFC-0495, RFC-0496, RFC-0497, RFC-0498, RFC-0500, RFC-0501, RFC-0502, RFC-0504, RFC-0505, RFC-0506, RFC-0508, RFC-0512, RFC-0514, RFC-0529, RFC-0572</history>
 </CHANGE_SUMMARY>
 */
 
