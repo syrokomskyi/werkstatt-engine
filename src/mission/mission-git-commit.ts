@@ -7,16 +7,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0644: add commitWorkpieceIfDirty helper for auto-committing dirty workpiece before mission.reconcile.</item>
   <item>RFC-0797: add commitCacheCloneIfDirty helper for auto-committing all dirty files in cache clone before reconcile dirty guard.</item>
   <item>RFC-0820: add noChanges field to MissionGitCommitData and prominent stderr warning when no changes to commit.</item>
   <item>RFC-0878: add .closed sentinel check to commitWorkpieceIfDirty — refuse to commit closed workpieces (defence-in-depth, since --no-verify bypasses the hook).</item>
   <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
-  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594</history>
+  <item>RFC-1095: review findings: execFileSync git add, drop speculative barrel exports</item>
+  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644</history>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import type {
@@ -515,7 +515,12 @@ export async function runMissionGitCommit(
       );
       const recorded = recordResult.data?.recorded ?? [];
       if (recorded.length > 0) {
-        git(workpieceDir, `add ${recorded.map((f) => JSON.stringify(f)).join(" ")}`);
+        // Array form — no shell: filenames with $(...) or quotes cannot inject.
+        execFileSync("git", ["add", ...recorded], {
+          cwd: workpieceDir,
+          stdio: ["pipe", "pipe", "pipe"],
+          env: { ...process.env, MISSION_GIT_COMMIT: "1" },
+        });
       }
       for (const reminder of recordResult.data?.keyDecisionsReminders ?? []) {
         process.stderr.write(`[mission.git.commit] review KEY_DECISIONS in ${reminder}\n`);
