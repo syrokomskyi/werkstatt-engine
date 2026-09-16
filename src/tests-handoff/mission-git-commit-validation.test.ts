@@ -5,11 +5,12 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0594: initial unit and integration tests for runPreCommitValidation and mission.git.commit gate.</item>
+  <item>RFC-1095: summary-record unit tests, commit integration tests, CS rules into compass.validate</item>
 </CHANGE_SUMMARY>
 */
 
 import { test, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
@@ -307,4 +308,74 @@ test("staged changes preserved on validation failure", async () => {
     stdio: ["pipe", "pipe", "pipe"],
   }).trim();
   expect(statusOutput).toContain("src/content/business-profile/de/offerings.md");
+});
+
+// ---------------------------------------------------------------------------
+// RFC-1095: compass.summary.record integration
+// ---------------------------------------------------------------------------
+
+const WORKPIECE_TS_WITH_HEADER = `/*
+<MODULE_CONTRACT>
+<purpose>Workpiece feature module for record integration coverage.</purpose>
+<non-goals><item>No production logic.</item></non-goals>
+</MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-0001: initial.</item>
+</CHANGE_SUMMARY>
+*/
+export const f = 1;
+`;
+
+test("RFC-1095: --rfc records CHANGE_SUMMARY item and writes X-RFC trailer (AC-10)", async () => {
+  const workpieceDir = setupWorkpiece();
+
+  mkdirSync(join(workpieceDir, "src"), { recursive: true });
+  writeFileSync(join(workpieceDir, "src", "feature.ts"), WORKPIECE_TS_WITH_HEADER);
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+
+  const input = {
+    flags: {
+      mission: "test-system-m000001",
+      message: "implement: RFC-1095 record",
+      rfc: "RFC-1095",
+    },
+  } as unknown as KernelCommandInput;
+  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode ?? 0).toBe(0);
+
+  const source = readFileSync(join(workpieceDir, "src", "feature.ts"), "utf-8");
+  expect(source).toContain("<item>RFC-1095: record</item>");
+
+  const logBody = execSync("git log -1 --format=%B", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  expect(logBody).toContain("X-RFC: RFC-1095");
+});
+
+test("RFC-1095: --adr writes X-ADR trailer", async () => {
+  const workpieceDir = setupWorkpiece();
+
+  writeFileSync(join(workpieceDir, "astro.config.mjs"), "// config\n");
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+
+  const input = {
+    flags: { mission: "test-system-m000001", message: "chore: config tweak", adr: "ADR-0042" },
+  } as unknown as KernelCommandInput;
+  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode ?? 0).toBe(0);
+
+  const logBody = execSync("git log -1 --format=%B", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  expect(logBody).toContain("X-ADR: ADR-0042");
 });
