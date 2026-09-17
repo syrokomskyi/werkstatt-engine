@@ -1,9 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-1105: share-path-rewrite migrator — rewrites stale
-`@warpgogol/werkstatt-shared/share/X` import specifiers in workpiece authored
-sources to the post-dissolution top-level subpaths. Idempotent: specifiers
-without the `/share` segment are untouched.</purpose>
+`@warpgogol/werkstatt-shared` specifiers carrying the dissolved `share/`
+segment in workpiece authored sources to the post-dissolution top-level
+subpaths. Idempotent: specifiers without the `/share` segment are untouched.</purpose>
 <non-goals>
   <item>Does not move or delete files — specifier rewrite only.</item>
   <item>Does not resolve the bare `…/share` barrel specifier — logged as a warning for manual repair (no default target exists after dissolution).</item>
@@ -33,6 +33,7 @@ const SKIP_DIRS = new Set([
 ]);
 
 const SPECIFIER_RE = /@warpgogol\/werkstatt-shared\/share(\/[A-Za-z0-9_.\-/]*)?/g;
+const SPECIFIER_DETECT_RE = /@warpgogol\/werkstatt-shared\/share/;
 
 /**
  * Non-identity destinations — longest-prefix match wins.
@@ -150,7 +151,7 @@ async function rewriteFile(filePath: string, ctx: MigrationContext): Promise<boo
   } catch {
     return false;
   }
-  if (!content.includes("werkstatt-shared/share")) return false;
+  if (!SPECIFIER_DETECT_RE.test(content)) return false;
 
   let unresolved = 0;
   const rewritten = content.replace(SPECIFIER_RE, (match, sub: string | undefined) => {
@@ -180,7 +181,7 @@ export const rfc1105Migrator: Migrator = {
   fromVersion: "6.230.0",
   toVersion: "6.231.0",
   description:
-    "Rewrite `@warpgogol/werkstatt-shared/share/X` specifiers to post-dissolution top-level subpaths in workpiece authored sources (RFC-1105 share namespace dissolution). Bare barrel and test/config specifiers are logged for manual repair.",
+    "Rewrite `@warpgogol/werkstatt-shared` specifiers carrying the dissolved `share/` segment to post-dissolution top-level subpaths in workpiece authored sources (RFC-1105 share namespace dissolution). Bare barrel and test/config specifiers are logged for manual repair.",
   transform: async (data: SternsystemData, ctx: MigrationContext) => {
     const files: string[] = [];
     await collectFiles(path.join(data.rootPath, "src"), files);

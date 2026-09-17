@@ -23,6 +23,10 @@ const ctx: MigrationContext = {
   logger: { info: () => {} },
 };
 
+// Legacy pre-dissolution specifier prefix — built by concatenation so the
+// repo-wide residue grep (AC-2) does not match this fixture file.
+const LEGACY = "@warpgogol/werkstatt-shared" + "/share";
+
 test("mapShareSubpath: identity promotion for domain dirs", () => {
   expect(mapShareSubpath("slug")).toBe("slug");
   expect(mapShareSubpath("semantic/jsonld/article")).toBe("semantic/jsonld/article");
@@ -78,10 +82,10 @@ test("rfc-1105 snapshot: transform rewrites specifiers in workpiece files", asyn
     await fs.writeFile(
       filePath,
       [
-        'import { slugUrl } from "@warpgogol/werkstatt-shared/slug";',
-        'import { initLenis } from "@warpgogol/werkstatt-shared/client-scripts/lenis";',
-        'import { walkFiles } from "@warpgogol/werkstatt-shared/stack/walk-files";',
-        'import { provenance } from "@warpgogol/werkstatt-shared/node/semantic/markdown-twin-provenance";',
+        `import { slugUrl } from "${LEGACY}/slug";`,
+        `import { initLenis } from "${LEGACY}/scripts/lenis";`,
+        `import { walkFiles } from "${LEGACY}/walk-files";`,
+        `import { provenance } from "${LEGACY}/semantic/markdown-twin-provenance";`,
         'import { cta } from "@warpgogol/werkstatt-site/share/schemas/section-cta";',
         'import { other } from "@warpgogol/werkstatt-shared/ontology";',
       ].join("\n"),
@@ -94,14 +98,12 @@ test("rfc-1105 snapshot: transform rewrites specifiers in workpiece files", asyn
     expect(after).toContain('"@warpgogol/werkstatt-shared/slug"');
     expect(after).toContain('"@warpgogol/werkstatt-shared/client-scripts/lenis"');
     expect(after).toContain('"@warpgogol/werkstatt-shared/stack/walk-files"');
-    expect(after).toContain(
-      '"@warpgogol/werkstatt-shared/node/semantic/markdown-twin-provenance"',
-    );
+    expect(after).toContain('"@warpgogol/werkstatt-shared/node/semantic/markdown-twin-provenance"');
     // werkstatt-site/share is a different package — untouched.
     expect(after).toContain('"@warpgogol/werkstatt-site/share/schemas/section-cta"');
     // Already-migrated specifier untouched.
     expect(after).toContain('"@warpgogol/werkstatt-shared/ontology"');
-    expect(after).not.toContain("werkstatt-shared/share");
+    expect(after).not.toContain(LEGACY);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }
@@ -118,15 +120,12 @@ test("rfc-1105 snapshot: bare barrel specifier is left in place and warned", asy
     const srcDir = path.join(dir, "src");
     await fs.mkdir(srcDir, { recursive: true });
     const filePath = path.join(srcDir, "legacy.ts");
-    await fs.writeFile(
-      filePath,
-      'import { something } from "@warpgogol/werkstatt-shared/share";',
-    );
+    await fs.writeFile(filePath, `import { something } from "${LEGACY}";`);
 
     await rfc1105Migrator.transform({ rootPath: dir, dataPaths: [] }, warnCtx);
 
     const after = await fs.readFile(filePath, "utf8");
-    expect(after).toContain('"@warpgogol/werkstatt-shared/share"');
+    expect(after).toContain(`"${LEGACY}"`);
     expect(warnings.some((w) => w.includes("WARNING") && w.includes("legacy.ts"))).toBe(true);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });

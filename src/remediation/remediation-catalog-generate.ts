@@ -5,7 +5,7 @@ RFC-1027: emits docs/remediation-catalog.generated.yaml from REMEDIATION_CATALOG
 cross-referencing validator rules[] declarations to identify uncovered ruleIds.
 </purpose>
 <non-goals>
-  <item>Do not own the catalog — that lives in @warpgogol/werkstatt-shared/share/remediation.</item>
+  <item>Do not own the catalog — that lives in @warpgogol/werkstatt-shared/remediation.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
