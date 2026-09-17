@@ -40,8 +40,8 @@ import {
   allMigratorIds,
 } from "../migrators/registry.ts";
 
-test("registry is seeded with rfc-0479 through rfc-0885 migrators", () => {
-  expect(migratorRegistry.length).toBe(23);
+test("registry is seeded with rfc-0479 through rfc-1105 migrators", () => {
+  expect(migratorRegistry.length).toBe(24);
   expect(migratorRegistry[0].id).toBe("rfc-0479");
   expect(migratorRegistry[1].id).toBe("rfc-0481");
   expect(migratorRegistry[2].id).toBe("rfc-0483");
@@ -75,7 +75,7 @@ test("numericRfcId parses RFC-NNNN format", () => {
 
 test("migratorsToApply returns migrators not in cursor", () => {
   const chain = migratorsToApply([]);
-  expect(chain.length).toBe(23);
+  expect(chain.length).toBe(24);
   expect(chain[0].id).toBe("rfc-0479");
   expect(chain[1].id).toBe("rfc-0481");
   expect(chain[2].id).toBe("rfc-0483");
@@ -99,6 +99,7 @@ test("migratorsToApply returns migrators not in cursor", () => {
   expect(chain[20].id).toBe("rfc-0572");
   expect(chain[21].id).toBe("rfc-0757");
   expect(chain[22].id).toBe("rfc-0885");
+  expect(chain[23].id).toBe("rfc-1105");
 });
 
 test("migratorsToApply excludes already-applied migrators", () => {
@@ -126,6 +127,7 @@ test("migratorsToApply excludes already-applied migrators", () => {
     "rfc-0572",
     "rfc-0757",
     "rfc-0885",
+    "rfc-1105",
   ]);
   expect(chain.length).toBe(0);
 });
@@ -156,5 +158,6 @@ test("allMigratorIds returns sorted ids", () => {
     "rfc-0572",
     "rfc-0757",
     "rfc-0885",
+    "rfc-1105",
   ]);
 });

@@ -79,6 +79,8 @@ vi.mock("@warpgogol/werkstatt-site/onboarding", () => ({
   readRuntimeTemplate: vi.fn(() => ""),
   generateWorkpiecePackageJson: vi.fn(() => ({ packageJson: "{}", resolved: [] })),
   readTemplateFields: vi.fn(() => ({})),
+  resolveBasePath: vi.fn(() => ""),
+  resolveAdapterBlock: vi.fn(() => ""),
 }));
 
 vi.mock("../bordbuch/bordbuch-io.ts", () => ({
