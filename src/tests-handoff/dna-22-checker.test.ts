@@ -24,7 +24,7 @@ function setupWorkpiece(clientEditable: string[]): string {
   mkdirSync(join(contentDir, "prose"), { recursive: true });
   mkdirSync(join(contentDir, "assets"), { recursive: true });
 
-  const frontmatter = `---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\n  tagline: test\nconstellations:\n  - test\nclientEditable:\n${clientEditable.map((e) => `  - ${e}`).join("\n")}\npages: []\ngrowth:\n  vendor:\n    adapter: null\n    options: {}\n  funnels: []\n  experiments: []\nrelease:\n  passport:\n    enabled: false\n    indexable: false\n    keyVersion: "1"\n    heartbeatUrl: ""\n---\n\n# Test\n`;
+  const frontmatter = `---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\n  tagline: test\nconstellations:\n  - test\nclientEditable:\n${clientEditable.map((e) => `  - ${e}`).join("\n")}\npages: []\n---\n\n# Test\n`;
   writeFileSync(join(contentDir, "system.md"), frontmatter);
   writeFileSync(join(contentDir, "pages", "home.md"), "# Home");
   writeFileSync(join(contentDir, "prose", "about.md"), "# About");

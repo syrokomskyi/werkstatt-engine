@@ -183,7 +183,7 @@ async function writeSystemManifest(cachePath: string): Promise<void> {
   await mkdir(contentDir, { recursive: true });
   await writeFile(
     join(contentDir, "system.md"),
-    "---\ni18n:\n  default: de\n  languages:\n    - de\n---\n",
+    "---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\ni18n:\n  default: de\n  supported:\n    de: true\n---\n",
   );
 }
 
@@ -1164,7 +1164,12 @@ describe("RFC-0715: resolveDefaultLang", () => {
   it("throws when system.md i18n.default is missing", async () => {
     const cachePath = join(tmpDir, "systems-cache", "test-sys");
     await mkdir(join(cachePath, "src", "content"), { recursive: true });
-    await writeFile(join(cachePath, "src", "content", "system.md"), "---\n---\n");
+    // RFC-1106: schema parses at load — required fields must be present so the
+    // manifest reaches the i18n.default check instead of failing Zod parse.
+    await writeFile(
+      join(cachePath, "src", "content", "system.md"),
+      "---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\n---\n",
+    );
 
     const { resolveDefaultLang } = await import("../nachweis/nachweis-io.ts");
     await expect(resolveDefaultLang(cachePath)).rejects.toThrow("i18n.default is required");
@@ -1183,7 +1188,7 @@ describe("RFC-0715: resolveDefaultLang", () => {
     await mkdir(join(cachePath, "src", "content"), { recursive: true });
     await writeFile(
       join(cachePath, "src", "content", "system.md"),
-      "---\ni18n:\n  default: uk\n  languages:\n    - uk\n---\n",
+      "---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\ni18n:\n  default: uk\n  supported:\n    uk: true\n---\n",
     );
 
     const { resolveDefaultLang } = await import("../nachweis/nachweis-io.ts");

@@ -9,6 +9,32 @@ const input = { argv: [], flags: {} };
 test("createCompassInventoryEntries excludes generation templates but keeps authored neighbors", async () => {
   const root = await mkdtemp(join(tmpdir(), "compass-inventory-"));
   try {
+    // RFC-1096: template exclusion is consumer policy (bindings.compass.excludedPaths),
+    // not a generic default — the fixture workspace must declare it.
+    await writeFile(
+      join(root, "forge.yaml"),
+      `schema: forge/config@1
+project:
+  name: test-ws
+  stack: [typescript]
+  packageManager: pnpm
+paths:
+  rfcsDir: docs/rfcs
+  adrsDir: docs/adrs
+  plansDir: docs/plans
+  auditsDir: docs/audits
+  specsDir: docs/specs
+  skillsDir: .agents/skills
+bindings:
+  schema: forge/bindings@1
+  commands: {}
+  paths: {}
+  compass:
+    excludedPaths:
+      - { pattern: "src/templates/**", reason: template-source }
+`,
+      "utf8",
+    );
     await mkdir(join(root, "packages", "sample", "src", "templates"), { recursive: true });
     await mkdir(join(root, "packages", "werkstatt", "src", "templates"), {
       recursive: true,

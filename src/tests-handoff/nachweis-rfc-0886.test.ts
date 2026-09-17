@@ -168,7 +168,7 @@ async function writeSystemManifest(cachePath: string, langs: string[] = ["de"]):
   const supported = langs.map((l) => `    ${l}: true`).join("\n");
   await writeFile(
     join(contentDir, "system.md"),
-    `---\ni18n:\n  default: de\n  supported:\n${supported}\n---\n`,
+    `---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\ni18n:\n  default: de\n  supported:\n${supported}\n---\n`,
   );
 }
 

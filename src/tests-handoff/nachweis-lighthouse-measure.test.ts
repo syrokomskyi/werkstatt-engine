@@ -175,7 +175,7 @@ async function writeSystemManifest(cachePath: string): Promise<void> {
   await mkdir(contentDir, { recursive: true });
   await writeFile(
     join(contentDir, "system.md"),
-    "---\ni18n:\n  default: de\n  supported:\n    de: true\n---\n",
+    "---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\ni18n:\n  default: de\n  supported:\n    de: true\n---\n",
   );
 }
 

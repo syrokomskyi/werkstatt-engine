@@ -134,7 +134,8 @@ async function writeSystemMd(): Promise<void> {
   const cacheDir = path.join(tmpDir, "..", "systems-cache", systemId);
   const contentDir = path.join(cacheDir, "src", "content");
   if (!existsSync(contentDir)) mkdirSync(contentDir, { recursive: true });
-  const systemMd = "---\ni18n:\n  default: de\n---\n\n# Test System\n";
+  const systemMd =
+    "---\napp: test-app\nversion: 1.0.0\nidentity:\n  systemStar: test\n  biome: default\ni18n:\n  default: de\n  supported:\n    de: true\n---\n\n# Test System\n";
   await fs.writeFile(path.join(contentDir, "system.md"), systemMd, "utf8");
 }
 

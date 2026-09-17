@@ -30,6 +30,14 @@ const WORKSPACE_ROOT = resolve(import.meta.dirname, "../../..");
 
 const SYSTEM_MD = `---
 app: test-app
+version: 1.0.0
+identity:
+  systemStar: test
+  biome: default
+i18n:
+  default: de
+  supported:
+    de: true
 title: Test App
 description: Test fixture for kernel.wire integration test
 ---
