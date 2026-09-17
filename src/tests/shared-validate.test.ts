@@ -9,13 +9,13 @@ function makeTmpDir() {
 }
 
 function makeWorkspace(tmpDir: string) {
-  const engineSrc = join(tmpDir, "packages", "werkstatt", "src");
+  const engineSrc = join(tmpDir, "packages", "werkstatt-engine", "src");
   mkdirSync(engineSrc, { recursive: true });
   return engineSrc;
 }
 
 function makePkgJson(tmpDir: string, deps: Record<string, string> = {}) {
-  const pkgDir = join(tmpDir, "packages", "werkstatt");
+  const pkgDir = join(tmpDir, "packages", "werkstatt-engine");
   mkdirSync(pkgDir, { recursive: true });
   writeFileSync(
     join(pkgDir, "package.json"),
@@ -24,7 +24,7 @@ function makePkgJson(tmpDir: string, deps: Record<string, string> = {}) {
 }
 
 function makeAutonomyFile(tmpDir: string, content: string) {
-  const pluginDir = join(tmpDir, "packages", "werkstatt", "src", "plugin");
+  const pluginDir = join(tmpDir, "packages", "werkstatt-engine", "src", "plugin");
   mkdirSync(pluginDir, { recursive: true });
   writeFileSync(join(pluginDir, "autonomy-validate.ts"), content);
 }
@@ -32,7 +32,24 @@ function makeAutonomyFile(tmpDir: string, content: string) {
 function makeSharedSrc(tmpDir: string) {
   const sharedSrc = join(tmpDir, "packages", "werkstatt-shared", "src");
   mkdirSync(sharedSrc, { recursive: true });
+  writeFileSync(
+    join(tmpDir, "packages", "werkstatt-shared", "package.json"),
+    JSON.stringify({ name: "@warpgogol/werkstatt-shared", version: "1.0.0" }),
+  );
   return sharedSrc;
+}
+
+function makeSharedPkgJsonWithEngineDep(tmpDir: string) {
+  const sharedDir = join(tmpDir, "packages", "werkstatt-shared");
+  mkdirSync(join(sharedDir, "src"), { recursive: true });
+  writeFileSync(
+    join(sharedDir, "package.json"),
+    JSON.stringify({
+      name: "@warpgogol/werkstatt-shared",
+      version: "1.0.0",
+      dependencies: { "@warpgogol/werkstatt-engine": "*" },
+    }),
+  );
 }
 
 const AUTONOMY_CLEAN = `
@@ -201,10 +218,40 @@ test("SHARED-04 fails on deep engine subpath imports in shared", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// SHARED-05: no engine dependency in werkstatt-shared package.json (RFC-1104)
+// ---------------------------------------------------------------------------
+
+test("SHARED-05 passes when shared package.json has no engine dep", async () => {
+  const tmpDir = makeTmpDir();
+  const engineSrc = makeWorkspace(tmpDir);
+  makeSharedSrc(tmpDir);
+  makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
+  makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
+  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "zod";\n`);
+
+  const result = await runSharedValidate(tmpDir);
+  const shared05 = result.checks.find((c) => c.id === "SHARED-05");
+  expect(shared05?.status).toBe("pass");
+});
+
+test("SHARED-05 fails when shared package.json declares engine dep", async () => {
+  const tmpDir = makeTmpDir();
+  const engineSrc = makeWorkspace(tmpDir);
+  makeSharedPkgJsonWithEngineDep(tmpDir);
+  makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
+  makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
+  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "zod";\n`);
+
+  const result = await runSharedValidate(tmpDir);
+  const shared05 = result.checks.find((c) => c.id === "SHARED-05");
+  expect(shared05?.status).toBe("fail");
+});
+
+// ---------------------------------------------------------------------------
 // Overall result
 // ---------------------------------------------------------------------------
 
-test("overall status is pass when all four checks pass", async () => {
+test("overall status is pass when all five checks pass", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
   makeSharedSrc(tmpDir);
@@ -215,7 +262,7 @@ test("overall status is pass when all four checks pass", async () => {
   const result = await runSharedValidate(tmpDir);
   expect(result.status).toBe("pass");
   expect(result.command).toBe("werkstatt.shared.validate");
-  expect(result.checks).toHaveLength(4);
+  expect(result.checks).toHaveLength(5);
 });
 
 test("overall status is fail when any check fails", async () => {

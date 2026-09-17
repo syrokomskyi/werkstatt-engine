@@ -17,14 +17,18 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../src/kernel/types.ts";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "../src/kernel/types.ts";
 import { runSharedValidate, type SharedValidateResult } from "../src/plugin/shared-validate.ts";
 import type { ModuleExport } from "../src/runtime/desired-state.ts";
 
 export const werkstattSharedValidateModule: ModuleExport = {
   name: "werkstatt-shared-validate",
   version: "0.1.0",
-    declarations: [],
+  declarations: [],
   commands: [
     {
       name: "werkstatt.shared.validate",
@@ -32,14 +36,16 @@ export const werkstattSharedValidateModule: ModuleExport = {
       rules: [],
       modulePath: "packages/werkstatt-engine/os/werkstatt-shared-validate.module.ts",
       description:
-        "Check SHARED-01 (werkstatt-shared dep declared), SHARED-02 (no site exemptions in autonomy-validate), SHARED-03 (no site imports in engine src). Enforces RFC-0868.",
+        "Check SHARED-01 (werkstatt-shared dep declared), SHARED-02 (no site exemptions in autonomy-validate), SHARED-03 (no site imports in engine src), SHARED-04 (no engine imports in shared src), SHARED-05 (no engine dep in shared package.json). Enforces RFC-0868 + RFC-1104.",
       scope: "workspace",
       supportsAllSites: false,
       flags: {},
       reads: [
-        "packages/werkstatt/package.json",
-        "packages/werkstatt/src/plugin/autonomy-validate.ts",
-        "packages/werkstatt/src/**",
+        "packages/werkstatt-engine/package.json",
+        "packages/werkstatt-engine/src/plugin/autonomy-validate.ts",
+        "packages/werkstatt-engine/src/**",
+        "packages/werkstatt-shared/package.json",
+        "packages/werkstatt-shared/src/**",
       ],
       cacheable: false,
       async execute(
@@ -53,12 +59,11 @@ export const werkstattSharedValidateModule: ModuleExport = {
           data: result,
           summary:
             result.status === "pass"
-              ? `Shared boundary guard passed — SHARED-01/02/03 all pass`
+              ? `Shared boundary guard passed — SHARED-01..05 all pass`
               : `Shared boundary guard failed — ${failedChecks.map((c) => c.id).join(", ")}`,
         };
       },
-    }
+    },
   ],
-  pipelines: [
-
-  ]};
+  pipelines: [],
+};

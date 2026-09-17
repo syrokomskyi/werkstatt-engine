@@ -1,10 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Boundary guard for RFC-0868 + RFC-1104. Implements four checks:
-SHARED-01: @warpgogol/werkstatt-shared is declared as a dependency in packages/werkstatt/package.json
+<purpose>Boundary guard for RFC-0868 + RFC-1104. Implements five checks:
+SHARED-01: @warpgogol/werkstatt-shared is declared as a dependency in packages/werkstatt-engine/package.json
 SHARED-02: No @warpgogol/werkstatt-site/* exemptions remain in EXEMPT_PREFIXES in autonomy-validate.ts
-SHARED-03: No @warpgogol/werkstatt-site/* imports remain in packages/werkstatt/src/** non-test files
-SHARED-04: No @warpgogol/werkstatt-engine/* imports remain in packages/werkstatt-shared/src/** (RFC-1104 cycle break)</purpose>
+SHARED-03: No @warpgogol/werkstatt-site/* imports remain in packages/werkstatt-engine/src/** non-test files
+SHARED-04: No @warpgogol/werkstatt-engine/* imports remain in packages/werkstatt-shared/src/** (RFC-1104 cycle break)
+SHARED-05: packages/werkstatt-shared/package.json declares no dependency on @warpgogol/werkstatt-engine (RFC-1104 AC-1)</purpose>
 
 <non-goals>
   <item>Does not scan werkstatt-shared for site imports — SHARED-04 only checks the engine boundary direction.</item>
@@ -14,6 +15,7 @@ SHARED-04: No @warpgogol/werkstatt-engine/* imports remain in packages/werkstatt
 <CHANGE_SUMMARY>
   <item>RFC-0868: initial shared-validate implementing SHARED-01/02/03 per RFC spec.</item>
   <item>RFC-1104: added SHARED-04 — no werkstatt-engine imports inside werkstatt-shared/src.</item>
+  <item>RFC-1104: added SHARED-05 — werkstatt-shared/package.json must not declare a dependency on werkstatt-engine.</item>
   <item>RFC-0868: use shared import-scan-util to avoid duplication with autonomy-validate.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -45,7 +47,7 @@ export interface SharedValidateResult {
 }
 
 async function checkSharedDependency(workspaceRoot: string): Promise<SharedCheckResult> {
-  const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt", "package.json");
+  const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt-engine", "package.json");
   try {
     const content = await readFile(pkgJsonPath, "utf8");
     const pkg = JSON.parse(content);
@@ -55,14 +57,14 @@ async function checkSharedDependency(workspaceRoot: string): Promise<SharedCheck
       id: "SHARED-01",
       status: hasShared ? "pass" : "fail",
       detail: hasShared
-        ? `${SHARED_PKG} declared in packages/werkstatt/package.json dependencies`
-        : `${SHARED_PKG} missing from packages/werkstatt/package.json dependencies`,
+        ? `${SHARED_PKG} declared in packages/werkstatt-engine/package.json dependencies`
+        : `${SHARED_PKG} missing from packages/werkstatt-engine/package.json dependencies`,
     };
   } catch {
     return {
       id: "SHARED-01",
       status: "fail",
-      detail: `Cannot read packages/werkstatt/package.json`,
+      detail: `Cannot read packages/werkstatt-engine/package.json`,
     };
   }
 }
@@ -71,7 +73,7 @@ async function checkExemptionHygiene(workspaceRoot: string): Promise<SharedCheck
   const autonomyPath = join(
     workspaceRoot,
     "packages",
-    "werkstatt",
+    "werkstatt-engine",
     "src",
     "plugin",
     "autonomy-validate.ts",
@@ -90,7 +92,7 @@ async function checkExemptionHygiene(workspaceRoot: string): Promise<SharedCheck
     return {
       id: "SHARED-02",
       status: "fail",
-      detail: `Cannot read packages/werkstatt/src/plugin/autonomy-validate.ts`,
+      detail: `Cannot read packages/werkstatt-engine/src/plugin/autonomy-validate.ts`,
     };
   }
 }
@@ -99,7 +101,7 @@ async function checkNoSiteImports(workspaceRoot: string): Promise<{
   result: SharedCheckResult;
   violations: ImportViolation[];
 }> {
-  const engineSrcDir = join(workspaceRoot, "packages", "werkstatt", "src");
+  const engineSrcDir = join(workspaceRoot, "packages", "werkstatt-engine", "src");
   const { violations, scannedFiles } = await scanDirectoryForImports(
     engineSrcDir,
     workspaceRoot,
@@ -112,8 +114,8 @@ async function checkNoSiteImports(workspaceRoot: string): Promise<{
       status: violations.length === 0 ? "pass" : "fail",
       detail:
         violations.length === 0
-          ? `No ${SITE_PREFIX}/* imports in packages/werkstatt/src/** (${scannedFiles} files scanned)`
-          : `${violations.length} ${SITE_PREFIX}/* import(s) found in packages/werkstatt/src/** (${scannedFiles} files scanned)`,
+          ? `No ${SITE_PREFIX}/* imports in packages/werkstatt-engine/src/** (${scannedFiles} files scanned)`
+          : `${violations.length} ${SITE_PREFIX}/* import(s) found in packages/werkstatt-engine/src/** (${scannedFiles} files scanned)`,
     },
     violations,
   };
@@ -143,15 +145,44 @@ async function checkNoEngineImportsInShared(workspaceRoot: string): Promise<{
   };
 }
 
+async function checkSharedPackageDeclaresNoEngineDep(
+  workspaceRoot: string,
+): Promise<SharedCheckResult> {
+  const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt-shared", "package.json");
+  try {
+    const content = await readFile(pkgJsonPath, "utf8");
+    const pkg = JSON.parse(content);
+    const depFields = ["dependencies", "devDependencies", "peerDependencies"] as const;
+    const offenders = depFields.filter(
+      (field) => pkg[field] && typeof pkg[field] === "object" && ENGINE_PREFIX in pkg[field],
+    );
+    const clean = offenders.length === 0;
+    return {
+      id: "SHARED-05",
+      status: clean ? "pass" : "fail",
+      detail: clean
+        ? `packages/werkstatt-shared/package.json declares no ${ENGINE_PREFIX} dependency`
+        : `${ENGINE_PREFIX} declared in packages/werkstatt-shared/package.json ${offenders.join(", ")} — must be removed`,
+    };
+  } catch {
+    return {
+      id: "SHARED-05",
+      status: "fail",
+      detail: `Cannot read packages/werkstatt-shared/package.json`,
+    };
+  }
+}
+
 export async function runSharedValidate(workspaceRoot: string): Promise<SharedValidateResult> {
-  const [shared01, shared02, shared03Result, shared04Result] = await Promise.all([
+  const [shared01, shared02, shared03Result, shared04Result, shared05] = await Promise.all([
     checkSharedDependency(workspaceRoot),
     checkExemptionHygiene(workspaceRoot),
     checkNoSiteImports(workspaceRoot),
     checkNoEngineImportsInShared(workspaceRoot),
+    checkSharedPackageDeclaresNoEngineDep(workspaceRoot),
   ]);
 
-  const checks = [shared01, shared02, shared03Result.result, shared04Result.result];
+  const checks = [shared01, shared02, shared03Result.result, shared04Result.result, shared05];
   const anyFail = checks.some((c) => c.status === "fail");
 
   return {

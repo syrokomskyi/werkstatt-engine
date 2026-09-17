@@ -925,13 +925,13 @@ describe("RFC-0872: PBP evidence-source schema", () => {
 
   it("validates technical-assessment kind with assessment field", async () => {
     const { evidenceSourceSchema } =
-      await import("@warpgogol/werkstatt-site/domain/pbp/schemas/evidence-source");
+      await import("@warpgogol/werkstatt-site/pbp/entities/evidence-source");
     expect(() => evidenceSourceSchema.parse(makeValidEntity())).not.toThrow();
   });
 
   it("rejects assessment field on certificate kind (RFC-0872 section 3: assessment MUST be absent)", async () => {
     const { evidenceSourceSchema } =
-      await import("@warpgogol/werkstatt-site/domain/pbp/schemas/evidence-source");
+      await import("@warpgogol/werkstatt-site/pbp/entities/evidence-source");
     const entity = makeValidEntity({
       kind: "certificate",
       items: { main: { sha256: SHA256_A } },
@@ -941,7 +941,7 @@ describe("RFC-0872: PBP evidence-source schema", () => {
 
   it("validates artifact role enum values", async () => {
     const { evidenceSourceSchema } =
-      await import("@warpgogol/werkstatt-site/domain/pbp/schemas/evidence-source");
+      await import("@warpgogol/werkstatt-site/pbp/entities/evidence-source");
     const entity = makeValidEntity({
       items: {
         raw: { role: "raw-result", canonical: true, sha256: SHA256_A },
@@ -956,7 +956,7 @@ describe("RFC-0872: PBP evidence-source schema", () => {
 
   it("rejects invalid artifact role value", async () => {
     const { evidenceSourceSchema } =
-      await import("@warpgogol/werkstatt-site/domain/pbp/schemas/evidence-source");
+      await import("@warpgogol/werkstatt-site/pbp/entities/evidence-source");
     const entity = makeValidEntity({
       items: { bad: { role: "invalid-role" } },
     });
