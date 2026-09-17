@@ -53,7 +53,7 @@ export function runMigratorRegistryValidate(
 
   for (const migrator of migratorRegistry) {
     const migratorDir = path.dirname(
-      path.resolve(workspaceRoot, "packages/os/site-kernel-handoff/src/migrators/registry.ts"),
+      path.resolve(workspaceRoot, "packages/werkstatt-engine/src/migrators/registry.ts"),
     );
     const pbtTestPath = path.join(migratorDir, `${migrator.id}.pbt.test.ts`);
     const snapshotTestPath = path.join(migratorDir, `${migrator.id}.snapshot.test.ts`);

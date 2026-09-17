@@ -11,6 +11,7 @@ ordered by RFC-id (numeric). Replaces the old RFC-0221 SemVer-based registry.</p
   <item>RFC-0548: register rfc-0548 migrator (backup AGENTS.md and regenerate with behavioral layer).</item>
   <item>RFC-0757: register rfc-0757 no-op migrator (send-message checklistItems generalization, advances cursor).</item>
   <item>RFC-0885: register rfc-0885 content migrator (consentStatus→consentScope, add default display to Nachweis evidence-source).</item>
+  <item>RFC-1105: register rfc-1105 share-path-rewrite migrator (werkstatt-shared/share/X → werkstatt-shared/X specifier rewrite in workpieces).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -45,6 +46,7 @@ import { rfc0529Migrator } from "./rfc-0529.ts";
 import { rfc0548Migrator } from "./rfc-0548.ts";
 import { rfc0757Migrator } from "./rfc-0757.ts";
 import { rfc0885Migrator } from "./rfc-0885.ts";
+import { rfc1105Migrator } from "./rfc-1105.ts";
 
 export const migratorRegistry: readonly Migrator[] = [
   rfc0479Migrator,
@@ -70,6 +72,7 @@ export const migratorRegistry: readonly Migrator[] = [
   rfc0572Migrator,
   rfc0757Migrator,
   rfc0885Migrator,
+  rfc1105Migrator,
 ];
 
 export function numericRfcId(id: string): number {
