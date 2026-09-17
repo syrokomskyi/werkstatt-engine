@@ -15,8 +15,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import {
   snapshotCanonicalJsonObjectV1,
   canonicalJsonHashV1,
-} from "../fingerprint/canonical-json.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CertificationDossierEventV1 } from "./contracts/index.ts";
 import { buildDossierEventIdentityV1 } from "./identity.ts";
 

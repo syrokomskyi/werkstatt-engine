@@ -8,7 +8,7 @@ import type {
   ArtifactProvenanceV1,
   SandboxProviderAdmissionV1,
 } from "../capability-artifacts/index.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { createCapabilityBroker } from "../isolation/broker/index.ts";
 import type { BrokerPolicyV1, BrokerInvocationContextV1 } from "../isolation/broker/index.ts";
 import {

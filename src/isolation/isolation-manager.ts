@@ -13,7 +13,7 @@
 </CHANGE_SUMMARY>
 */
 
-import type { ComponentId, IsolationTier } from "../component/contracts.ts";
+import type { ComponentId, IsolationTier } from "@warpgogol/werkstatt-shared/component";
 import type {
   IsolationAdapterV1,
   IsolationManager as IIsolationManager,
@@ -23,7 +23,7 @@ import type {
   SandboxedWorkloadCreateV1,
   TerminationReportV1,
 } from "./contracts.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const DEFAULT_MAX_SANDBOXES = 16;
 

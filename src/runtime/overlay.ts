@@ -19,7 +19,7 @@ import type {
   DesiredState,
   ComponentDeclaration,
   DesiredStateOverlay,
-} from "./desired-state.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 /**
  * Overlay conflict error — thrown when two overlays with the same priority

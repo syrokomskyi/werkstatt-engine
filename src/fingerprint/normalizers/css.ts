@@ -11,7 +11,7 @@
 */
 
 import postcss from "postcss";
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeCss(content: string): string {
   const root = postcss.parse(content);

@@ -16,8 +16,8 @@ import type {
   EffectClass,
   EffectDeclarationV1,
   CompensationAction,
-} from "../component/contracts.ts";
-import type { ComponentId } from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import type { ComponentId } from "@warpgogol/werkstatt-shared/component";
 
 export type EffectOutcome =
   "committed" | "aborted" | "compensated" | "withheld" | "failed-rollback" | "quarantined";

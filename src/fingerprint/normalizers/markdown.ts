@@ -14,7 +14,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkMdx from "remark-mdx";
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 function stripHtmlCommentsOutsideCodeFences(text: string): string {
   const lines = text.split("\n");

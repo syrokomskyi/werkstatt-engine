@@ -21,10 +21,10 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
-import type { EffectClass, CompensationResult } from "../component/contracts.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import { isSha256Digest } from "../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { EffectClass, CompensationResult } from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { isSha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { getDefaultEffectClassifier } from "./effect-classifier.ts";
 import { CompensationVerifier } from "./compensation-verifier.ts";
 import { CompensationStore, resolveCompensationStorePath } from "./compensation-store.ts";

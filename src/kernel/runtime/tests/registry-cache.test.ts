@@ -5,8 +5,8 @@ import {
   setRegistryCacheEnabled,
   isRegistryCacheEnabled,
 } from "../registry-cache.ts";
-import type { KernelAppConfig } from "../../types.ts";
-import type { ModuleExport } from "../../../runtime/desired-state.ts";
+import type { KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 const mockModule: ModuleExport = {
   name: "test-module",

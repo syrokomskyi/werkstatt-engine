@@ -41,7 +41,7 @@ import type {
   KernelCommandResult,
   KernelNextStep,
   KernelRuntimeContext,
-} from "./types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 const TELEMETRY_RELATIVE_PATH = join(
   "node_modules",

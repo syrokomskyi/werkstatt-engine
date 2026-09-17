@@ -34,7 +34,7 @@ import type {
   KernelCommandResult,
   KernelLogger,
   KernelRuntimeContext,
-} from "../types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.join(__dirname, "..", "templates", "icons");

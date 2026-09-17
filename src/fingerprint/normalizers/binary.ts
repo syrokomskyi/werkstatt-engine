@@ -10,7 +10,7 @@
 </CHANGE_SUMMARY>
 */
 
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeBinary(bytes: Uint8Array): string {
   return byteHash(bytes);

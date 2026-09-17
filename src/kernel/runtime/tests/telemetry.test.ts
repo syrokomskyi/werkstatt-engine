@@ -4,7 +4,7 @@ import {
   getFactoryTelemetryPusher,
   flushFactoryTelemetry,
 } from "../telemetry.ts";
-import type { KernelExecutionReport } from "../../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 import type { MetricsPusher } from "@warpgogol/werkstatt-shared/observability";
 
 function makeReport(overrides: Partial<KernelExecutionReport> = {}): KernelExecutionReport {

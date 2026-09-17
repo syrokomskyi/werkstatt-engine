@@ -22,7 +22,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
   Diagnostic,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { diagnosticsResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 const VALIDATOR_NAME_PATTERN = /\.validate$|\.check$|\.lint$/;

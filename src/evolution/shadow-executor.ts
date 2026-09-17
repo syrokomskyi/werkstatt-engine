@@ -12,8 +12,8 @@
 </CHANGE_SUMMARY>
 */
 
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import { byteHash } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CandidateEvidenceV1 } from "./contracts.ts";
 
 export interface ShadowExecutor {

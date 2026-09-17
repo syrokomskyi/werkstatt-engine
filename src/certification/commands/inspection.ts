@@ -15,7 +15,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ReleaseCandidateV1 } from "../contracts/candidate.ts";
 import type { GateDecisionV1 } from "../contracts/decisions.ts";
 import type { CoverageReportV1 } from "../contracts/decisions.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { GateChannel } from "../contracts/identifiers.ts";
 import type { DossierRepositoryV1 } from "../storage/repository.ts";
 import { verifyDossierIntegrity, buildRootReference } from "../storage/repository.ts";

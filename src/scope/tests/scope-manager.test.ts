@@ -19,9 +19,9 @@ import type {
   ComponentDeclaration,
   ComponentScope,
   ScopeContext,
-} from "../../component/contracts.ts";
-import { SCOPE_ERROR_CODES } from "../../component/contracts.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import { SCOPE_ERROR_CODES } from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_SHA =
   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Sha256Digest;

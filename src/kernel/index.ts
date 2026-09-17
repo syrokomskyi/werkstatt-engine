@@ -32,8 +32,7 @@ export {
 export { createKernelLogger } from "./logger.ts";
 export { buildActualState } from "../runtime/reconciler.ts";
 export * from "./runtime.ts";
-export * from "./types.ts";
-export * from "../runtime/desired-state.ts";
+export * from "@warpgogol/werkstatt-shared/kernel";
 export { resolveCompassScanRoot } from "./resolve-compass-scan-root.ts";
 export { runKernelWire } from "./wire.ts";
 
@@ -110,13 +109,13 @@ export * from "./adr/index.ts";
 export { createCompassInventoryEntries, type CompassInventoryEntry } from "./compass-inventory.ts";
 
 // RFC-0258: atomic file-write primitive for workspace-shared writers
-export { writeFileAtomic, type WriteFileAtomicOptions } from "./fs-atomic.ts";
+// RFC-1104: writeFileAtomic + WriteFileAtomicOptions re-exported via werkstatt-shared/kernel above.
 
 // RFC-0345: idempotent file-write primitive — skips writes when content is unchanged
 export { writeFileIfChanged } from "./fs-idempotent.ts";
 
 // RFC-0267: WorkspaceIO port + adapters
-export * from "./workspace-io.ts";
+// RFC-1104: workspace-io re-exported via werkstatt-shared/kernel above.
 
 // RFC-0081: Generated-file governance marker (canonical source lives in site-kernel)
 // RFC-0336: buildGeneratedHeader is the single shared advisory-block builder.

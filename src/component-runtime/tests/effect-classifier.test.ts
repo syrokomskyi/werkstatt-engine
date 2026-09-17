@@ -6,7 +6,7 @@ import {
   getDefaultEffectClassifier,
   resetDefaultEffectClassifier,
 } from "../effect-classifier.ts";
-import type { EffectDeclarationExt } from "../../component/contracts.ts";
+import type { EffectDeclarationExt } from "@warpgogol/werkstatt-shared/component";
 
 describe("EffectClassifier", () => {
   it("classifies known operations", () => {

@@ -27,7 +27,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import { execSync } from "node:child_process";
 
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "./types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

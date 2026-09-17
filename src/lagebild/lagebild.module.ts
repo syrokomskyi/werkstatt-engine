@@ -11,7 +11,7 @@
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createLagebildModule(): Promise<ModuleExport> {
   const { runLagebildConnect } = await import("./lagebild-connect.ts");

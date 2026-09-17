@@ -26,8 +26,8 @@ import path from "node:path";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
 import { gitExec } from "../werkstatt/git-exec.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import { isSha256Digest, byteHashFile } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { isSha256Digest, byteHashFile } from "@warpgogol/werkstatt-shared/fingerprint";
 import type {
   GateDecisionV1,
   MainVerificationDecisionV1,

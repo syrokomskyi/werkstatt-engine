@@ -36,8 +36,8 @@ import { mkdir, readFile, writeFile as writeFileRaw, stat } from "node:fs/promis
 import { dirname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
-import { writeFileAtomic } from "./fs-atomic.ts";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "./types.ts";
+import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 const FLEET_SITES_RELATIVE_PATH = join("fleet", "fleet.sites.yaml");
 

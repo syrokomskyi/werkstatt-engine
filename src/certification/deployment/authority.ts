@@ -12,13 +12,13 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
-import { byteHash } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { GateChannel } from "../contracts/identifiers.ts";
 import type { GateDecisionV1, MainVerificationDecisionV1 } from "../contracts/decisions.ts";
 import type { DeploymentOperationState } from "../state-machine.ts";
 import { validateDeploymentTransition, validateArtifactTransition } from "../state-machine.ts";
-import type { ReleaseArtifactState } from "../../schemas/release.ts";
+import type { ReleaseArtifactState } from "@warpgogol/werkstatt-shared/ontology/operations";
 
 export type CertificationGate = "dev-deploy" | "propagate-alt" | "promote-main";
 

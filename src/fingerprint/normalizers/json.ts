@@ -10,7 +10,7 @@
 </CHANGE_SUMMARY>
 */
 
-import { stableJsonHash } from "../primitives.ts";
+import { stableJsonHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeJson(content: string): string {
   const parsed = JSON.parse(content);

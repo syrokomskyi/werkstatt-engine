@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runWorkpieceConfigPresenceCheck } from "./workpiece-config-presence-check.ts";
-import type { KernelCommandInput, KernelRuntimeContext } from "../kernel/types.ts";
+import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 function makeInput(flags: Record<string, unknown>): KernelCommandInput {
   return {

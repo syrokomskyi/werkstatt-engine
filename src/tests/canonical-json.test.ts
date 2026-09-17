@@ -8,8 +8,8 @@ import {
   canonicalJsonHashV1,
   CanonicalJsonInvariantError,
   CANONICAL_JSON_V1,
-} from "../fingerprint/canonical-json.ts";
-import { isSha256Digest, stableJsonHash } from "../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
+import { isSha256Digest, stableJsonHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures", "canonical-json-v1");
 const vectors = JSON.parse(readFileSync(join(FIXTURES_DIR, "vectors.json"), "utf8")) as {

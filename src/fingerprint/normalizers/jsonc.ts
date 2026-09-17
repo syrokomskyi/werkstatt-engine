@@ -11,7 +11,7 @@
 */
 
 import { parse as parseJsonc } from "jsonc-parser";
-import { stableJsonHash } from "../primitives.ts";
+import { stableJsonHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeJsonc(content: string): string {
   const parsed = parseJsonc(content);

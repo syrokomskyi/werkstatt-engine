@@ -1,6 +1,6 @@
 import { test, expect, describe } from "vitest";
 import { parseKernelArgv, resolveCommandFlags, KERNEL_UNIVERSAL_FLAGS } from "../argv.ts";
-import type { KernelCommandDefinition } from "../../types.ts";
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 
 const mockDefinition: KernelCommandDefinition = {
   name: "test.cmd",

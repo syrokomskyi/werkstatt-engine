@@ -11,7 +11,7 @@ import {
   runCommitMessageLint,
   type CommitRecord,
 } from "../commit-message-lint.ts";
-import type { KernelCommandInput, KernelRuntimeContext } from "../types.ts";
+import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

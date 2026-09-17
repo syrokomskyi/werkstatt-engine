@@ -25,7 +25,7 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 import { tsImport } from "tsx/esm/api";
-import type { DiscoveredSiteWorkspace, KernelAppConfig } from "./types.ts";
+import type { DiscoveredSiteWorkspace, KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
 import { discoverSiteWorkspaces as discoverSitesFromResolver } from "./site-workspace-resolver.ts";
 // @ai-invariant: Workspace discovery must remain read-only and avoid app-specific path assumptions outside explicit adapters.
 

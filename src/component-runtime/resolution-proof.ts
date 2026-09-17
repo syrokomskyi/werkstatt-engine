@@ -12,8 +12,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { ComponentId, CapabilityId } from "../component/contracts.ts";
-import type { ResolvedComponentSetV1 } from "../component/contracts.ts";
+import type { ComponentId, CapabilityId } from "@warpgogol/werkstatt-shared/component";
+import type { ResolvedComponentSetV1 } from "@warpgogol/werkstatt-shared/component";
 
 export type ResolutionViolationCode =
   | "RESOLUTION-01"

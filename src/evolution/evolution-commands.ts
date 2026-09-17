@@ -17,11 +17,11 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createEvolutionController, type EvolutionControllerV1 } from "./controller.ts";
 import type { CapabilityCandidateV1, CandidateEvidenceV1 } from "./contracts.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
-import { byteHash } from "../fingerprint/primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import { applyOverlay, removeOverlay } from "../runtime/overlay-store.ts";
 
 let controller: EvolutionControllerV1 | null = null;

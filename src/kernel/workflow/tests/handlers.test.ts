@@ -2,8 +2,8 @@ import { test, expect, describe, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runWorkflowList, runWorkflowAmendList, runWorkflowLint } from "../handlers.ts";
-import type { KernelCommandInput, KernelRuntimeContext } from "../../types.ts";
-import type { ActualState } from "../../../runtime/desired-state.ts";
+import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
 
 let tmpDir: string;
 

@@ -22,7 +22,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { byteHash } from "./primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { FingerprintFileResult, FingerprintOptions, FingerprintResult } from "./types.ts";
 import { normalizeFile } from "./normalizers/index.ts";
 import { normalizeFileStable } from "./normalizers/stable.ts";

@@ -17,9 +17,9 @@ last persisted desired state, compare it with actual state, and correct drift.
 
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { writeFileAtomic } from "../kernel/fs-atomic.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import type { DesiredState, ComponentDeclaration } from "./desired-state.ts";
+import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { DesiredState, ComponentDeclaration } from "@warpgogol/werkstatt-shared/kernel";
 
 /**
  * On-disk schema for persisted desired state.

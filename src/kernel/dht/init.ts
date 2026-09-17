@@ -24,7 +24,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { DHTConfig } from "./types.ts";
 import { createDhtConfig, loadDhtConfig, CONFIG_FILENAME } from "./config.ts";
 

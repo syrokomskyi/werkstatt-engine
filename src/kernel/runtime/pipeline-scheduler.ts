@@ -26,7 +26,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelExecutionReport, KernelPipelineStep } from "../types.ts";
+import type { KernelExecutionReport, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
 
 export interface ScheduledStep {
   step: KernelPipelineStep;

@@ -13,7 +13,7 @@
 </CHANGE_SUMMARY>
 */
 
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type {
   CertificationStorageAdapterV1,
   StoragePutInputV1,

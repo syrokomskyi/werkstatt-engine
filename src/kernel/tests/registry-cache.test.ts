@@ -5,8 +5,8 @@ import {
   setRegistryCacheEnabled,
   isRegistryCacheEnabled,
 } from "../runtime/registry-cache.ts";
-import type { KernelAppConfig } from "../types.ts";
-import type { ModuleExport } from "../../runtime/desired-state.ts";
+import type { KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

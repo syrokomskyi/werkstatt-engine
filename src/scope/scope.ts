@@ -23,8 +23,8 @@ import type {
   ScopeContext,
   ScopedRegistry,
   ScopeManager,
-} from "../component/contracts.ts";
-import { SCOPE_ERROR_CODES } from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import { SCOPE_ERROR_CODES } from "@warpgogol/werkstatt-shared/component";
 
 const DEFAULT_REGISTRY_LIMIT = 64;
 

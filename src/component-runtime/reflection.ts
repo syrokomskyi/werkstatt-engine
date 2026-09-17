@@ -21,7 +21,7 @@ import type {
   EffectDeclarationV1,
   GrantRequestV1,
   ResolvedComponentSetV1,
-} from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import type { ComponentLifecycleState } from "./lifecycle.ts";
 import { computeSetHash } from "../component/identity.ts";
 

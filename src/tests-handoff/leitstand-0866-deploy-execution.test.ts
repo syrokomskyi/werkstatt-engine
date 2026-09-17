@@ -36,7 +36,7 @@ vi.mock("../leitstand/leitstand-commands.ts", async (importOriginal) => {
 import type { PropagationResult, HealthCheck } from "@warpgogol/werkstatt-engine/schemas";
 import type { AuthorizeResult } from "../leitstand/deploy-helpers.ts";
 import type { DeploymentStaticConfig } from "@warpgogol/werkstatt-engine/schemas";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const nullAdapter: DeploymentAdapter = {
   name: "null",

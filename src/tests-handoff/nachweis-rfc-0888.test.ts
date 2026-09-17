@@ -343,7 +343,7 @@ afterEach(async () => {
 
 describe("RFC-0888: bordbuchEntryKindSchema includes sichtpass", () => {
   it("includes sichtpass in the enum", async () => {
-    const { bordbuchEntryKindSchema } = await import("../schemas/mission.ts");
+    const { bordbuchEntryKindSchema } = await import("@warpgogol/werkstatt-shared/ontology/operations");
     expect(bordbuchEntryKindSchema.options).toContain("sichtpass");
   });
 });

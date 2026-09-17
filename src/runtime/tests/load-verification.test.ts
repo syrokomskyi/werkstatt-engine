@@ -9,7 +9,7 @@
 
 import { test, expect } from "vitest";
 import * as desired_state_persistence from "../desired-state-persistence.ts";
-import * as desired_state from "../desired-state.ts";
+import * as desired_state from "@warpgogol/werkstatt-shared/kernel";
 import * as overlay_store from "../overlay-store.ts";
 import * as validate_declarations from "../validate-declarations.ts";
 

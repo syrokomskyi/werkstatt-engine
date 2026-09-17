@@ -1,6 +1,6 @@
 import { test, expect, describe } from "vitest";
 import { summarizeLogs, assertKnownOptionKeys } from "../shared.ts";
-import type { KernelExecutionReport } from "../../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 
 function makeLog(
   overrides: Partial<KernelExecutionReport["logs"][number]> = {},

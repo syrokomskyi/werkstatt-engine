@@ -8,8 +8,8 @@ import type {
   KernelCommandInput,
   KernelRuntimeContext,
   KernelCommandDefinition,
-} from "../types.ts";
-import type { ModuleExport } from "../../runtime/desired-state.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

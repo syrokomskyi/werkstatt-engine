@@ -12,9 +12,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
-import { byteHash } from "../../fingerprint/primitives.ts";
-import type { ResolvedComponentSetV1 } from "../../component/contracts.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { ResolvedComponentSetV1 } from "@warpgogol/werkstatt-shared/component";
 import type { CertificationHealth } from "../health/monitor.ts";
 
 export interface CleanCutoverMarkerV1 {

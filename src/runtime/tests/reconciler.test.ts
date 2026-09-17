@@ -20,8 +20,8 @@ import type {
   ModuleExport,
   CommandDeclaration,
   ModuleBuildContext,
-} from "../desired-state.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
 

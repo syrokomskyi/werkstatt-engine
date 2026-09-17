@@ -10,7 +10,7 @@ import {
   type PipelineRunState,
 } from "../execute-pipeline.ts";
 import type { StepExecutionResult } from "../pipeline-scheduler.ts";
-import type { KernelExecutionReport, KernelCommandDefinition } from "../../types.ts";
+import type { KernelExecutionReport, KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 
 function okReport(command: string): KernelExecutionReport {
   return {

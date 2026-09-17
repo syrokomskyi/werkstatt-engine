@@ -25,7 +25,7 @@ import type {
 import type { PropagationResult, HealthCheck } from "@warpgogol/werkstatt-engine/schemas";
 import type { AuthorizeResult } from "../deploy-helpers.ts";
 import type { DeploymentStaticConfig } from "@warpgogol/werkstatt-engine/schemas";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { createCloudflareWorkersAdapter } from "../adapters/cloudflare-workers.ts";
 import { createGitHubPagesAdapter } from "../adapters/github-pages.ts";
 

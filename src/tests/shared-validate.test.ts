@@ -29,6 +29,12 @@ function makeAutonomyFile(tmpDir: string, content: string) {
   writeFileSync(join(pluginDir, "autonomy-validate.ts"), content);
 }
 
+function makeSharedSrc(tmpDir: string) {
+  const sharedSrc = join(tmpDir, "packages", "werkstatt-shared", "src");
+  mkdirSync(sharedSrc, { recursive: true });
+  return sharedSrc;
+}
+
 const AUTONOMY_CLEAN = `
 const EXEMPT_PREFIXES = ["@warpgogol/werkstatt-engine", "@warpgogol/werkstatt-shared", "@warpgogol/forge"];
 export function isExempt(specifier: string): boolean { return false; }
@@ -122,7 +128,10 @@ test("SHARED-03 fails when @warpgogol/werkstatt-site imports exist", async () =>
   const engineSrc = makeWorkspace(tmpDir);
   makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
   makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
-  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/werkstatt-site/checks";\n`);
+  writeFileSync(
+    join(engineSrc, "a.ts"),
+    `import { foo } from "@warpgogol/werkstatt-site/checks";\n`,
+  );
 
   const result = await runSharedValidate(tmpDir);
   const shared03 = result.checks.find((c) => c.id === "SHARED-03");
@@ -142,12 +151,63 @@ test("SHARED-03 ignores test files", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// SHARED-04: no engine imports in werkstatt-shared source (RFC-1104)
+// ---------------------------------------------------------------------------
+
+test("SHARED-04 passes when no @warpgogol/werkstatt-engine imports exist in shared", async () => {
+  const tmpDir = makeTmpDir();
+  const engineSrc = makeWorkspace(tmpDir);
+  const sharedSrc = makeSharedSrc(tmpDir);
+  makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
+  makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
+  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "zod";\n`);
+  writeFileSync(join(sharedSrc, "b.ts"), `import { bar } from "zod";\n`);
+
+  const result = await runSharedValidate(tmpDir);
+  const shared04 = result.checks.find((c) => c.id === "SHARED-04");
+  expect(shared04?.status).toBe("pass");
+});
+
+test("SHARED-04 fails when @warpgogol/werkstatt-engine imports exist in shared", async () => {
+  const tmpDir = makeTmpDir();
+  makeWorkspace(tmpDir);
+  const sharedSrc = makeSharedSrc(tmpDir);
+  makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
+  makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
+  writeFileSync(
+    join(sharedSrc, "b.ts"),
+    `import { foo } from "@warpgogol/werkstatt-engine/kernel";\n`,
+  );
+
+  const result = await runSharedValidate(tmpDir);
+  const shared04 = result.checks.find((c) => c.id === "SHARED-04");
+  expect(shared04?.status).toBe("fail");
+});
+
+test("SHARED-04 fails on deep engine subpath imports in shared", async () => {
+  const tmpDir = makeTmpDir();
+  makeWorkspace(tmpDir);
+  const sharedSrc = makeSharedSrc(tmpDir);
+  makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
+  makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
+  writeFileSync(
+    join(sharedSrc, "b.ts"),
+    `import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel/types";\n`,
+  );
+
+  const result = await runSharedValidate(tmpDir);
+  const shared04 = result.checks.find((c) => c.id === "SHARED-04");
+  expect(shared04?.status).toBe("fail");
+});
+
+// ---------------------------------------------------------------------------
 // Overall result
 // ---------------------------------------------------------------------------
 
-test("overall status is pass when all three checks pass", async () => {
+test("overall status is pass when all four checks pass", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
+  makeSharedSrc(tmpDir);
   makePkgJson(tmpDir, { "@warpgogol/werkstatt-shared": "*" });
   makeAutonomyFile(tmpDir, AUTONOMY_CLEAN);
   writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "zod";\n`);
@@ -155,7 +215,7 @@ test("overall status is pass when all three checks pass", async () => {
   const result = await runSharedValidate(tmpDir);
   expect(result.status).toBe("pass");
   expect(result.command).toBe("werkstatt.shared.validate");
-  expect(result.checks).toHaveLength(3);
+  expect(result.checks).toHaveLength(4);
 });
 
 test("overall status is fail when any check fails", async () => {

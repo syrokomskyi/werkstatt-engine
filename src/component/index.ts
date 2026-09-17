@@ -1,14 +1,9 @@
 /*
 <MODULE_CONTRACT>
-<purpose>component index — re-export the component contracts and schemas surface.</purpose>
-<non-goals>
-  <item>Do not implement component logic here — it lives in sibling modules.</item>
-</non-goals>
+  <purpose>component index — re-export the component contracts and schemas surface. Contract types sunk to @warpgogol/werkstatt-shared/component per RFC-1104; schemas and identity stay engine-local.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1104: contracts re-exported from werkstatt-shared/component; schemas + identity remain engine-local.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -41,9 +36,9 @@ export type {
   ResolvedComponentSetV1,
   ComponentContractViolation,
   ComponentContractResult,
-} from "./contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 
-export { SCOPE_ERROR_CODES } from "./contracts.ts";
+export { SCOPE_ERROR_CODES } from "@warpgogol/werkstatt-shared/component";
 
 export {
   parseComponentDeclaration,

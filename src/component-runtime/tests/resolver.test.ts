@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { resolve, type ResolveOptions } from "../resolver.ts";
-import type { ComponentDeclaration, ComponentId } from "../../component/contracts.ts";
-import type { DesiredState } from "../../runtime/desired-state.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { ComponentDeclaration, ComponentId } from "@warpgogol/werkstatt-shared/component";
+import type { DesiredState } from "@warpgogol/werkstatt-shared/kernel";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
 const VALID_SHA_2 = ("sha256:" + "b".repeat(64)) as Sha256Digest;

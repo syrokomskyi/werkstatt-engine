@@ -18,7 +18,7 @@ import type { CertificationPolicyBundleV1 } from "../contracts/policy-bundle.ts"
 import type { CertificationProfileV1 } from "../profile/schemas.ts";
 import type { EvidenceEnvelopeV1 } from "../contracts/evidence.ts";
 import type { GateDecisionV1 } from "../contracts/decisions.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export type OrchestratorState =
   | "idle"

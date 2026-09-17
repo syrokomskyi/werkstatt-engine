@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { test, expect } from "vitest";
 import { runAdrValidate } from "../adr/index.ts";
-import type { KernelCommandInput, KernelLogger, KernelRuntimeContext } from "../types.ts";
-import { createDefaultIO } from "../workspace-io.ts";
+import type { KernelCommandInput, KernelLogger, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

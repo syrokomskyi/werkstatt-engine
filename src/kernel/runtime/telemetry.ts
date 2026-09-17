@@ -20,7 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelExecutionReport } from "../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 import type { MetricsPusher } from "@warpgogol/werkstatt-shared/observability";
 import { createMetricsPusher, METRIC_REFS } from "@warpgogol/werkstatt-shared/observability";
 

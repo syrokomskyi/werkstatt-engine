@@ -29,7 +29,7 @@ import type {
   KernelCommandDefinition,
   KernelFlagSpec,
   KernelFlagValue,
-} from "../types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 const _VALUE_FLAG_NAMES = new Set(["root", "package", "history"]);
 

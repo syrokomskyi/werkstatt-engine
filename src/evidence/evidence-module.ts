@@ -20,7 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createEvidenceModule(): Promise<ModuleExport> {
   const { runEvidenceSync } = await import("./evidence-sync.ts");

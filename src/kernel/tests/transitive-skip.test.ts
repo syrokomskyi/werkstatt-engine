@@ -9,7 +9,7 @@ import {
   clearPipelineCacheHits,
   type PipelineRunState,
 } from "../runtime/execute-pipeline.ts";
-import type { KernelCommandDefinition } from "../types.ts";
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

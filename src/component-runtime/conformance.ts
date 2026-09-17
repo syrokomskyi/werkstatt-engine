@@ -12,7 +12,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { CapabilityId, ComponentId, ResolvedComponentSetV1 } from "../component/contracts.ts";
+import type { CapabilityId, ComponentId, ResolvedComponentSetV1 } from "@warpgogol/werkstatt-shared/component";
 import type { ReflectedLifecycleState } from "./reflection.ts";
 export type { ReflectedLifecycleState } from "./reflection.ts";
 

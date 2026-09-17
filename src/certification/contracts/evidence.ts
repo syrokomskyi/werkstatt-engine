@@ -13,7 +13,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { z } from "zod";
-import { diagnosticSchema } from "../../schemas/diagnostic.ts";
+import { diagnosticSchema } from "@warpgogol/werkstatt-shared/kernel";
 import {
   digestSchema,
   evidenceIdSchema,

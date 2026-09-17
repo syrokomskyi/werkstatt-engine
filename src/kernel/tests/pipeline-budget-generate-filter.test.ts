@@ -8,7 +8,7 @@ import {
   budgetsFilePath,
   type StepTelemetryRecord,
 } from "../pipeline-budgets.ts";
-import type { KernelCommandInput, KernelRuntimeContext } from "../types.ts";
+import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

@@ -29,7 +29,7 @@ import type {
   KernelCommandResult,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type {
   GateDecisionV1,
   MainVerificationDecisionV1,

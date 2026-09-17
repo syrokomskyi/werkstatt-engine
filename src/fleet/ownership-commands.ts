@@ -15,7 +15,7 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import {
   registerOwnership,
   verifyOwnership,

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { byteHash } from "../fingerprint/primitives.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { createEvolutionController } from "../evolution/controller.ts";
 import {
   createEvolutionReducerState,

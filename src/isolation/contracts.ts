@@ -17,8 +17,8 @@ import type {
   ComponentId,
   GrantScope,
   IsolationTier,
-} from "../component/contracts.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export type IsolationPropertyKind =
   | "containment"

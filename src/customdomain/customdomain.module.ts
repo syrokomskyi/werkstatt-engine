@@ -14,7 +14,7 @@ customdomain.register, redirect.register.
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createCustomdomainModule(): Promise<ModuleExport> {
   const { runCustomdomainRegister } = await import("./customdomain-register.ts");

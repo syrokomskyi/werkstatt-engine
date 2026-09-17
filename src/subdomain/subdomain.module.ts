@@ -13,7 +13,7 @@ subdomain.register, subdomain.validate, subdomain.list.
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createSubdomainModule(): Promise<ModuleExport> {
   const { runSubdomainRegister } = await import("./subdomain-register.ts");

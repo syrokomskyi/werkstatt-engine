@@ -7,7 +7,7 @@ import {
   workshopCapacitySchema,
   dhtPlacementResultSchema,
   dhtCacheEntrySchema,
-} from "../schemas/dht.ts";
+} from "@warpgogol/werkstatt-shared/ontology/operations";
 
 // ---------------------------------------------------------------------------
 // Helpers

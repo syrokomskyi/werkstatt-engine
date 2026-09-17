@@ -15,7 +15,7 @@ Used by composition.overlay.apply and composition.overlay.inspect commands.
 </CHANGE_SUMMARY>
 */
 
-import type { DesiredStateOverlay } from "./desired-state.ts";
+import type { DesiredStateOverlay } from "@warpgogol/werkstatt-shared/kernel";
 
 const overlays = new Map<string, DesiredStateOverlay>();
 

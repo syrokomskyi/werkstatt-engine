@@ -26,7 +26,7 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { executeKernelCommand } from "../kernel/runtime/execute-command.ts";
 import { executeKernelPipeline } from "../kernel/runtime/execute-pipeline.ts";
 import { getOrBuildWorkspaceRegistry } from "../kernel/runtime/registry-cache.ts";

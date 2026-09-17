@@ -15,7 +15,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type {
   ResolvedComponentSetV1,
   ResolvedComponentIdentityV1,
-} from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import type { ComponentFiber } from "./fiber.ts";
 import type { QuiescenceResult, Deadline } from "./fiber.ts";
 import type { EffectUnwindReportV1 } from "./effects.ts";

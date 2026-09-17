@@ -16,7 +16,7 @@ import type {
   ChangeProfileV1,
   RiskRuleV1,
 } from "../certification/evaluators/index.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { EvidenceEnvelopeV1 } from "../certification/index.ts";
 
 const D =

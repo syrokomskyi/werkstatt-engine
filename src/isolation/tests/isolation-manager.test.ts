@@ -22,7 +22,7 @@ import type {
   CapabilityId,
   IsolationTier,
   GrantScope,
-} from "../../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import type { IsolationPolicy } from "../contracts.ts";
 
 const COMPONENT_ID = "werkstatt/test" as ComponentId;

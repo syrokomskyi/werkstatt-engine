@@ -22,7 +22,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { promises as fs, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "./types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import { discoverSiteWorkspaces } from "./discovery.ts";
 import { loadSystemManifestSync } from "@warpgogol/werkstatt-shared/content";
 import { buildGeneratedHeader, hasGeneratedMarker } from "./generated-marker.ts";

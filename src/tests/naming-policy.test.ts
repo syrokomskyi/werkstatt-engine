@@ -12,7 +12,7 @@ import {
   isLatinOnly,
   KNOWN_TLDS,
   hasTldSuffix,
-} from "../schemas/naming-policy.ts";
+} from "@warpgogol/werkstatt-shared/ontology/operations";
 
 // ---------------------------------------------------------------------------
 // Sternsystem ID

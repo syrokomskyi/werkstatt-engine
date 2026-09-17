@@ -10,7 +10,7 @@ import type {
   ResolvedRequirementV1,
   ActionAnchorV1,
 } from "../certification/index.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const D =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;

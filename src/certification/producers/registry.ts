@@ -22,8 +22,8 @@ import type {
   ApplicabilityRuleV1,
 } from "../profile/schemas.ts";
 import type { Environment } from "../contracts/identifiers.ts";
-import type { Diagnostic } from "../../schemas/diagnostic.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Diagnostic } from "@warpgogol/werkstatt-shared/kernel";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export type ProducerKind = "kernel-command" | "evaluator-agent" | "remote-workload";
 

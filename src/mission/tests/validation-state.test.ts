@@ -8,7 +8,7 @@ import {
   buildValidatorStatesFromSteps,
   type ValidationState,
 } from "../validation-state.ts";
-import type { KernelExecutionReport } from "../../kernel/types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 
 let tmpDir: string;
 

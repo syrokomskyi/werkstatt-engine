@@ -13,7 +13,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import type { CertificationDossierEventV1, DossierRootReferenceV1 } from "../contracts/dossier.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { computeDossierEventHash, computeDossierRoot } from "../dossier-hash.ts";
 
 export interface DossierRepositoryV1 {

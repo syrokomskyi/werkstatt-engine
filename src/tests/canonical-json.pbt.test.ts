@@ -5,7 +5,7 @@ import {
   canonicalJsonBytesV1,
   canonicalJsonHashV1,
   isCanonicalJsonObjectV1,
-} from "../fingerprint/canonical-json.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
 
 // ---------------------------------------------------------------------------
 // Arbitraries

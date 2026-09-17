@@ -12,8 +12,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
-import { byteHash } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CertificationHealthDecisionV1 } from "../contracts/decisions.ts";
 import type { CertificationStatus } from "../contracts/identifiers.ts";
 import type { DriftAction } from "../profile/schemas.ts";

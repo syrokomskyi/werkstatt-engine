@@ -10,7 +10,7 @@
 </CHANGE_SUMMARY>
 */
 
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeText(content: string): string {
   const normalized = content.replace(/\r\n/g, "\n");

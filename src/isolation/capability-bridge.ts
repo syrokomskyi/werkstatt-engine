@@ -14,7 +14,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { CapabilityId } from "../component/contracts.ts";
+import type { CapabilityId } from "@warpgogol/werkstatt-shared/component";
 import type {
   CapabilityBridgeRequestV1,
   CapabilityBridgeResponseV1,

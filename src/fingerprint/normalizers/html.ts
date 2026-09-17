@@ -11,7 +11,7 @@
 </CHANGE_SUMMARY>
 */
 
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const DYNAMIC_ATTR_PREFIXES = ["data-", "nonce", "integrity", "crossorigin"] as const;
 

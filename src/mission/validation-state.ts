@@ -18,7 +18,7 @@ validation.state.inspect.
 
 import { join } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import type { KernelExecutionReport } from "../kernel/types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 
 export interface ValidationState {
   missionId: string;

@@ -13,7 +13,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { z } from "zod";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const sha256Regex = /^sha256:[0-9a-f]{64}$/;
 export const digestSchema = z.string().regex(sha256Regex) as unknown as z.ZodType<Sha256Digest>;

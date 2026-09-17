@@ -30,7 +30,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { GitMeshVerifyResult } from "./types.ts";
 import { loadGitMeshConfig } from "./config.ts";
 import { gitLogSignatureStatus, gitRevParseHead } from "./git-ops.ts";

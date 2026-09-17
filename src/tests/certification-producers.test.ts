@@ -20,8 +20,8 @@ import type {
 } from "../certification/index.ts";
 import type { CertificationProfileV1 } from "../certification/profile/schemas.ts";
 import type { ApplicabilityRuleV1 } from "../certification/profile/schemas.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import type { Diagnostic } from "../schemas/diagnostic.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { Diagnostic } from "@warpgogol/werkstatt-shared/kernel";
 
 const D =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;

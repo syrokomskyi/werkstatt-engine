@@ -22,7 +22,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>  
 ******************************************************************************/
 
-import type { KernelLogEvent, KernelLogLevel, KernelLogger, KernelOutputFormat } from "./types.ts";
+import type { KernelLogEvent, KernelLogLevel, KernelLogger, KernelOutputFormat } from "@warpgogol/werkstatt-shared/kernel";
 function formatPrettyLine(level: KernelLogLevel, message: string): string {
   if (level === "section") {
     return `\n== ${message} ==`;

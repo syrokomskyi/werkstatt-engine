@@ -8,18 +8,18 @@
 */
 
 import { test, expect } from "vitest";
-import * as artifact_store from "../artifact-store.ts";
-import * as dht from "../dht.ts";
-import * as diagnostic from "../diagnostic.ts";
-import * as handoff from "../handoff.ts";
-import * as leitstand from "../leitstand.ts";
-import * as materialization from "../materialization.ts";
-import * as mission from "../mission.ts";
-import * as naming_policy from "../naming-policy.ts";
-import * as notausgang from "../notausgang.ts";
-import * as release from "../release.ts";
-import * as sternsystem from "../sternsystem.ts";
-import * as werkstatt from "../werkstatt.ts";
+import * as artifact_store from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as dht from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as diagnostic from "@warpgogol/werkstatt-shared/kernel";
+import * as handoff from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as leitstand from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as materialization from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as mission from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as naming_policy from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as notausgang from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as release from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as sternsystem from "@warpgogol/werkstatt-shared/ontology/operations";
+import * as werkstatt from "@warpgogol/werkstatt-shared/ontology/operations";
 
 test("artifact-store module loads", () => {
   expect(artifact_store).toBeDefined();

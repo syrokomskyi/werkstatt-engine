@@ -17,7 +17,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import { parse as parseAstro } from "@astrojs/compiler";
 import type { Node } from "@astrojs/compiler/types";
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 interface NormalizedAttribute {
   name: string;

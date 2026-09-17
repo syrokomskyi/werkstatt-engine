@@ -19,12 +19,12 @@ import type {
   KernelCommandInput,
   KernelExecutionReport,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { resolveOverlays, inspectOverlays } from "./overlay.ts";
 import { reconcile, reconcileFromPersisted } from "./reconciler.ts";
 import { applyOverlay, getActiveOverlays, removeOverlay } from "./overlay-store.ts";
 import { loadPersistedDesiredState } from "./desired-state-persistence.ts";
-import type { DesiredStateOverlay, ModuleExport } from "./desired-state.ts";
+import type { DesiredStateOverlay, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 function makeReport(
   commandName: string,

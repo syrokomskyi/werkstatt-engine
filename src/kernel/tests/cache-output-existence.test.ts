@@ -9,7 +9,7 @@ import {
   type CommandResultCacheKey,
 } from "../cache/command-result-cache.ts";
 import type { CacheLayer, CacheEntry } from "../cache/cache-layer.ts";
-import type { KernelCommandDefinition, KernelExecutionReport } from "../types.ts";
+import type { KernelCommandDefinition, KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

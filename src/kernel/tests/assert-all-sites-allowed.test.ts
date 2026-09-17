@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
 import { assertAllSitesAllowed } from "../runtime/execute-command.ts";
-import type { KernelCommandDefinition } from "../types.ts";
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

@@ -15,8 +15,8 @@ import type {
   IsolationTier,
   ResolvedComponentSetV1,
   ResolvedComponentIdentityV1,
-} from "../contracts.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
 const VALID_SHA_2 = ("sha256:" + "b".repeat(64)) as Sha256Digest;

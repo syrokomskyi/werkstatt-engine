@@ -17,8 +17,8 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
-import type { ComponentId, IsolationTier, CapabilityId } from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ComponentId, IsolationTier, CapabilityId } from "@warpgogol/werkstatt-shared/component";
 import {
   createIsolationManager,
   type AdmittedProvider,

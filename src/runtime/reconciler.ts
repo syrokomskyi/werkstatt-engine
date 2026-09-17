@@ -26,8 +26,8 @@ import type {
   ComponentDeclaration,
   ModuleExport,
   CommandDeclaration,
-} from "./desired-state.ts";
-import type { ModuleFiberState, KernelPipelineStep } from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleFiberState, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
 
 /**
  * Build ActualState from ModuleExport[].
@@ -131,7 +131,7 @@ export function buildDesiredState(
   options: {
     profileId: string;
     requiredCapabilities?: string[];
-    availableArtifacts?: ReadonlyMap<string, import("../fingerprint/primitives.ts").Sha256Digest>;
+    availableArtifacts?: ReadonlyMap<string, import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest>;
     admittedGrants?: ReadonlyArray<{ scope: string; resource: string }>;
   },
 ): DesiredState {
@@ -356,7 +356,7 @@ export async function reconcileFromPersisted(
   options: {
     profileId: string;
     requiredCapabilities?: string[];
-    availableArtifacts?: ReadonlyMap<string, import("../fingerprint/primitives.ts").Sha256Digest>;
+    availableArtifacts?: ReadonlyMap<string, import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest>;
     admittedGrants?: ReadonlyArray<{ scope: string; resource: string }>;
     onActivate?: (decl: ComponentDeclaration) => Promise<void>;
     onDeactivate?: (id: string) => Promise<void>;

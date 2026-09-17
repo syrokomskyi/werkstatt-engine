@@ -13,7 +13,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import type { IssuerRegistryEntryV1, AttestationVerificationV1, SignedDecisionV1, SignedRootV1 } from "../contracts/authority.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export interface IssuerRegistryV1 {
   entries: Map<string, IssuerRegistryEntryV1>;

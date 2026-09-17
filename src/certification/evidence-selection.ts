@@ -17,7 +17,7 @@ import type {
   ResolvedRequirementV1,
   CertificationPolicyBundleV1,
 } from "./contracts/index.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export type CertificationLimitFailureV1 = {
   readonly ok: false;

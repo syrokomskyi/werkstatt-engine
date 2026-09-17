@@ -12,8 +12,8 @@
 </CHANGE_SUMMARY>
 */
 
-import { byteHash } from "../fingerprint/primitives.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const HASH_PREFIX_LENGTH = "sha256:".length;
 const ROUTING_HASH_HEX_CHARS = 12;

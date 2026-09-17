@@ -23,8 +23,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "../types.ts";
-import type { ModuleExport } from "../../runtime/desired-state.ts";
+import type { KernelModule } from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createCacheModule(): Promise<ModuleExport> {
 const { runKernelCacheStatus, runKernelCacheClear } = await import("./cache-handlers.ts");

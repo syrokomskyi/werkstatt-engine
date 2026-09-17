@@ -25,7 +25,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { generateKeyPair, saveKeyPair, keyExists, toHex } from "./index.ts";
-import type { KeyEncoding } from "./types.ts";
+import type { KeyEncoding } from "@warpgogol/werkstatt-shared/signing";
 
 export interface SigningKeyGenerateResult {
   privateKeyPath: string;

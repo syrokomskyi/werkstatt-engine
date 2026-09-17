@@ -11,7 +11,7 @@
 */
 
 import { parse } from "@typescript-eslint/typescript-estree";
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeTypeScript(content: string): string {
   const ast = parse(content, {

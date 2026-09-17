@@ -15,7 +15,7 @@ with validator rules[] declarations.
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createRemediationModule(): Promise<ModuleExport> {
   const { runRemediationCatalogGenerate } = await import("./remediation-catalog-generate.ts");

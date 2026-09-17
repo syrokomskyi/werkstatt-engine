@@ -12,7 +12,7 @@
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createComponentRuntimeModule(): Promise<ModuleExport> {
   const {

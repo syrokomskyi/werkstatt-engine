@@ -19,7 +19,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createSigningModule(): Promise<ModuleExport> {
   const { runSigningKeyGenerate } = await import("./signing-commands.ts");

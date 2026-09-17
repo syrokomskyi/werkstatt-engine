@@ -17,13 +17,13 @@ import { writeFile as writeFileRaw, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "../kernel/generated-marker.ts";
-import { writeFileAtomic } from "../kernel/fs-atomic.ts";
+import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
 import { REMEDIATION_CATALOG } from "@warpgogol/werkstatt-shared/share/remediation";
 import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 const CATALOG_RELATIVE_PATH = join("docs", "remediation-catalog.generated.yaml");
 

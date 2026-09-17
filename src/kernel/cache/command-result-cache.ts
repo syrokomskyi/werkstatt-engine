@@ -38,7 +38,7 @@ import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprin
 import { fingerprintFile, fingerprintTree } from "@warpgogol/werkstatt-engine/fingerprint/semantic";
 
 import type { CacheLayer } from "./cache-layer.ts";
-import type { KernelExecutionReport } from "../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 import type { WorkspaceTreeIndex } from "./workspace-tree-index.ts";
 import { filterTreeIndex } from "./workspace-tree-index.ts";
 

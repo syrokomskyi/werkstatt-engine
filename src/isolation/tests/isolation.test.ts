@@ -17,7 +17,7 @@ import {
   createConformanceResult,
   type IsolationConformanceFixtureV1,
 } from "../conformance.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
 const VALID_SHA_2 = ("sha256:" + "b".repeat(64)) as Sha256Digest;

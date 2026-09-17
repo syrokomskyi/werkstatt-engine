@@ -23,7 +23,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelExecutionReport } from "../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 
 export function summarizeLogs(
   logs: KernelExecutionReport["logs"],

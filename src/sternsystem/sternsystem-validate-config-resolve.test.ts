@@ -64,7 +64,7 @@ vi.mock("./passport.ts", () => ({
 }));
 
 vi.mock("../schemas/naming-policy.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../schemas/naming-policy.ts")>();
+  const actual = await importOriginal<typeof import("@warpgogol/werkstatt-shared/ontology/operations")>();
   return {
     ...actual,
     hasTldSuffix: vi.fn().mockReturnValue(false),

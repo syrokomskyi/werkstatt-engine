@@ -35,7 +35,7 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "./types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 const RECORD_SEP = "\x1e";
 const FIELD_SEP = "\x1f";

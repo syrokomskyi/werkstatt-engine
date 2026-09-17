@@ -16,8 +16,8 @@ import {
   snapshotCanonicalJsonObjectV1,
   canonicalJsonHashV1,
   type CanonicalJsonObjectV1,
-} from "../fingerprint/canonical-json.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type {
   ReleaseCandidateV1,
   CertificationPolicyBundleV1,

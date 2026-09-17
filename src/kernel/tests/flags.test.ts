@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import type { KernelCommandDefinition } from "../types.ts";
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 import { executeKernelCommand, parseKernelArgv, resolveCommandFlags } from "../index.ts";
 
 /*

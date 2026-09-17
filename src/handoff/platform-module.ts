@@ -14,7 +14,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createPlatformModule(): Promise<ModuleExport> {
   const { runPlatformConsistencyValidate } = await import("./platform-consistency.ts");

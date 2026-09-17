@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ComponentFiber } from "../fiber.ts";
-import type { ResolvedComponentIdentityV1 } from "../../component/contracts.ts";
+import type { ResolvedComponentIdentityV1 } from "@warpgogol/werkstatt-shared/component";
 import { RevertibleEffectHandler } from "../effects.ts";
 
 const VALID_SHA = "sha256:" + "a".repeat(64);

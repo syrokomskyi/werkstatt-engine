@@ -13,7 +13,7 @@
 
 import path from "node:path";
 
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import { normalizePdf } from "./pdf.ts";
 import { normalizeSourceMap } from "./sourcemap.ts";
 import { normalizeJsonStable } from "./json-stable.ts";

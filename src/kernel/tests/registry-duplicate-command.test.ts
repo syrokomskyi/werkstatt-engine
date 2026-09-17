@@ -1,8 +1,8 @@
 import { test, expect } from "vitest";
 import { buildActualState } from "../../runtime/reconciler.ts";
-import type { CommandDeclaration } from "../../runtime/desired-state.ts";
-import type { KernelCommandResult } from "../types.ts";
-import type { ModuleExport } from "../../runtime/desired-state.ts";
+import type { CommandDeclaration } from "@warpgogol/werkstatt-shared/kernel";
+import type { KernelCommandResult } from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

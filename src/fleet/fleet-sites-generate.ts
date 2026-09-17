@@ -27,15 +27,15 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { buildGeneratedHeader, stripGeneratedMarker } from "../kernel/generated-marker.ts";
-import { writeFileAtomic } from "../kernel/fs-atomic.ts";
+import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
 import {
   discoverSystems,
   resolveCacheClonePath,
   readSystemState,
 } from "../sternsystem/registry-io.ts";
-import type { SystemConfig } from "../schemas/sternsystem.ts";
+import type { SystemConfig } from "@warpgogol/werkstatt-shared/ontology/operations";
 
 const FLEET_SITES_FILE = "fleet/fleet.sites.yaml";
 

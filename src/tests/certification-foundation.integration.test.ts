@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   snapshotCanonicalJsonObjectV1,
   canonicalJsonHashV1,
-} from "../fingerprint/canonical-json.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import { diagnosticSchema } from "../schemas/diagnostic.ts";
-import { releaseManifestSchema, legacyReleaseStateSchema } from "../schemas/release.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { diagnosticSchema } from "@warpgogol/werkstatt-shared/kernel";
+import { releaseManifestSchema, legacyReleaseStateSchema } from "@warpgogol/werkstatt-shared/ontology/operations";
 import {
   buildReleaseCandidateIdentityV1,
   buildEvidenceIdentityV1,

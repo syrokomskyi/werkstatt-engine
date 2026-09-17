@@ -12,8 +12,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | --- | --- |
 | `@warpgogol/werkstatt-engine` | `./src/index.ts` |
 | `@warpgogol/werkstatt-engine/os/werkstatt-autonomy-module` | `./os/werkstatt-autonomy.module.ts` |
-| `@warpgogol/werkstatt-engine/kernel` | `./src/kernel/index.ts` |
-| `@warpgogol/werkstatt-engine/kernel/*` | `./src/kernel/*` (all kernel subpath exports) |
+| `@warpgogol/werkstatt-engine/kernel` | `./src/kernel/index.ts` (mixed barrel — contract cluster re-exported from `@warpgogol/werkstatt-shared/kernel`, RFC-1104) |
+| `@warpgogol/werkstatt-engine/kernel/*` | `./src/kernel/*` (all kernel subpath exports; `kernel/types` and `kernel/workspace-io` are forwarding modules → `@warpgogol/werkstatt-shared/kernel`, RFC-1104) |
 | `@warpgogol/werkstatt-engine/mission` | `./src/mission/index.ts` |
 | `@warpgogol/werkstatt-engine/sternsystem` | `./src/sternsystem/index.ts` |
 | `@warpgogol/werkstatt-engine/release` | `./src/release/index.ts` |
@@ -26,9 +26,9 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/artifact-store` | `./src/artifact-store/index.ts` |
 | `@warpgogol/werkstatt-engine/evidence` | `./src/evidence/index.ts` |
 | `@warpgogol/werkstatt-engine/integrity` | `./src/integrity/index.ts` |
-| `@warpgogol/werkstatt-engine/signing` | `./src/signing/index.ts` |
+| `@warpgogol/werkstatt-engine/signing` | `./src/signing/index.ts` (forwarding barrel → `@warpgogol/werkstatt-shared/signing`, RFC-1104) |
 | `@warpgogol/werkstatt-engine/observability` | `./src/observability/index.ts` |
-| `@warpgogol/werkstatt-engine/fingerprint` | `./src/fingerprint/index.ts` |
+| `@warpgogol/werkstatt-engine/fingerprint` | `./src/fingerprint/index.ts` (mixed barrel — primitives + canonical-json re-exported from `@warpgogol/werkstatt-shared/fingerprint`, RFC-1104) |
 | `@warpgogol/werkstatt-engine/fingerprint/semantic` | `./src/fingerprint/semantic.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate` | `./src/agent-gate/index.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate/reflect-route` | `./src/agent-gate/reflect-route.ts` |
@@ -38,8 +38,8 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/scope-module` | `./src/scope/scope.module.ts` |
 | `@warpgogol/werkstatt-engine/scope` | `./src/scope/scope.ts` |
 | `@warpgogol/werkstatt-engine/changelog` | `./src/changelog/index.ts` |
-| `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` |
-| `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` |
+| `@warpgogol/werkstatt-engine/schemas` | `./src/schemas/index.ts` (forwarding barrel → `@warpgogol/werkstatt-shared/ontology/operations` + `/kernel`, RFC-1104) |
+| `@warpgogol/werkstatt-engine/component` | `./src/component/index.ts` (mixed barrel — contracts re-exported from `@warpgogol/werkstatt-shared/component`, RFC-1104) |
 | `@warpgogol/werkstatt-engine/handoff` | `./src/handoff/index.ts` |
 | `@warpgogol/werkstatt-engine/e2e` | `./src/e2e/index.ts` |
 | `@warpgogol/werkstatt-engine/os/werkstatt-e2e-module` | `./os/werkstatt-e2e-module.ts` |

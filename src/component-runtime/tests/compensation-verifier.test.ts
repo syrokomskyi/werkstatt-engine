@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { CompensationStore } from "../compensation-store.ts";
 import { CompensationVerifier } from "../compensation-verifier.ts";
-import type { CompensationAction } from "../../component/contracts.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
-import type { KernelRuntimeContext } from "../../kernel/types.ts";
+import type { CompensationAction } from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 const OP_HASH = `sha256:${"a".repeat(64)}` as Sha256Digest;
 const COMP_HASH = `sha256:${"b".repeat(64)}` as Sha256Digest;

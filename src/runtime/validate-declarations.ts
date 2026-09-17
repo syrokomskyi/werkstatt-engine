@@ -14,7 +14,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { CommandDeclaration } from "./desired-state.ts";
+import type { CommandDeclaration } from "@warpgogol/werkstatt-shared/kernel";
 
 /**
  * Commands legitimately exempt from declaring `generates` entries despite having

@@ -38,7 +38,7 @@ import {
   createRecordingIO,
   createReadOnlyIO,
   type WriteIntent,
-} from "../workspace-io.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import type {
   CheckResult,
   ExecuteKernelCommandOptions,
@@ -47,7 +47,7 @@ import type {
   KernelExecutionReport,
   KernelRuntimeContext,
   RemediationHint,
-} from "../types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { parse as yamlParse } from "yaml";
 import { parseKernelArgv, resolveCommandFlags } from "./argv.ts";
 import { formatFailureDiagnostics } from "./diagnostics.ts";
@@ -56,8 +56,8 @@ import { buildRegistryForModule, ensureTargetSites, loadAppRuntime } from "./reg
 import { getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { getFactoryTelemetryPusher, recordCommandTelemetry } from "./telemetry.ts";
 import { manifestFilePath, type CommandManifest } from "../command-manifest.ts";
-import type { GeneratorOwnershipEntry } from "../types.ts";
-import type { ActualState } from "../../runtime/desired-state.ts";
+import type { GeneratorOwnershipEntry } from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
 import { getDefaultScopeManager } from "../../scope/scope.ts";
 
 /**

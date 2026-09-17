@@ -8,10 +8,10 @@
 */
 
 import { test, expect } from "vitest";
-import * as key from "../key.ts";
-import * as sign from "../sign.ts";
+import * as key from "@warpgogol/werkstatt-shared/signing";
+import * as sign from "@warpgogol/werkstatt-shared/signing";
 import * as signing_commands from "../signing-commands.ts";
-import * as types from "../types.ts";
+import * as types from "@warpgogol/werkstatt-shared/signing";
 
 test("key module loads", () => {
   expect(key).toBeDefined();

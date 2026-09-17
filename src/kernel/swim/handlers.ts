@@ -31,7 +31,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createSocket, type Socket } from "node:dgram";
 import { randomBytes } from "node:crypto";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { SwimConfig, SwimMembershipView, SwimMember, GenomeLogEntry } from "./types.ts";
 import { loadSwimConfig, loadOrCreateSwimConfig, CONFIG_FILENAME } from "./config.ts";
 import {

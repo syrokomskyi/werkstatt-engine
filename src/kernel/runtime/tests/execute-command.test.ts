@@ -1,6 +1,6 @@
 import { test, expect, describe } from "vitest";
 import { assertAllSitesAllowed, computeOwnershipMap } from "../execute-command.ts";
-import type { KernelCommandDefinition } from "../../types.ts";
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 
 const mockCommand: KernelCommandDefinition = {
   name: "test.cmd",

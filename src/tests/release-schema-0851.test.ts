@@ -5,7 +5,7 @@ import {
   releaseManifestSchema,
   legacyReleaseStateSchema,
   legacyReleaseDiagnosticSchema,
-} from "../schemas/release.ts";
+} from "@warpgogol/werkstatt-shared/ontology/operations";
 
 describe("releaseArtifactStateSchema (RFC-0851)", () => {
   it("accepts prepared", () => {

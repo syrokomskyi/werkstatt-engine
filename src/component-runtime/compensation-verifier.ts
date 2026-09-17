@@ -26,10 +26,10 @@ import type {
   CompensationProbe,
   CompensationResult,
   ProbeResult,
-} from "../component/contracts.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CompensationStore } from "./compensation-store.ts";
-import type { KernelRuntimeContext } from "../kernel/types.ts";
+import type { KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 export class CompensationVerifier {
   private readonly store: CompensationStore;

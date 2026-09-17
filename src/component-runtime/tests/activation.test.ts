@@ -4,7 +4,7 @@ import { ComponentFiber } from "../fiber.ts";
 import type {
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
-} from "../../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import { computeSetHash } from "../../component/identity.ts";
 
 const VALID_SHA = "sha256:" + "a".repeat(64);

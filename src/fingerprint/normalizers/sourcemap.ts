@@ -12,7 +12,7 @@
 
 import path from "node:path";
 
-import { stableJsonHash } from "../primitives.ts";
+import { stableJsonHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const NON_DETERMINISTIC_KEYS = new Set(["createdAt", "buildTimestamp", "generatedAt"]);
 

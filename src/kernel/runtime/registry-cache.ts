@@ -26,8 +26,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelAppConfig } from "../types.ts";
-import type { ActualState } from "../../runtime/desired-state.ts";
+import type { KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
 import { buildRegistry } from "./registry.ts";
 import { loadWorkspaceConfig } from "../discovery.ts";
 

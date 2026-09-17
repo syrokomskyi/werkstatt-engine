@@ -17,7 +17,7 @@ import type {
   ComponentDeclaration,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
-} from "../../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import { ComponentFiber } from "../fiber.ts";
 import type { Deadline } from "../fiber.ts";
 import {
@@ -46,7 +46,7 @@ export interface TrustedFixture {
   readonly manifests: readonly ComponentDeclaration[];
   readonly availableArtifacts: ReadonlyMap<
     ComponentId,
-    import("../../fingerprint/primitives.ts").Sha256Digest
+    import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest
   >;
   readonly admittedGrants: ReadonlyArray<{ scope: string; resource: string }>;
 }

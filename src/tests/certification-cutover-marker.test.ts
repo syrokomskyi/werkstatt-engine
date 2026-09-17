@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import type { ResolvedComponentSetV1 } from "../component/contracts.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { ResolvedComponentSetV1 } from "@warpgogol/werkstatt-shared/component";
 import {
   verifyCutover,
   buildCutoverMarker,

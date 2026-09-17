@@ -12,7 +12,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { Diagnostic } from "../schemas/diagnostic.ts";
+import type { Diagnostic } from "@warpgogol/werkstatt-shared/kernel";
 
 export interface CertificationTransitionBlockResult {
   command: string;

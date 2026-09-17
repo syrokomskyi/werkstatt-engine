@@ -16,8 +16,8 @@ import {
   safeWorkspaceRelativePathSchema,
   safeDiagnosticUrlSchema,
   DIAGNOSTIC_LIMITS,
-} from "../schemas/diagnostic.ts";
-import { snapshotCanonicalJsonObjectV1 } from "../fingerprint/canonical-json.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import { snapshotCanonicalJsonObjectV1 } from "@warpgogol/werkstatt-shared/fingerprint";
 
 // ---------------------------------------------------------------------------
 // Helpers

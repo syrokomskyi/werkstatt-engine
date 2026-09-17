@@ -8,7 +8,7 @@
 */
 
 import { test, expect } from "vitest";
-import * as contracts from "../contracts.ts";
+import * as contracts from "@warpgogol/werkstatt-shared/component";
 import * as identity from "../identity.ts";
 import * as schemas from "../schemas.ts";
 

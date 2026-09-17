@@ -17,7 +17,7 @@ import type {
   CoverageReportV1,
   SelectedEvidenceV1,
 } from "./contracts/index.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import {
   buildEvidenceIndex,
   selectRequirementEvidence,

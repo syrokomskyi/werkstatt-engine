@@ -8,13 +8,13 @@
 */
 
 import { test, expect } from "vitest";
-import { byteHash, stableStringify, stableJsonHash, isSha256Digest } from "../primitives.ts";
+import { byteHash, stableStringify, stableJsonHash, isSha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { normalizePathSep, shouldIgnore } from "../path-matcher.ts";
 import {
   snapshotCanonicalJsonObjectV1,
   isCanonicalJsonObjectV1,
   CANONICAL_JSON_V1,
-} from "../canonical-json.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
 import { fingerprintFile } from "../fingerprint.ts";
 import type { FingerprintOptions, FingerprintFileResult, FingerprintResult } from "../types.ts";
 import * as semantic from "../semantic.ts";

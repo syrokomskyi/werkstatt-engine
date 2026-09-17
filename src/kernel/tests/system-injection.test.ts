@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { KernelCommandDefinition } from "../types.ts";
-import type { DiscoveredSiteWorkspace } from "../types.ts";
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
+import type { DiscoveredSiteWorkspace } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

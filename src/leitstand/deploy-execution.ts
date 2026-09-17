@@ -33,7 +33,7 @@ import type {
   HealthCheck,
   PropagationResult,
 } from "@warpgogol/werkstatt-engine/schemas";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import {
   verifyFreshness,
   runMissionCheckWithResilience,

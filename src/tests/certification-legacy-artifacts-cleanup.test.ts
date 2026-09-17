@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CleanCutoverMarkerV1 } from "../certification/cutover/marker.ts";
 import {
   verifyCleanupPrerequisites,

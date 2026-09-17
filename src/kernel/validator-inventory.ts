@@ -29,7 +29,7 @@ import { mkdir, readFile, writeFile as writeFileRaw } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
-import { writeFileAtomic } from "./fs-atomic.ts";
+import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
 import { loadPipelineBudgets } from "./pipeline-budgets.ts";
 import { getOrBuildWorkspaceRegistry } from "./runtime/registry-cache.ts";
 import type {
@@ -37,7 +37,7 @@ import type {
   KernelCommandDefinition,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "./types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 const INVENTORY_RELATIVE_PATH = join("docs", "validator-inventory.generated.yaml");
 

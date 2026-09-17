@@ -19,8 +19,8 @@ import type {
   CapabilityProvideV1,
   ResolvedComponentIdentityV1,
   ResolvedComponentSetV1,
-} from "../component/contracts.ts";
-import type { DesiredState } from "../runtime/desired-state.ts";
+} from "@warpgogol/werkstatt-shared/component";
+import type { DesiredState } from "@warpgogol/werkstatt-shared/kernel";
 import { parseComponentDeclaration } from "../component/schemas.ts";
 import {
   computeSetHash,
@@ -29,7 +29,7 @@ import {
   computeEffectPolicyHash,
   computeIsolationPolicyHash,
 } from "../component/identity.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { ResolutionViolationV1, ResolutionProofV1 } from "./resolution-proof.ts";
 import { createResolutionProof } from "./resolution-proof.ts";
 

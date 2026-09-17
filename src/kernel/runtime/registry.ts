@@ -38,8 +38,8 @@ import type {
   SiteWorkspacesListResult,
   KernelCommandDefinition,
   KernelRegisteredCommandInfo,
-} from "../types.ts";
-import type { ActualState, ModuleExport } from "../../runtime/desired-state.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function buildRegistry(config: KernelAppConfig): Promise<ActualState> {
   const exports: ModuleExport[] = [];

@@ -12,7 +12,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { ReleaseArtifactState } from "../schemas/release.ts";
+import type { ReleaseArtifactState } from "@warpgogol/werkstatt-shared/ontology/operations";
 import type { DeploymentOperationStateV1 } from "./contracts/state.ts";
 
 export type DeploymentOperationState =

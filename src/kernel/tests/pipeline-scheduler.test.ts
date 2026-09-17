@@ -4,7 +4,7 @@ import {
   executeScheduledSteps,
   ScheduleError,
 } from "../runtime/pipeline-scheduler.ts";
-import type { KernelExecutionReport, KernelPipelineStep } from "../types.ts";
+import type { KernelExecutionReport, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>

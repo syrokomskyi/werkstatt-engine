@@ -17,13 +17,13 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
-} from "../kernel/types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import type {
   ComponentId,
   CapabilityId,
   ComponentScope,
   ScopeContext,
-} from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import { getDefaultScopeManager } from "./scope.ts";
 
 function flagString(input: KernelCommandInput, name: string): string {

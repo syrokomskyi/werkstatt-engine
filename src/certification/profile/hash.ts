@@ -12,11 +12,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import {
   snapshotCanonicalJsonObjectV1,
   canonicalJsonHashV1,
-} from "../../fingerprint/canonical-json.ts";
+} from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CertificationProfileV1 } from "./schemas.ts";
 
 export interface ProfileHashResultV1 {

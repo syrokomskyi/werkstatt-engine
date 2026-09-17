@@ -34,7 +34,7 @@ import { readFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
-import { writeFileAtomic } from "./fs-atomic.ts";
+import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
 import { listRegisteredKernelCommands, listRegisteredKernelPipelines } from "./runtime.ts";
 import type {
   CheckResult,
@@ -43,7 +43,7 @@ import type {
   KernelCommandResult,
   KernelFlagSpec,
   KernelRuntimeContext,
-} from "./types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 
 export interface CommandManifestEntry {
   name: string;

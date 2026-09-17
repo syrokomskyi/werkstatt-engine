@@ -14,7 +14,7 @@
 */
 
 import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import type { ModuleExport } from "../runtime/desired-state.ts";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createIdentityModule(): Promise<ModuleExport> {
   const { runIdentityBootstrap } = await import("../identity/identity-bootstrap.ts");

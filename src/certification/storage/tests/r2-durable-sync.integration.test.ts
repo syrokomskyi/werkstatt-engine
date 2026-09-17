@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createR2StorageAdapter } from "../r2-adapter.ts";
 import { verifyStoredObject } from "../adapter.ts";
 import { verifyDurableSync } from "../../../leitstand/deploy-helpers.ts";
-import type { Sha256Digest } from "../../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const mockConfig = {
   accountId: "test-account-id",

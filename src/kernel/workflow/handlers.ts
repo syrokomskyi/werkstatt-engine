@@ -24,7 +24,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 import { listRegisteredKernelCommandNames } from "../runtime.ts";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../types.ts";
+import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import {
   WORKFLOW_PHASES,
   WORKFLOW_CHAINS,

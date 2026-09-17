@@ -34,7 +34,7 @@ import {
   readSystemState,
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
-import type { DiscoveredSiteWorkspace } from "./types.ts";
+import type { DiscoveredSiteWorkspace } from "@warpgogol/werkstatt-shared/kernel";
 // @ai-invariant: The resolver must refuse dual representation — a site existing as both apps/<id> and a mission workpiece is an error, not a fallback.
 
 export type SiteWorkspaceSource = "apps" | "mission" | "cache-clone";

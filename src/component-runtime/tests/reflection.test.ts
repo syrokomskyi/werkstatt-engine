@@ -15,9 +15,9 @@ import type {
   CapabilityId,
   ResolvedComponentSetV1,
   ResolvedComponentIdentityV1,
-} from "../../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 import { computeSetHash } from "../../component/identity.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
 const _VALID_SHA_2 = ("sha256:" + "b".repeat(64)) as Sha256Digest;

@@ -8,9 +8,9 @@ import type {
   KernelCommandInput,
   KernelRuntimeContext,
   DiscoveredSiteWorkspace,
-} from "../types.ts";
-import type { ActualState } from "../../runtime/desired-state.ts";
-import { createDefaultIO } from "../workspace-io.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
 import { createKernelLogger } from "../logger.ts";
 
 /*

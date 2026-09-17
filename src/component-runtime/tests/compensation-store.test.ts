@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { CompensationStore, resolveCompensationStorePath } from "../compensation-store.ts";
-import type { CompensationResult } from "../../component/contracts.ts";
-import type { Sha256Digest } from "../../fingerprint/primitives.ts";
+import type { CompensationResult } from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const VALID_HASH = `sha256:${"a".repeat(64)}` as Sha256Digest;
 

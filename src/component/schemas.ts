@@ -18,7 +18,7 @@ import type {
   ComponentContractViolation,
   ComponentDeclaration,
   ResolvedComponentSetV1,
-} from "./contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 
 const COMPONENT_ID_RE = /^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
 const CAPABILITY_ID_RE = /^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;

@@ -22,7 +22,7 @@ import type {
   IsolationPropertyKind,
 } from "./contracts.ts";
 import { REQUIRED_PROPERTIES, REJECTED_ADAPTER_TIERS } from "./contracts.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export interface IsolationConformanceFixtureV1 {
   readonly fixtureId: string;

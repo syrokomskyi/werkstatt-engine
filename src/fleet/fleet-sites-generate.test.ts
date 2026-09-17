@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as yamlStringify } from "yaml";
 import { runFleetSitesGenerate, validateFleetSitesDrift } from "./fleet-sites-generate.ts";
-import type { KernelRuntimeContext } from "../kernel/types.ts";
+import type { KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {

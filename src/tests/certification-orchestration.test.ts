@@ -19,7 +19,7 @@ import type {
   GateDecisionV1,
 } from "../certification/index.ts";
 import type { CertificationProfileV1 } from "../certification/profile/schemas.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import {
   createDossierRepository,
   appendDossierEvent,

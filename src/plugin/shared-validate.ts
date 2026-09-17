@@ -1,17 +1,19 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Boundary guard for RFC-0868. Implements three checks:
+<purpose>Boundary guard for RFC-0868 + RFC-1104. Implements four checks:
 SHARED-01: @warpgogol/werkstatt-shared is declared as a dependency in packages/werkstatt/package.json
 SHARED-02: No @warpgogol/werkstatt-site/* exemptions remain in EXEMPT_PREFIXES in autonomy-validate.ts
-SHARED-03: No @warpgogol/werkstatt-site/* imports remain in packages/werkstatt/src/** non-test files</purpose>
+SHARED-03: No @warpgogol/werkstatt-site/* imports remain in packages/werkstatt/src/** non-test files
+SHARED-04: No @warpgogol/werkstatt-engine/* imports remain in packages/werkstatt-shared/src/** (RFC-1104 cycle break)</purpose>
 
 <non-goals>
-  <item>Does not scan werkstatt-shared source — that is the shared package's own boundary, not the engine's.</item>
+  <item>Does not scan werkstatt-shared for site imports — SHARED-04 only checks the engine boundary direction.</item>
   <item>Does not replace werkstatt.autonomy.validate — SHARED-03 is a cross-check, not a replacement.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0868: initial shared-validate implementing SHARED-01/02/03 per RFC spec.</item>
+  <item>RFC-1104: added SHARED-04 — no werkstatt-engine imports inside werkstatt-shared/src.</item>
   <item>RFC-0868: use shared import-scan-util to avoid duplication with autonomy-validate.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -28,6 +30,7 @@ import { scanDirectoryForImports, type ImportViolation } from "./import-scan-uti
 
 const SHARED_PKG = "@warpgogol/werkstatt-shared";
 const SITE_PREFIX = "@warpgogol/werkstatt-site";
+const ENGINE_PREFIX = "@warpgogol/werkstatt-engine";
 
 export interface SharedCheckResult {
   id: string;
@@ -116,14 +119,39 @@ async function checkNoSiteImports(workspaceRoot: string): Promise<{
   };
 }
 
+async function checkNoEngineImportsInShared(workspaceRoot: string): Promise<{
+  result: SharedCheckResult;
+  violations: ImportViolation[];
+}> {
+  const sharedSrcDir = join(workspaceRoot, "packages", "werkstatt-shared", "src");
+  const { violations, scannedFiles } = await scanDirectoryForImports(
+    sharedSrcDir,
+    workspaceRoot,
+    (specifier) => specifier === ENGINE_PREFIX || specifier.startsWith(ENGINE_PREFIX + "/"),
+  );
+
+  return {
+    result: {
+      id: "SHARED-04",
+      status: violations.length === 0 ? "pass" : "fail",
+      detail:
+        violations.length === 0
+          ? `No ${ENGINE_PREFIX}/* imports in packages/werkstatt-shared/src/** (${scannedFiles} files scanned)`
+          : `${violations.length} ${ENGINE_PREFIX}/* import(s) found in packages/werkstatt-shared/src/** (${scannedFiles} files scanned)`,
+    },
+    violations,
+  };
+}
+
 export async function runSharedValidate(workspaceRoot: string): Promise<SharedValidateResult> {
-  const [shared01, shared02, shared03Result] = await Promise.all([
+  const [shared01, shared02, shared03Result, shared04Result] = await Promise.all([
     checkSharedDependency(workspaceRoot),
     checkExemptionHygiene(workspaceRoot),
     checkNoSiteImports(workspaceRoot),
+    checkNoEngineImportsInShared(workspaceRoot),
   ]);
 
-  const checks = [shared01, shared02, shared03Result.result];
+  const checks = [shared01, shared02, shared03Result.result, shared04Result.result];
   const anyFail = checks.some((c) => c.status === "fail");
 
   return {

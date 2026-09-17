@@ -8,7 +8,7 @@ import {
   canCancel,
 } from "../lifecycle.ts";
 import type { ComponentLifecycleState } from "../lifecycle.ts";
-import type { ResolvedComponentIdentityV1 } from "../../component/contracts.ts";
+import type { ResolvedComponentIdentityV1 } from "@warpgogol/werkstatt-shared/component";
 
 const VALID_SHA = "sha256:" + "a".repeat(64);
 

@@ -82,7 +82,7 @@ import {
   flagSite,
 } from "./deploy-helpers.ts";
 import { buildAuthHeader } from "./deploy-execution.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 function _logCacheDirSize(cacheDir: string, logger: { info: (msg: string) => void }): void {
   try {

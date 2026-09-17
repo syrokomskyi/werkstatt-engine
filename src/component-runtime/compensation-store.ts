@@ -19,9 +19,9 @@ import { mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { createRequire } from "node:module";
 
-import type { CompensationResult, ProbeResult } from "../component/contracts.ts";
-import type { Sha256Digest } from "../fingerprint/primitives.ts";
-import { isSha256Digest } from "../fingerprint/primitives.ts";
+import type { CompensationResult, ProbeResult } from "@warpgogol/werkstatt-shared/component";
+import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { isSha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 const require_ = createRequire(import.meta.url);
 

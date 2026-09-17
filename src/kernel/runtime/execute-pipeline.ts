@@ -33,14 +33,14 @@ import { join, relative, sep } from "node:path";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
 import { deriveModuleBasePath } from "./registry.ts";
-import type { ActualState } from "../../runtime/desired-state.ts";
+import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
 import {
   batchAppendStepTelemetry,
   loadPipelineBudgets,
   lookupExpectedDurationMs,
   type StepTelemetryRecord,
 } from "../pipeline-budgets.ts";
-import { createDefaultIO } from "../workspace-io.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
 import { createCacheLayer } from "../cache/cache-layer.ts";
 import {
   COMMAND_RESULT_CACHE_SCHEMA_VERSION,
@@ -65,7 +65,7 @@ import type {
   KernelCommandDefinition,
   KernelRuntimeContext,
   PipelineStepTiming,
-} from "../types.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
 import { executeRegisteredCommand, computeOwnershipMap } from "./execute-command.ts";
 import { assertKnownOptionKeys, summarizeLogs } from "./shared.ts";
 import { ensureTargetSites, loadAppRuntime } from "./registry.ts";

@@ -102,8 +102,8 @@ import {
   legacyReleaseStateSchema,
   type ReleaseManifest,
   type LegacyReleaseDiagnostic,
-} from "../schemas/release.ts";
-import type { ReleaseArtifactRef } from "../schemas/artifact-store.ts";
+} from "@warpgogol/werkstatt-shared/ontology/operations";
+import type { ReleaseArtifactRef } from "@warpgogol/werkstatt-shared/ontology/operations";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];

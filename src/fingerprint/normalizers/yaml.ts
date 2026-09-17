@@ -11,7 +11,7 @@
 */
 
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { byteHash } from "../primitives.ts";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export function normalizeYaml(content: string): string {
   const parsed = parseYaml(content);

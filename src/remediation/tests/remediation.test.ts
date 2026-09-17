@@ -25,8 +25,8 @@ import type {
   KernelCommandInput,
   KernelRuntimeContext,
   KernelCommandDefinition,
-} from "../../kernel/types.ts";
-import type { ModuleExport } from "../../runtime/desired-state.ts";
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 function makeCommand(
   name: string,

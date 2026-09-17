@@ -23,7 +23,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { parse } from "yaml";
-import type { Diagnostic } from "./types.ts";
+import type { Diagnostic } from "@warpgogol/werkstatt-shared/kernel";
 
 export interface WorkspacePackageInfo {
   name: string;

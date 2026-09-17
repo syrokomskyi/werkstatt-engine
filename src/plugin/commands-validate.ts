@@ -22,7 +22,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import type { Diagnostic, KernelCommandResult, KernelNextStep } from "../kernel/types.ts";
+import type { Diagnostic, KernelCommandResult, KernelNextStep } from "@warpgogol/werkstatt-shared/kernel";
 
 export interface CommandsValidateResult {
   command: string;

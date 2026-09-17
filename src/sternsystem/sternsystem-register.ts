@@ -40,7 +40,7 @@ import {
 import { runSternsystemPin } from "./sternsystem-pin.ts";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
-import { hasTldSuffix } from "../schemas/naming-policy.ts";
+import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 
 export interface SternsystemRegisterData {
   command: "sternsystem.register";

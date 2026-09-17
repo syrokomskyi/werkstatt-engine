@@ -47,7 +47,7 @@ import {
   bordbuchPathFor,
 } from "./external-edit-collector.ts";
 import { collectEnvFiles } from "../mission/env-persist.ts";
-import { hasTldSuffix } from "../schemas/naming-policy.ts";
+import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 import { readPassport } from "./registry-io.ts";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
 import { readAuthorization, isAuthorizationExpired } from "./handover.ts";

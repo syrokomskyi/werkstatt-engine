@@ -19,7 +19,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { SystemConfig, SystemState } from "../schemas/sternsystem.ts";
+import type { SystemConfig, SystemState } from "@warpgogol/werkstatt-shared/ontology/operations";
 
 export const LAGEBILD_SECRET_NAMES = [
   "LAGEBILD_API_URL",

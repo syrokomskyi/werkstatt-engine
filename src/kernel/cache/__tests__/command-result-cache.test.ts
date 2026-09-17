@@ -13,7 +13,7 @@ import {
   type CommandResultCacheKey,
 } from "../command-result-cache.ts";
 import { NoopCacheLayer } from "../noop-cache-layer.ts";
-import type { KernelExecutionReport } from "../../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 import { buildWorkspaceTreeIndex } from "../workspace-tree-index.ts";
 
 function makeReport(overrides: Partial<KernelExecutionReport> = {}): KernelExecutionReport {

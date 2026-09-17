@@ -1,6 +1,6 @@
 import { test, expect, describe } from "vitest";
 import { aggregateCollectErrors } from "../runtime/execute-pipeline.ts";
-import type { KernelExecutionReport } from "../types.ts";
+import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
 import type { StepExecutionResult } from "../runtime/pipeline-scheduler.ts";
 
 /*

@@ -19,7 +19,7 @@ EffectDeclarationExt.
 import type {
   EffectClass,
   EffectDeclarationExt,
-} from "../component/contracts.ts";
+} from "@warpgogol/werkstatt-shared/component";
 
 export class EffectClassifier {
   private readonly registry: Map<string, EffectDeclarationExt>;
