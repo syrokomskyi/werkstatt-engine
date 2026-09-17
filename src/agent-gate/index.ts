@@ -17,7 +17,7 @@ astro-aware caller.
 </CHANGE_SUMMARY>
 */
 
-import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/share/agent";
+import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "./ports.ts";
 import type { RateLimiter } from "./limits.ts";

@@ -16,7 +16,7 @@ are warnings.
 </CHANGE_SUMMARY>
 */
 
-import { REMEDIATION_CATALOG } from "@warpgogol/werkstatt-shared/share/remediation";
+import { REMEDIATION_CATALOG } from "@warpgogol/werkstatt-shared/remediation";
 import type {
   KernelCommandInput,
   KernelCommandResult,

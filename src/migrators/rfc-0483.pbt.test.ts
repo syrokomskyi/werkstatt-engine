@@ -108,7 +108,7 @@ async function createBaseWorkpiece(dir: string): Promise<void> {
   );
   await fs.writeFile(
     path.join(dir, "src", "content.config.ts"),
-    `// GENERATED. Do not change this line unless the file contains project specific changes.\nimport { defineCollection } from "astro:content";\nimport { fsDataCollectionLoader } from "@warpgogol/werkstatt-site/content-source";\nimport { pbpCollections } from "@warpgogol/werkstatt-site/pbp/astro";\nimport { toDataEntryId } from "@warpgogol/werkstatt-shared/share/content";\n\nconst business = defineCollection({\n  loader: fsDataCollectionLoader({\n    base: "src/content/business",\n    generateId: (entry) => toDataEntryId(entry),\n  }),\n  schema: z.object({}).catchall(z.any()),\n});\n\nexport const collections = {\n  ...pbpCollections,\n  business,\n};\n`,
+    `// GENERATED. Do not change this line unless the file contains project specific changes.\nimport { defineCollection } from "astro:content";\nimport { fsDataCollectionLoader } from "@warpgogol/werkstatt-site/content-source";\nimport { pbpCollections } from "@warpgogol/werkstatt-site/pbp/astro";\nimport { toDataEntryId } from "@warpgogol/werkstatt-shared/content";\n\nconst business = defineCollection({\n  loader: fsDataCollectionLoader({\n    base: "src/content/business",\n    generateId: (entry) => toDataEntryId(entry),\n  }),\n  schema: z.object({}).catchall(z.any()),\n});\n\nexport const collections = {\n  ...pbpCollections,\n  business,\n};\n`,
   );
 }
 

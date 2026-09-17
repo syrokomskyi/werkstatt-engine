@@ -22,7 +22,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import fs from "node:fs/promises";
 import { existsSync, readlinkSync, symlinkSync } from "node:fs";
 import path from "node:path";
-import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
+import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import type { ArtifactFile, ArtifactManifest } from "./types.ts";
 

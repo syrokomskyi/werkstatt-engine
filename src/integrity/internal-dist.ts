@@ -23,7 +23,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
  */
 
 import path from "node:path";
-import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
+import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 
 export async function discoverDistFiles(cwd: string, distDir = "dist"): Promise<string[]> {
   const root = path.join(cwd, distDir);

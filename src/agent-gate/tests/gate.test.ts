@@ -16,7 +16,7 @@ import { test, expect } from "vitest";
 import { createAgentGate, type AgentGatePorts, __resetLimiterCache } from "../index.ts";
 import { __resetMcpLimiterCache } from "../mcp/handler.ts";
 import { createFixedWindowLimiter } from "../limits.ts";
-import { buildAgentSurfaceManifest } from "@warpgogol/werkstatt-shared/share/agent";
+import { buildAgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 
 const LEAD_SUBMIT: CapabilityRecord = {

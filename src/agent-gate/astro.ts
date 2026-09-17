@@ -22,7 +22,7 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 import type { APIRoute } from "astro";
 import { UPSTASH_QSTASH_TOKEN } from "astro:env/server";
 import { buildQstashPublish } from "@warpgogol/werkstatt-shared/integration";
-import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/share/agent";
+import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import {
   SEARCH_EMBEDDING_MODEL,
   SEARCH_EMBEDDING_DIMENSIONS,
@@ -35,7 +35,7 @@ import {
   type SearchResult,
   type SearchChunk,
   type SearchManifest,
-} from "@warpgogol/werkstatt-shared/share/agent";
+} from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, type AgentGatePorts } from "./index.ts";
 import { createFixedWindowLimiter } from "./limits.ts";

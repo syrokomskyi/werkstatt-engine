@@ -78,10 +78,10 @@ test("rfc-1105 snapshot: transform rewrites specifiers in workpiece files", asyn
     await fs.writeFile(
       filePath,
       [
-        'import { slugUrl } from "@warpgogol/werkstatt-shared/share/slug";',
-        'import { initLenis } from "@warpgogol/werkstatt-shared/share/scripts/lenis";',
-        'import { walkFiles } from "@warpgogol/werkstatt-shared/share/walk-files";',
-        'import { provenance } from "@warpgogol/werkstatt-shared/share/semantic/markdown-twin-provenance";',
+        'import { slugUrl } from "@warpgogol/werkstatt-shared/slug";',
+        'import { initLenis } from "@warpgogol/werkstatt-shared/client-scripts/lenis";',
+        'import { walkFiles } from "@warpgogol/werkstatt-shared/stack/walk-files";',
+        'import { provenance } from "@warpgogol/werkstatt-shared/node/semantic/markdown-twin-provenance";',
         'import { cta } from "@warpgogol/werkstatt-site/share/schemas/section-cta";',
         'import { other } from "@warpgogol/werkstatt-shared/ontology";',
       ].join("\n"),

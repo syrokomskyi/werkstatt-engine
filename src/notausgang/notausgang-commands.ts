@@ -24,7 +24,7 @@ import {
   type KernelCommandResult,
   type KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
+import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import { fingerprintTree, fingerprintFile } from "@warpgogol/werkstatt-engine/fingerprint/semantic";
 import { byteHashFile } from "@warpgogol/werkstatt-engine/fingerprint";
 import {

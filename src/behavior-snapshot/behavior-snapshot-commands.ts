@@ -28,13 +28,13 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
+import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import {
   parseRedirectRules,
   extractRedirectTarget,
   type RedirectRule,
-} from "@warpgogol/werkstatt-shared/share/redirects";
-import { isHtmlRedirectPage } from "@warpgogol/werkstatt-shared/share/semantic";
+} from "@warpgogol/werkstatt-shared/redirects";
+import { isHtmlRedirectPage } from "@warpgogol/werkstatt-shared/semantic";
 import { hashHtml } from "@warpgogol/werkstatt-engine/fingerprint";
 import type { RouteFact } from "@warpgogol/werkstatt-engine/schemas";
 

@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "../kernel/generated-marker.ts";
 import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
-import { REMEDIATION_CATALOG } from "@warpgogol/werkstatt-shared/share/remediation";
+import { REMEDIATION_CATALOG } from "@warpgogol/werkstatt-shared/remediation";
 import type {
   KernelCommandInput,
   KernelCommandResult,

@@ -35,7 +35,7 @@ import type {
 import { executeKernelCommand, executeKernelPipeline } from "@warpgogol/werkstatt-engine/kernel";
 import { createCacheLayer } from "../kernel/cache/cache-layer.ts";
 import { clearPipelineCacheHits } from "../kernel/runtime/execute-pipeline.ts";
-import { collectFiles } from "@warpgogol/werkstatt-shared/share/fs";
+import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import {
   runPipelinePhase,
   computeBuildInputHash,

@@ -26,8 +26,8 @@ const ctx: MigrationContext = {
 
 const fileContentArbitrary = fc.oneof(
   fc.string({ minLength: 0, maxLength: 300 }),
-  fc.constant('import { slugUrl } from "@warpgogol/werkstatt-shared/share/slug";'),
-  fc.constant('import { x } from "@warpgogol/werkstatt-shared/share/scripts/lenis";'),
+  fc.constant('import { slugUrl } from "@warpgogol/werkstatt-shared/slug";'),
+  fc.constant('import { x } from "@warpgogol/werkstatt-shared/client-scripts/lenis";'),
   fc.constant('import { y } from "@warpgogol/werkstatt-shared/slug";'),
   fc.constant('import { z } from "@warpgogol/werkstatt-site/share/schemas/section-cta";'),
   fc.constant("no specifiers here"),

@@ -19,7 +19,7 @@ import {
   parseRedirectRules,
   extractRedirectTarget,
   type RedirectRule,
-} from "@warpgogol/werkstatt-shared/share/redirects";
+} from "@warpgogol/werkstatt-shared/redirects";
 
 let tmpDir: string;
 
@@ -95,7 +95,7 @@ test("collectRoutes: without redirect rules, all routes included", async () => {
   expect(paths).toContain("/de/agb");
 });
 
-test("parseRedirectRules: import from @warpgogol/werkstatt-shared/share/redirects works correctly", () => {
+test("parseRedirectRules: import from @warpgogol/werkstatt-shared/redirects works correctly", () => {
   const rules = parseRedirectRules("/old /new 301\n# comment\n/de/* / 308\n");
   expect(rules).toHaveLength(2);
   expect(rules[0].from).toBe("/old");
@@ -147,7 +147,7 @@ test("collectRoutes: non-redirect routes retain contentHash as string", async ()
   expect(typeof routes[0].contentHash).toBe("string");
 });
 
-test("extractRedirectTarget: import from @warpgogol/werkstatt-shared/share/redirects works in handoff tests", () => {
+test("extractRedirectTarget: import from @warpgogol/werkstatt-shared/redirects works in handoff tests", () => {
   const html = '<meta http-equiv="refresh" content="0;url=/target">';
   expect(extractRedirectTarget(html)).toBe("/target");
 });

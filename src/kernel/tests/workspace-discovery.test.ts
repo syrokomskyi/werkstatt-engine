@@ -32,7 +32,7 @@ async function createWorkspace(): Promise<string> {
     name: "@warpgogol/worker",
   });
   await writeJson(join(root, "packages/share/package.json"), {
-    name: "@warpgogol/werkstatt-shared/share",
+    name: "@warpgogol/werkstatt-shared",
   });
   await writeJson(join(root, "packages/werkstatt/package.json"), {
     name: "@warpgogol/werkstatt-engine",

@@ -38,7 +38,7 @@ test("runAutonomyValidate passes for self-imports (@warpgogol/werkstatt-engine)"
 test("runAutonomyValidate passes for @warpgogol/werkstatt-shared imports", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
-  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/werkstatt-shared/share";\n`);
+  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/werkstatt-shared/semantic";\n`);
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("pass");

@@ -28,7 +28,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileExists } from "@warpgogol/werkstatt-shared/share/fs";
+import { fileExists } from "@warpgogol/werkstatt-shared/node/fs";
 import {
   discoverSystems,
   readSystemState,
