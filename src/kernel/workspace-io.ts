@@ -8,4 +8,4 @@
 </CHANGE_SUMMARY>
 */
 
-export * from "@warpgogol/werkstatt-shared/kernel";
+export * from "@warpgogol/werkstatt-shared/kernel/workspace-io";

@@ -26,15 +26,20 @@ test("engine/kernel resolves sunk contract cluster", () => {
 });
 
 test("engine/kernel/types forwarding module resolves", () => {
-  expect(kernelTypes).toBeDefined();
-  expect(kernelTypes.diagnosticSchema).toBeDefined();
+  // original surface: type-only exports + defineKernelConfig (diagnosticSchema lives in kernel/diagnostic, never in types)
+  expect(kernelTypes.defineKernelConfig).toBeTypeOf("function");
 });
 
 test("engine/kernel/workspace-io forwarding module resolves", () => {
-  expect(kernelWorkspaceIo.writeFileAtomic).toBeTypeOf("function");
+  // original surface: WorkspaceIO contract + IO factories (writeFileAtomic lives in kernel/fs-atomic)
+  expect(kernelWorkspaceIo.createDefaultIO).toBeTypeOf("function");
+  expect(kernelWorkspaceIo.createRecordingIO).toBeTypeOf("function");
+  expect(kernelWorkspaceIo.createReadOnlyIO).toBeTypeOf("function");
+  expect(kernelWorkspaceIo.KernelMetaError).toBeTypeOf("function");
 });
 
 test("engine/runtime/desired-state forwarding module resolves", () => {
+  // type-only module — zero runtime keys; load verification only
   expect(runtimeDesiredState).toBeDefined();
 });
 

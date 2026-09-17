@@ -152,7 +152,12 @@ async function checkSharedPackageDeclaresNoEngineDep(
   try {
     const content = await readFile(pkgJsonPath, "utf8");
     const pkg = JSON.parse(content);
-    const depFields = ["dependencies", "devDependencies", "peerDependencies"] as const;
+    const depFields = [
+      "dependencies",
+      "devDependencies",
+      "peerDependencies",
+      "optionalDependencies",
+    ] as const;
     const offenders = depFields.filter(
       (field) => pkg[field] && typeof pkg[field] === "object" && ENGINE_PREFIX in pkg[field],
     );
