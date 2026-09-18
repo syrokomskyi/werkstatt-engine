@@ -1,6 +1,6 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0865: Minimal Astro certification profile for the astro-typescript-turborepo stack. Covers all 9 site quality dimensions with Main-gate required requirements.</purpose>
+<purpose>RFC-0865: Minimal Astro certification profile for the site stack. Covers all 9 site quality dimensions with Main-gate required requirements.</purpose>
 <non-goals>
   <item>Do not add producer execution, deployment decisions, or I/O — this is a static data declaration.</item>
   <item>Do not add requirements beyond the minimal 9-dimension Main-gate coverage.</item>

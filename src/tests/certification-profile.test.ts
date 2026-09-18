@@ -86,7 +86,7 @@ function mkProfile(opts?: Partial<CertificationProfileV1>): CertificationProfile
     schema: "werkstatt/certification-profile@1",
     id: "test-profile",
     version: "1.0.0",
-    plugin: { id: "werkstatt-site", profileId: "astro-typescript-turborepo" },
+    plugin: { id: "werkstatt-site", profileId: "site" },
     dimensions: [...ALL_DIMENSIONS],
     producers,
     requirements,
@@ -101,7 +101,7 @@ function mkProfile(opts?: Partial<CertificationProfileV1>): CertificationProfile
 
 const CTX = {
   pluginId: "werkstatt-site",
-  profileId: "astro-typescript-turborepo",
+  profileId: "site",
   registeredCommands: new Set<string>(),
 };
 

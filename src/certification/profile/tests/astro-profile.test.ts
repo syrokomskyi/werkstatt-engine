@@ -11,7 +11,7 @@ describe("astroCertificationProfile", () => {
 
   it("has correct plugin binding", () => {
     expect(astroCertificationProfile.plugin.id).toBe("werkstatt-site");
-    expect(astroCertificationProfile.plugin.profileId).toBe("astro-typescript-turborepo");
+    expect(astroCertificationProfile.plugin.profileId).toBe("site");
   });
 
   it("covers all 9 site quality dimensions", () => {
@@ -44,7 +44,7 @@ describe("astroCertificationProfile", () => {
   it("passes validateCertificationProfileV1 with matching context", () => {
     const ctx = {
       pluginId: "werkstatt-site",
-      profileId: "astro-typescript-turborepo",
+      profileId: "site",
       registeredCommands: new Set(["mission.check"]),
     };
     const result = validateCertificationProfileV1(astroCertificationProfile, ctx);
@@ -55,7 +55,7 @@ describe("astroCertificationProfile", () => {
   it("fails validation when plugin id does not match", () => {
     const ctx = {
       pluginId: "wrong-plugin",
-      profileId: "astro-typescript-turborepo",
+      profileId: "site",
       registeredCommands: new Set(["mission.check"]),
     };
     const result = validateCertificationProfileV1(astroCertificationProfile, ctx);

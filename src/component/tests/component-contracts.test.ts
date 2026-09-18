@@ -70,7 +70,7 @@ function makeValidSet(
 ): Omit<ResolvedComponentSetV1, "setHash"> {
   return {
     schema: "werkstatt/resolved-component-set@1",
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
     components: [makeResolvedIdentity()],
     dependencyGraphHash: VALID_SHA,
     grantSetHash: VALID_SHA,
@@ -278,8 +278,8 @@ describe("computeSetHash — sensitivity", () => {
   });
 
   it("changes when profileId changes", () => {
-    const setA = makeValidSet({ profileId: "astro-typescript-turborepo" });
-    const setB = makeValidSet({ profileId: "phaser-turborepo" });
+    const setA = makeValidSet({ profileId: "site" });
+    const setB = makeValidSet({ profileId: "phaser-game" });
     expect(computeSetHash(setA)).not.toBe(computeSetHash(setB));
   });
 

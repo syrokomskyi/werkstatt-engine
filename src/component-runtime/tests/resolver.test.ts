@@ -47,7 +47,7 @@ function makeDesiredState(overrides: Partial<DesiredState> = {}): DesiredState {
     requiredCapabilities: [],
     availableArtifacts: new Map([[cid("werkstatt/engine"), VALID_SHA]]),
     admittedGrants: [],
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
     ...overrides,
   };
 }

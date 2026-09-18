@@ -27,7 +27,7 @@ function makeSet(
 ): ResolvedComponentSetV1 {
   const base = {
     schema: "werkstatt/resolved-component-set@1" as const,
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
     components,
     dependencyGraphHash: VALID_SHA,
     grantSetHash: VALID_SHA,

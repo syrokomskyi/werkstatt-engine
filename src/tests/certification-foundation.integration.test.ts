@@ -98,7 +98,7 @@ function mkPolicy(reqs?: ResolvedRequirementV1[]): CertificationPolicyBundleV1 {
     schema: "werkstatt/certification-policy-bundle@1",
     policyBundleId: "pb-1",
     version: "1.0.0",
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
     resolvedRequirements: reqs ?? [
       { requirementId: "req-001", source: "spec", description: "R1", mandatory: true },
       { requirementId: "req-002", source: "spec", description: "R2", mandatory: true },

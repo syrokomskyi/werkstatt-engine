@@ -52,7 +52,7 @@ function makeResolvedIdentity(
 function makeResolvedSet(): ResolvedComponentSetV1 {
   const base: Omit<ResolvedComponentSetV1, "setHash"> = {
     schema: "werkstatt/resolved-component-set@1",
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
     components: [makeResolvedIdentity()],
     dependencyGraphHash: VALID_SHA as string,
     grantSetHash: VALID_SHA as string,

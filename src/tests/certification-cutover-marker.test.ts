@@ -21,7 +21,7 @@ const TS = "2026-08-15T12:00:00Z";
 function mkComponentSet(): ResolvedComponentSetV1 {
   return {
     schema: "werkstatt/resolved-component-set@1",
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
     components: [
       { componentId: "engine/kernel", version: "1.0.0", artifactHash: D },
       { componentId: "site/astro", version: "1.0.0", artifactHash: D1 },
