@@ -70,7 +70,7 @@ export const astroCertificationProfile: CertificationProfileV1 = {
   version: "1.0.0",
   plugin: {
     id: "werkstatt-site",
-    profileId: "astro-typescript-turborepo",
+    profileId: "site",
   },
   dimensions: [...DIMENSIONS],
   producers: {
