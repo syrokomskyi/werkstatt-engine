@@ -57,6 +57,13 @@ beforeEach(() => {
   workpieceDir = path.join(testRoot, "workpiece");
   mkdirSync(cacheCloneDir, { recursive: true });
   mkdirSync(workpieceDir, { recursive: true });
+  // Git identity for commits in cloned repos — `git clone` does not inherit the
+  // source repo's local user.email/user.name, and CI runners have no global
+  // git identity. Env vars cover every git command uniformly.
+  vi.stubEnv("GIT_AUTHOR_NAME", "Test");
+  vi.stubEnv("GIT_AUTHOR_EMAIL", "test@test.local");
+  vi.stubEnv("GIT_COMMITTER_NAME", "Test");
+  vi.stubEnv("GIT_COMMITTER_EMAIL", "test@test.local");
   mockAppendBordbuch.mockClear();
   mockAppendBordbuch.mockResolvedValue({
     entry: { id: "event-000001", kind: "operator-note" } as any,
@@ -65,6 +72,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   rmSync(testRoot, { recursive: true, force: true });
 });
 
