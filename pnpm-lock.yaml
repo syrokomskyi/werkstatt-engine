@@ -54,11 +54,11 @@ importers:
         specifier: ^8.70.0
         version: 8.70.0(typescript@5.9.3)
       '@warpgogol/forge':
-        specifier: '*'
-        version: 4.2.4
+        specifier: ^5.1.0
+        version: 5.1.0
       '@warpgogol/werkstatt-shared':
-        specifier: '*'
-        version: 0.14.1(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@types/node@26.6.1)(typescript@5.9.3)
+        specifier: ^0.15.0
+        version: 0.15.0
       ai:
         specifier: ^7.0.99
         version: 7.0.105(zod@4.6.5)
@@ -1856,18 +1856,13 @@ packages:
   '@vitest/spy@5.0.1':
     resolution: {integrity: sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==}
 
-  '@warpgogol/forge@4.2.4':
-    resolution: {integrity: sha512-rUXRxj24rneF7zKEcvq/XisfjrxMj+gPNlh42rkz86jEftcPBqXnUcN2rc1oumdsJfy4c11qztdV0iKnLSRtzw==}
+  '@warpgogol/forge@5.1.0':
+    resolution: {integrity: sha512-jjcR5EuXbgY3bsdJFIcY6v8B5vNmM+5e6nXmzr0R5qWdGfiKDzD4v9Z35MwaA+TqLhOIE8f6LCRdc6eZE9hCYA==}
     engines: {node: '>=24 <25'}
     hasBin: true
 
-  '@warpgogol/werkstatt-engine@1.10.4':
-    resolution: {integrity: sha512-ZSbhVVtAfRkqiAHfy/CQ21YuvOytFhD1Atvw+GWr/Xy7CQi2M6mXZtulM/3TzL3rhqYUt4ikD/c6ZgB+nUsKCA==}
-    engines: {node: '>=24 <25'}
-    hasBin: true
-
-  '@warpgogol/werkstatt-shared@0.14.1':
-    resolution: {integrity: sha512-CVMXDHsBFzZGHZF1JP2FEOc9BFkJHUKk9nUe+cIqC8ds88xX51ZIPJYJbh/UlB/ZJ/ClrrMq7n1WI//wgh07OQ==}
+  '@warpgogol/werkstatt-shared@0.15.0':
+    resolution: {integrity: sha512-4i3xYVlRwobXG+D0p0PhW6HYDE29NNuUKymKEw9mW9TOeRCQLi0HrCbeAg2ExtvL5NFKHsrzkghs3BKJ+j3ZtQ==}
     engines: {node: '>=24 <25'}
 
   '@workflow/serde@4.1.0':
@@ -6459,7 +6454,7 @@ snapshots:
 
   '@vitest/spy@5.0.1': {}
 
-  '@warpgogol/forge@4.2.4':
+  '@warpgogol/forge@5.1.0':
     dependencies:
       '@aws-sdk/client-s3': 3.1134.0
       ajv: 8.20.0
@@ -6468,102 +6463,11 @@ snapshots:
       yaml: 2.9.1
       zod: 4.6.5
 
-  '@warpgogol/werkstatt-engine@1.10.4(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@types/node@26.6.1)(typescript@5.9.3)':
-    dependencies:
-      '@ai-sdk/anthropic': 4.0.56(zod@4.6.5)
-      '@ai-sdk/openai': 4.0.69(zod@4.6.5)
-      '@astrojs/compiler': 4.0.0
-      '@astrojs/markdown-remark': 7.3.1
-      '@aws-sdk/client-s3': 3.1134.0
-      '@libp2p/identify': 4.1.14
-      '@libp2p/kad-dht': 16.4.5
-      '@libp2p/peer-id': 6.0.15
-      '@libp2p/ping': 3.1.13
-      '@libp2p/tcp': 11.0.28
-      '@multiformats/multiaddr': 13.0.3
-      '@noble/ed25519': 3.2.0
-      '@types/better-sqlite3': 9.6.0
-      '@types/picomatch': 4.0.3
-      '@typescript-eslint/typescript-estree': 8.70.0(typescript@5.9.3)
-      '@warpgogol/forge': 4.2.4
-      '@warpgogol/werkstatt-shared': 0.14.1(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@types/node@26.6.1)(typescript@5.9.3)
-      ai: 7.0.105(zod@4.6.5)
-      ajv: 8.20.0
-      ajv-formats: 3.0.1(ajv@8.20.0)
-      asn1js: 3.0.10
-      astro: 7.3.3(@astrojs/markdown-remark@7.3.1)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.6.1)(tsx@4.23.13)(yaml@2.9.1)
-      dotenv: 17.4.2
-      jsonc-parser: 3.3.1
-      libp2p: 3.3.11
-      p-limit: 7.3.2
-      pdf-lib: 1.17.1
-      picomatch: 4.0.7
-      pkijs: 3.4.0
-      postcss: 8.5.28
-      remark-frontmatter: 5.0.0
-      remark-mdx: 3.1.1
-      remark-parse: 11.0.0
-      semver: 7.8.5
-      simple-git: 3.36.0
-      tar: 7.5.22
-      tsx: 4.23.13
-      unified: 11.0.5
-      uuid: 14.0.2
-      yaml: 2.9.1
-      zod: 4.6.5
-    optionalDependencies:
-      '@syrokomskyi/axiom-factory-app': link:../../../pipelines/apps/axiom/factory
-      '@syrokomskyi/axiom-study': link:../../../pipelines/packages/axiom/axiom-study
-      better-sqlite3: 13.0.3
-      lighthouse: 13.4.1(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))
-    transitivePeerDependencies:
-      - '@azure/app-configuration'
-      - '@azure/cosmos'
-      - '@azure/data-tables'
-      - '@azure/identity'
-      - '@azure/keyvault-secrets'
-      - '@azure/storage-blob'
-      - '@capacitor/preferences'
-      - '@deno/kv'
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-      - '@netlify/blobs'
-      - '@nuxt/kit'
-      - '@opentelemetry/core'
-      - '@opentelemetry/exporter-trace-otlp-http'
-      - '@planetscale/database'
-      - '@types/node'
-      - '@upstash/redis'
-      - '@vercel/blob'
-      - '@vercel/functions'
-      - '@vercel/kv'
-      - '@vitejs/devtools'
-      - aws4fetch
-      - bufferutil
-      - db0
-      - idb-keyval
-      - ioredis
-      - jiti
-      - less
-      - proxy-agent
-      - react
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - typescript
-      - uploadthing
-      - utf-8-validate
-      - vue
-      - yauzl
-
-  '@warpgogol/werkstatt-shared@0.14.1(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@types/node@26.6.1)(typescript@5.9.3)':
+  '@warpgogol/werkstatt-shared@0.15.0':
     dependencies:
       '@lordicon/element': 2.3.1
+      '@noble/ed25519': 3.2.0
       '@sindresorhus/slugify': 3.0.1
-      '@warpgogol/werkstatt-engine': 1.10.4(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@types/node@26.6.1)(typescript@5.9.3)
       ajv: 8.20.0
       bs58: 6.0.0
       cyrillic-to-translit-js: 3.2.1
@@ -6579,47 +6483,9 @@ snapshots:
     optionalDependencies:
       '@syrokomskyi/axiom-study': link:../../../pipelines/packages/axiom/axiom-study
     transitivePeerDependencies:
-      - '@azure/app-configuration'
-      - '@azure/cosmos'
-      - '@azure/data-tables'
-      - '@azure/identity'
-      - '@azure/keyvault-secrets'
-      - '@azure/storage-blob'
-      - '@capacitor/preferences'
-      - '@deno/kv'
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-      - '@netlify/blobs'
       - '@nuxt/kit'
-      - '@opentelemetry/core'
-      - '@opentelemetry/exporter-trace-otlp-http'
-      - '@planetscale/database'
-      - '@types/node'
-      - '@upstash/redis'
-      - '@vercel/blob'
-      - '@vercel/functions'
-      - '@vercel/kv'
-      - '@vitejs/devtools'
-      - aws4fetch
-      - bufferutil
-      - db0
-      - idb-keyval
-      - ioredis
-      - jiti
-      - less
-      - proxy-agent
       - react
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - typescript
-      - uploadthing
-      - utf-8-validate
       - vue
-      - yauzl
 
   '@workflow/serde@4.1.0': {}
 
