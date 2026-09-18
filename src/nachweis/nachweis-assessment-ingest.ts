@@ -60,6 +60,13 @@ function flagBool(input: KernelCommandInput, key: string): boolean {
   return v === true || v === "true";
 }
 
+// computeSourceSha256 returns a "sha256:<hex>" digest; the PBP evidence-source
+// items schema requires bare 64-hex (/^[a-f0-9]{64}$/). Strip the scheme prefix
+// for storage and for the already-ingested comparison so both forms match.
+function bareSha256(digest: string | undefined): string {
+  return (digest ?? "").replace(/^sha256:/, "");
+}
+
 const CREDENTIAL_PATTERNS: RegExp[] = [
   /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[A-Za-z0-9]{20,}["']?/i,
   /(?:aws_secret_access_key|private_key|client_secret)\s*[:=]\s*["']?[^\s"']{8,}["']?/i,
@@ -279,7 +286,9 @@ export async function runNachweisAssessmentIngest(
         existingHashes[artifact.key] = item.sha256;
       }
     }
-    const allMatch = bundle.artifacts.every((a) => existingHashes[a.key] === artifactHashes[a.key]);
+    const allMatch = bundle.artifacts.every(
+      (a) => bareSha256(existingHashes[a.key]) === bareSha256(artifactHashes[a.key]),
+    );
     if (allMatch) {
       logger.info(
         `[nachweis.assessment.ingest] already ingested for '${bundle.slug}' (${bundle.seriesId}/${bundle.observationId}) — skipping`,
@@ -398,7 +407,7 @@ export async function runNachweisAssessmentIngest(
       ext,
     );
     items[artifact.key] = {
-      sha256: artifactHashes[artifact.key],
+      sha256: bareSha256(artifactHashes[artifact.key]),
       storage: "private",
       mediaType: artifact.mediaType,
       qualityStatus: "verified",
@@ -418,11 +427,16 @@ export async function runNachweisAssessmentIngest(
     profile: "technical-assessment",
     seriesId: bundle.seriesId,
     observationId: bundle.observationId,
+    subject: bundle.subject,
+    provider: bundle.provider,
+    tool: bundle.tool,
+    executionMode: bundle.execution.mode,
+    authorizationBasis: bundle.execution.authorizationBasis,
     observedAt: bundle.observedAt,
     methodology: bundle.methodology,
-    freshness: bundle.freshness,
+    ...(bundle.result.overall ? { overall: bundle.result.overall } : {}),
     dimensions: bundle.result.dimensions,
-    authorizationBasis: bundle.execution.authorizationBasis,
+    freshness: bundle.freshness,
     ...(bundle.providerReportUrl ? { providerReportUrl: bundle.providerReportUrl } : {}),
   };
 
