@@ -102,7 +102,7 @@ export function parseCommandResultCacheKey(
   if (namespace !== COMMAND_RESULT_CACHE_NAMESPACE) return null;
   const parts = key.split(":");
   if (parts.length < 5) return null;
-  const [schemaVersion, commandName, siteName, inputsHash, moduleHash] = parts;
+  const [, commandName, siteName, inputsHash, moduleHash] = parts;
   return {
     commandName,
     siteName: siteName || null,

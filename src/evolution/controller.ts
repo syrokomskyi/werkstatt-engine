@@ -304,7 +304,7 @@ export function createEvolutionController(
       throw new Error(`no active candidate found for component "${componentId}"`);
     },
 
-    async quarantine(candidateId: string, reason: string): Promise<void> {
+    async quarantine(candidateId: string, _reason: string): Promise<void> {
       const candidate = state.candidates.get(candidateId);
       if (!candidate) {
         throw new Error(`candidate "${candidateId}" not found`);

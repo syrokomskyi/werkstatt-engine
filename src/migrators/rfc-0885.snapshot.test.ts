@@ -15,7 +15,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { rfc0885Migrator } from "./rfc-0885.ts";
-import type { SternsystemData, MigrationContext } from "./types.ts";
+import type { MigrationContext } from "./types.ts";
 
 const ctx: MigrationContext = {
   systemId: "test",

@@ -11,14 +11,6 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import {
-  runReleasePrepare,
-  runReleaseReady,
-  runReleaseValidate,
-  runReleaseList,
-  runReleaseStateValidate,
-} from "./release-commands.ts";
 
 export {
   runReleasePrepare,

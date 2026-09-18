@@ -15,7 +15,6 @@ import { validateDeclarations } from "../validate-declarations.ts";
 import type {
   ComponentDeclaration,
   DesiredState,
-  ActualState,
   MutableActualState,
   ModuleExport,
   CommandDeclaration,

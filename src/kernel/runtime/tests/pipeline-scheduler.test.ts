@@ -3,7 +3,6 @@ import {
   buildSchedule,
   executeScheduledSteps,
   ScheduleError,
-  type ScheduledStep,
 } from "../pipeline-scheduler.ts";
 import type { KernelExecutionReport, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
 

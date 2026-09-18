@@ -560,7 +560,7 @@ export interface OpenStepCtx {
 export async function buildOpenSteps(
   _workspaceRoot: string,
   _missionId: string,
-  ctx: unknown,
+  _ctx: unknown,
 ): Promise<OperationStep<unknown>[]> {
   const steps: OperationStep<unknown>[] = [
     {

@@ -10,7 +10,7 @@ const { capturedMfOptions, MockMiniflare } = vi.hoisted(() => {
     constructor(options: Record<string, unknown>) {
       capturedMfOptions.push(options);
     }
-    async dispatchFetch(url: string): Promise<Response> {
+    async dispatchFetch(_url: string): Promise<Response> {
       return new Response("ok", { status: 200 });
     }
     async dispose(): Promise<void> {}

@@ -2,8 +2,6 @@ import { test, expect, describe } from "vitest";
 import {
   WORKFLOW_PHASES,
   WORKFLOW_CHAINS,
-  type WorkflowPhase,
-  type WorkflowChain,
   type WorkflowFrontmatter,
   type WorkflowListEntry,
   type WorkflowLintViolation,

@@ -5,7 +5,7 @@
 */
 
 import { test, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 

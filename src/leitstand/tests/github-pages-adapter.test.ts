@@ -296,7 +296,7 @@ describe("health", () => {
       workspaceRoot: tmpDir,
     };
 
-    const result = await adapter.health(input);
+    await adapter.health(input);
     // With contentHash: null, the route is treated as a redirect route.
     // A 200 response to a null-hash route means it's not a redirect → unhealthy.
     // But if we use a route with contentHash set to a real hash, we need the hash to match.

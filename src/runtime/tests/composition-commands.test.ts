@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { compositionModule } from "../composition.module.ts";
-import type { ModuleExport, CommandDeclaration, PipelineDeclaration } from "@warpgogol/werkstatt-shared/kernel";
+import type { CommandDeclaration, PipelineDeclaration } from "@warpgogol/werkstatt-shared/kernel";
 
 describe("RFC-1038: composition module", () => {
   it("AC-1: exports ModuleExport with composition.* commands", () => {

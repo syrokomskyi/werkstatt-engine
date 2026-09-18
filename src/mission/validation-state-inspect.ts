@@ -22,7 +22,6 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import {
   readValidationState,
-  type ValidationState,
   type ValidatorState,
 } from "./validation-state.ts";
 import { createCacheLayer, type CacheEntryInfo } from "../kernel/cache/cache-layer.ts";

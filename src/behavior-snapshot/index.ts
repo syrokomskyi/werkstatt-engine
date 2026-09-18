@@ -10,11 +10,6 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import {
-  runBehaviorSnapshotCapture,
-  runBehaviorSnapshotDiff,
-} from "./behavior-snapshot-commands.ts";
 
 export {
   runBehaviorSnapshotCapture,

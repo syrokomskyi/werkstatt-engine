@@ -5,12 +5,12 @@
 */
 
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
 import { runOperation, readJournal, abandonOperation, appendRecord } from "../runner.ts";
-import type { OperationDefinition, JournalRecord } from "../types.ts";
+import type { OperationDefinition } from "../types.ts";
 
 interface TestCtx {
   log: string[];

@@ -21,7 +21,6 @@ import type { APIRoute } from "astro";
 import { createFixedWindowLimiter } from "./limits.ts";
 import {
   reflectRuntime,
-  assertNoForbiddenFields,
   type LawKernelSummary,
   type ReflectionInput,
   type RuntimeReflectionV1,

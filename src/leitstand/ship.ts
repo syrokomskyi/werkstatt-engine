@@ -83,24 +83,6 @@ const PHASE_STEP_COUNT: Record<ShipPhase, number> = {
   archived: 15,
 };
 
-const STEP_NAMES = [
-  "preflight",
-  "mission-validate",
-  "mission-reconcile",
-  "mission-close",
-  "release-prepare",
-  "sync-after-prepare",
-  "release-ready",
-  "certify-dev",
-  "sync-after-dev",
-  "certify-alt",
-  "sync-after-alt",
-  "certify-main",
-  "sync-after-main",
-  "verify",
-  "mission-archive",
-] as const;
-
 // ─── Phase runner (delegates to executeKernelCommand with flag validation) ───
 
 async function runShipPhase(

@@ -510,8 +510,6 @@ export async function runBootSmoke(input: {
       if (timer) clearTimeout(timer);
     }
 
-    const allOk = requestResults.every((r) => r.ok);
-
     return {
       booted: true,
       bootError: null,

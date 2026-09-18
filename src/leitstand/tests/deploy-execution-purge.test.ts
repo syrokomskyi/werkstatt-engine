@@ -126,7 +126,7 @@ const authResult: AuthorizeResult = {
 function makeCtx(
   adapter: DeploymentAdapter,
   workspaceRoot: string,
-  channel: "dev" | "alt" | "main" = "dev",
+  _channel: "dev" | "alt" | "main" = "dev",
 ): DeployExecutionContext {
   return {
     systemId: "test-sys",

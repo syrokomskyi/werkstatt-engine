@@ -10,7 +10,7 @@
 */
 
 import { test, expect, describe, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -20,7 +20,6 @@ import {
   removeAuthorization,
   verifyAuthorization,
   isAuthorizationExpired,
-  computeAuthorizationHash,
   type HandoverAuthorizationV1,
 } from "./handover.ts";
 import {
@@ -28,7 +27,6 @@ import {
   signPassport,
   verifyPassport,
   derivePublicKey,
-  computePassportHash,
   type SignedSitePassport,
 } from "./passport.ts";
 import { writePassport, readPassport } from "./registry-io.ts";

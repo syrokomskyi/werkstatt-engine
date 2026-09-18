@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   CACHE_CLONE_GITIGNORE_SENTINEL,

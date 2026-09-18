@@ -25,7 +25,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { mkdir, readFile, writeFile as writeFileRaw } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";

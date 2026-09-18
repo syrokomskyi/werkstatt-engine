@@ -25,7 +25,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-shared/kernel";
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createDhtModule(): Promise<ModuleExport> {

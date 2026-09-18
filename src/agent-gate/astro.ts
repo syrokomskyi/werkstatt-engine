@@ -25,7 +25,6 @@ import { buildQstashPublish } from "@warpgogol/werkstatt-shared/integration";
 import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import {
   SEARCH_EMBEDDING_MODEL,
-  SEARCH_EMBEDDING_DIMENSIONS,
   SEARCH_MAX_TOP_K,
   SEARCH_DEFAULT_TOP_K,
   SEARCH_CHUNK_TEXT_MAX_LENGTH,

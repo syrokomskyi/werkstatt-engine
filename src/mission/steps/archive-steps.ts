@@ -16,9 +16,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { OperationStep } from "../../journal/index.ts";
 
 export async function buildArchiveSteps(
-  workspaceRoot: string,
-  missionId: string,
-  manifest: unknown,
+  _workspaceRoot: string,
+  _missionId: string,
+  _manifest: unknown,
 ): Promise<OperationStep<unknown>[]> {
   return [];
 }

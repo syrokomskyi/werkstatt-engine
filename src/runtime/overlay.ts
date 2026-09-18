@@ -17,7 +17,6 @@ when two overlays with the same priority modify the same componentId.
 
 import type {
   DesiredState,
-  ComponentDeclaration,
   DesiredStateOverlay,
 } from "@warpgogol/werkstatt-shared/kernel";
 

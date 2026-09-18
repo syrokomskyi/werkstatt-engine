@@ -9,7 +9,7 @@
 */
 
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSternsystemValidate } from "./sternsystem-validate.ts";
@@ -19,7 +19,6 @@ import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
 import {
   buildPassportPayload,
   signPassport,
-  derivePublicKey,
   type SignedSitePassport,
 } from "./passport.ts";
 import { writePassport } from "./registry-io.ts";

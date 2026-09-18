@@ -18,6 +18,7 @@ import { execSync } from "node:child_process";
 import { existsSync, renameSync } from "node:fs";
 import path from "node:path";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
+import type { BordbuchEntryKind } from "@warpgogol/werkstatt-engine/schemas";
 
 export interface WorkpieceRescueResult {
   rescued: boolean;
@@ -186,7 +187,7 @@ export async function rescueWorkpieceEdits(
           await appendAndCommitBordbuch(
             workspaceRoot,
             systemId,
-            "operator-note" as any,
+            "operator-note" as BordbuchEntryKind,
             `Rescue push failed for ${missionId} — commits ${workpieceHead.slice(0, 8)} in cache clone only`,
             "mission:rescue",
             {

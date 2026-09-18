@@ -26,7 +26,6 @@ import type {
 import type { IsolationPolicy } from "../contracts.ts";
 
 const COMPONENT_ID = "werkstatt/test" as ComponentId;
-const FAKE_ADAPTER_ID = "fake-sandbox-adapter";
 
 function makePolicy(
   tier: IsolationTier,

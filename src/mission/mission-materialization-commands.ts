@@ -473,7 +473,7 @@ function makeSkippedPipelineReport(pipelineName: string): KernelPipelineReport {
 }
 
 // RFC-0958: buildValidateSteps — journaled steps for mission.validate build cycle
-export function buildValidateSteps(ctx: ValidateStepCtx): OperationStep<ValidateStepCtx>[] {
+export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<ValidateStepCtx>[] {
   return [
     {
       name: "build-prepare",
@@ -1690,7 +1690,7 @@ export async function runMissionReconcile(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<MissionReconcileData>> {
-  const { workspaceRoot, logger } = context;
+  const { workspaceRoot } = context;
   const missionId = flagString(input, "mission");
   const message = flagString(input, "message") ?? `Reconcile ${missionId}`;
   const actor = resolveActor(input);
@@ -1883,7 +1883,7 @@ export interface ReconcileStepCtx {
 export async function buildReconcileSteps(
   _workspaceRoot: string,
   _missionId: string,
-  ctx: unknown,
+  _ctx: unknown,
 ): Promise<OperationStep<unknown>[]> {
   const steps: OperationStep<unknown>[] = [
     {

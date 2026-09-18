@@ -23,7 +23,6 @@ import type {
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
 import { resolveActor } from "../mission/actor-identity.ts";
 import { readPassport, writePassport } from "./registry-io.ts";
-import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
 import {
   readAuthorization,
@@ -40,7 +39,6 @@ import {
   buildPassportPayload,
   signPassport,
   derivePublicKey,
-  computePassportHash,
   type SignedSitePassport,
 } from "./passport.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";

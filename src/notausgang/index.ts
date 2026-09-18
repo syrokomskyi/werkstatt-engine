@@ -11,8 +11,6 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import { runNotausgangExport, runNotausgangValidate } from "./notausgang-commands.ts";
 
 export {
   runNotausgangExport,

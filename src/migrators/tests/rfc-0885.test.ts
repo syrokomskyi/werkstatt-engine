@@ -57,22 +57,6 @@ async function writeEvidenceSourceFile(
   await fs.writeFile(path.join(dir, filename), content);
 }
 
-async function readFrontmatter(filePath: string): Promise<Record<string, unknown>> {
-  const content = await fs.readFile(filePath, "utf-8");
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return {};
-  const lines = match[1].split("\n");
-  const result: Record<string, unknown> = {};
-  for (const line of lines) {
-    const idx = line.indexOf(":");
-    if (idx === -1) continue;
-    const key = line.slice(0, idx).trim();
-    const val = line.slice(idx + 1).trim();
-    if (val) result[key] = val;
-  }
-  return result;
-}
-
 test("rfc-0885 migrator has correct id and version metadata", () => {
   expect(rfc0885Migrator.id).toBe("rfc-0885");
   expect(rfc0885Migrator.fromVersion).toBe("6.22.0");

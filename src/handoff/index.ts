@@ -12,11 +12,6 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import { runHandoffAbsorb } from "./handoff-absorb.ts";
-import { runHandoffPack } from "./handoff-pack.ts";
-import { runHandoffValidate } from "./handoff-validate.ts";
-import { runMigratorRegistryValidate } from "./migrator-registry-validate.ts";
 
 export { diffCapabilities, intentMatches, worstTier } from "./capability-diff.ts";
 export {

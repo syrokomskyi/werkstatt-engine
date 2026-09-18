@@ -24,7 +24,13 @@ import { resolveOverlays, inspectOverlays } from "./overlay.ts";
 import { reconcile, reconcileFromPersisted } from "./reconciler.ts";
 import { applyOverlay, getActiveOverlays, removeOverlay } from "./overlay-store.ts";
 import { loadPersistedDesiredState } from "./desired-state-persistence.ts";
-import type { DesiredStateOverlay, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  DesiredStateOverlay,
+  ModuleExport,
+  MutableActualState,
+  KernelCommandDefinition,
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { ComponentScope } from "@warpgogol/werkstatt-shared/component";
 
 function makeReport(
   commandName: string,
@@ -41,7 +47,7 @@ function makeReport(
     exitCode,
     ok,
     summary,
-    metadata: { name: commandName } as any,
+    metadata: { name: commandName } as KernelCommandDefinition,
     logs: context.logger.getEvents(),
     filesModified: [],
     timing: { durationMs, exceededTimeout: false },
@@ -98,7 +104,7 @@ async function runCompositionReconcile(
   const result = await reconcileFromPersisted(
     context.workspaceRoot,
     [],
-    context.actualState as any,
+    context.actualState as MutableActualState,
     { profileId: context.site?.name ?? "werkstatt" },
   );
 
@@ -139,8 +145,8 @@ async function runOverlayApply(
 
   const overlay: DesiredStateOverlay = {
     id: overlayId,
-    scope: scope as any,
-    context: { scope: scope as any },
+    scope: scope as ComponentScope,
+    context: { scope: scope as ComponentScope },
     addOrReplace: new Map(),
     remove: removeComponent ? [removeComponent] : [],
     priority: 100,
@@ -159,7 +165,7 @@ async function runOverlayApply(
     };
 
     if (effectiveDesired) {
-      const result = await reconcile(effectiveDesired, context.actualState as any);
+      const result = await reconcile(effectiveDesired, context.actualState as MutableActualState);
       reconciliation = {
         applied: result.applied,
         failures: result.failures,

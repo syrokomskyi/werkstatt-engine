@@ -35,7 +35,10 @@ const consentStatusArb = fc.constantFrom(
 test("rfc-0885 migrator is idempotent over arbitrary consent status", async () => {
   await fc.asyncProperty(
     consentStatusArb,
-    fc.option(fc.date().map((d) => d.toISOString()), { nil: null }),
+    fc.option(
+      fc.date().map((d) => d.toISOString()),
+      { nil: null },
+    ),
     async (status, grantedAt) => {
       const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rfc-0885-pbt-"));
       try {
@@ -50,7 +53,7 @@ test("rfc-0885 migrator is idempotent over arbitrary consent status", async () =
         const data: SternsystemData = { rootPath: dir, dataPaths: [] };
         const once = await rfc0885Migrator.transform(data, ctx);
         const content1 = await fs.readFile(filePath, "utf8");
-        const twice = await rfc0885Migrator.transform(once, ctx);
+        await rfc0885Migrator.transform(once, ctx);
         const content2 = await fs.readFile(filePath, "utf8");
 
         expect(content2, "Migrator must be idempotent").toEqual(content1);

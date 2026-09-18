@@ -13,7 +13,6 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createIdentityModule(): Promise<ModuleExport> {

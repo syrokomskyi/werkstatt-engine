@@ -52,7 +52,7 @@ function resolveRepoSlug(workerName: string, tokenOwner?: string): string {
   return workerName;
 }
 
-function extractTokenOwner(token: string): string | undefined {
+function extractTokenOwner(_token: string): string | undefined {
   // GitHub tokens don't encode the owner. We can't resolve it from the token alone.
   // The operator must use "owner/repo" format in workerName if the token owner
   // can't be inferred. Return undefined — the caller handles the fallback.

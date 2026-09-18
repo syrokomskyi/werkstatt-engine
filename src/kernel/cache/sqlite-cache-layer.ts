@@ -39,7 +39,6 @@ import type {
   CacheStatus,
 } from "./cache-layer.ts";
 import {
-  COMMAND_RESULT_CACHE_NAMESPACE,
   parseCommandResultCacheKey,
 } from "./command-result-cache.ts";
 

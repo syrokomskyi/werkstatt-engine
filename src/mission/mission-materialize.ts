@@ -173,31 +173,6 @@ function flagBool(input: KernelCommandInput, key: string): boolean {
   return v === true || v === "true";
 }
 
-const STERNSYSTEM_DATA_PATHS = [
-  "src/content",
-  "public",
-  "provenance",
-  "bordbuch",
-  "behavior.snapshot.generated.yaml",
-  "system-config.yaml",
-  "system-state.yaml",
-];
-
-function filterGitignoredPaths(paths: string[], cwd: string): string[] {
-  const result: string[] = [];
-  for (const p of paths) {
-    try {
-      execSync(`git check-ignore --quiet -- ${JSON.stringify(p)}`, {
-        cwd,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    } catch {
-      result.push(p);
-    }
-  }
-  return result;
-}
-
 // RFC-0597: Materialization state file interface
 interface MaterializationState {
   systemId: string;
@@ -1924,7 +1899,7 @@ export async function runMissionMaterialize(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<MissionMaterializeData>> {
-  const { workspaceRoot, logger } = context;
+  const { workspaceRoot } = context;
   const missionId = flagString(input, "mission");
   const reportOnly = flagBool(input, "report-only");
   const skipPreflight = flagBool(input, "skip-preflight");

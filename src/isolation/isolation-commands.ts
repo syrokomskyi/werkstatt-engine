@@ -18,7 +18,11 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
-import type { ComponentId, IsolationTier, CapabilityId } from "@warpgogol/werkstatt-shared/component";
+import type {
+  ComponentId,
+  IsolationTier,
+  CapabilityId,
+} from "@warpgogol/werkstatt-shared/component";
 import {
   createIsolationManager,
   type AdmittedProvider,
@@ -37,7 +41,7 @@ function getManager(): IsolationManager {
       { adapter: createFakeSandboxAdapter(), tier: 2 },
     ];
     manager = createIsolationManager(providers, {
-      onSandboxEvent: (event: SandboxLifecycleEvent) => {
+      onSandboxEvent: (_event: SandboxLifecycleEvent) => {
         // Bordbuch recording is handled in the command handlers where context is available
       },
     });

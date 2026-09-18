@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { installWorkpieceCommitHook } from "../workpiece-commit-hook.ts";
 

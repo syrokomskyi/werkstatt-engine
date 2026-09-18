@@ -10,13 +10,6 @@
 </CHANGE_SUMMARY>
 */
 
-import type { KernelModule } from "@warpgogol/werkstatt-engine/kernel";
-import {
-  runArtifactStorePut,
-  runArtifactStoreGet,
-  runArtifactStoreValidate,
-  runArtifactStoreGc,
-} from "./artifact-store-commands.ts";
 
 export {
   runArtifactStorePut,

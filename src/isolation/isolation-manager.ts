@@ -55,7 +55,7 @@ export interface AdmittedProvider {
   readonly tier: IsolationTier;
 }
 
-function generateSandboxId(componentId: ComponentId): string {
+function generateSandboxId(_componentId: ComponentId): string {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 8);
   return `sandbox-${ts}-${rand}`;
@@ -117,7 +117,7 @@ export function createIsolationManager(
       }
 
       const sandboxId = generateSandboxId(componentId);
-      const artifactHash = "sha256:" + "0".repeat(64) as Sha256Digest;
+      const artifactHash = ("sha256:" + "0".repeat(64)) as Sha256Digest;
 
       const createInput: SandboxedWorkloadCreateV1 = {
         workloadId: sandboxId,

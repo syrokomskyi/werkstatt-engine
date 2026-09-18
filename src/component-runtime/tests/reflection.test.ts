@@ -7,7 +7,6 @@ import {
   type CapabilityCatalogV1,
   type LiveComponentObservation,
   type LawKernelSummary,
-  type RuntimeReflectionV1,
 } from "../reflection.ts";
 import type {
   ComponentDeclaration,

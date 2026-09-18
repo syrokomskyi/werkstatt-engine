@@ -28,11 +28,6 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
   return typeof v === "string" ? v : undefined;
 }
 
-function flagBool(input: KernelCommandInput, key: string): boolean {
-  const v = input.flags[key];
-  return v === true || v === "true";
-}
-
 export async function runFleetOwnershipRegister(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
@@ -78,7 +73,12 @@ export async function runFleetOwnershipRegister(
       return {
         exitCode: 1,
         summary: `[fleet.ownership.register] ${err.code}: ${err.message}`,
-        data: { command: "fleet.ownership.register", systemId, error: err.code, message: err.message },
+        data: {
+          command: "fleet.ownership.register",
+          systemId,
+          error: err.code,
+          message: err.message,
+        },
       };
     }
     return {
@@ -134,7 +134,12 @@ export async function runFleetOwnershipVerify(
       return {
         exitCode: 1,
         summary: `[fleet.ownership.verify] ${err.code}: ${err.message}`,
-        data: { command: "fleet.ownership.verify", systemId, error: err.code, message: err.message },
+        data: {
+          command: "fleet.ownership.verify",
+          systemId,
+          error: err.code,
+          message: err.message,
+        },
       };
     }
     return {
@@ -188,7 +193,12 @@ export async function runFleetOwnershipTransfer(
       return {
         exitCode: 1,
         summary: `[fleet.ownership.transfer] ${err.code}: ${err.message}`,
-        data: { command: "fleet.ownership.transfer", systemId, error: err.code, message: err.message },
+        data: {
+          command: "fleet.ownership.transfer",
+          systemId,
+          error: err.code,
+          message: err.message,
+        },
       };
     }
     return {

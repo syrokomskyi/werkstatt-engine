@@ -13,7 +13,7 @@ cross-referencing validator rules[] declarations to identify uncovered ruleIds.
 </CHANGE_SUMMARY>
 */
 
-import { writeFile as writeFileRaw, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "../kernel/generated-marker.ts";
