@@ -9,7 +9,13 @@
 */
 
 import { test, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+} from "node:fs";
 import { execSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
@@ -34,7 +40,10 @@ const silentLogger = {
 
 function gitInit(dir: string, branch = "main"): void {
   execSync(`git init -b ${branch}`, { cwd: dir, stdio: "pipe" });
-  execSync('git config user.email "test@test.local"', { cwd: dir, stdio: "pipe" });
+  execSync('git config user.email "test@test.local"', {
+    cwd: dir,
+    stdio: "pipe",
+  });
   execSync('git config user.name "Test"', { cwd: dir, stdio: "pipe" });
 }
 
@@ -44,7 +53,11 @@ function gitCommit(dir: string, msg: string): string {
     stdio: "pipe",
     encoding: "utf-8",
   });
-  return execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf-8", stdio: "pipe" }).trim();
+  return execSync("git rev-parse HEAD", {
+    cwd: dir,
+    encoding: "utf-8",
+    stdio: "pipe",
+  }).trim();
 }
 
 let testRoot: string;
@@ -57,6 +70,13 @@ beforeEach(() => {
   workpieceDir = path.join(testRoot, "workpiece");
   mkdirSync(cacheCloneDir, { recursive: true });
   mkdirSync(workpieceDir, { recursive: true });
+  // Git identity for commits in cloned repos — `git clone` does not inherit the
+  // source repo's local user.email/user.name, and CI runners have no global
+  // git identity. Env vars cover every git command uniformly.
+  vi.stubEnv("GIT_AUTHOR_NAME", "Test");
+  vi.stubEnv("GIT_AUTHOR_EMAIL", "test@test.local");
+  vi.stubEnv("GIT_COMMITTER_NAME", "Test");
+  vi.stubEnv("GIT_COMMITTER_EMAIL", "test@test.local");
   mockAppendBordbuch.mockClear();
   mockAppendBordbuch.mockResolvedValue({
     entry: { id: "event-000001", kind: "operator-note" } as any,
@@ -65,6 +85,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   rmSync(testRoot, { recursive: true, force: true });
 });
 
@@ -125,9 +146,12 @@ test("rescues uncommitted changes — commits and merges into cache clone", asyn
   gitInit(cacheCloneDir);
   const initialSha = gitCommit(cacheCloneDir, "initial");
 
-  execSync(`git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`, {
-    stdio: "pipe",
-  });
+  execSync(
+    `git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`,
+    {
+      stdio: "pipe",
+    },
+  );
 
   writeFileSync(path.join(workpieceDir, "content.md"), "new content");
 
@@ -156,9 +180,12 @@ test("rescues new commits in workpiece — merges into cache clone", async () =>
   gitInit(cacheCloneDir);
   const initialSha = gitCommit(cacheCloneDir, "initial");
 
-  execSync(`git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`, {
-    stdio: "pipe",
-  });
+  execSync(
+    `git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`,
+    {
+      stdio: "pipe",
+    },
+  );
 
   writeFileSync(path.join(workpieceDir, "page.md"), "page content");
   execSync("git add -A", { cwd: workpieceDir, stdio: "pipe" });
@@ -188,9 +215,12 @@ test("no-op when workpiece HEAD is already ancestor of cache clone HEAD", async 
   gitInit(cacheCloneDir);
   gitCommit(cacheCloneDir, "initial");
 
-  execSync(`git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`, {
-    stdio: "pipe",
-  });
+  execSync(
+    `git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`,
+    {
+      stdio: "pipe",
+    },
+  );
 
   const result = await rescueWorkpieceEdits(
     workpieceDir,
@@ -209,22 +239,36 @@ test("backs up old workpiece on merge failure", async () => {
   gitCommit(cacheCloneDir, "initial");
   writeFileSync(path.join(cacheCloneDir, "conflict.md"), "cache version");
   execSync("git add -A", { cwd: cacheCloneDir, stdio: "pipe" });
-  execSync('git commit -m "cache adds conflict.md"', { cwd: cacheCloneDir, stdio: "pipe" });
-
-  execSync(`git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`, {
+  execSync('git commit -m "cache adds conflict.md"', {
+    cwd: cacheCloneDir,
     stdio: "pipe",
   });
+
+  execSync(
+    `git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`,
+    {
+      stdio: "pipe",
+    },
+  );
   execSync("git reset --hard HEAD~1", { cwd: workpieceDir, stdio: "pipe" });
 
   writeFileSync(path.join(workpieceDir, "conflict.md"), "workpiece version");
   execSync("git add -A", { cwd: workpieceDir, stdio: "pipe" });
-  execSync('git commit -m "workpiece adds conflict.md"', { cwd: workpieceDir, stdio: "pipe" });
+  execSync('git commit -m "workpiece adds conflict.md"', {
+    cwd: workpieceDir,
+    stdio: "pipe",
+  });
 
   const logs: string[] = [];
-  const result = await rescueWorkpieceEdits(workpieceDir, cacheCloneDir, "test-m000001", {
-    info: (msg: string) => logs.push(msg),
-    warn: (msg: string) => logs.push(msg),
-  });
+  const result = await rescueWorkpieceEdits(
+    workpieceDir,
+    cacheCloneDir,
+    "test-m000001",
+    {
+      info: (msg: string) => logs.push(msg),
+      warn: (msg: string) => logs.push(msg),
+    },
+  );
 
   expect(result.rescued).toBe(false);
   expect(result.mergedToCacheClone).toBe(false);
@@ -245,17 +289,25 @@ test("pushes rescued commits to bare repo when origin is configured", async () =
   gitCommit(cacheCloneDir, "initial");
   execSync("git push -u origin main", { cwd: cacheCloneDir, stdio: "pipe" });
 
-  execSync(`git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`, {
-    stdio: "pipe",
-  });
+  execSync(
+    `git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`,
+    {
+      stdio: "pipe",
+    },
+  );
 
   writeFileSync(path.join(workpieceDir, "content.md"), "rescued content");
 
   const logs: string[] = [];
-  const result = await rescueWorkpieceEdits(workpieceDir, cacheCloneDir, "test-m000001", {
-    info: (msg: string) => logs.push(msg),
-    warn: (msg: string) => logs.push(msg),
-  });
+  const result = await rescueWorkpieceEdits(
+    workpieceDir,
+    cacheCloneDir,
+    "test-m000001",
+    {
+      info: (msg: string) => logs.push(msg),
+      warn: (msg: string) => logs.push(msg),
+    },
+  );
 
   expect(result.rescued).toBe(true);
   expect(result.mergedToCacheClone).toBe(true);
@@ -279,9 +331,12 @@ test("records bordbuch evidence when push to bare repo fails", async () => {
     stdio: "pipe",
   });
 
-  execSync(`git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`, {
-    stdio: "pipe",
-  });
+  execSync(
+    `git clone ${JSON.stringify(cacheCloneDir)} ${JSON.stringify(workpieceDir)}`,
+    {
+      stdio: "pipe",
+    },
+  );
 
   writeFileSync(path.join(workpieceDir, "content.md"), "rescued content");
 
