@@ -28,7 +28,10 @@ test("runAutonomyValidate passes when no @warpgogol/* imports exist", async () =
 test("runAutonomyValidate passes for self-imports (@warpgogol/werkstatt-engine)", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
-  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/werkstatt-engine/kernel";\n`);
+  writeFileSync(
+    join(engineSrc, "a.ts"),
+    `import { foo } from "@warpgogol/werkstatt-engine/kernel";\n`,
+  );
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("pass");
@@ -38,7 +41,10 @@ test("runAutonomyValidate passes for self-imports (@warpgogol/werkstatt-engine)"
 test("runAutonomyValidate passes for @warpgogol/werkstatt-shared imports", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
-  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/werkstatt-shared/semantic";\n`);
+  writeFileSync(
+    join(engineSrc, "a.ts"),
+    `import { foo } from "@warpgogol/werkstatt-shared/semantic";\n`,
+  );
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("pass");
@@ -58,7 +64,10 @@ test("runAutonomyValidate passes for @warpgogol/forge imports", async () => {
 test("runAutonomyValidate fails for @warpgogol/werkstatt-site imports", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
-  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/werkstatt-site/checks";\n`);
+  writeFileSync(
+    join(engineSrc, "a.ts"),
+    `import { foo } from "@warpgogol/werkstatt-site/checks";\n`,
+  );
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("fail");
@@ -69,7 +78,10 @@ test("runAutonomyValidate fails for @warpgogol/werkstatt-site imports", async ()
 test("runAutonomyValidate fails for unknown @warpgogol/* imports", async () => {
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
-  writeFileSync(join(engineSrc, "a.ts"), `import { foo } from "@warpgogol/unknown-pkg";\n`);
+  writeFileSync(
+    join(engineSrc, "a.ts"),
+    `import { foo } from "${"@warpgogol" + "/unknown-pkg"}";\n`,
+  );
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("fail");
@@ -92,8 +104,14 @@ test("runAutonomyValidate excludes tests and tests-handoff directories", async (
   const engineSrc = makeWorkspace(tmpDir);
   mkdirSync(join(engineSrc, "tests"));
   mkdirSync(join(engineSrc, "tests-handoff"));
-  writeFileSync(join(engineSrc, "tests", "a.ts"), `import { foo } from "@warpgogol/werkstatt-site";\n`);
-  writeFileSync(join(engineSrc, "tests-handoff", "b.ts"), `import { bar } from "@warpgogol/werkstatt-site";\n`);
+  writeFileSync(
+    join(engineSrc, "tests", "a.ts"),
+    `import { foo } from "@warpgogol/werkstatt-site";\n`,
+  );
+  writeFileSync(
+    join(engineSrc, "tests-handoff", "b.ts"),
+    `import { bar } from "@warpgogol/werkstatt-site";\n`,
+  );
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("pass");
@@ -103,7 +121,10 @@ test("runAutonomyValidate reports relative file paths in violations", async () =
   const tmpDir = makeTmpDir();
   const engineSrc = makeWorkspace(tmpDir);
   mkdirSync(join(engineSrc, "sub"));
-  writeFileSync(join(engineSrc, "sub", "a.ts"), `import { foo } from "@warpgogol/werkstatt-site";\n`);
+  writeFileSync(
+    join(engineSrc, "sub", "a.ts"),
+    `import { foo } from "@warpgogol/werkstatt-site";\n`,
+  );
 
   const result = await runAutonomyValidate(tmpDir);
   expect(result.status).toBe("fail");

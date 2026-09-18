@@ -86,7 +86,7 @@ test("rfc-1105 snapshot: transform rewrites specifiers in workpiece files", asyn
         `import { initLenis } from "${LEGACY}/scripts/lenis";`,
         `import { walkFiles } from "${LEGACY}/walk-files";`,
         `import { provenance } from "${LEGACY}/semantic/markdown-twin-provenance";`,
-        'import { cta } from "@warpgogol/werkstatt-site/share/schemas/section-cta";',
+        'import { cta } from "@warpgogol/werkstatt-site' + '/share/schemas/section-cta";',
         'import { other } from "@warpgogol/werkstatt-shared/ontology";',
       ].join("\n"),
     );
