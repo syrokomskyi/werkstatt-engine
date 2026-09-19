@@ -13,7 +13,6 @@ SHARED-05: packages/werkstatt-shared/package.json declares no dependency on @war
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0868: initial shared-validate implementing SHARED-01/02/03 per RFC spec.</item>
   <item>RFC-1104: added SHARED-04 — no werkstatt-engine imports inside werkstatt-shared/src.</item>
   <item>RFC-1104: added SHARED-05 — werkstatt-shared/package.json must not declare a dependency on werkstatt-engine.</item>
   <item>RFC-0868: use shared import-scan-util to avoid duplication with autonomy-validate.</item>
@@ -22,7 +21,8 @@ SHARED-05: packages/werkstatt-shared/package.json declares no dependency on @war
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. engine package now 0 diagnostics.</item>
+  <history>RFC-0868</history>
 </CHANGE_SUMMARY>
 */
 

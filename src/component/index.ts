@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>component index — re-export the component contracts and schemas surface. Contract types sunk to @warpgogol/werkstatt-shared/component per RFC-1104; schemas and identity stay engine-local.</purpose>
+  <non-goals>
+    <item>Do not add logic here — pure re-export barrel.</item>
+  </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1104: contracts re-exported from werkstatt-shared/component; schemas + identity remain engine-local.</item>
