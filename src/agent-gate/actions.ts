@@ -21,8 +21,12 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { CapabilityInputOutputSchema, CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
+import type {
+  CapabilityInputOutputSchema,
+  CapabilityRecord,
+} from "@warpgogol/werkstatt-shared/ontology";
 import type { IntegrationEvent } from "@warpgogol/werkstatt-shared/integration/port";
+import { deriveActionEventId } from "@warpgogol/werkstatt-shared/agent";
 
 export interface ValidationFieldError {
   path: string;
@@ -118,22 +122,32 @@ export function validateAgainstCapabilitySchema(
 
 const CONTACT_FIELDS = ["name", "email", "phone"] as const;
 
-/** Normalize validated action input into the delivery substrate's event shape. */
+/**
+ * Normalize validated action input into the delivery substrate's event shape.
+ * RFC-1112: when `idempotencyKey` is present the eventId is derived
+ * deterministically from it (same key → same eventId → QStash dedup and the
+ * receipt store agree). Without a key the eventId is a random UUID.
+ */
 export function buildIntegrationEventFromAction(
   capability: CapabilityRecord,
   input: Record<string, unknown>,
   locale: string,
   now: Date,
+  idempotencyKey?: string,
 ): IntegrationEvent {
+  if (!capability.integration) {
+    throw new Error(
+      `capability "${capability.id}" has no integration block — only sideEffect "write" capabilities dispatch events`,
+    );
+  }
   const contact: Record<string, string> = {};
   for (const field of CONTACT_FIELDS) {
     const v = input[field];
     if (typeof v === "string" && v.length > 0) contact[field] = v;
   }
-  const eventId =
-    typeof input.eventId === "string" && UUID_RE.test(input.eventId)
-      ? input.eventId
-      : crypto.randomUUID();
+  const eventId = idempotencyKey
+    ? deriveActionEventId(capability.id, idempotencyKey)
+    : crypto.randomUUID();
 
   return {
     eventId,

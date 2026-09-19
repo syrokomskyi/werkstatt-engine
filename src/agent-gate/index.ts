@@ -14,6 +14,7 @@ astro-aware caller.
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial gate factory.</item>
   <item>RFC-0291: add per-IP rate limiting, identity header passthrough, MCP size cap.</item>
+  <item>RFC-1112: idempotency-key extraction + replay step, problem+json errors, X-Agent-Idempotency marker.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -32,11 +33,16 @@ import {
   type ActionContext,
   resolveCapability,
   checkPayloadSize,
+  checkIdempotency,
   checkRateLimit,
   parseJsonBody,
   validateSchema,
-  buildAndDispatchEvent,
+  dispatchOrPreview,
+  extractIdempotencyKey,
+  httpBodyHash,
+  problemResponse,
 } from "./action-pipeline.ts";
+import { buildAgentProblem } from "@warpgogol/werkstatt-shared/agent";
 
 export type { AgentGatePorts } from "./ports.ts";
 export * from "./actions.ts";
@@ -156,6 +162,10 @@ export function createAgentGate(
       const raw = await request.text();
       const clientIp = extractClientIp(request);
       const agentIdentity = extractAgentIdentity(request);
+      // RFC-1112: the idempotency key + body hash are extracted before the
+      // pipeline so the replay check can run ahead of rate limiting.
+      const idempotencyKey = extractIdempotencyKey(request);
+      const bodyHash = idempotencyKey ? httpBodyHash(raw) : undefined;
 
       const ctx: ActionContext = {
         capabilityId,
@@ -166,11 +176,14 @@ export function createAgentGate(
         rawBody: raw,
         clientIp,
         agentIdentity,
+        idempotencyKey,
+        bodyHash,
       };
 
       const steps: (() => Response | Promise<Response | void> | void)[] = [
         () => resolveCapability(ctx),
         () => checkPayloadSize(ctx),
+        () => checkIdempotency(ctx),
         () =>
           checkRateLimit(
             ctx,
@@ -178,14 +191,24 @@ export function createAgentGate(
           ),
         () => parseJsonBody(ctx),
         () => validateSchema(ctx),
-        () => buildAndDispatchEvent(ctx),
+        () => dispatchOrPreview(ctx),
       ];
 
+      let response: Response | undefined;
       for (const step of steps) {
         const result = await step();
-        if (result instanceof Response) return result;
+        if (result instanceof Response) {
+          response = result;
+          break;
+        }
       }
-      return jsonResponse({ accepted: false, error: "pipeline-incomplete" }, 500);
+      // Unreachable in practice — dispatchOrPreview always returns a Response.
+      response ??= problemResponse(
+        buildAgentProblem("dispatch-failed", { detail: "Pipeline completed without a result." }),
+      );
+      // RFC-1112: mark responses when no receipt store is configured.
+      if (!ports.idempotency) response.headers.set("X-Agent-Idempotency", "disabled");
+      return response;
     },
   };
 }

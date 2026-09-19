@@ -14,4 +14,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 declare module "astro:env/server" {
   export const UPSTASH_QSTASH_TOKEN: string | undefined;
+  export const UPSTASH_REDIS_REST_URL: string | undefined;
+  export const UPSTASH_REDIS_REST_TOKEN: string | undefined;
 }

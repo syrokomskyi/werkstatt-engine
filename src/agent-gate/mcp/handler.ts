@@ -14,6 +14,7 @@ one level up, at the transport boundary in index.ts).
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial MCP method handler.</item>
   <item>RFC-0291: add rate limiting, size cap, identity passthrough, freshness _meta.</item>
+  <item>RFC-1112: idempotency via params._meta, shared executeAction core, problem-details in error.data.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -21,7 +22,14 @@ import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "../ports.ts";
 import type { RateLimiter } from "../limits.ts";
-import { validateAgainstCapabilitySchema, buildIntegrationEventFromAction } from "../actions.ts";
+import { validateAgainstCapabilitySchema } from "../actions.ts";
+import {
+  checkIdempotencyReplay,
+  executeAction,
+  mcpBodyHash,
+  MCP_IDEMPOTENCY_META_KEY,
+} from "../action-pipeline.ts";
+import { buildAgentProblem, type AgentProblemDetails } from "@warpgogol/werkstatt-shared/agent";
 import { buildToolsList } from "./tools.ts";
 import {
   PINNED_MCP_PROTOCOL_VERSION,
@@ -118,9 +126,37 @@ async function handleToolsCall(
     // RFC-0291: payload size cap on MCP action arguments.
     const argsBytes = new TextEncoder().encode(JSON.stringify(params.arguments ?? {})).length;
     if (argsBytes > capability.limits.maxPayloadBytes) {
-      return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, "Payload too large.", {
-        retryable: false,
+      const problem = buildAgentProblem("payload-too-large", {
+        detail: `Arguments are ${argsBytes} bytes; the limit is ${capability.limits.maxPayloadBytes}.`,
       });
+      return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, problem.title, problem);
+    }
+
+    // RFC-1112: idempotency key travels in params._meta (MCP has no headers);
+    // the body hash is the canonical JSON hash of the arguments.
+    const meta = (params as { _meta?: Record<string, unknown> })._meta;
+    const idempotencyKey =
+      typeof meta?.[MCP_IDEMPOTENCY_META_KEY] === "string"
+        ? (meta[MCP_IDEMPOTENCY_META_KEY] as string)
+        : undefined;
+    const bodyHash = idempotencyKey ? mcpBodyHash(params.arguments) : undefined;
+
+    // RFC-1112: replay check runs before rate limiting — a replay must not
+    // consume budget.
+    const replay = await checkIdempotencyReplay({
+      ports: ctx.ports,
+      capability,
+      idempotencyKey,
+      bodyHash,
+    });
+    if (replay !== null) {
+      if ("receiptId" in replay) {
+        return jsonRpcSuccess(req.id ?? null, {
+          content: [{ type: "text", text: JSON.stringify(replay) }],
+        });
+      }
+      const problem = replay as AgentProblemDetails;
+      return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, problem.title, problem);
     }
 
     // RFC-0291: per-IP rate limit (fail-open if no limiter).
@@ -133,44 +169,51 @@ async function handleToolsCall(
       const clientIp = ctx.clientIp ?? "unknown";
       const result = limiter.check(`${capabilityId}:${clientIp}`);
       if (!result.allowed) {
-        return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, "Rate limited.", {
-          retryable: true,
+        const problem = buildAgentProblem("rate-limited", {
           retryAfterSeconds: result.retryAfterSeconds,
         });
+        return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, problem.title, problem);
       }
     }
 
     const validated = validateAgainstCapabilitySchema(capability.input, params.arguments ?? {});
     if (!validated.ok) {
-      return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.INVALID_PARAMS, "Invalid arguments.", {
+      const problem = buildAgentProblem("schema-violation", {
         schemaRef: `/.well-known/agent.openapi.json#/components/schemas/${capabilityId}-input`,
         errors: validated.errors,
       });
+      return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.INVALID_PARAMS, problem.title, problem);
     }
-    const locale =
-      typeof (params.arguments as Record<string, unknown> | undefined)?.locale === "string" &&
-      ctx.manifest.languages.supported.includes((params.arguments as Record<string, string>).locale)
-        ? (params.arguments as Record<string, string>).locale
-        : ctx.manifest.languages.default;
-    const event = buildIntegrationEventFromAction(
+
+    // RFC-1112: shared execution core — preview for sideEffect "none",
+    // dispatch + receipt otherwise.
+    const result = await executeAction({
       capability,
-      validated.value,
-      locale,
-      ctx.ports.now(),
-    );
-    if (ctx.agentIdentity && Object.keys(ctx.agentIdentity).length > 0) {
-      event.payload._agentIdentity = ctx.agentIdentity;
-    }
-    try {
-      const outcome = await ctx.ports.dispatch.send(event);
-      return jsonRpcSuccess(req.id ?? null, {
-        content: [{ type: "text", text: JSON.stringify(outcome) }],
-      });
-    } catch (err) {
-      return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, "Dispatch failed.", {
-        retryable: true,
-        message: err instanceof Error ? err.message : String(err),
-      });
+      manifest: ctx.manifest,
+      ports: ctx.ports,
+      validatedValue: validated.value,
+      agentIdentity: ctx.agentIdentity ?? {},
+      idempotencyKey,
+      bodyHash,
+    });
+    switch (result.kind) {
+      case "receipt":
+        return jsonRpcSuccess(req.id ?? null, {
+          content: [{ type: "text", text: JSON.stringify(result.receipt) }],
+        });
+      case "preview":
+        return jsonRpcSuccess(req.id ?? null, {
+          content: [
+            { type: "text", text: JSON.stringify({ valid: true, draftId: result.draftId }) },
+          ],
+        });
+      case "problem":
+        return jsonRpcError(
+          req.id ?? null,
+          JSON_RPC_ERROR.SERVER_ERROR,
+          result.problem.title,
+          result.problem,
+        );
     }
   }
 

@@ -14,7 +14,10 @@
 
 import { test, expect } from "vitest";
 import { validateAgainstCapabilitySchema, buildIntegrationEventFromAction } from "../actions.ts";
-import type { CapabilityRecord, CapabilityInputOutputSchema } from "@warpgogol/werkstatt-shared/ontology";
+import type {
+  CapabilityRecord,
+  CapabilityInputOutputSchema,
+} from "@warpgogol/werkstatt-shared/ontology";
 
 const schema: CapabilityInputOutputSchema = {
   type: "object",
@@ -125,7 +128,7 @@ test("buildIntegrationEventFromAction: extracts contact fields and keeps full pa
   expect(event.eventId).toMatch(/^[0-9a-f-]{36}$/);
 });
 
-test("buildIntegrationEventFromAction: reuses a client-supplied valid uuid eventId", () => {
+test("buildIntegrationEventFromAction: ignores a client-supplied eventId field", () => {
   const cap = makeCapability();
   const clientId = "11111111-1111-1111-1111-111111111111";
   const event = buildIntegrationEventFromAction(
@@ -134,5 +137,35 @@ test("buildIntegrationEventFromAction: reuses a client-supplied valid uuid event
     "de",
     new Date(),
   );
-  expect(event.eventId).toBe(clientId);
+  // RFC-1112: eventId is never client-controlled — random UUID without a key.
+  expect(event.eventId).not.toBe(clientId);
+  expect(event.eventId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("buildIntegrationEventFromAction: idempotency key derives a deterministic eventId", () => {
+  const cap = makeCapability();
+  const a = buildIntegrationEventFromAction(
+    cap,
+    { message: "hello there!!" },
+    "de",
+    new Date(),
+    "key-1",
+  );
+  const b = buildIntegrationEventFromAction(
+    cap,
+    { message: "hello there!!" },
+    "de",
+    new Date(),
+    "key-1",
+  );
+  const c = buildIntegrationEventFromAction(
+    cap,
+    { message: "hello there!!" },
+    "de",
+    new Date(),
+    "key-2",
+  );
+  expect(a.eventId).toBe(b.eventId);
+  expect(a.eventId).not.toBe(c.eventId);
+  expect(a.eventId).toMatch(/^[0-9a-f-]{36}$/);
 });

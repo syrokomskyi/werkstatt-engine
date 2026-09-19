@@ -16,12 +16,17 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial Astro adapter.</item>
   <item>RFC-0954: add createAgentSearchRoute for semantic search endpoint.</item>
+  <item>RFC-1112: dispatch returns ActionReceipt; wire restRedisReceiptStore when UPSTASH_REDIS_* are configured.</item>
 </CHANGE_SUMMARY>
 */
 
 import type { APIRoute } from "astro";
-import { UPSTASH_QSTASH_TOKEN } from "astro:env/server";
-import { buildQstashPublish } from "@warpgogol/werkstatt-shared/integration";
+import {
+  UPSTASH_QSTASH_TOKEN,
+  UPSTASH_REDIS_REST_URL,
+  UPSTASH_REDIS_REST_TOKEN,
+} from "astro:env/server";
+import { buildQstashPublish, restRedisReceiptStore } from "@warpgogol/werkstatt-shared/integration";
 import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import {
   SEARCH_EMBEDDING_MODEL,
@@ -74,12 +79,29 @@ function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGate
         });
         const res = await fetch(publishRequest);
         if (!res.ok) throw new Error(`QStash publish responded ${res.status}`);
-        return { accepted: true, eventId: event.eventId };
+        // RFC-1112: the adapter stamps submittedAt at publish time; receiptId == eventId.
+        return {
+          receiptId: event.eventId,
+          status: "accepted" as const,
+          duplicate: false,
+          submittedAt: new Date().toISOString(),
+        };
       },
     },
     now: () => new Date(),
     // RFC-0291: 60-second fixed window per capability per IP.
     createRateLimiter: (maxPerWindow) => createFixedWindowLimiter(60, maxPerWindow),
+    // RFC-1112: receipt store over the same EU Redis as the delivery ledger.
+    // Absent when the secrets are not configured — the gate then answers with
+    // X-Agent-Idempotency: disabled.
+    ...(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN
+      ? {
+          idempotency: restRedisReceiptStore({
+            url: UPSTASH_REDIS_REST_URL,
+            token: UPSTASH_REDIS_REST_TOKEN,
+          }),
+        }
+      : {}),
   };
 }
 

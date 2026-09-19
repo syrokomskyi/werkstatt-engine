@@ -16,13 +16,14 @@ import { test, expect } from "vitest";
 import { createAgentGate, type AgentGatePorts, __resetLimiterCache } from "../index.ts";
 import { __resetMcpLimiterCache } from "../mcp/handler.ts";
 import { createFixedWindowLimiter } from "../limits.ts";
-import { buildAgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
+import { buildAgentSurfaceManifest, type ActionReceipt } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 
 const LEAD_SUBMIT: CapabilityRecord = {
   id: "lead.submit",
-  version: 1,
+  version: 2,
   kind: "action",
+  sideEffect: "write",
   title: { de: "Anfrage senden", en: "Submit an inquiry" },
   description: { de: "Übermittelt eine Anfrage.", en: "Delivers an inquiry." },
   input: {
@@ -33,12 +34,45 @@ const LEAD_SUBMIT: CapabilityRecord = {
   },
   output: {
     type: "object",
+    required: ["receiptId", "status", "duplicate", "submittedAt"],
     additionalProperties: false,
-    properties: { accepted: { type: "boolean" }, eventId: { type: "string" } },
+    properties: {
+      receiptId: { type: "string", format: "uuid" },
+      status: { type: "string" },
+      duplicate: { type: "boolean" },
+      submittedAt: { type: "string" },
+    },
   },
   integration: { eventKind: "lead", source: "agent" },
   requires: { entitlements: [], sections: ["send-message"] },
   humanEquivalent: { sectionType: "send-message" },
+  limits: { perMinutePerIp: 10, maxPayloadBytes: 16384 },
+};
+
+/** RFC-1112: side-effect-free preview capability (no integration, no humanEquivalent). */
+const LEAD_PREPARE: CapabilityRecord = {
+  id: "lead.prepare",
+  version: 1,
+  kind: "action",
+  sideEffect: "none",
+  title: { de: "Anfrage prüfen", en: "Preview an inquiry" },
+  description: { de: "Prüft eine Anfrage.", en: "Validates an inquiry." },
+  input: {
+    type: "object",
+    required: ["message"],
+    additionalProperties: false,
+    properties: { message: { type: "string", minLength: 10, maxLength: 4000 } },
+  },
+  output: {
+    type: "object",
+    required: ["valid", "draftId"],
+    additionalProperties: false,
+    properties: {
+      valid: { type: "boolean" },
+      draftId: { type: "string" },
+    },
+  },
+  requires: { entitlements: [], sections: [] },
   limits: { perMinutePerIp: 10, maxPayloadBytes: 16384 },
 };
 
@@ -69,7 +103,14 @@ function makeFakePorts(overrides: Partial<AgentGatePorts> = {}): AgentGatePorts 
     knowledge: {
       read: async (path: string) => (path === "/api/agent/v1/offer.json" ? '{"data":{}}' : null),
     },
-    dispatch: { send: async (event) => ({ accepted: true, eventId: event.eventId }) },
+    dispatch: {
+      send: async (event) => ({
+        receiptId: event.eventId,
+        status: "accepted" as const,
+        duplicate: false,
+        submittedAt: "2026-07-05T00:00:00.000Z",
+      }),
+    },
     now: () => new Date("2026-07-05T00:00:00.000Z"),
     createRateLimiter: (maxPerWindow) => createFixedWindowLimiter(60, maxPerWindow),
     ...overrides,
@@ -100,7 +141,7 @@ test("initialize: returns the pinned protocol version + serverInfo", async () =>
   expect(body.result).toEqual({
     protocolVersion: "2025-06-18",
     capabilities: { tools: {}, resources: {} },
-    serverInfo: { name: "test-bundle agent surface", version: "1.1.0" },
+    serverInfo: { name: "test-bundle agent surface", version: "2.0.0" },
   });
 });
 
@@ -133,7 +174,7 @@ test("tools/call knowledge: returns the file contents as text", async () => {
   expect(body.result).toEqual({ content: [{ type: "text", text: '{"data":{}}' }] });
 });
 
-test("tools/call action: happy path dispatches and returns accepted + eventId", async () => {
+test("tools/call action: happy path dispatches and returns an ActionReceipt", async () => {
   const gate = createAgentGate(makeManifest(true), [LEAD_SUBMIT], makeFakePorts());
   const body = await rpcResult(
     await gate.handleMcp(
@@ -141,9 +182,16 @@ test("tools/call action: happy path dispatches and returns accepted + eventId", 
     ),
   );
   const content = (body.result as { content: Array<{ type: string; text: string }> }).content;
-  const parsed = JSON.parse(content[0]!.text) as { accepted: boolean; eventId: string };
-  expect(parsed.accepted).toBe(true);
-  expect(parsed.eventId).toMatch(/^[0-9a-f-]{36}$/);
+  const parsed = JSON.parse(content[0]!.text) as {
+    receiptId: string;
+    status: string;
+    duplicate: boolean;
+    submittedAt: string;
+  };
+  expect(parsed.status).toBe("accepted");
+  expect(parsed.duplicate).toBe(false);
+  expect(parsed.receiptId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(parsed.submittedAt).toBe("2026-07-05T00:00:00.000Z");
 });
 
 test("tools/call action: invalid arguments return -32602 with field errors", async () => {
@@ -248,7 +296,7 @@ test("GET is rejected with 405", async () => {
 // Direct HTTP action route
 // ---------------------------------------------------------------------------
 
-test("handleAction: happy path returns 200 with the output shape", async () => {
+test("handleAction: happy path returns 200 with an ActionReceipt", async () => {
   const gate = createAgentGate(makeManifest(true), [LEAD_SUBMIT], makeFakePorts());
   const res = await gate.handleAction(
     "lead.submit",
@@ -258,8 +306,15 @@ test("handleAction: happy path returns 200 with the output shape", async () => {
     }),
   );
   expect(res.status).toBe(200);
-  const body = (await res.json()) as { accepted: boolean };
-  expect(body.accepted).toBe(true);
+  const body = (await res.json()) as {
+    receiptId: string;
+    status: string;
+    duplicate: boolean;
+    submittedAt: string;
+  };
+  expect(body.status).toBe("accepted");
+  expect(body.duplicate).toBe(false);
+  expect(body.receiptId).toMatch(/^[0-9a-f-]{36}$/);
 });
 
 test("handleAction: unknown capability id returns 404", async () => {
@@ -274,7 +329,7 @@ test("handleAction: unknown capability id returns 404", async () => {
   expect(res.status).toBe(404);
 });
 
-test("handleAction: schema violation returns 400", async () => {
+test("handleAction: schema violation returns 422 problem+json", async () => {
   const gate = createAgentGate(makeManifest(true), [LEAD_SUBMIT], makeFakePorts());
   const res = await gate.handleAction(
     "lead.submit",
@@ -283,7 +338,12 @@ test("handleAction: schema violation returns 400", async () => {
       body: JSON.stringify({ message: "short" }),
     }),
   );
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(422);
+  expect(res.headers.get("content-type")).toBe("application/problem+json");
+  const body = (await res.json()) as { code: string; retryable: boolean; errors: unknown[] };
+  expect(body.code).toBe("schema-violation");
+  expect(body.retryable).toBe(false);
+  expect(body.errors.length > 0).toBeTruthy();
 });
 
 test("handleAction: oversized payload returns 413", async () => {
@@ -298,7 +358,7 @@ test("handleAction: oversized payload returns 413", async () => {
   expect(res.status).toBe(413);
 });
 
-test("handleAction: dispatch failure returns 502", async () => {
+test("handleAction: dispatch failure returns 502 problem+json", async () => {
   const gate = createAgentGate(
     makeManifest(true),
     [LEAD_SUBMIT],
@@ -318,6 +378,9 @@ test("handleAction: dispatch failure returns 502", async () => {
     }),
   );
   expect(res.status).toBe(502);
+  const body = (await res.json()) as { code: string; retryable: boolean };
+  expect(body.code).toBe("dispatch-failed");
+  expect(body.retryable).toBe(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -345,8 +408,8 @@ test("handleAction: per-IP rate limit returns 429 with Retry-After after exceedi
   const r3 = await gate.handleAction("lead.submit", req());
   expect(r3.status).toBe(429);
   expect(r3.headers.get("Retry-After")).toBeTruthy();
-  const body = (await r3.json()) as { error: string; retryAfterSeconds: number };
-  expect(body.error).toBe("rate-limited");
+  const body = (await r3.json()) as { code: string; retryAfterSeconds: number };
+  expect(body.code).toBe("rate-limited");
   expect(body.retryAfterSeconds).toBeGreaterThan(0);
 });
 
@@ -375,7 +438,12 @@ test("handleAction: identity headers are passed through as payload._agentIdentit
       dispatch: {
         send: async (event) => {
           capturedPayload = event.payload;
-          return { accepted: true, eventId: event.eventId };
+          return {
+            receiptId: event.eventId,
+            status: "accepted" as const,
+            duplicate: false,
+            submittedAt: "2026-07-05T00:00:00.000Z",
+          };
         },
       },
     }),
@@ -408,7 +476,12 @@ test("handleAction: identity headers are capped at 1KB total", async () => {
       dispatch: {
         send: async (event) => {
           capturedPayload = event.payload;
-          return { accepted: true, eventId: event.eventId };
+          return {
+            receiptId: event.eventId,
+            status: "accepted" as const,
+            duplicate: false,
+            submittedAt: "2026-07-05T00:00:00.000Z",
+          };
         },
       },
     }),
@@ -522,4 +595,219 @@ test("tools/call action: MCP path enforces payload size cap", async () => {
   const body = (await res.json()) as { error: { code: number; data: { retryable: boolean } } };
   expect(body.error.code).toBe(-32000);
   expect(body.error.data.retryable).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// RFC-1112: idempotency, receipts, preview capabilities
+// ---------------------------------------------------------------------------
+
+/** In-memory receipt store fake for the idempotency port. */
+function makeMemoryStore() {
+  const map = new Map<string, { receipt: ActionReceipt; bodyHash: string }>();
+  return {
+    map,
+    get: async (key: string) => map.get(key) ?? null,
+    put: async (key: string, bodyHash: string, receipt: ActionReceipt) => {
+      map.set(key, { receipt, bodyHash });
+    },
+  };
+}
+
+test("handleAction: Idempotency-Key replay returns the stored receipt as duplicate", async () => {
+  __resetLimiterCache();
+  const store = makeMemoryStore();
+  let dispatchCount = 0;
+  const gate = createAgentGate(
+    makeManifest(true),
+    [LEAD_SUBMIT],
+    makeFakePorts({
+      idempotency: store,
+      dispatch: {
+        send: async (event) => {
+          dispatchCount += 1;
+          return {
+            receiptId: event.eventId,
+            status: "accepted" as const,
+            duplicate: false,
+            submittedAt: "2026-07-05T00:00:00.000Z",
+          };
+        },
+      },
+    }),
+  );
+  const req = () =>
+    new Request("https://test.example/api/agent/actions/lead.submit", {
+      method: "POST",
+      headers: { "Idempotency-Key": "key-1" },
+      body: JSON.stringify({ message: "hello world!" }),
+    });
+  const r1 = await gate.handleAction("lead.submit", req());
+  expect(r1.status).toBe(200);
+  const first = (await r1.json()) as { receiptId: string; duplicate: boolean };
+  expect(first.duplicate).toBe(false);
+
+  const r2 = await gate.handleAction("lead.submit", req());
+  expect(r2.status).toBe(200);
+  const second = (await r2.json()) as { receiptId: string; status: string; duplicate: boolean };
+  expect(second.receiptId).toBe(first.receiptId);
+  expect(second.status).toBe("duplicate");
+  expect(second.duplicate).toBe(true);
+  expect(dispatchCount).toBe(1);
+});
+
+test("handleAction: same Idempotency-Key with a different body returns 409", async () => {
+  __resetLimiterCache();
+  const store = makeMemoryStore();
+  const gate = createAgentGate(
+    makeManifest(true),
+    [LEAD_SUBMIT],
+    makeFakePorts({ idempotency: store }),
+  );
+  const req = (message: string) =>
+    new Request("https://test.example/api/agent/actions/lead.submit", {
+      method: "POST",
+      headers: { "Idempotency-Key": "key-2" },
+      body: JSON.stringify({ message }),
+    });
+  await gate.handleAction("lead.submit", req("hello world!"));
+  const res = await gate.handleAction("lead.submit", req("a different message"));
+  expect(res.status).toBe(409);
+  const body = (await res.json()) as { code: string; retryable: boolean };
+  expect(body.code).toBe("idempotency-key-reuse");
+  expect(body.retryable).toBe(false);
+});
+
+test("handleAction: Idempotency-Key derives a deterministic eventId", async () => {
+  __resetLimiterCache();
+  const eventIds: string[] = [];
+  const gate = createAgentGate(
+    makeManifest(true),
+    [LEAD_SUBMIT],
+    makeFakePorts({
+      dispatch: {
+        send: async (event) => {
+          eventIds.push(event.eventId);
+          return {
+            receiptId: event.eventId,
+            status: "accepted" as const,
+            duplicate: false,
+            submittedAt: "2026-07-05T00:00:00.000Z",
+          };
+        },
+      },
+    }),
+  );
+  const req = (key: string) =>
+    new Request("https://test.example/api/agent/actions/lead.submit", {
+      method: "POST",
+      headers: { "Idempotency-Key": key },
+      body: JSON.stringify({ message: "hello world!" }),
+    });
+  await gate.handleAction("lead.submit", req("same-key"));
+  await gate.handleAction("lead.submit", req("same-key"));
+  await gate.handleAction("lead.submit", req("other-key"));
+  // No store → each request dispatches, but same key → same eventId.
+  expect(eventIds[0]).toBe(eventIds[1]);
+  expect(eventIds[0]).not.toBe(eventIds[2]);
+  expect(eventIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("handleAction: no idempotency port → X-Agent-Idempotency: disabled", async () => {
+  __resetLimiterCache();
+  const gate = createAgentGate(makeManifest(true), [LEAD_SUBMIT], makeFakePorts());
+  const res = await gate.handleAction(
+    "lead.submit",
+    new Request("https://test.example/api/agent/actions/lead.submit", {
+      method: "POST",
+      headers: { "Idempotency-Key": "key-3" },
+      body: JSON.stringify({ message: "hello world!" }),
+    }),
+  );
+  expect(res.headers.get("X-Agent-Idempotency")).toBe("disabled");
+});
+
+test("handleAction: sideEffect none capability returns a preview draftId without dispatching", async () => {
+  __resetLimiterCache();
+  let dispatched = false;
+  const manifest = buildAgentSurfaceManifest({
+    site: "test-bundle",
+    baseUrl: "https://test.example",
+    languages: { default: "de", supported: ["de", "en"] },
+    knowledge: [],
+    actions: [
+      {
+        id: "lead.prepare",
+        url: "/api/agent/actions/lead.prepare",
+        title: LEAD_PREPARE.title,
+        inputSchemaRef: "#/components/schemas/lead.prepare-input",
+        entitlement: "agent.actions",
+      },
+    ],
+  });
+  const gate = createAgentGate(
+    manifest,
+    [LEAD_PREPARE],
+    makeFakePorts({
+      dispatch: {
+        send: async () => {
+          dispatched = true;
+          throw new Error("must not be called");
+        },
+      },
+    }),
+  );
+  const res = await gate.handleAction(
+    "lead.prepare",
+    new Request("https://test.example/api/agent/actions/lead.prepare", {
+      method: "POST",
+      body: JSON.stringify({ message: "hello world!" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { valid: boolean; draftId: string };
+  expect(body.valid).toBe(true);
+  expect(body.draftId).toMatch(/^sha256:[0-9a-f]{64}$/);
+  expect(dispatched).toBe(false);
+});
+
+test("tools/call action: _meta idempotency key replays via MCP", async () => {
+  __resetMcpLimiterCache();
+  __resetLimiterCache();
+  const store = makeMemoryStore();
+  let dispatchCount = 0;
+  const gate = createAgentGate(
+    makeManifest(true),
+    [LEAD_SUBMIT],
+    makeFakePorts({
+      idempotency: store,
+      dispatch: {
+        send: async (event) => {
+          dispatchCount += 1;
+          return {
+            receiptId: event.eventId,
+            status: "accepted" as const,
+            duplicate: false,
+            submittedAt: "2026-07-05T00:00:00.000Z",
+          };
+        },
+      },
+    }),
+  );
+  const call = () =>
+    rpc("tools/call", {
+      name: "action.lead.submit",
+      arguments: { message: "hello world!" },
+      _meta: { "gogol.dev/idempotencyKey": "mcp-key-1" },
+    });
+  const b1 = await rpcResult(await gate.handleMcp(call()));
+  const c1 = (b1.result as { content: Array<{ text: string }> }).content;
+  const first = JSON.parse(c1[0]!.text) as { receiptId: string; duplicate: boolean };
+  expect(first.duplicate).toBe(false);
+
+  const b2 = await rpcResult(await gate.handleMcp(call()));
+  const c2 = (b2.result as { content: Array<{ text: string }> }).content;
+  const second = JSON.parse(c2[0]!.text) as { receiptId: string; duplicate: boolean };
+  expect(second.receiptId).toBe(first.receiptId);
+  expect(second.duplicate).toBe(true);
+  expect(dispatchCount).toBe(1);
 });

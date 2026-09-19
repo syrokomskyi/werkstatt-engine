@@ -11,6 +11,7 @@ domain (read-only) and one per active action.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial tools projection.</item>
+  <item>RFC-1112: mark sideEffect "none" tools as side-effect-free previews.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -43,9 +44,14 @@ export function buildToolsList(
   for (const ref of manifest.actions) {
     const record = byId.get(ref.id);
     if (!record) continue;
+    const base = record.description[manifest.languages.default] ?? ref.id;
     tools.push({
       name: `action.${ref.id}`,
-      description: record.description[manifest.languages.default] ?? ref.id,
+      // RFC-1112: preview capabilities are marked so agents know nothing is dispatched.
+      description:
+        record.sideEffect === "none"
+          ? `${base} (Side-effect-free preview — validates input and returns a draftId; dispatches nothing.)`
+          : base,
       inputSchema: record.input,
     });
   }
