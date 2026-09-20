@@ -12,12 +12,12 @@ astro-aware caller.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1112: idempotency-key extraction + replay step, problem+json errors, X-Agent-Idempotency marker.</item>
   <item>RFC-1113: MCP-Protocol-Version header ↔ _meta consistency check; UnsupportedProtocolVersionError → HTTP 400.</item>
   <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
   <item>RFC-1114: handleA2a transport boundary — A2A-Version header gate, SendMessage routing.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
-  <history>RFC-0290, RFC-0291</history>
+  <item>RFC-1114: review findings — schema-violation for malformed message, drop unreachable fallback</item>
+  <history>RFC-0290, RFC-0291, RFC-1112</history>
 </CHANGE_SUMMARY>
 */
 
@@ -270,7 +270,8 @@ export function createAgentGate(
       // absent is served as 1.0 (documented deviation: no 0.3 semantics exist).
       const a2aVersion = request.headers.get(A2A_VERSION_HEADER);
       if (!isSupportedA2aVersionHeader(a2aVersion)) {
-        return jsonResponse(a2aVersionNotSupported(body.id ?? null, a2aVersion ?? ""), 400);
+        // Non-null here: isSupportedA2aVersionHeader only rejects a present header.
+        return jsonResponse(a2aVersionNotSupported(body.id ?? null, a2aVersion!), 400);
       }
       const result: JsonRpcResponse = await handleA2aRequest(body, {
         manifest,

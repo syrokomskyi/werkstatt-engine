@@ -18,6 +18,7 @@ boundary in index.ts).
 <CHANGE_SUMMARY>
   <item>RFC-1114: initial A2A SendMessage handler over the shared action pipeline.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
+  <item>RFC-1114: review findings — schema-violation for malformed message, drop unreachable fallback</item>
 </CHANGE_SUMMARY>
 */
 
@@ -27,11 +28,7 @@ import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "../ports.ts";
 import type { RateLimiter } from "../limits.ts";
 import { validateAgainstCapabilitySchema } from "../actions.ts";
-import {
-  checkIdempotencyReplay,
-  executeAction,
-  mcpBodyHash,
-} from "../action-pipeline.ts";
+import { checkIdempotencyReplay, executeAction, mcpBodyHash } from "../action-pipeline.ts";
 import {
   A2A_METHOD_SEND_MESSAGE,
   buildA2aTask,
@@ -100,9 +97,8 @@ async function handleSendMessage(
   // SendMessageConfiguration.blocking is ignored — the server is always synchronous.
 
   if (!isA2aMessage(params.message)) {
-    const problem = buildAgentProblem("invalid-json", {
-      detail:
-        "params.message must be an A2A Message: messageId (string), role \"user\", parts[].",
+    const problem = buildAgentProblem("schema-violation", {
+      detail: 'params.message must be an A2A Message: messageId (string), role "user", parts[].',
     });
     return jsonRpcError(id, JSON_RPC_ERROR.INVALID_PARAMS, problem.title, problem);
   }
@@ -222,9 +218,7 @@ async function handleSendMessage(
           contextId: message.contextId,
           state: "completed",
           timestamp,
-          artifacts: [
-            { name: "receipt", parts: [{ kind: "data", data: result.receipt }] },
-          ],
+          artifacts: [{ name: "receipt", parts: [{ kind: "data", data: result.receipt }] }],
         }),
       );
     case "preview":
@@ -252,9 +246,7 @@ async function handleSendMessage(
           contextId: message.contextId,
           state: "failed",
           timestamp,
-          artifacts: [
-            { name: "problem", parts: [{ kind: "data", data: result.problem }] },
-          ],
+          artifacts: [{ name: "problem", parts: [{ kind: "data", data: result.problem }] }],
         }),
       );
   }
