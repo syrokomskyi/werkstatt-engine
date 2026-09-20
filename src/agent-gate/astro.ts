@@ -19,6 +19,7 @@ public/ assets (works identically in dev and on Cloudflare Workers).
   <item>RFC-1112: dispatch returns ActionReceipt; wire restRedisReceiptStore when UPSTASH_REDIS_* are configured.</item>
   <item>RFC-1114: add createAgentA2aRoute for the A2A endpoint.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
+  <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,14 +38,13 @@ import {
   SEARCH_CHUNK_TEXT_MAX_LENGTH,
   SEARCH_MANIFEST_PATH,
   type SearchQuery,
-  type SearchResponse,
-  type SearchResult,
   type SearchChunk,
   type SearchManifest,
 } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, type AgentGatePorts } from "./index.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
+import { runAgentSearch } from "./search-route.ts";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -284,31 +284,13 @@ export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
         );
       }
 
-      const chunkById = new Map<string, SearchChunk>(searchManifest.chunks.map((c) => [c.id, c]));
-
       try {
-        const embeddingResult = await env.AI.run(SEARCH_EMBEDDING_MODEL, {
-          text: [query.q],
+        // RFC-1115: core lives in search-route.ts — flattened citation shape,
+        // measured tookMs, no astro imports (vitest-loadable).
+        const response = await runAgentSearch(query, searchManifest, {
+          ai: env.AI,
+          searchIndex: env.SEARCH_INDEX,
         });
-        const queryVector = embeddingResult.data[0];
-
-        const vectorizeResult = await env.SEARCH_INDEX.query(queryVector, {
-          topK: query.topK ?? SEARCH_DEFAULT_TOP_K,
-          returnMetadata: "all",
-        });
-
-        const results: SearchResult[] = [];
-        for (const match of vectorizeResult.matches ?? []) {
-          const chunk = chunkById.get(match.id);
-          if (!chunk) continue;
-          results.push({ chunk, score: match.score });
-        }
-
-        const response: SearchResponse = {
-          query: query.q,
-          results,
-          tookMs: 0,
-        };
 
         return withCors(
           new Response(JSON.stringify(response), {

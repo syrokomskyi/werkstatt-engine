@@ -12,10 +12,12 @@ domain (read-only) and one per active action.
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial tools projection.</item>
   <item>RFC-1112: mark sideEffect "none" tools as side-effect-free previews.</item>
+  <item>RFC-1115: render agentGuidance into multi-sentence tool descriptions via renderAgentGuidanceDescription.</item>
 </CHANGE_SUMMARY>
 */
 
 import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
+import { renderAgentGuidanceDescription } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 
 export interface McpTool {
@@ -45,13 +47,16 @@ export function buildToolsList(
     const record = byId.get(ref.id);
     if (!record) continue;
     const base = record.description[manifest.languages.default] ?? ref.id;
+    // RFC-1115: agentGuidance composes a model-oriented multi-sentence
+    // description; absent guidance keeps the RFC-1112 fallback.
+    const description = record.agentGuidance
+      ? renderAgentGuidanceDescription(base, record.agentGuidance)
+      : record.sideEffect === "none"
+        ? `${base} (Side-effect-free preview — validates input and returns a draftId; dispatches nothing.)`
+        : base;
     tools.push({
       name: `action.${ref.id}`,
-      // RFC-1112: preview capabilities are marked so agents know nothing is dispatched.
-      description:
-        record.sideEffect === "none"
-          ? `${base} (Side-effect-free preview — validates input and returns a draftId; dispatches nothing.)`
-          : base,
+      description,
       inputSchema: record.input,
     });
   }
