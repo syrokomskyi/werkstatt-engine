@@ -45,6 +45,7 @@ import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, type AgentGatePorts } from "./index.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 import { runAgentSearch } from "./search-route.ts";
+import { runAgentHealth } from "./health-route.ts";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -416,6 +417,39 @@ export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
       );
     },
 
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RFC-1116: Agent surface health route
+// ---------------------------------------------------------------------------
+
+/**
+ * Factory the generated apps/<site>/src/pages/api/agent/health.ts calls.
+ * Core lives in health-route.ts (vitest-loadable); this adapter only resolves
+ * env + the QStash token and wraps the response in CORS headers.
+ */
+export function createAgentHealthRoute(manifest: AgentSurfaceManifest): {
+  GET: APIRoute;
+  OPTIONS: APIRoute;
+} {
+  return {
+    GET: async ({ request }) => {
+      const env = await resolveSearchEnv();
+      const { status, body } = await runAgentHealth(manifest, {
+        requestUrl: request.url,
+        fetchFn: fetch,
+        env,
+        qstashToken: UPSTASH_QSTASH_TOKEN,
+      });
+      return withCors(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    },
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }

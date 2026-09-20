@@ -34,6 +34,7 @@ import type {
   PropagationResult,
 } from "@warpgogol/werkstatt-engine/schemas";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import type { AgentContractCheckResult } from "@warpgogol/werkstatt-shared/agent";
 import {
   verifyFreshness,
   runMissionCheckWithResilience,
@@ -115,6 +116,8 @@ export interface DeployExecutionResult {
   healthState: "healthy" | "unhealthy" | "unknown";
   healthChecks: HealthCheck[];
   featureSmokeCheck?: FeatureSmokeCheckResult;
+  /** RFC-1116: external agent-surface contract check result — evidence, non-fatal. */
+  agentContractCheck?: AgentContractCheckResult;
   effectRecord: DeploymentEffectRecordV1;
   bordbuchCommitted: boolean;
   systemStateUpdated: boolean;
@@ -292,6 +295,7 @@ export async function executeDeployPhases(
   let failingPhase: string | undefined;
   let releaseSignResult: DeployExecutionResult["releaseSignResult"];
   let featureSmokeCheck: FeatureSmokeCheckResult | undefined;
+  let agentContractCheck: AgentContractCheckResult | undefined;
 
   const gate =
     channel === "dev" ? "dev-deploy" : channel === "alt" ? "propagate-alt" : "promote-main";
@@ -515,6 +519,20 @@ export async function executeDeployPhases(
       // Non-fatal — search index warm-up is best-effort
     }
 
+    // RFC-1116: External agent-surface contract check — non-fatal, recorded as
+    // deploy evidence; certification consumes the result like other smoke data.
+    try {
+      const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+      const contractResult = (await executeKernelCommand({
+        workspaceRoot: ctx.workspaceRoot,
+        commandName: "agent.surface.contract.check",
+        argv: [`--url=${actualDeploymentUrl}`],
+      })) as { data?: AgentContractCheckResult };
+      agentContractCheck = contractResult.data;
+    } catch {
+      // Non-fatal — contract check is best-effort evidence
+    }
+
     if (channel === "dev" && ctx.missionId && ctx.commitSha) {
       try {
         const missionResult = await runMissionCheckWithResilience(
@@ -669,6 +687,7 @@ export async function executeDeployPhases(
       healthState,
       healthChecks,
       featureSmokeCheck,
+      agentContractCheck,
       effectRecord: finalEffectRecord,
       bordbuchCommitted,
       systemStateUpdated,
@@ -705,6 +724,7 @@ export async function executeDeployPhases(
       healthState,
       healthChecks,
       featureSmokeCheck,
+      agentContractCheck,
       effectRecord: failedEffectRecord,
       bordbuchCommitted,
       systemStateUpdated,
