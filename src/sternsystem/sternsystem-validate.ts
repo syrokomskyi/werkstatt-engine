@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0902: add STERN-ID-TLD rule rejecting IDs ending in a known TLD suffix.</item>
   <item>RFC-0966: add PASSPORT-01 (missing passport), PASSPORT-02 (invalid signature), PASSPORT-03 (resource drift) rules.</item>
   <item>RFC-0968: add HANDOVER-01/02/03/04/05 rules for sternsystem handover protocol.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870</history>
+  <item>ADR-0082: extend generated.drift.validate coverage to cache clones</item>
+  <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902</history>
 </CHANGE_SUMMARY>
 */
 
@@ -502,6 +502,41 @@ export async function runSternsystemValidate(
     // RFC-0870: Manifest presence check — committed generated manifests must exist in cache clone HEAD
     const manifestViolations = checkManifestPresence(cacheDir, entry.id);
     violations.push(...manifestViolations);
+
+    // ADR-0082: cache-clone generated drift — committed generated files in the
+    // cache clone are drift-checked via generated.drift.validate --target=cache-clone.
+    // Emitted as warnings: pre-existing drift needs a one-time cleanup pass
+    // before this check can go blocking (see ADR consequences).
+    if (existsSync(cacheDir)) {
+      try {
+        const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+        const driftReport = (await executeKernelCommand({
+          workspaceRoot,
+          commandName: "generated.drift.validate",
+          argv: [`--site=${entry.id}`, "--target=cache-clone"],
+          outputFormat: "json",
+        })) as {
+          data?: {
+            diagnostics?: Array<{
+              ruleId?: string;
+              file?: string;
+              message?: string;
+            }>;
+          };
+        };
+        const driftDiagnostics = driftReport?.data?.diagnostics ?? [];
+        for (const diag of driftDiagnostics) {
+          warnings.push({
+            systemId: entry.id,
+            field: diag.ruleId ?? "DRIFT",
+            message:
+              diag.message ?? `cache clone generated drift in ${diag.file ?? "unknown file"}`,
+          });
+        }
+      } catch {
+        // Non-fatal — drift check skipped (site plugin or generators unavailable)
+      }
+    }
 
     // RFC-0822: ENV-PERSIST-01 warning — cache clone lacks .env* but workpiece has them
     try {
