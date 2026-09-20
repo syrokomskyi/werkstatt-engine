@@ -422,6 +422,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - `persistEnvFilesToCacheClone(workpieceDir, cacheCloneDir)` (RFC-0822): copies `.env*` files from workpiece to cache clone (untracked). Excludes `.env.example` and `.env.*.example`. Used by `mission.close` as a final step. Non-fatal on failure.
 - `restoreEnvFilesFromCacheClone(cacheCloneDir, workpieceDir)` (RFC-0822): restores `.env*` files from cache clone to workpiece after `atomicMoveDir`. Replaces `PUBLIC_IMAGE_PROVIDER` with `build-portable`. Used by `mission.materialize`. Non-fatal on failure.
 - `sternsystem.validate` emits `ENV-PERSIST-01` warning when cache clone lacks `.env*` but active workpiece has them.
+- `sternsystem.validate` emits non-blocking `DRIFT-01`/`DRIFT-02` warnings (ADR-0082) by invoking `generated.drift.validate --site <id> --target=cache-clone` via `executeKernelCommand` per system — committed generated files in the cache clone are re-rendered via generator dryRun and compared against disk. Warnings (not violations) until a one-time cleanup pass clears pre-existing drift.
 
 ## Operator config file persistence (RFC-0840)
 
