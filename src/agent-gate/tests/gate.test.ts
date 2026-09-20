@@ -1,14 +1,16 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0290: the conformance corpus — golden request/response pairs replayed through createAgentGate with fake ports. Fixtures were written from the pinned MCP spec (2025-06-18) before the handler; the handler must satisfy them.</purpose>
-<keywords>RFC-0290, RFC-0291, agent surface, gate, MCP, conformance, test</keywords>
+<purpose>RFC-0290: the conformance corpus — golden request/response pairs replayed through createAgentGate with fake ports. Fixtures were written from the pinned MCP spec before the handler; the handler must satisfy them. RFC-1113: the corpus speaks the 2026-07-28 stateless era — every request carries _meta["io.modelcontextprotocol/protocolVersion"].</purpose>
+<keywords>RFC-0290, RFC-0291, RFC-1113, agent surface, gate, MCP, conformance, test</keywords>
 </MODULE_CONTRACT>
 <MODULE_MAP>
-  <entry key="tests">initialize, ping, tools/list, tools/call (knowledge+action+errors), resources/*, method-not-found, batch rejection, GET 405, HTTP action route, rate limiting (429), identity passthrough, freshness _meta, MCP size cap.</entry>
+  <entry key="tests">server/discover, initialize rejection, per-request version gate, header consistency, ping, tools/list, tools/call (knowledge+action+errors), resources/*, method-not-found, batch rejection, GET 405, HTTP action route, rate limiting (429), identity passthrough, freshness _meta, MCP size cap.</entry>
 </MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial conformance corpus.</item>
   <item>RFC-0291: add rate limiting, identity, freshness, MCP size cap tests.</item>
+  <item>RFC-1113: 2026-07-28 stateless era — _meta version on every request, server/discover, initialize → UnsupportedProtocolVersionError, header consistency.</item>
+  <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
 </CHANGE_SUMMARY>
 */
 
@@ -78,6 +80,7 @@ const LEAD_PREPARE: CapabilityRecord = {
 
 function makeManifest(withAction: boolean) {
   return buildAgentSurfaceManifest({
+    generatedAt: "2026-01-01T00:00:00.000Z",
     site: "test-bundle",
     baseUrl: "https://test.example",
     languages: { default: "de", supported: ["de", "en"] },
@@ -117,11 +120,25 @@ function makeFakePorts(overrides: Partial<AgentGatePorts> = {}): AgentGatePorts 
   };
 }
 
+/** RFC-1113: the _meta key + version every modern request declares. */
+const PROTOCOL_VERSION_META = { "io.modelcontextprotocol/protocolVersion": "2026-07-28" };
+
 function rpc(method: string, params?: unknown, id: string | number = 1) {
+  const p = (params ?? {}) as Record<string, unknown>;
+  const meta = { ...PROTOCOL_VERSION_META, ...((p._meta as Record<string, unknown>) ?? {}) };
   return new Request("https://test.example/api/agent/mcp", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) }),
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params: { ...p, _meta: meta } }),
+  });
+}
+
+/** Raw request without the injected _meta version — for version-gate tests. */
+function rawRpc(body: unknown, headers: Record<string, string> = {}) {
+  return new Request("https://test.example/api/agent/mcp", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body),
   });
 }
 
@@ -134,15 +151,113 @@ async function rpcResult(res: Response) {
   return body;
 }
 
-test("initialize: returns the pinned protocol version + serverInfo", async () => {
+test("server/discover: returns supportedVersions + capabilities + serverInfo", async () => {
   const manifest = makeManifest(false);
   const gate = createAgentGate(manifest, [], makeFakePorts());
-  const body = await rpcResult(await gate.handleMcp(rpc("initialize")));
+  const body = await rpcResult(await gate.handleMcp(rpc("server/discover")));
   expect(body.result).toEqual({
-    protocolVersion: "2025-06-18",
+    resultType: "complete",
+    supportedVersions: ["2026-07-28"],
     capabilities: { tools: {}, resources: {} },
-    serverInfo: { name: "test-bundle agent surface", version: "2.0.0" },
+    _meta: {
+      "io.modelcontextprotocol/serverInfo": {
+        name: "test-bundle agent surface",
+        version: "2.0.0",
+      },
+    },
   });
+});
+
+test("server/discover: answers even without a declared protocol version", async () => {
+  const gate = createAgentGate(makeManifest(false), [], makeFakePorts());
+  const res = await gate.handleMcp(rawRpc({ jsonrpc: "2.0", id: 1, method: "server/discover" }));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { result: { supportedVersions: string[] } };
+  expect(body.result.supportedVersions).toEqual(["2026-07-28"]);
+});
+
+test("initialize: legacy handshake returns UnsupportedProtocolVersionError naming supported versions", async () => {
+  const manifest = makeManifest(false);
+  const gate = createAgentGate(manifest, [], makeFakePorts());
+  const res = await gate.handleMcp(
+    rawRpc({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-06-18" },
+    }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as {
+    error: { code: number; data: { supported: string[]; requested: string } };
+  };
+  expect(body.error.code).toBe(-32022);
+  expect(body.error.data.supported).toEqual(["2026-07-28"]);
+  expect(body.error.data.requested).toBe("2025-06-18");
+});
+
+test("version gate: missing _meta protocol version → -32022 + HTTP 400", async () => {
+  const gate = createAgentGate(makeManifest(false), [], makeFakePorts());
+  const res = await gate.handleMcp(rawRpc({ jsonrpc: "2.0", id: 1, method: "ping", params: {} }));
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as {
+    error: { code: number; data: { supported: string[]; requested: null } };
+  };
+  expect(body.error.code).toBe(-32022);
+  expect(body.error.data.supported).toEqual(["2026-07-28"]);
+  expect(body.error.data.requested).toBeNull();
+});
+
+test("version gate: unsupported _meta protocol version → -32022 + HTTP 400", async () => {
+  const gate = createAgentGate(makeManifest(false), [], makeFakePorts());
+  const res = await gate.handleMcp(
+    rawRpc({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+      params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2025-11-25" } },
+    }),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as {
+    error: { code: number; data: { supported: string[]; requested: string } };
+  };
+  expect(body.error.code).toBe(-32022);
+  expect(body.error.data.requested).toBe("2025-11-25");
+});
+
+test("version gate: MCP-Protocol-Version header matching _meta → request proceeds", async () => {
+  const gate = createAgentGate(makeManifest(false), [], makeFakePorts());
+  const res = await gate.handleMcp(
+    rawRpc(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ping",
+        params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } },
+      },
+      { "MCP-Protocol-Version": "2026-07-28" },
+    ),
+  );
+  expect(res.status).toBe(200);
+});
+
+test("version gate: MCP-Protocol-Version header mismatching _meta → 400", async () => {
+  const gate = createAgentGate(makeManifest(false), [], makeFakePorts());
+  const res = await gate.handleMcp(
+    rawRpc(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ping",
+        params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } },
+      },
+      { "MCP-Protocol-Version": "2025-11-25" },
+    ),
+  );
+  expect(res.status).toBe(400);
+  const body = (await res.json()) as { error: { code: number } };
+  expect(body.error.code).toBe(-32600);
 });
 
 test("ping: returns an empty object", async () => {
@@ -570,7 +685,11 @@ test("tools/call action: MCP path enforces per-IP rate limit", async () => {
         jsonrpc: "2.0",
         id: 1,
         method: "tools/call",
-        params: { name: "action.lead.submit", arguments: { message: "hello world!" } },
+        params: {
+          name: "action.lead.submit",
+          arguments: { message: "hello world!" },
+          _meta: PROTOCOL_VERSION_META,
+        },
       }),
     });
   expect((await gate.handleMcp(req("1.1.1.1"))).status).toBe(200);
@@ -730,6 +849,7 @@ test("handleAction: sideEffect none capability returns a preview draftId without
   __resetLimiterCache();
   let dispatched = false;
   const manifest = buildAgentSurfaceManifest({
+    generatedAt: "2026-01-01T00:00:00.000Z",
     site: "test-bundle",
     baseUrl: "https://test.example",
     languages: { default: "de", supported: ["de", "en"] },

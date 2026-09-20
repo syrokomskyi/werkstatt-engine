@@ -15,6 +15,8 @@ astro-aware caller.
   <item>RFC-0290: initial gate factory.</item>
   <item>RFC-0291: add per-IP rate limiting, identity header passthrough, MCP size cap.</item>
   <item>RFC-1112: idempotency-key extraction + replay step, problem+json errors, X-Agent-Idempotency marker.</item>
+  <item>RFC-1113: MCP-Protocol-Version header ↔ _meta consistency check; UnsupportedProtocolVersionError → HTTP 400.</item>
+  <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,7 +28,9 @@ import { handleJsonRpcRequest } from "./mcp/handler.ts";
 import {
   isJsonRpcRequest,
   jsonRpcError,
+  readRequestProtocolVersion,
   JSON_RPC_ERROR,
+  MCP_PROTOCOL_VERSION_HEADER,
   type JsonRpcResponse,
 } from "./mcp/protocol.ts";
 import {
@@ -148,6 +152,21 @@ export function createAgentGate(
           jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Invalid JSON-RPC 2.0 request."),
         );
       }
+      // RFC-1113 / MCP 2026-07-28: on Streamable HTTP the MCP-Protocol-Version
+      // header MUST match _meta["io.modelcontextprotocol/protocolVersion"];
+      // a mismatch is a 400 Bad Request.
+      const headerVersion = request.headers.get(MCP_PROTOCOL_VERSION_HEADER);
+      const metaVersion = readRequestProtocolVersion(body);
+      if (headerVersion !== null && metaVersion !== undefined && headerVersion !== metaVersion) {
+        return jsonResponse(
+          jsonRpcError(
+            body.id ?? null,
+            JSON_RPC_ERROR.INVALID_REQUEST,
+            `${MCP_PROTOCOL_VERSION_HEADER} header does not match the _meta protocol version.`,
+          ),
+          400,
+        );
+      }
       const result: JsonRpcResponse = await handleJsonRpcRequest(body, {
         manifest,
         catalog,
@@ -155,7 +174,13 @@ export function createAgentGate(
         agentIdentity: extractAgentIdentity(request),
         clientIp: extractClientIp(request),
       });
-      return jsonResponse(result);
+      // RFC-1113: the 2026-07-28 schema requires UnsupportedProtocolVersionError
+      // to be served with HTTP 400 on the HTTP transport.
+      const status =
+        "error" in result && result.error.code === JSON_RPC_ERROR.UNSUPPORTED_PROTOCOL_VERSION
+          ? 400
+          : 200;
+      return jsonResponse(result, status);
     },
 
     async handleAction(capabilityId: string, request: Request): Promise<Response> {

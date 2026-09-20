@@ -2,9 +2,13 @@
 <MODULE_CONTRACT>
 <purpose>
 RFC-0290: the JSON-RPC method router for the stateless MCP subset. Handles
-exactly: initialize, ping, tools/list, tools/call, resources/list,
+exactly: server/discover, ping, tools/list, tools/call, resources/list,
 resources/read. Everything else is method-not-found (batching is rejected
 one level up, at the transport boundary in index.ts).
+RFC-1113: the 2026-07-28 stateless era — every request except server/discover
+must declare _meta["io.modelcontextprotocol/protocolVersion"] from
+SUPPORTED_MCP_PROTOCOL_VERSIONS; the legacy initialize handshake returns
+UnsupportedProtocolVersionError naming the supported list.
 </purpose>
 <non-goals>
   <item>Do not implement prompts/sampling/logging/notifications — out of the pinned subset.</item>
@@ -15,6 +19,8 @@ one level up, at the transport boundary in index.ts).
   <item>RFC-0290: initial MCP method handler.</item>
   <item>RFC-0291: add rate limiting, size cap, identity passthrough, freshness _meta.</item>
   <item>RFC-1112: idempotency via params._meta, shared executeAction core, problem-details in error.data.</item>
+  <item>RFC-1113: server/discover + per-request protocol-version gate; initialize → UnsupportedProtocolVersionError.</item>
+  <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
 </CHANGE_SUMMARY>
 */
 
@@ -32,10 +38,12 @@ import {
 import { buildAgentProblem, type AgentProblemDetails } from "@warpgogol/werkstatt-shared/agent";
 import { buildToolsList } from "./tools.ts";
 import {
-  PINNED_MCP_PROTOCOL_VERSION,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
   JSON_RPC_ERROR,
   jsonRpcError,
   jsonRpcSuccess,
+  readRequestProtocolVersion,
+  unsupportedProtocolVersion,
   type JsonRpcRequest,
   type JsonRpcResponse,
 } from "./protocol.ts";
@@ -258,22 +266,52 @@ async function handleResourcesRead(
   });
 }
 
-/** Route one JSON-RPC request to its handler. The transport boundary (index.ts) owns batching/HTTP-method rejection. */
+/** Route one JSON-RPC request to its handler. The transport boundary (index.ts) owns batching/HTTP-method rejection and the MCP-Protocol-Version header consistency check. */
 export async function handleJsonRpcRequest(
   req: JsonRpcRequest,
   ctx: McpHandlerContext,
 ): Promise<JsonRpcResponse> {
   const id = req.id ?? null;
-  switch (req.method) {
-    case "initialize":
-      return jsonRpcSuccess(id, {
-        protocolVersion: PINNED_MCP_PROTOCOL_VERSION,
-        capabilities: { tools: {}, resources: {} },
-        serverInfo: {
+
+  // RFC-1113: server/discover is the version-negotiation recovery path — it
+  // answers unconditionally so a client holding an unsupported version can
+  // still learn SUPPORTED_MCP_PROTOCOL_VERSIONS (spec: servers MUST implement it).
+  if (req.method === "server/discover") {
+    return jsonRpcSuccess(id, {
+      resultType: "complete",
+      supportedVersions: [...SUPPORTED_MCP_PROTOCOL_VERSIONS],
+      capabilities: { tools: {}, resources: {} },
+      _meta: {
+        "io.modelcontextprotocol/serverInfo": {
           name: `${ctx.manifest.site} agent surface`,
           version: ctx.manifest.surfaceVersion,
         },
-      });
+      },
+    });
+  }
+
+  // RFC-1113: initialize is the legacy-era handshake — a modern-only server
+  // answers with the spec-defined error naming the supported versions.
+  if (req.method === "initialize") {
+    const params = (req.params ?? {}) as { protocolVersion?: unknown };
+    return unsupportedProtocolVersion(
+      id,
+      params.protocolVersion ?? readRequestProtocolVersion(req),
+    );
+  }
+
+  // RFC-1113: per-request version gate — every other method must declare a
+  // supported version in params._meta["io.modelcontextprotocol/protocolVersion"].
+  // Absent or unsupported → UnsupportedProtocolVersionError (HTTP 400 upstream).
+  const requestedVersion = readRequestProtocolVersion(req);
+  if (
+    requestedVersion === undefined ||
+    !(SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]).includes(requestedVersion)
+  ) {
+    return unsupportedProtocolVersion(id, requestedVersion);
+  }
+
+  switch (req.method) {
     case "ping":
       return jsonRpcSuccess(id, {});
     case "tools/list":
