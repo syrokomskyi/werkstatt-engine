@@ -194,9 +194,10 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 
 ### Agent Gate (RFC-0286, RFC-0954, RFC-1113)
 
-- `packages/werkstatt-engine/src/agent-gate/astro.ts` owns the Astro API route factories for the agent surface: `createAgentMcpRoute` (MCP endpoint), `createAgentActionRoute` (action dispatch), and `createAgentSearchRoute` (semantic search).
+- `packages/werkstatt-engine/src/agent-gate/astro.ts` owns the Astro API route factories for the agent surface: `createAgentMcpRoute` (MCP endpoint), `createAgentActionRoute` (action dispatch), `createAgentSearchRoute` (semantic search), and `createAgentHealthRoute` (health, RFC-1116).
 - RFC-1113: the MCP endpoint speaks the **2026-07-28 stateless era** only. `SUPPORTED_MCP_PROTOCOL_VERSIONS` in `src/agent-gate/mcp/protocol.ts` is the single source of truth (`["2026-07-28"]`). Every request except `server/discover` must declare `_meta["io.modelcontextprotocol/protocolVersion"]` from the supported list — absent or unsupported versions get `UnsupportedProtocolVersionError` (-32022, HTTP 400). The legacy `initialize` handshake returns the same error naming the supported list. On Streamable HTTP the `MCP-Protocol-Version` header must match the `_meta` version (mismatch → 400). Upgrading = extend the list + regenerate fixtures.
 - `createAgentSearchRoute(manifest)` (RFC-0954) returns `{ GET, POST, OPTIONS }` — handles search queries (GET/POST) and reindex (POST with `x-search-reindex-token` header). Uses `env.AI.run("@cf/baai/bge-m3", ...)` for embeddings and `env.SEARCH_INDEX` (Vectorize) for vector storage. Returns 503 if bindings missing, 502 if embedding fails, 500 if Vectorize query fails. Respects `ACCESS_PIN` middleware for access-protected channels.
+- `createAgentHealthRoute(manifest)` (RFC-1116) returns `{ GET, OPTIONS }` — reports `AgentHealth` (`status`, `surfaceVersion`, `contentHash` self-fetched from `/.well-known/build-identity.json`, `checks` for manifest/knowledge/dispatch/search). 200 when ok, 503 when degraded (manifest or declared knowledge unreachable, `UPSTASH_QSTASH_TOKEN` absent, or advertised search bindings missing). Core logic lives in `src/agent-gate/health-route.ts` (`runAgentHealth`, vitest-loadable — no astro imports); the adapter only resolves env + token.
 
 ### Canonical JSON identity bytes (RFC-0849)
 
