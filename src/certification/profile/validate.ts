@@ -10,7 +10,6 @@
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>ADR-0083: CERT-PROFILE-02 is test-only — leitstand.certify uses astroCertificationProfile directly and never builds ctx.profileId from a site forge.yaml. If wired to a live command, sites need profile: site or a site default.</item>
-  <item>ADR-0083: add code mention</item>
 </CHANGE_SUMMARY>
 */
 

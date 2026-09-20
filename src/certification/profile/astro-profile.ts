@@ -9,7 +9,6 @@
 <CHANGE_SUMMARY>
   <item>RFC-0865: initial minimal Astro certification profile.</item>
   <item>ADR-0083: profileId "site" is a logical id — no profiles/site.yaml; CERT-PROFILE-02 stays test-only until wired to a live command.</item>
-  <item>ADR-0083: add code mention</item>
 </CHANGE_SUMMARY>
 */
 
