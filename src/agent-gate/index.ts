@@ -12,11 +12,12 @@ astro-aware caller.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0290: initial gate factory.</item>
-  <item>RFC-0291: add per-IP rate limiting, identity header passthrough, MCP size cap.</item>
   <item>RFC-1112: idempotency-key extraction + replay step, problem+json errors, X-Agent-Idempotency marker.</item>
   <item>RFC-1113: MCP-Protocol-Version header ↔ _meta consistency check; UnsupportedProtocolVersionError → HTTP 400.</item>
   <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
+  <item>RFC-1114: handleA2a transport boundary — A2A-Version header gate, SendMessage routing.</item>
+  <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
+  <history>RFC-0290, RFC-0291</history>
 </CHANGE_SUMMARY>
 */
 
@@ -25,6 +26,12 @@ import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "./ports.ts";
 import type { RateLimiter } from "./limits.ts";
 import { handleJsonRpcRequest } from "./mcp/handler.ts";
+import { handleA2aRequest } from "./a2a/handler.ts";
+import {
+  A2A_VERSION_HEADER,
+  a2aVersionNotSupported,
+  isSupportedA2aVersionHeader,
+} from "./a2a/protocol.ts";
 import {
   isJsonRpcRequest,
   jsonRpcError,
@@ -54,6 +61,8 @@ export * from "./mcp/protocol.ts";
 export * from "./mcp/tools.ts";
 export * from "./limits.ts";
 export type { McpHandlerContext } from "./mcp/handler.ts";
+export type { A2aHandlerContext } from "./a2a/handler.ts";
+export * from "./a2a/protocol.ts";
 export type { ActionContext, StepResult } from "./action-pipeline.ts";
 
 /**
@@ -123,6 +132,7 @@ function jsonResponse(
 export interface AgentGate {
   handleMcp(request: Request): Promise<Response>;
   handleAction(capabilityId: string, request: Request): Promise<Response>;
+  handleA2a(request: Request): Promise<Response>;
 }
 
 /** Construct the gate for one site from its manifest + active capability records + ports. */
@@ -231,6 +241,46 @@ export function createAgentGate(
       response ??= problemResponse(
         buildAgentProblem("dispatch-failed", { detail: "Pipeline completed without a result." }),
       );
+      // RFC-1112: mark responses when no receipt store is configured.
+      if (!ports.idempotency) response.headers.set("X-Agent-Idempotency", "disabled");
+      return response;
+    },
+
+    async handleA2a(request: Request): Promise<Response> {
+      if (request.method !== "POST") {
+        return new Response(null, { status: 405, headers: { Allow: "POST" } });
+      }
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse(jsonRpcError(null, JSON_RPC_ERROR.PARSE_ERROR, "Invalid JSON."));
+      }
+      if (Array.isArray(body)) {
+        return jsonResponse(
+          jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Batch requests are not supported."),
+        );
+      }
+      if (!isJsonRpcRequest(body)) {
+        return jsonResponse(
+          jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Invalid JSON-RPC 2.0 request."),
+        );
+      }
+      // RFC-1114: A2A-Version header gate — a present header must match 1.x;
+      // absent is served as 1.0 (documented deviation: no 0.3 semantics exist).
+      const a2aVersion = request.headers.get(A2A_VERSION_HEADER);
+      if (!isSupportedA2aVersionHeader(a2aVersion)) {
+        return jsonResponse(a2aVersionNotSupported(body.id ?? null, a2aVersion ?? ""), 400);
+      }
+      const result: JsonRpcResponse = await handleA2aRequest(body, {
+        manifest,
+        catalog,
+        ports,
+        agentIdentity: extractAgentIdentity(request),
+        clientIp: extractClientIp(request),
+        idempotencyKey: extractIdempotencyKey(request),
+      });
+      const response = jsonResponse(result);
       // RFC-1112: mark responses when no receipt store is configured.
       if (!ports.idempotency) response.headers.set("X-Agent-Idempotency", "disabled");
       return response;

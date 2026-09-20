@@ -17,6 +17,8 @@ public/ assets (works identically in dev and on Cloudflare Workers).
   <item>RFC-0290: initial Astro adapter.</item>
   <item>RFC-0954: add createAgentSearchRoute for semantic search endpoint.</item>
   <item>RFC-1112: dispatch returns ActionReceipt; wire restRedisReceiptStore when UPSTASH_REDIS_* are configured.</item>
+  <item>RFC-1114: add createAgentA2aRoute for the A2A endpoint.</item>
+  <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
 </CHANGE_SUMMARY>
 */
 
@@ -115,6 +117,21 @@ export function createAgentMcpRoute(
     POST: async ({ request }) => {
       const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
       return withCors(await gate.handleMcp(request));
+    },
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
+  };
+}
+
+/** Factory the generated apps/<site>/src/pages/api/agent/a2a.ts calls (RFC-1114). */
+export function createAgentA2aRoute(
+  manifest: AgentSurfaceManifest,
+  catalog: CapabilityRecord[],
+): { GET: APIRoute; POST: APIRoute; OPTIONS: APIRoute } {
+  return {
+    GET: async () => withCors(new Response(null, { status: 405, headers: { Allow: "POST" } })),
+    POST: async ({ request }) => {
+      const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
+      return withCors(await gate.handleA2a(request));
     },
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
