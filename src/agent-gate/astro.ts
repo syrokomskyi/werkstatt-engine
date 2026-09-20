@@ -20,6 +20,7 @@ public/ assets (works identically in dev and on Cloudflare Workers).
   <item>RFC-1114: add createAgentA2aRoute for the A2A endpoint.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
+  <item>RFC-1112/1113/1114 gap fix: CORS Allow-Headers gains Idempotency-Key, MCP-Protocol-Version, A2A-Version; Expose-Headers gains X-Agent-Idempotency.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -50,8 +51,11 @@ import { runAgentHealth } from "./health-route.ts";
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  // RFC-1112/1113/1114: browser agents must be allowed to send the protocol
+  // headers — Idempotency-Key (actions), MCP-Protocol-Version (MCP), A2A-Version.
   "Access-Control-Allow-Headers":
-    "Content-Type, Signature-Agent, Signature, User-Agent, x-search-reindex-token",
+    "Content-Type, Signature-Agent, Signature, User-Agent, x-search-reindex-token, Idempotency-Key, MCP-Protocol-Version, A2A-Version",
+  "Access-Control-Expose-Headers": "X-Agent-Idempotency",
   "Access-Control-Max-Age": "86400",
 };
 
