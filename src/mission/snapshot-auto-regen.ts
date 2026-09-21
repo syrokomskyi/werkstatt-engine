@@ -9,13 +9,14 @@
   <item>RFC-0689: extract shared autoRegenerateSnapshotOnSnap01 helper from mission-materialization-commands.ts (RFC-0615) for reuse by leitstand.dev-deploy.</item>
   <item>RFC-0697: add orchestrateSnap01Recovery shared helper encapsulating detect → regenerate → (optional) rebuild orchestration, replacing duplicated inline logic in leitstand.dev-deploy and mission.validate.</item>
   <item>ADR-0085: guard autoRegenerateSnapshotOnSnap01 against closed workpieces — the direct executeKernelCommand path bypasses the pipeline-level .closed skip, so regeneration would write a tracked file that RFC-0878 can never commit.</item>
+  <item>ADR-0087: replace hand-rolled .closed sentinel check with isClosedWorkpiece from kernel/runtime/closed-workpiece.ts — the executor now enforces the same guard, this early-exit remains for a clear orchestrator result.</item>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type { KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
+import { isClosedWorkpiece } from "../kernel/runtime/closed-workpiece.ts";
 import { resolveMissionDir } from "./mission-io.ts";
 
 interface SnapshotDiagnostics {
@@ -52,7 +53,7 @@ export async function autoRegenerateSnapshotOnSnap01(
   // exit stays so the orchestrator gets a clear `regenerated: false` result
   // instead of a skipped-report chain through behavior.snapshot.generate.
   const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
-  if (existsSync(path.join(workpieceDir, ".closed"))) {
+  if (isClosedWorkpiece(workpieceDir)) {
     const error =
       `snapshot auto-regeneration skipped: workpiece is closed (ADR-0085) — ` +
       `mission '${missionId}' cannot accept commits`;

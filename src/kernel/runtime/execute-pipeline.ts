@@ -13,6 +13,7 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>ADR-0087: closed-workpiece helpers extracted to runtime/closed-workpiece.ts (leaf module shared with execute-command.ts); skippedExecutionReport moved to runtime/shared.ts; pipeline keeps the early skip for reporting/telemetry while enforcement lives in executeRegisteredCommand.</item>
   <item>ADR-0023: reuse CacheLayer SQLite connection across pipeline steps; batch telemetry writes to a single append at pipeline completion; close cache after pipeline run.</item>
   <item>RFC-0809: add collect-errors mode — aggregate all independent step failures instead of stopping at first failure. Extract aggregateCollectErrors pure function for testability.</item>
   <item>RFC-1028: replace hardcoded moduleSrcDir with dynamic per-command resolution from command.modulePath via deriveModuleBasePath. Fixes stale cache keys caused by deleted packages/os/site-kernel-checks path.</item>

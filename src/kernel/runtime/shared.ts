@@ -2,8 +2,8 @@
 <MODULE_CONTRACT>
 <purpose>
 Small helpers shared between runtime/execute-command.ts and runtime/execute-pipeline.ts:
-log-severity summarization for an execution report, and the option-object shape guard used
-by both execute* entry points.
+log-severity summarization for an execution report, the option-object shape guard used
+by both execute* entry points, and the skipped-execution report builder.
 </purpose>
 <non-goals>
   <item>Do not introduce app-specific runtime composition or deployment behavior into this reusable package source file.</item>
@@ -13,6 +13,7 @@ by both execute* entry points.
   <item>Shared helpers stay pure — no I/O, no state, just transformations.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>ADR-0087: add skippedExecutionReport — shared zero-duration Skipped-report builder used by the pipeline step loop and the executor-level closed-workpiece guard.</item>
   <item>RFC-0303: split out of runtime.ts (Phase 3 file-size split, hot-path file 8/8).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 

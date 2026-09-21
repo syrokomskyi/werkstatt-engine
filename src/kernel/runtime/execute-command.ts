@@ -14,6 +14,7 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>ADR-0087: closed-workpiece guard moved into executeRegisteredCommand — mutating commands on a .closed site return Skipped: closed-mission unless all declared writes are gitignored; single enforcement point for pipeline steps and direct executeKernelCommand calls.</item>
   <item>RFC-0960 fo-fix: add console.warn to computeOwnershipMap catch block for agent-facing clarity on import failures.</item>
   <item>RFC-1026: add module state check before execute (KERNEL-MODULE-02 for non-active modules), trackInFlight with try/finally release, KERNEL-MODULE-01 for disposed commands.</item>
   <item>RFC-1027: aggregate remediationHints from CheckResult diagnostics into KernelExecutionReport, capped at 3 entries sorted by occurrence count.</item>
