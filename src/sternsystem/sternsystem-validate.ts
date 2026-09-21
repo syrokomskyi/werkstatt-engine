@@ -15,6 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>ADR-0082: extend generated.drift.validate coverage to cache clones</item>
+  <item>ADR-0088: add JRN-01 rule — op-started records in cache-clone operations/*.jsonl must carry non-empty missionId.</item>
   <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902</history>
 </CHANGE_SUMMARY>
 */
@@ -52,6 +53,7 @@ import { readPassport } from "./registry-io.ts";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
 import { readAuthorization, isAuthorizationExpired } from "./handover.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
+import { readJournal } from "../journal/jsonl.ts";
 
 export interface SternsystemValidateData {
   validated: number;
@@ -129,6 +131,54 @@ function checkManifestPresence(cacheDir: string, systemId: string): SternsystemV
       }
     } catch {
       // Git command failed — skip this manifest
+    }
+  }
+  return violations;
+}
+
+/**
+ * ADR-0088: JRN-01 — every `op-started` record in the cache clone's
+ * `operations/*.jsonl` journals MUST carry a non-empty `missionId` so the
+ * ADR-0084 close-time sweep can attribute the operation to a mission.
+ * Unreadable journal files produce a warning — they may hide violations.
+ */
+async function checkJournalAttribution(
+  cacheDir: string,
+  systemId: string,
+  warnings: Array<{ systemId: string; field: string; message: string }>,
+): Promise<SternsystemViolation[]> {
+  const violations: SternsystemViolation[] = [];
+  const operationsDir = path.join(cacheDir, "operations");
+  if (!existsSync(operationsDir)) return violations;
+
+  let files: string[];
+  try {
+    files = (await fs.readdir(operationsDir)).filter((f) => f.endsWith(".jsonl"));
+  } catch {
+    return violations;
+  }
+
+  for (const file of files) {
+    const journalPath = path.join(operationsDir, file);
+    let records;
+    try {
+      records = await readJournal(journalPath);
+    } catch (err) {
+      warnings.push({
+        systemId,
+        field: "JRN-01",
+        message: `operations/${file}: unreadable journal — cannot verify mission attribution (${(err as Error).message})`,
+      });
+      continue;
+    }
+    for (const rec of records) {
+      if (rec.kind === "op-started" && (!rec.missionId || rec.missionId.trim() === "")) {
+        violations.push({
+          systemId,
+          rule: "JRN-01",
+          message: `operations/${file}: op-started '${rec.opId}' (${rec.op}) has empty missionId — cache-clone journal ops must be mission-attributed (ADR-0088)`,
+        });
+      }
     }
   }
   return violations;
@@ -502,6 +552,10 @@ export async function runSternsystemValidate(
     // RFC-0870: Manifest presence check — committed generated manifests must exist in cache clone HEAD
     const manifestViolations = checkManifestPresence(cacheDir, entry.id);
     violations.push(...manifestViolations);
+
+    // ADR-0088: JRN-01 — journal mission attribution in cache clone operations/
+    const journalViolations = await checkJournalAttribution(cacheDir, entry.id, warnings);
+    violations.push(...journalViolations);
 
     // ADR-0082: cache-clone generated drift — committed generated files in the
     // cache clone are drift-checked via generated.drift.validate --target=cache-clone.

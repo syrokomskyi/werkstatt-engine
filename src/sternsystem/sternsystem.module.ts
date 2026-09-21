@@ -106,7 +106,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       {
         name: "sternsystem.validate",
         contract: "sternsystem",
-        rules: ["HANDOVER-01"],
+        rules: ["HANDOVER-01", "JRN-01"],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",
