@@ -706,5 +706,50 @@ describe("RFC-0875: nachweis.measure.cloudflare-agent-readiness", () => {
       expect(commerceDim!.status).toBe("not-checked");
       expect(commerceDim!.score).toBeUndefined();
     });
+
+    it("parseAgentReadiness maps provider overall (0-100) to score, not the ordinal level", async () => {
+      const { parseAgentReadiness } =
+        await import("../nachweis/nachweis-cloudflare-agent-readiness-measure.ts");
+
+      const parsed = parseAgentReadiness({
+        meta: {
+          processors: {
+            agentReadiness: {
+              level: 3,
+              levelName: "Good",
+              overall: 72,
+              checks: {
+                robots: { status: "pass", details: {} },
+              },
+            },
+          },
+        },
+      } as never);
+
+      expect(parsed.overall?.score).toBe(72);
+      expect(parsed.overall?.level).toBe("Good");
+    });
+
+    it("parseAgentReadiness normalizes ordinal level to 0-100 when overall is absent", async () => {
+      const { parseAgentReadiness } =
+        await import("../nachweis/nachweis-cloudflare-agent-readiness-measure.ts");
+
+      const parsed = parseAgentReadiness({
+        meta: {
+          processors: {
+            agentReadiness: {
+              level: 5,
+              levelName: "Agent-Native",
+              checks: {
+                robots: { status: "pass", details: {} },
+              },
+            },
+          },
+        },
+      } as never);
+
+      expect(parsed.overall?.score).toBe(100);
+      expect(parsed.overall?.level).toBe("Agent-Native");
+    });
   });
 });

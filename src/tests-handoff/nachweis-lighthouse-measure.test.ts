@@ -635,5 +635,95 @@ describe("RFC-0874: nachweis.measure.lighthouse", () => {
       const bundle = buildAssessmentBundle(options, runResults as never, []);
       expect(bundle.observedAt).toBe("2026-08-18T10:00:00.000Z");
     });
+
+    it("emits result.overall.score as median of non-experimental numeric categories", async () => {
+      const { buildAssessmentBundle } = await import("../nachweis/nachweis-lighthouse-measure.ts");
+
+      const runResults = [
+        {
+          runIndex: 1,
+          lhrPath: "/tmp/lhr-run-01.json",
+          lighthouseVersion: "13.4.1",
+          fetchTime: "2026-08-18T10:00:00.000Z",
+          userAgent: "test",
+          requestedUrl: "https://example.com",
+          finalUrl: "https://example.com",
+          categories: [],
+        },
+      ];
+
+      const options = {
+        systemId: "test-system",
+        url: "https://example.com",
+        seriesId: "test-series",
+        authorizationBasis: "site-owner" as const,
+        runs: 5,
+        methodologyId: "WG-LH-01",
+        methodologyVersion: "1.0",
+        freshnessDays: 30,
+        dryRun: false,
+      };
+
+      const aggregated = [
+        { id: "performance", providerLabel: "Performance", score: 84, experimental: false },
+        { id: "accessibility", providerLabel: "Accessibility", score: 97, experimental: false },
+        { id: "best-practices", providerLabel: "Best Practices", score: 96, experimental: false },
+        { id: "seo", providerLabel: "SEO", score: 100, experimental: false },
+        {
+          id: "agentic-browsing",
+          providerLabel: "Agentic Browsing",
+          score: 100,
+          experimental: false,
+        },
+        { id: "experimental-cat", providerLabel: "Experimental", score: 10, experimental: true },
+      ];
+
+      const bundle = buildAssessmentBundle(options, runResults as never, aggregated as never);
+      // Median of non-experimental scores [84, 96, 97, 100, 100] → 97;
+      // the experimental score 10 must not drag the headline down.
+      expect(bundle.result.overall?.score).toBe(97);
+    });
+
+    it("omits result.overall when no numeric category scores exist", async () => {
+      const { buildAssessmentBundle } = await import("../nachweis/nachweis-lighthouse-measure.ts");
+
+      const runResults = [
+        {
+          runIndex: 1,
+          lhrPath: "/tmp/lhr-run-01.json",
+          lighthouseVersion: "13.4.1",
+          fetchTime: "2026-08-18T10:00:00.000Z",
+          userAgent: "test",
+          requestedUrl: "https://example.com",
+          finalUrl: "https://example.com",
+          categories: [],
+        },
+      ];
+
+      const options = {
+        systemId: "test-system",
+        url: "https://example.com",
+        seriesId: "test-series",
+        authorizationBasis: "site-owner" as const,
+        runs: 5,
+        methodologyId: "WG-LH-01",
+        methodologyVersion: "1.0",
+        freshnessDays: 30,
+        dryRun: false,
+      };
+
+      const aggregated = [
+        {
+          id: "agentic-browsing",
+          providerLabel: "Agentic Browsing",
+          numerator: 2,
+          denominator: 3,
+          status: "fail",
+        },
+      ];
+
+      const bundle = buildAssessmentBundle(options, runResults as never, aggregated as never);
+      expect(bundle.result.overall).toBeUndefined();
+    });
   });
 });

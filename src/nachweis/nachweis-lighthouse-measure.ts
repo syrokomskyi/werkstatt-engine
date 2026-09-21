@@ -516,6 +516,21 @@ export function buildAssessmentBundle(
     return dim as AssessmentBundleV1["result"]["dimensions"][number];
   });
 
+  // Headline score: median of non-experimental numeric category scores
+  // (falls back to all numeric scores when every category is experimental).
+  const nonExperimentalScores = aggregatedCategories
+    .filter((c) => c.experimental !== true)
+    .map((c) => c.score)
+    .filter((s): s is number => typeof s === "number");
+  const headlineScores =
+    nonExperimentalScores.length > 0
+      ? nonExperimentalScores
+      : aggregatedCategories.map((c) => c.score).filter((s): s is number => typeof s === "number");
+  const overall =
+    headlineScores.length > 0
+      ? { score: aggregateNumericSamples(headlineScores).median }
+      : undefined;
+
   return {
     schemaVersion: "nachweis-assessment-bundle@1",
     systemId: options.systemId,
@@ -552,6 +567,7 @@ export function buildAssessmentBundle(
       aggregation: "median",
     },
     result: {
+      ...(overall ? { overall } : {}),
       dimensions,
     },
     freshness: { maxAgeDays: options.freshnessDays },

@@ -60,6 +60,8 @@ export interface CloudflareAgentReadinessMeasureResult {
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
 const DEFAULT_MAX_ELAPSED_MS = 300_000; // 5 minutes
 const CLOUDFLARE_API_BASE = "https://api.cloudflare.com/client/v4/accounts";
+// Cloudflare Agent Readiness reports an ordinal level 0..5 (5 = "Agent-Native").
+const CF_AGENT_READINESS_MAX_LEVEL = 5;
 
 // ── Flag helpers ────────────────────────────────────────────────────────────
 
@@ -197,8 +199,12 @@ export function parseAgentReadiness(raw: CloudflareScanResultResponse): {
   }
 
   const overall: { score?: number; level?: string } = {};
-  if (typeof ar.level === "number") {
-    overall.score = ar.level;
+  // `overall` is the provider's 0-100 score; `level` is an ordinal 0-5 readiness
+  // level — never store the raw level in the 0-100 score field.
+  if (typeof ar.overall === "number" && ar.overall >= 0 && ar.overall <= 100) {
+    overall.score = Math.round(ar.overall);
+  } else if (typeof ar.level === "number" && ar.level >= 0) {
+    overall.score = Math.round((ar.level / CF_AGENT_READINESS_MAX_LEVEL) * 100);
   }
   if (typeof ar.levelName === "string" && ar.levelName.length > 0) {
     overall.level = ar.levelName;
@@ -686,7 +692,8 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
     const parserMetadata = {
       parserVersion: "cf-ar-01",
       fieldPaths: {
-        overall: "result.meta.processors.agentReadiness.level",
+        overall: "result.meta.processors.agentReadiness.overall",
+        level: "result.meta.processors.agentReadiness.level",
         levelName: "result.meta.processors.agentReadiness.levelName",
         checks: "result.meta.processors.agentReadiness.checks.<dimensionId>.status",
         checkDetails: "result.meta.processors.agentReadiness.checks.<dimensionId>.details",
