@@ -131,11 +131,7 @@ export interface NotausgangExportData {
   // RFC-1120
   evidence: Record<string, NotausgangEvidenceVerdict>;
   features: NotausgangFeatureNote[];
-  verifier: {
-    script: "verify.py";
-    runtime: "python3-stdlib";
-    manifestFile: "notausgang-manifest.json";
-  };
+  verifier: NotausgangVerifier;
 }
 
 const NOTAUSGANG_VERIFIER = {
@@ -143,6 +139,8 @@ const NOTAUSGANG_VERIFIER = {
   runtime: "python3-stdlib",
   manifestFile: "notausgang-manifest.json",
 } as const;
+
+type NotausgangVerifier = typeof NOTAUSGANG_VERIFIER;
 
 const TEMPLATES_DIR = fileURLToPath(new URL("./templates/", import.meta.url));
 

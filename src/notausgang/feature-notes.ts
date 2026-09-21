@@ -115,10 +115,10 @@ export async function buildFeatureInventory(
   // Source 1: system.md frontmatter — authored source of truth
   const frontmatter = await readSystemMdFrontmatter(input.siteDir);
   const entitlementsOverride = frontmatter.entitlementsOverride;
-  const overrideFeatures = Array.isArray(entitlementsOverride)
-    ? entitlementsOverride.map(String)
+  const overrideRaw = Array.isArray(entitlementsOverride)
+    ? entitlementsOverride
     : ((entitlementsOverride as { features?: unknown } | undefined)?.features ?? []);
-  for (const f of Array.isArray(overrideFeatures) ? overrideFeatures.map(String) : []) {
+  for (const f of Array.isArray(overrideRaw) ? overrideRaw.map(String) : []) {
     detected.set(f, signalForFeatureId(f));
   }
   const integrations = frontmatter.integrations as Record<string, unknown> | undefined;
@@ -129,15 +129,12 @@ export async function buildFeatureInventory(
 
   // Source 2: system-config.yaml deployment — platform-managed fact
   const deployment = input.systemConfig.deployment as
-    | { adapter?: string; channels?: Record<string, unknown> }
-    | undefined;
+    { adapter?: string; channels?: Record<string, unknown> } | undefined;
   const workerAdapter =
     typeof deployment?.adapter === "string" && deployment.adapter.includes("worker");
 
   // Source 3: content-tree markers
-  const portalContent = existsSync(
-    path.join(input.siteDir, "src", "content", "portal"),
-  );
+  const portalContent = existsSync(path.join(input.siteDir, "src", "content", "portal"));
 
   // Source 4: release dist markers — _worker.js proves worker-level serving
   const distHasWorker = existsSync(path.join(input.distDir, "_worker.js"));
