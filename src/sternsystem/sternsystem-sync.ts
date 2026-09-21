@@ -108,11 +108,18 @@ export async function runSternsystemSync(
     // files) into a commit before pushing. The cache clone is system-managed —
     // dirty state is operational output, not user work. Closed missions never
     // reconcile again, so sync is the last chance for their operational deltas
-    // to reach the bare repo and external mirrors.
-    const sweep = commitCacheCloneIfDirty(cachePath, id);
-    if (sweep.committed) {
-      logger.info(
-        `[sternsystem.sync] auto-committed dirty operational files (${sweep.commitSha?.slice(0, 8)})`,
+    // to reach the bare repo and external mirrors. Non-fatal: a failed sweep
+    // must not block propagation of already-committed state.
+    try {
+      const sweep = commitCacheCloneIfDirty(cachePath, id);
+      if (sweep.committed) {
+        logger.info(
+          `[sternsystem.sync] auto-committed dirty operational files (${sweep.commitSha?.slice(0, 8)})`,
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        `[sternsystem.sync] operational sweep failed (non-fatal): ${(err as Error).message}`,
       );
     }
     logger.info(`[sternsystem.sync] pushing cache clone to bare repo…`);

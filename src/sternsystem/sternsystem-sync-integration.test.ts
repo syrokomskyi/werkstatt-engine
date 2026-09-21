@@ -447,3 +447,37 @@ test(
     expect(externalFile).toContain('"op":"abandoned"');
   },
 );
+
+// ADR-0086: a failed sweep must not block propagation of committed state
+test(
+  "sync continues pushing when the operational sweep fails (index.lock)",
+  { retry: 2 },
+  async () => {
+    await setupSystemConfig([
+      { path: cacheDir, storageType: "non-bare" },
+      { path: bareDir, storageType: "bare" },
+    ]);
+
+    // Committed content that must still reach the bare repo
+    await writeFile(join(cacheDir, "src/content/system.md"), "# Committed\n");
+    git(cacheDir, "add -A");
+    git(cacheDir, 'commit -m "committed-content"');
+
+    // Dirty file + index.lock → git add -A inside the sweep throws
+    await writeFile(join(cacheDir, "operations-dirty.jsonl"), "{}\n");
+    await writeFile(join(cacheDir, ".git", "index.lock"), "");
+
+    try {
+      const result = await runSternsystemSync(
+        makeInput({ id: "test-bundle", direction: "push" }),
+        makeContext(workspaceRoot),
+      );
+
+      expect(result.exitCode).toBe(0);
+      const bareLog = git(bareDir, "log --oneline");
+      expect(bareLog).toContain("committed-content");
+    } finally {
+      await rm(join(cacheDir, ".git", "index.lock"), { force: true });
+    }
+  },
+);
