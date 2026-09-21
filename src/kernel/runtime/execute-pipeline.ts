@@ -29,7 +29,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 import os from "node:os";
+import { execSync } from "node:child_process";
 import { join, relative, sep } from "node:path";
+import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
 import { deriveModuleBasePath } from "./registry.ts";
@@ -180,6 +182,101 @@ function stepStatus(report: KernelExecutionReport): PipelineStepTiming["status"]
  */
 function isTransitiveSkip(report: KernelExecutionReport): boolean {
   return report.summary?.startsWith("Skipped: transitive-cache-skip") ?? false;
+}
+
+function isClosedMissionSkip(report: KernelExecutionReport): boolean {
+  return report.summary?.startsWith("Skipped: closed-mission") ?? false;
+}
+
+// ---------------------------------------------------------------------------
+// ADR-0085: closed-mission workpiece — mutating steps become no-ops
+// ---------------------------------------------------------------------------
+
+const CLOSED_WORKPIECE_SENTINEL = ".closed";
+
+/**
+ * ADR-0085: detect a closed-mission workpiece via the `.closed` sentinel
+ * written by mission.close (RFC-0878). A closed workpiece is immutable —
+ * writes to git-tracked files can never be committed and produce only
+ * uncommittable churn.
+ */
+export function isClosedWorkpiece(siteDirectory: string): boolean {
+  return existsSync(join(siteDirectory, CLOSED_WORKPIECE_SENTINEL));
+}
+
+/**
+ * ADR-0085: reduce a declared `writes[]` pattern to a concrete path (relative
+ * to the site directory) suitable for `git check-ignore`. The `<app>/` prefix
+ * is stripped, `{placeholder}` segments become a literal, and the path is cut
+ * at the first glob character — `git check-ignore` matches parent directories,
+ * so `dist/client` is reported ignored when `dist/` is ignored.
+ * Returns null for patterns outside the site directory (non-`<app>` prefixes)
+ * or patterns that cannot be reduced to a concrete prefix.
+ */
+export function writePatternToCheckPath(pattern: string, siteName: string): string | null {
+  if (!pattern.startsWith("<app>/")) return null;
+  let rel = pattern.slice("<app>/".length);
+  rel = rel.replaceAll("{app}", siteName).replace(/\{[a-zA-Z0-9_-]+\}/g, "x");
+  const globIndex = rel.search(/[*?[\]]/);
+  if (globIndex >= 0) rel = rel.slice(0, globIndex);
+  rel = rel.replace(/\/+$/, "");
+  return rel.length > 0 ? rel : null;
+}
+
+/**
+ * ADR-0085: batch-resolve which candidate paths are gitignored inside the site
+ * directory via a single `git check-ignore --stdin` call. Returns null when
+ * the site directory is not a git repository or git is unavailable — without
+ * git tracking no write can produce committable churn, so callers treat every
+ * path as untracked.
+ */
+function collectGitignoredPaths(
+  siteDirectory: string,
+  candidatePaths: string[],
+): Set<string> | null {
+  if (candidatePaths.length === 0) return new Set();
+  try {
+    const output = execSync("git check-ignore --stdin", {
+      cwd: siteDirectory,
+      input: `${candidatePaths.join("\n")}\n`,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return new Set(
+      output
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    );
+  } catch (err) {
+    // exit 1 → no path is ignored (empty set); exit 128 / ENOENT → no git
+    // tracking at all → null (nothing can churn a non-repo workpiece).
+    if ((err as { status?: number }).status === 1) return new Set();
+    return null;
+  }
+}
+
+/**
+ * ADR-0085: a mutating step may run on a closed workpiece only when every
+ * declared write resolves to a gitignored path inside the site directory —
+ * such writes cannot produce committable churn and are required by
+ * release.prepare's rebuild path (passport.emit, dist mutators). Steps with
+ * no declared writes, writes outside the site directory, or writes to tracked
+ * paths are skipped. `ignoredPaths === null` means no git tracking — all
+ * writes are uncommittable, so the step runs.
+ */
+export function mutatingStepRunsOnClosedWorkpiece(
+  command: KernelCommandDefinition,
+  siteName: string,
+  ignoredPaths: Set<string> | null,
+): boolean {
+  if (ignoredPaths === null) return true;
+  const writes = command.writes ?? [];
+  if (writes.length === 0) return false;
+  return writes.every((pattern) => {
+    const checkPath = writePatternToCheckPath(pattern, siteName);
+    return checkPath !== null && ignoredPaths.has(checkPath);
+  });
 }
 
 function skippedExecutionReport(
@@ -720,6 +817,27 @@ async function executePipelineForSite(
 
   const scheduled = buildSchedule(steps);
 
+  // ADR-0085: closed-mission workpiece — mutating steps become no-ops unless
+  // every declared write is confined to gitignored paths (dist/, .cache/, …).
+  const workpieceClosed = isClosedWorkpiece(site.directory);
+  const closedIgnoredPaths = workpieceClosed
+    ? collectGitignoredPaths(
+        site.directory,
+        steps.flatMap((s) => {
+          const cmd = registry.commands.get(s.command);
+          if (!cmd || cmd.mutatesState === false) return [];
+          return (cmd.writes ?? [])
+            .map((w) => writePatternToCheckPath(w, site.name))
+            .filter((p): p is string => p !== null);
+        }),
+      )
+    : null;
+  if (workpieceClosed) {
+    progressLine(
+      `[${site.name}] workpiece is closed (ADR-0085) — mutating steps run only when all writes are gitignored`,
+    );
+  }
+
   const stepTimings: Map<number, PipelineStepTiming> = new Map();
 
   try {
@@ -773,6 +891,14 @@ async function executePipelineForSite(
         let report: KernelExecutionReport;
         if (step.skip) {
           report = skippedExecutionReport(command, context, step.skipReason);
+        } else if (
+          workpieceClosed &&
+          command.mutatesState !== false &&
+          !mutatingStepRunsOnClosedWorkpiece(command, site.name, closedIgnoredPaths)
+        ) {
+          // ADR-0085: closed workpiece — a mutating step with tracked or
+          // undeclared writes would produce uncommittable churn.
+          report = skippedExecutionReport(command, context, "closed-mission");
         } else if (shouldTransitiveSkip(command, runState)) {
           // RFC-0687: transitive cache skip — all upstream commands were cache hits.
           report = skippedExecutionReport(command, context, "transitive-cache-skip");
@@ -842,7 +968,14 @@ async function executePipelineForSite(
           `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}`,
         );
         // ADR-0023: collect telemetry in-memory; batch write at pipeline completion.
-        if (!step.skip && !report.cached && !isTransitiveSkip(report)) {
+        // ADR-0085: closed-mission skips are excluded — a 0ms skip would
+        // corrupt the expectedDurationMs budgets derived from telemetry.
+        if (
+          !step.skip &&
+          !report.cached &&
+          !isTransitiveSkip(report) &&
+          !isClosedMissionSkip(report)
+        ) {
           telemetryBatch.push({
             pipeline: options.pipelineName,
             command: step.command,

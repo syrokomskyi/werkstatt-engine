@@ -26,6 +26,7 @@ import path from "node:path";
 import { parse as yamlParse } from "yaml";
 import type {
   Diagnostic,
+  DiscoveredSiteWorkspace,
   KernelCommandInput,
   KernelCommandResult,
   KernelNextStep,
@@ -193,7 +194,10 @@ function autoCommitAfterValidation(
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
 ): { dirty: boolean; fileCount: number; files?: string[] } {
   let dirtyCheck = isWorkpieceDirty(workpieceDir);
-  if (dirtyCheck.dirty && !skipAutoCommit) {
+  // ADR-0085: never attempt commits on a closed workpiece — RFC-0878 blocks
+  // them anyway; report the dirty state without the misleading failure warn.
+  const workpieceClosed = existsSync(path.join(workpieceDir, ".closed"));
+  if (dirtyCheck.dirty && !skipAutoCommit && !workpieceClosed) {
     try {
       const autoCommit = commitWorkpieceIfDirty(
         workpieceDir,
@@ -432,6 +436,10 @@ export interface ValidateStepCtx {
   evidenceDir: string;
   missionDir: string;
   workpieceDir: string;
+  // ADR-0085: synthetic site pointing at the workpiece — set for closed
+  // missions, where registry.currentMission is null and site discovery would
+  // resolve to the cache clone instead of the workpiece under audit.
+  siteWorkspace?: DiscoveredSiteWorkspace;
   collectErrors: boolean;
   skipContentRegression: boolean;
   autoAcceptRegression: boolean;
@@ -491,6 +499,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
           pipelineName: "build.prepare",
           siteName: c.manifest.systemId,
           outputFormat: "pretty",
+          ...(c.siteWorkspace ? { siteWorkspace: c.siteWorkspace } : {}),
           ...(c.force ? { force: true } : {}),
           ...(c.collectErrors ? { collectErrors: true } : {}),
         });
@@ -566,6 +575,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
           pipelineName: "build.check",
           siteName: c.manifest.systemId,
           outputFormat: "pretty",
+          ...(c.siteWorkspace ? { siteWorkspace: c.siteWorkspace } : {}),
           ...(c.force ? { force: true } : {}),
           ...(Object.keys(pipelineFlags).length > 0 ? { flags: pipelineFlags } : {}),
           ...(c.collectErrors ? { collectErrors: true } : {}),
@@ -695,6 +705,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
                 pipelineName: "build.post",
                 siteName: c.manifest.systemId,
                 outputFormat: "pretty",
+                ...(c.siteWorkspace ? { siteWorkspace: c.siteWorkspace } : {}),
                 ...(c.force ? { force: true } : {}),
                 ...(c.collectErrors ? { collectErrors: true } : {}),
               });
@@ -735,6 +746,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
                   pipelineName: "build.post",
                   siteName: c.manifest.systemId,
                   outputFormat: "pretty",
+                  ...(c.siteWorkspace ? { siteWorkspace: c.siteWorkspace } : {}),
                   ...(c.force ? { force: true } : {}),
                   ...(c.collectErrors ? { collectErrors: true } : {}),
                 });
@@ -819,9 +831,11 @@ export async function runMissionValidate(
   if (!missionId) throw new Error("[mission.validate] --mission is required");
 
   const manifest = await readMissionManifest(workspaceRoot, missionId);
-  if (manifest.state !== "open") {
+  // ADR-0085: closed missions remain auditable — mutating pipeline steps are
+  // skipped by the executor (`.closed` sentinel), validators run read-only.
+  if (manifest.state !== "open" && manifest.state !== "closed") {
     throw new Error(
-      `[mission.validate] mission '${missionId}' is not open (state: ${manifest.state})`,
+      `[mission.validate] mission '${missionId}' is not open or closed (state: ${manifest.state})`,
     );
   }
   if (!manifest.materializedAt) {
@@ -835,6 +849,20 @@ export async function runMissionValidate(
   const evidenceDir = path.join(missionDir, "evidence");
   const distributionDir = path.join(missionDir, "distribution");
   await fs.mkdir(evidenceDir, { recursive: true });
+
+  // ADR-0085: for closed missions, registry.currentMission is null and site
+  // discovery would resolve to the cache clone — point pipelines at the
+  // workpiece under audit via a synthetic site (same pattern as
+  // release.prepare).
+  const closedSiteWorkspace: DiscoveredSiteWorkspace | undefined =
+    manifest.state === "closed"
+      ? {
+          name: manifest.systemId,
+          directory: workpieceDir,
+          toolsDirectory: path.join(workpieceDir, "tools"),
+          configPath: path.join(workpieceDir, "tools", "kernel.config.ts"),
+        }
+      : undefined;
 
   // RFC-1086: parse --fast flag — mutually exclusive with --force
   const fast = input.flags.fast === true;
@@ -1151,6 +1179,7 @@ export async function runMissionValidate(
     evidenceDir,
     missionDir,
     workpieceDir,
+    ...(closedSiteWorkspace ? { siteWorkspace: closedSiteWorkspace } : {}),
     collectErrors,
     skipContentRegression,
     autoAcceptRegression,
