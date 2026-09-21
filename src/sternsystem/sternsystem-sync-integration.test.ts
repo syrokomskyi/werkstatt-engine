@@ -411,3 +411,39 @@ test("sync overwrites diverged external mirror via --force-with-lease", { retry:
   const externalLog = git(externalDir, "log --oneline");
   expect(externalLog).not.toContain("diverge-external");
 });
+
+// ADR-0086: dirty operational files are committed and pushed during sync
+test(
+  "sync commits dirty operational files and pushes them to bare and external mirrors",
+  { retry: 2 },
+  async () => {
+    await setupSystemConfig([
+      { path: cacheDir, storageType: "non-bare" },
+      { path: bareDir, storageType: "bare" },
+      { path: externalDir, storageType: "bare" },
+    ]);
+
+    // Simulate an uncommitted operational journal write (e.g. op-abandoned record)
+    await mkdir(join(cacheDir, "operations"), { recursive: true });
+    await writeFile(join(cacheDir, "operations", "op-1.jsonl"), '{"op":"abandoned","id":"op-1"}\n');
+
+    const result = await runSternsystemSync(
+      makeInput({ id: "test-bundle", direction: "push" }),
+      makeContext(workspaceRoot),
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    // Cache clone is clean after sync — the sweep committed the journal
+    const status = git(cacheDir, "status --porcelain");
+    expect(status, "cache clone must be clean after sync sweep").toBe("");
+
+    // The auto-commit reached the bare repo
+    const bareLog = git(bareDir, "log --oneline");
+    expect(bareLog).toContain("cache-clone: auto-commit");
+
+    // The journal file content reached the external mirror
+    const externalFile = git(externalDir, "show main:operations/op-1.jsonl");
+    expect(externalFile).toContain('"op":"abandoned"');
+  },
+);

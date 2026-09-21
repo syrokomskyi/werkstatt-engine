@@ -13,6 +13,7 @@
   <item>RFC-0480: remove pull/both directions — push-only (edits-only-through-missions invariant).</item>
   <item>RFC-0818: reorder external push + bundle creation to after bordbuch commit so bordbuch entry reaches external mirrors.</item>
   <item>ADR-0073: Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
+  <item>ADR-0086: commit all dirty operational files (operations journals, status files) via commitCacheCloneIfDirty before pushing — closed missions never reconcile again, so sync is the last chance for their operational state to reach mirrors.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -33,6 +34,7 @@ import {
   isGitAccessible,
 } from "./registry-io.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
+import { commitCacheCloneIfDirty } from "../mission/mission-git-commit.ts";
 
 export interface SternsystemSyncData {
   systemId: string;
@@ -102,6 +104,17 @@ export async function runSternsystemSync(
   const branchName = branch.replace("refs/heads/", "");
 
   if (existsSync(path.join(cachePath, ".git"))) {
+    // ADR-0086: sweep all dirty operational files (operations/ journals, status
+    // files) into a commit before pushing. The cache clone is system-managed —
+    // dirty state is operational output, not user work. Closed missions never
+    // reconcile again, so sync is the last chance for their operational deltas
+    // to reach the bare repo and external mirrors.
+    const sweep = commitCacheCloneIfDirty(cachePath, id);
+    if (sweep.committed) {
+      logger.info(
+        `[sternsystem.sync] auto-committed dirty operational files (${sweep.commitSha?.slice(0, 8)})`,
+      );
+    }
     logger.info(`[sternsystem.sync] pushing cache clone to bare repo…`);
     try {
       // RFC-0986: Use --force-with-lease — cache clone is the source of truth.
