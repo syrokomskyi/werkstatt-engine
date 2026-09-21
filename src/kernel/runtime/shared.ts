@@ -23,7 +23,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandDefinition,
+  KernelExecutionReport,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 
 export function summarizeLogs(
   logs: KernelExecutionReport["logs"],
@@ -85,4 +89,31 @@ export function assertKnownOptionKeys(options: object, allowedKeys: string[], la
   throw new Error(
     `${label} received unknown key(s): ${described.join(", ")}. Valid keys: ${allowedKeys.join(", ")}.`,
   );
+}
+
+/**
+ * Build a zero-duration `Skipped: <reason>` report for a command that was not
+ * executed. Shared by the pipeline step loop (transitive-cache / closed-mission
+ * skips) and the executor-level closed-workpiece guard (ADR-0087).
+ */
+export function skippedExecutionReport(
+  command: KernelCommandDefinition,
+  context: KernelRuntimeContext,
+  reason?: string,
+): KernelExecutionReport {
+  return {
+    siteName: context.site?.name,
+    commandName: command.name,
+    exitCode: 0,
+    ok: true,
+    summary: `Skipped: ${reason ?? "pipeline step marked skip"}`,
+    metadata: command,
+    logs: context.logger.getEvents(),
+    logSummary: summarizeLogs(context.logger.getEvents()),
+    timing: {
+      durationMs: 0,
+      exceededTimeout: false,
+    },
+    filesModified: [],
+  };
 }

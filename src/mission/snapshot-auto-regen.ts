@@ -46,10 +46,11 @@ export async function autoRegenerateSnapshotOnSnap01(
 ): Promise<AutoRegenerateResult> {
   const { workspaceRoot, systemId, missionId, logger } = opts;
 
-  // ADR-0085: a closed workpiece is immutable — regeneration would write a
-  // tracked file that RFC-0878 can never commit, producing pure churn.
-  // This path bypasses the pipeline-level `.closed` skip (direct
-  // executeKernelCommand), so it needs its own guard.
+  // ADR-0085/0087: a closed workpiece is immutable — regeneration would write
+  // a tracked file that RFC-0878 can never commit, producing pure churn.
+  // executeRegisteredCommand enforces the same guard (ADR-0087); this early
+  // exit stays so the orchestrator gets a clear `regenerated: false` result
+  // instead of a skipped-report chain through behavior.snapshot.generate.
   const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
   if (existsSync(path.join(workpieceDir, ".closed"))) {
     const error =

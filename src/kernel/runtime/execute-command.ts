@@ -51,7 +51,8 @@ import type {
 import { parse as yamlParse } from "yaml";
 import { parseKernelArgv, resolveCommandFlags } from "./argv.ts";
 import { formatFailureDiagnostics } from "./diagnostics.ts";
-import { assertKnownOptionKeys, summarizeLogs } from "./shared.ts";
+import { assertKnownOptionKeys, skippedExecutionReport, summarizeLogs } from "./shared.ts";
+import { isClosedWorkpiece, mutatingCommandRunsOnClosedWorkpiece } from "./closed-workpiece.ts";
 import { buildRegistryForModule, ensureTargetSites, loadAppRuntime } from "./registry.ts";
 import { getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { getFactoryTelemetryPusher, recordCommandTelemetry } from "./telemetry.ts";
@@ -130,6 +131,23 @@ export async function executeRegisteredCommand(
       ...(expectedDurationMs !== undefined ? { expectedDurationMs } : {}),
       exceededTimeout,
     };
+  }
+
+  // ADR-0087: closed-workpiece immutability is enforced at the executor — the
+  // single choke point for pipeline steps AND direct executeKernelCommand
+  // calls (mission.close, leitstand.*, snapshot auto-regen, …). A mutating
+  // command whose site carries the .closed sentinel is skipped unless every
+  // declared write resolves to a gitignored path (ADR-0085 exemption).
+  // Commands without context.site cannot address the workpiece and are
+  // unaffected.
+  if (
+    command.mutatesState !== false &&
+    context.site &&
+    isClosedWorkpiece(context.site.directory) &&
+    !mutatingCommandRunsOnClosedWorkpiece(command, context.site)
+  ) {
+    logger.info(`Skipped: closed-mission — ${command.name} (workpiece is closed)`);
+    return skippedExecutionReport(command, context, "closed-mission");
   }
 
   // RFC-0260: schema-carrying commands resolve flags strictly and abort before
