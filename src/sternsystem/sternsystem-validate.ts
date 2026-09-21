@@ -54,6 +54,7 @@ import { verifyPassport, buildPassportPayload, computePassportHash } from "./pas
 import { readAuthorization, isAuthorizationExpired } from "./handover.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import { readJournal } from "../journal/jsonl.ts";
+import type { JournalRecord } from "../journal/types.ts";
 
 export interface SternsystemValidateData {
   validated: number;
@@ -154,13 +155,18 @@ async function checkJournalAttribution(
   let files: string[];
   try {
     files = (await fs.readdir(operationsDir)).filter((f) => f.endsWith(".jsonl"));
-  } catch {
+  } catch (err) {
+    warnings.push({
+      systemId,
+      field: "JRN-01",
+      message: `operations/: cannot list journal directory — attribution check skipped (${(err as Error).message})`,
+    });
     return violations;
   }
 
   for (const file of files) {
     const journalPath = path.join(operationsDir, file);
-    let records;
+    let records: JournalRecord[];
     try {
       records = await readJournal(journalPath);
     } catch (err) {
