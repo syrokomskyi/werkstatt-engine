@@ -567,6 +567,7 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 - **`vitest.config.ts` reads `.flaky-tests.json`** from the workspace root and extends `test.exclude` with quarantined test file paths. The ledger is read synchronously at config load time. If the file is missing or unreadable, no exclusions are applied (graceful degradation).
 - **Integration tests in `src/sternsystem/sternsystem-sync-integration.test.ts` use `it.retry(2)`** (vitest options object: `test("name", { retry: 2 }, fn)`) for tests that race under parallel git I/O load. Retry is restricted to I/O races — never use retry to mask real bugs.
 - **The `.flaky-tests.json` ledger** is a committed file at the workspace root. It stores quarantined test metadata: file path, reason, owner, `quarantinedAt`, `consecutivePasses`, `lastRunAt`, `lastResult`, and `reviewDueAt`. Use `test.flaky.quarantine` to add/remove entries and `test.flaky.report` to run quarantined tests in isolation and update pass counts.
+- **Quarantined files are excluded only as vitest entry points** — `vitest run <quarantined-file>` reports "No test files found", but the tests still execute when a non-quarantined shim imports them (e.g. `sternsystem-sync.test.ts` → `import "./sternsystem-sync-integration.test.ts"`). To run a quarantined file's tests locally, target the shim that imports it. Discovered during ADR-0086.
 
 ## Mutation testing pilot (RFC-1056, DNA-102)
 
