@@ -24,6 +24,12 @@ export type {
 export { appendRecord, readJournal, findIncompleteOperation, TornLineError } from "./jsonl.ts";
 export { runOperation, abandonOperation } from "./runner.ts";
 export {
+  findIncompleteOperationsForMission,
+  abandonIncompleteOperationsForMission,
+  type IncompleteOperationRef,
+  type OperationSweepResult,
+} from "./sweep.ts";
+export {
   checkDifferentKindOperation,
   type BlockedResult,
   type NotBlockedResult,
