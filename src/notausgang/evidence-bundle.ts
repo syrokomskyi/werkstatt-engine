@@ -26,6 +26,7 @@ import {
   resolveNachweisPublicR2Path,
   resolveNachweisScreenshotDisplayR2Path,
   resolveNachweisRawScreenshotR2Path,
+  UnsupportedNachweisKindError,
 } from "../nachweis/nachweis-io.ts";
 
 export type EvidenceDownloadFn = (r2Path: string) => Promise<Uint8Array>;
@@ -99,11 +100,18 @@ function consentScopesGranted(
   consentData: Record<string, unknown> | undefined,
 ): boolean {
   const kind = typeof source.data.kind === "string" ? source.data.kind : "external-web-sources";
-  const gate = evaluateGateV2(source.slug, kind, {
-    evidenceData: source.data,
-    consentData,
-    bordbuchEntries: [],
-  });
+  let gate: ReturnType<typeof evaluateGateV2>;
+  try {
+    gate = evaluateGateV2(source.slug, kind, {
+      evidenceData: source.data,
+      consentData,
+      bordbuchEntries: [],
+    });
+  } catch (err) {
+    // Non-Nachweis kinds have no publication policy and no consent aspects — granted trivially.
+    if (err instanceof UnsupportedNachweisKindError) return true;
+    throw err;
+  }
   return gate.conditions
     .filter((c) => c.id === "consent-granted" || c.id === "display-consent-consistent")
     .every((c) => !c.required || c.status === "pass");
