@@ -139,6 +139,17 @@ test("sweeps incomplete ops across multiple journal files", async () => {
   expect(findIncompleteOperation(records3)).not.toBeNull();
 });
 
+test("does not match missionId as a prefix of a longer id (boundary-aware)", async () => {
+  const journalPath = path.join(operationsDir, "ship-m-0060.jsonl");
+  await writeOpStarted(journalPath, "op-m0060", "leitstand.ship", "m-0060");
+
+  const result = await abandonIncompleteOperationsForMission(operationsDir, "m-006");
+
+  expect(result.abandoned).toEqual([]);
+  const records = await readJournal(journalPath);
+  expect(findIncompleteOperation(records)).not.toBeNull();
+});
+
 test("returns empty result when operations directory does not exist", async () => {
   const missing = path.join(tmpDir, "no-such-dir");
   const scan = await findIncompleteOperationsForMission(missing, "m-008");

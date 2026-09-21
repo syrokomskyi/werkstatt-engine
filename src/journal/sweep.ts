@@ -14,8 +14,9 @@
 import { readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { appendRecord, readJournal } from "./jsonl.ts";
+import { readJournal } from "./jsonl.ts";
 import { abandonOperation } from "./runner.ts";
+import type { JournalRecord } from "./types.ts";
 
 export interface IncompleteOperationRef {
   opId: string;
@@ -27,6 +28,20 @@ export interface OperationSweepResult {
   incomplete: IncompleteOperationRef[];
   /** Basenames of journal files that could not be parsed (e.g. torn lines). */
   unreadableFiles: string[];
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Boundary-aware containment check: `text` references `missionId` when the id
+ * appears and is not immediately followed by an alphanumeric character — so
+ * `m-006` matches `ship-m-006.jsonl` and `ship-m-006-retry.jsonl` but not
+ * `ship-m-0060.jsonl`.
+ */
+export function referencesMissionId(text: string, missionId: string): boolean {
+  return new RegExp(`${escapeRegExp(missionId)}(?![0-9A-Za-z])`).test(text);
 }
 
 /**
@@ -48,7 +63,7 @@ export async function findIncompleteOperationsForMission(
   const files = (await readdir(operationsDir)).filter((f) => f.endsWith(".jsonl"));
   for (const file of files) {
     const journalPath = path.join(operationsDir, file);
-    let records;
+    let records: JournalRecord[];
     try {
       records = await readJournal(journalPath);
     } catch {
@@ -56,18 +71,16 @@ export async function findIncompleteOperationsForMission(
       continue;
     }
 
-    const fileReferencesMission = file.includes(missionId);
+    const fileReferencesMission = referencesMissionId(file, missionId);
     const terminalOpIds = new Set(
-      records
-        .filter((r) => r.kind === "op-done" || r.kind === "op-abandoned")
-        .map((r) => r.opId),
+      records.filter((r) => r.kind === "op-done" || r.kind === "op-abandoned").map((r) => r.opId),
     );
 
     for (const rec of records) {
       if (rec.kind !== "op-started") continue;
       const belongsToMission =
         rec.missionId === missionId ||
-        rec.opId.includes(missionId) ||
+        referencesMissionId(rec.opId, missionId) ||
         fileReferencesMission;
       if (!belongsToMission || terminalOpIds.has(rec.opId)) continue;
       result.incomplete.push({ opId: rec.opId, op: rec.op, journalPath });

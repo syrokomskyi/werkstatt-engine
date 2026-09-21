@@ -62,6 +62,7 @@ import { checkDifferentKindOperation } from "../journal/index.ts";
 import {
   abandonIncompleteOperationsForMission,
   findIncompleteOperationsForMission,
+  referencesMissionId,
 } from "../journal/sweep.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import { getDefaultScopeManager } from "../scope/scope.ts";
@@ -675,7 +676,7 @@ export async function buildCloseSteps(
         const sweep = await abandonIncompleteOperationsForMission(operationsDir, cc.missionId);
         // Fail closed when a journal file that may reference this mission is
         // unreadable — we cannot prove no resumable op remains.
-        const blocking = sweep.unreadableFiles.filter((f) => f.includes(cc.missionId));
+        const blocking = sweep.unreadableFiles.filter((f) => referencesMissionId(f, cc.missionId));
         if (blocking.length > 0) {
           throw new Error(
             `[mission.close] cannot verify journal operations — unreadable file(s): ${blocking.join(", ")}`,
@@ -691,7 +692,10 @@ export async function buildCloseSteps(
           logger.info(`  [abandon-incomplete-operations] abandoned ${op.op} (${op.opId})`);
         }
         try {
-          gitExec(systemDir, "add operations/");
+          const touched = [...new Set(sweep.abandoned.map((op) => op.journalPath))];
+          for (const journalPath of touched) {
+            gitExec(systemDir, `add ${JSON.stringify(path.relative(systemDir, journalPath))}`);
+          }
           cacheCloneCommit(systemDir, `journal: abandon incomplete operations for ${cc.missionId}`);
         } catch (commitErr) {
           logger.warn(
