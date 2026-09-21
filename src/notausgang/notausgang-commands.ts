@@ -17,6 +17,7 @@
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   resolveSiteWorkspace,
@@ -29,11 +30,17 @@ import { fingerprintTree, fingerprintFile } from "@warpgogol/werkstatt-engine/fi
 import { byteHashFile } from "@warpgogol/werkstatt-engine/fingerprint";
 import {
   notausgangManifestSchema,
+  type NotausgangEvidenceVerdict,
+  type NotausgangFeatureNote,
   type NotausgangManifest,
 } from "@warpgogol/werkstatt-engine/schemas";
+import { stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { generateOperationId } from "../werkstatt/index.ts";
 import { atomicMoveDir, atomicWriteFile } from "../werkstatt/atomic.ts";
 import { readSystemConfig, resolveCacheClonePath } from "../sternsystem/registry-io.ts";
+import { bundleEvidenceArtifacts } from "./evidence-bundle.ts";
+import { buildFeatureInventory, renderFeatureNotes } from "./feature-notes.ts";
+import { downloadFromR2 } from "../nachweis/nachweis-io.ts";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -121,6 +128,36 @@ export interface NotausgangExportData {
   distHash: string;
   siteHash: string;
   bordbuchHash: string;
+  // RFC-1120
+  evidence: Record<string, NotausgangEvidenceVerdict>;
+  features: NotausgangFeatureNote[];
+  verifier: {
+    script: "verify.py";
+    runtime: "python3-stdlib";
+    manifestFile: "notausgang-manifest.json";
+  };
+}
+
+const NOTAUSGANG_VERIFIER = {
+  script: "verify.py",
+  runtime: "python3-stdlib",
+  manifestFile: "notausgang-manifest.json",
+} as const;
+
+const TEMPLATES_DIR = fileURLToPath(new URL("./templates/", import.meta.url));
+
+/** sha256sum-format checksum list over every package file except SHA256SUMS.txt itself. */
+async function writeSha256Sums(stagingDir: string): Promise<void> {
+  const files = await collectFiles(stagingDir);
+  const lines: string[] = [];
+  for (const abs of files) {
+    const rel = path.relative(stagingDir, abs).replace(/\\/g, "/");
+    if (rel === "SHA256SUMS.txt") continue;
+    const hex = (await byteHashFile(abs)).replace(/^sha256:/, "");
+    lines.push(`${hex}  ${rel}`);
+  }
+  lines.sort();
+  await atomicWriteFile(path.join(stagingDir, "SHA256SUMS.txt"), lines.join("\n") + "\n");
 }
 
 export async function runNotausgangExport(
@@ -280,7 +317,39 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
       reason: reasons[i] ?? "No reason provided",
     }));
 
-    // Write manifest as YAML (RFC-0376)
+    // RFC-1120: evidence bundling — eligible artifacts from R2, fail-closed on hash mismatch
+    const evidenceResult = await bundleEvidenceArtifacts({
+      siteDir: siteWorkspace.directory,
+      stagingDir,
+      systemId,
+      download: downloadFromR2,
+      logger,
+    });
+
+    // RFC-1120: feature disclosure — inventory from cache-clone-readable sources
+    const features = await buildFeatureInventory({
+      siteDir: siteWorkspace.directory,
+      distDir: distSrc,
+      systemConfig: config as Record<string, unknown>,
+    });
+    await atomicWriteFile(
+      path.join(stagingDir, "feature-notes.md"),
+      renderFeatureNotes({
+        systemId,
+        releaseId,
+        exportedAt: new Date().toISOString(),
+        features,
+      }),
+    );
+
+    // RFC-1120: offline verifier + verification guide (copied verbatim)
+    await fs.copyFile(path.join(TEMPLATES_DIR, "verify.py"), path.join(stagingDir, "verify.py"));
+    await fs.copyFile(
+      path.join(TEMPLATES_DIR, "verification.md"),
+      path.join(stagingDir, "verification.md"),
+    );
+
+    // Write manifest as YAML (RFC-0376) + JSON twin for the stdlib verifier (RFC-1120)
     const manifest = {
       schemaVersion: "1.0.0",
       systemId,
@@ -301,12 +370,22 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
       distHash,
       siteHash,
       bordbuchHash,
+      evidence: evidenceResult.verdicts,
+      features,
+      verifier: NOTAUSGANG_VERIFIER,
     };
 
     await atomicWriteFile(
       path.join(stagingDir, "notausgang-manifest.yaml"),
       stringifyYaml(manifest) + "\n",
     );
+    await atomicWriteFile(
+      path.join(stagingDir, "notausgang-manifest.json"),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+
+    // RFC-1120: flat checksum list — written last so it covers every other file
+    await writeSha256Sums(stagingDir);
 
     // Atomic publish
     await atomicMoveDir(stagingDir, outputPath, { replace: true });
@@ -322,6 +401,9 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
         distHash,
         siteHash,
         bordbuchHash,
+        evidence: evidenceResult.verdicts,
+        features,
+        verifier: NOTAUSGANG_VERIFIER,
       },
       summary: `[notausgang.export] ${systemId} exported to ${outputFlag} (${nulled.length} integrations nulled, ${exceptions.length} exceptions)`,
       nextSteps: [
@@ -484,11 +566,38 @@ export async function runNotausgangValidate(
     });
   }
 
-  // Legacy JSON artifact check
+  // RFC-1120 NA-MANIFEST-02: JSON twin must exist, parse, and match the YAML manifest
+  let manifestJson: Record<string, unknown> | null = null;
   if (existsSync(manifestJsonPath)) {
+    try {
+      manifestJson = JSON.parse(await fs.readFile(manifestJsonPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      if (manifest) {
+        for (const field of ["evidence", "features", "verifier"] as const) {
+          const yamlHash = stableJsonHash(manifest[field] ?? null);
+          const jsonHash = stableJsonHash(manifestJson[field] ?? null);
+          if (yamlHash !== jsonHash) {
+            violations.push({
+              rule: "NA-MANIFEST-02",
+              message: `notausgang-manifest.json '${field}' does not match the YAML twin`,
+              file: "notausgang-manifest.json",
+            });
+          }
+        }
+      }
+    } catch (err) {
+      violations.push({
+        rule: "NA-MANIFEST-02",
+        message: `notausgang-manifest.json does not parse: ${(err as Error).message}`,
+        file: "notausgang-manifest.json",
+      });
+    }
+  } else {
     violations.push({
-      rule: "legacy-json-artifact",
-      message: "notausgang-manifest.json found — export must be re-generated as YAML",
+      rule: "NA-MANIFEST-02",
+      message: "notausgang-manifest.json not found — export must be re-generated (RFC-1120)",
       file: "notausgang-manifest.json",
     });
   }
@@ -719,6 +828,104 @@ export async function runNotausgangValidate(
       violations.push({
         rule: "artifact-manifest-missing",
         message: "artifact-manifest.yaml not found",
+      });
+    }
+  }
+
+  // --- RFC-1120: evidence bundle rules ---
+  const evidenceDir = path.join(exportDir, "evidence");
+  const manifestEvidence = (manifest?.evidence ?? {}) as Record<
+    string,
+    {
+      verdict?: string;
+      artifacts?: Array<{ itemKey?: string; filename?: string; sha256?: string }>;
+    }
+  >;
+  const bundledSources = Object.entries(manifestEvidence).filter(
+    ([, v]) => v?.verdict === "bundled",
+  );
+
+  // NA-EVIDENCE-01: every bundled source has evidence/<id>/ with integrity.txt
+  for (const [sourceId] of bundledSources) {
+    const sourceDir = path.join(evidenceDir, sourceId);
+    const integrityPath = path.join(sourceDir, "integrity.txt");
+    if (!existsSync(integrityPath)) {
+      violations.push({
+        rule: "NA-EVIDENCE-01",
+        message: `manifest records evidence '${sourceId}' as bundled but evidence/${sourceId}/integrity.txt is missing`,
+        file: `evidence/${sourceId}/integrity.txt`,
+      });
+    }
+  }
+
+  // NA-EVIDENCE-02: re-verify each integrity.txt line against artifact bytes
+  if (existsSync(evidenceDir)) {
+    for (const entry of await fs.readdir(evidenceDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const integrityPath = path.join(evidenceDir, entry.name, "integrity.txt");
+      if (!existsSync(integrityPath)) continue;
+      const lines = (await fs.readFile(integrityPath, "utf8"))
+        .split("\n")
+        .filter((l) => l.trim().length > 0);
+      for (const line of lines) {
+        const sep = line.indexOf("  ");
+        if (sep < 0) {
+          violations.push({
+            rule: "NA-EVIDENCE-02",
+            message: `malformed integrity.txt line: '${line}'`,
+            file: `evidence/${entry.name}/integrity.txt`,
+          });
+          continue;
+        }
+        const expected = line.slice(0, sep).trim();
+        const rel = line.slice(sep + 2).trim();
+        const artifactPath = path.join(evidenceDir, entry.name, rel);
+        if (!existsSync(artifactPath)) {
+          violations.push({
+            rule: "NA-EVIDENCE-02",
+            message: `artifact '${rel}' listed in integrity.txt is missing`,
+            file: `evidence/${entry.name}/${rel}`,
+          });
+          continue;
+        }
+        const actual = (await byteHashFile(artifactPath)).replace(/^sha256:/, "");
+        if (actual !== expected) {
+          violations.push({
+            rule: "NA-EVIDENCE-02",
+            message: `artifact '${rel}' hash mismatch: expected ${expected}, got ${actual}`,
+            file: `evidence/${entry.name}/${rel}`,
+          });
+        }
+      }
+    }
+  }
+
+  // NA-FEATURES-01: feature-notes.md present and non-empty
+  const featureNotesPath = path.join(exportDir, "feature-notes.md");
+  if (!existsSync(featureNotesPath)) {
+    violations.push({
+      rule: "NA-FEATURES-01",
+      message: "feature-notes.md not found — export must be re-generated (RFC-1120)",
+      file: "feature-notes.md",
+    });
+  } else {
+    const content = await fs.readFile(featureNotesPath, "utf8");
+    if (content.trim().length === 0) {
+      violations.push({
+        rule: "NA-FEATURES-01",
+        message: "feature-notes.md is empty",
+        file: "feature-notes.md",
+      });
+    }
+  }
+
+  // NA-VERIFIER-01: verifier files present
+  for (const rel of ["verify.py", "verification.md", "SHA256SUMS.txt"]) {
+    if (!existsSync(path.join(exportDir, rel))) {
+      violations.push({
+        rule: "NA-VERIFIER-01",
+        message: `${rel} not found — export must be re-generated (RFC-1120)`,
+        file: rel,
       });
     }
   }

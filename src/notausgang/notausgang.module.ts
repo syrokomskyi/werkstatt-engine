@@ -19,14 +19,13 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createNotausgangModule(): Promise<ModuleExport> {
-  const { runNotausgangExport, runNotausgangValidate } =
-        await import("./notausgang-commands.ts");
+  const { runNotausgangExport, runNotausgangValidate } = await import("./notausgang-commands.ts");
   return {
     name: "notausgang",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "notausgang.export",
         modulePath: "packages/werkstatt-engine/src/notausgang/notausgang.module.ts",
         generates: [],
@@ -53,14 +52,22 @@ export async function createNotausgangModule(): Promise<ModuleExport> {
           "releases/{release}/**",
           "systems-cache/{system}/**",
           "systems-cache/{system}/system-config.yaml",
+          "systems-cache/{system}/src/content/system.md",
+          "systems-cache/{system}/src/content/business-profile/**",
         ],
         cacheable: false,
         execute: runNotausgangExport,
       },
-    {
+      {
         name: "notausgang.validate",
         contract: "notausgang",
-        rules: [],
+        rules: [
+          "NA-EVIDENCE-01",
+          "NA-EVIDENCE-02",
+          "NA-FEATURES-01",
+          "NA-VERIFIER-01",
+          "NA-MANIFEST-02",
+        ],
         modulePath: "packages/werkstatt-engine/src/notausgang/notausgang.module.ts",
         description:
           "Deep integrity verification of a Notausgang export package (RFC-0359, RFC-0380). Re-computes hashes, validates manifest schema, Bordbuch NDJSON, pin content, behavior snapshots, and scans for secrets. Flags: --path.",
@@ -71,9 +78,8 @@ export async function createNotausgangModule(): Promise<ModuleExport> {
         },
         reads: ["{--path}/**"],
         execute: runNotausgangValidate,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }
