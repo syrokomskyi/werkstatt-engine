@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const workspaceRoot = resolve(__dirname, "..", "..");
+const workspaceRoot = resolve(import.meta.dirname, "..", "..");
 const ledgerPath = join(workspaceRoot, ".flaky-tests.json");
 
 // Intentionally duplicated in packages/werkstatt-site/vitest.config.ts — vitest configs
@@ -29,7 +29,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", ...quarantinedExcludes],
     testTimeout: 30_000,
-    poolOptions: { forks: { maxWorkers: "50%" } },
+    maxWorkers: "50%",
     coverage: {
       provider: "v8",
       reporter: ["json", "json-summary", "text-summary", "html"],
