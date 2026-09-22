@@ -14,15 +14,16 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
+import { runPlatformUpdate } from "./platform-update.ts";
 
 export async function createPlatformModule(): Promise<ModuleExport> {
   const { runPlatformConsistencyValidate } = await import("./platform-consistency.ts");
   return {
     name: "platform",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "platform.consistency.validate",
         contract: "platform",
         rules: [],
@@ -54,9 +55,35 @@ export async function createPlatformModule(): Promise<ModuleExport> {
           rules: ["PC-01", "PC-02", "PC-03"],
           blocks: ["release.prepare"],
         },
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+      {
+        name: "werkstatt.platform.update",
+        contract: "platform",
+        rules: [],
+        modulePath: "packages/werkstatt-engine/src/handoff/platform-module.ts",
+        generates: [],
+        description:
+          "Bump @warpgogol/* platform dependencies in a workshop and report Sternsystems whose pinnedPlatform drifts from the new installed version (RFC-1125). Idempotent — re-running on an up-to-date workshop is a no-op.",
+        scope: "workspace",
+        supportsAllSites: false,
+        flags: {
+          to: {
+            kind: "string",
+            description: "Target version: semver (e.g. 6.317.0) or 'latest' (default).",
+          },
+          json: { kind: "boolean", description: "JSON output for agent consumption." },
+        },
+        reads: [
+          "package.json",
+          "node_modules/@warpgogol/**",
+          "../systems-cache/*/system-config.yaml",
+        ],
+        writes: ["package.json", "pnpm-lock.yaml"],
+        mutatesState: true,
+        cacheable: false,
+        execute: runPlatformUpdate,
+      },
+    ],
+    pipelines: [],
+  };
 }
