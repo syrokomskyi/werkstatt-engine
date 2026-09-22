@@ -9,6 +9,7 @@ import {
   computeInputsHash,
   computeModuleHash,
   getCachedCommandResult,
+  parseCommandResultCacheKey,
   setCachedCommandResult,
   type CommandResultCacheKey,
 } from "../command-result-cache.ts";
@@ -64,6 +65,52 @@ describe("buildCommandResultCacheKey", () => {
     const key1 = buildCommandResultCacheKey(makeKey({ siteName: null }));
     const key2 = buildCommandResultCacheKey(makeKey({ siteName: "warpgogol-com" }));
     expect(key1).not.toBe(key2);
+  });
+});
+
+describe("parseCommandResultCacheKey", () => {
+  test("round-trips plain hashes", () => {
+    const key = buildCommandResultCacheKey(
+      makeKey({ siteName: "app", inputsHash: "abc", moduleHash: "def" }),
+    );
+    expect(parseCommandResultCacheKey(COMMAND_RESULT_CACHE_NAMESPACE, key)).toEqual({
+      commandName: "test.command",
+      siteName: "app",
+      inputsHash: "abc",
+      moduleHash: "def",
+    });
+  });
+
+  test("round-trips algo-prefixed hashes (sha256:hex)", () => {
+    // Real keys embed "sha256:<hex>" hashes — a naive split(":") truncates
+    // them (inputsHash → "sha256", moduleHash → inputs hex). RFC-1127.
+    const key = buildCommandResultCacheKey(
+      makeKey({
+        siteName: "app",
+        inputsHash: "sha256:aaa111",
+        moduleHash: "sha256:bbb222",
+      }),
+    );
+    expect(parseCommandResultCacheKey(COMMAND_RESULT_CACHE_NAMESPACE, key)).toEqual({
+      commandName: "test.command",
+      siteName: "app",
+      inputsHash: "sha256:aaa111",
+      moduleHash: "sha256:bbb222",
+    });
+  });
+
+  test("handles empty siteName with prefixed hashes", () => {
+    const key = buildCommandResultCacheKey(
+      makeKey({ siteName: null, inputsHash: "sha256:aaa", moduleHash: "sha256:bbb" }),
+    );
+    const parsed = parseCommandResultCacheKey(COMMAND_RESULT_CACHE_NAMESPACE, key);
+    expect(parsed?.siteName).toBeNull();
+    expect(parsed?.moduleHash).toBe("sha256:bbb");
+  });
+
+  test("returns null for other namespaces and malformed keys", () => {
+    expect(parseCommandResultCacheKey("other_ns", "1:cmd:site:a:b")).toBeNull();
+    expect(parseCommandResultCacheKey(COMMAND_RESULT_CACHE_NAMESPACE, "1:cmd")).toBeNull();
   });
 });
 

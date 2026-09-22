@@ -74,6 +74,10 @@
       "types": "./src/kernel/command-manifest.module.ts",
       "default": "./src/kernel/command-manifest.module.ts"
     },
+    "./kernel/cache": {
+      "types": "./src/kernel/cache/index.ts",
+      "default": "./src/kernel/cache/index.ts"
+    },
     "./kernel/cache-module": {
       "types": "./src/kernel/cache/cache-module.ts",
       "default": "./src/kernel/cache/cache-module.ts"

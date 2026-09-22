@@ -16,7 +16,6 @@ helpers for storing and retrieving KernelExecutionReport objects in the
   <item>Command results are cached by input hash — identical inputs skip re-execution.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0390: initial implementation — COMMAND_RESULT_CACHE_NAMESPACE, CommandResultCacheKey, buildCommandResultCacheKey, computeInputsHash, computeModuleHash, getCachedCommandResult, setCachedCommandResult.</item>
   <item>RFC-0637: add modulePaths parameter to computeModuleHash for granular per-command module hashing.</item>
   <item>RFC-0685: add tree index support to expandGlobs, byte-mode selection per extension in computeInputsHash, inputsMetadata sidecar in cache entries, wrapper format for getCachedCommandResult/setCachedCommandResult.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -25,6 +24,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1127: step 1 — cache barrel + parse fix
+
+Add ./kernel/cache subpath export (narrow barrel: createCacheLayer, computeModuleHash, key helpers). Fix parseCommandResultCacheKey truncating algo-prefixed hashes (sha256:hex) — list() returned garbage moduleHash for all real keys.</item>
+  <history>RFC-0390</history>
 </CHANGE_SUMMARY>
 */
 
@@ -102,7 +105,23 @@ export function parseCommandResultCacheKey(
   if (namespace !== COMMAND_RESULT_CACHE_NAMESPACE) return null;
   const parts = key.split(":");
   if (parts.length < 5) return null;
-  const [, commandName, siteName, inputsHash, moduleHash] = parts;
+  const [, commandName, siteName] = parts;
+  // Hashes are "algo:hex" (e.g. sha256:abc…) — each may occupy two segments.
+  // Parse from the right: when the penultimate segment is an algo prefix it
+  // belongs to moduleHash; the same rule then applies to inputsHash.
+  const rest = parts.slice(3);
+  const isAlgoPrefix = (s: string) => /^(sha\d+|blake2[bs]?|md5)$/.test(s);
+  let moduleHash: string;
+  let inputParts: string[];
+  if (rest.length >= 3 && isAlgoPrefix(rest[rest.length - 2])) {
+    moduleHash = rest.slice(-2).join(":");
+    inputParts = rest.slice(0, -2);
+  } else {
+    moduleHash = rest[rest.length - 1];
+    inputParts = rest.slice(0, -1);
+  }
+  const inputsHash = inputParts.join(":");
+  if (!inputsHash || !moduleHash) return null;
   return {
     commandName,
     siteName: siteName || null,
