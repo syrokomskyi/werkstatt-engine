@@ -76,9 +76,13 @@ beforeEach(async () => {
     "export const x = 1;\n",
     "utf8",
   );
+  // RFC-1125: sternsystem.register preflight requires werkstatt.identity.json + signing key
+  await writeFile(join(workspaceRoot, "werkstatt.identity.json"), "{}", "utf8");
+  process.env.SIGNING_PRIVATE_KEY = "deadbeef".repeat(8);
 });
 
 afterEach(async () => {
+  delete process.env.SIGNING_PRIVATE_KEY;
   await rm(join(workspaceRoot, ".."), { recursive: true, force: true });
 });
 
