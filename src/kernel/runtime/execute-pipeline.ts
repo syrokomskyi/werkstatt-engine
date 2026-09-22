@@ -13,7 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1028: replace hardcoded moduleSrcDir with dynamic per-command resolution from command.modulePath via deriveModuleBasePath. Fixes stale cache keys caused by deleted packages/os/site-kernel-checks path.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -26,7 +25,10 @@ Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (
   <item>RFC-1130: qa.independent.run cacheable + cacheBypassFlags
 
 Steps 1-4: cacheBypassFlags field on KernelCommandDefinition, executor bypass at both cache call sites (hasCacheBypassFlag), qa.independent.run flipped to cacheable with narrowed reads + modulePaths, 14 new contract tests.</item>
-  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809</history>
+  <item>RFC-1130: document bypassCache in tryCacheRead/tryCacheWrite docstrings
+
+fo-review finding (axis E): docstrings did not mention the new bypassCache skip condition. Review report persisted.</item>
+  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028</history>
 </CHANGE_SUMMARY>
 */
 
@@ -471,7 +473,8 @@ async function getOrComputeModuleHash(
 /**
  * RFC-0390 + RFC-0685: Attempt to read a cached result for the given command.
  * Returns the cached report (with `cached: true`) or null on miss.
- * Skips cache when `dryRun` or `force` is set, or when cache is unavailable.
+ * Skips cache when `dryRun` or `force` is set, when `bypassCache` is set
+ * (RFC-1130 `cacheBypassFlags`), or when cache is unavailable.
  *
  * RFC-0685: when the cached entry has `inputsMetadata` and `inputsHash`, and
  * the tree index is available, compares current file metadata against stored
@@ -645,8 +648,9 @@ async function tryMtimeFastPath(
 
 /**
  * RFC-0390 + RFC-0685: Store a successful command result in the cache.
- * Only stores when `ok: true`, not `dryRun`, and the command is cacheable.
- * On `--force`, still stores (refreshing entries).
+ * Only stores when `ok: true`, not `dryRun`, not `bypassCache` (RFC-1130
+ * `cacheBypassFlags` — a filtered run must not poison the full-run entry),
+ * and the command is cacheable. On `--force`, still stores (refreshing entries).
  *
  * RFC-0685: also stores inputsMetadata sidecar and a metadata-to-inputsHash
  * mapping for the mtime fast path.
