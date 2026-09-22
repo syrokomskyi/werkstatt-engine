@@ -13,8 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>ADR-0087: closed-workpiece helpers extracted to runtime/closed-workpiece.ts (leaf module shared with execute-command.ts); skippedExecutionReport moved to runtime/shared.ts; pipeline keeps the early skip for reporting/telemetry while enforcement lives in executeRegisteredCommand.</item>
-  <item>ADR-0023: reuse CacheLayer SQLite connection across pipeline steps; batch telemetry writes to a single append at pipeline completion; close cache after pipeline run.</item>
   <item>RFC-0809: add collect-errors mode — aggregate all independent step failures instead of stopping at first failure. Extract aggregateCollectErrors pure function for testability.</item>
   <item>RFC-1028: replace hardcoded moduleSrcDir with dynamic per-command resolution from command.modulePath via deriveModuleBasePath. Fixes stale cache keys caused by deleted packages/os/site-kernel-checks path.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -23,7 +21,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>ADR-0022, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687</history>
+  <item>RFC-1126: step 2 — kernel runtime wiring
+
+Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
+  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687</history>
 </CHANGE_SUMMARY>
 */
 
@@ -41,7 +42,11 @@ import {
   lookupExpectedDurationMs,
   type StepTelemetryRecord,
 } from "../pipeline-budgets.ts";
-import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
+import {
+  createDefaultIO,
+  EMPTY_WORKPIECE_ENV,
+  loadWorkpieceEnv,
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createCacheLayer } from "../cache/cache-layer.ts";
 import {
   COMMAND_RESULT_CACHE_SCHEMA_VERSION,
@@ -770,6 +775,7 @@ async function executePipelineForSite(
           fileIntents: intents,
           actualState: registry,
           ownershipMap,
+          workpieceEnv: await loadWorkpieceEnv(site.directory),
         };
 
         const stepLabel = `[${stepIndex + 1}/${totalSteps}]`;
@@ -1051,6 +1057,7 @@ async function executePipelineForWorkspace(
           fileIntents: intents,
           actualState: registry,
           ownershipMap,
+          workpieceEnv: EMPTY_WORKPIECE_ENV,
         };
 
         const stepLabel = `[${stepIndex + 1}/${totalSteps}]`;
