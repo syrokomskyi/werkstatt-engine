@@ -13,7 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0809: add collect-errors mode — aggregate all independent step failures instead of stopping at first failure. Extract aggregateCollectErrors pure function for testability.</item>
   <item>RFC-1028: replace hardcoded moduleSrcDir with dynamic per-command resolution from command.modulePath via deriveModuleBasePath. Fixes stale cache keys caused by deleted packages/os/site-kernel-checks path.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -24,7 +23,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1126: step 2 — kernel runtime wiring
 
 Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
-  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687</history>
+  <item>RFC-1130: qa.independent.run cacheable + cacheBypassFlags
+
+Steps 1-4: cacheBypassFlags field on KernelCommandDefinition, executor bypass at both cache call sites (hasCacheBypassFlag), qa.independent.run flipped to cacheable with narrowed reads + modulePaths, 14 new contract tests.</item>
+  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809</history>
 </CHANGE_SUMMARY>
 */
 
@@ -475,6 +477,19 @@ async function getOrComputeModuleHash(
  * the tree index is available, compares current file metadata against stored
  * metadata. If identical, reuses the stored `inputsHash` without fingerprinting.
  */
+
+/**
+ * RFC-1130: true when argv contains a flag listed in the command's
+ * `cacheBypassFlags` (`--name` or `--name=value` forms). The cache key is
+ * flag-blind by design — flags that reduce coverage (e.g. `--rfc`) must
+ * bypass both the cache read and the cache write so a filtered run can
+ * neither serve a stale full-run report nor poison the full-run entry.
+ */
+export function hasCacheBypassFlag(command: KernelCommandDefinition, argv: string[]): boolean {
+  const names = command.cacheBypassFlags ?? [];
+  return names.some((n) => argv.some((a) => a === `--${n}` || a.startsWith(`--${n}=`)));
+}
+
 export async function tryCacheRead(
   cache: CacheLayer,
   command: KernelCommandDefinition,
@@ -485,9 +500,10 @@ export async function tryCacheRead(
   moduleHashCache: Map<string, string>,
   force: boolean,
   dryRun: boolean,
+  bypassCache?: boolean,
   treeIndex?: WorkspaceTreeIndex,
 ): Promise<KernelExecutionReport | null> {
-  if (dryRun || force) return null;
+  if (dryRun || force || bypassCache) return null;
   if (!isCommandCacheable(command)) return null;
   if (!cache.available) return null;
 
@@ -635,7 +651,7 @@ async function tryMtimeFastPath(
  * RFC-0685: also stores inputsMetadata sidecar and a metadata-to-inputsHash
  * mapping for the mtime fast path.
  */
-async function tryCacheWrite(
+export async function tryCacheWrite(
   cache: CacheLayer,
   command: KernelCommandDefinition,
   report: KernelExecutionReport,
@@ -645,9 +661,10 @@ async function tryCacheWrite(
   moduleSrcDir: string,
   moduleHashCache: Map<string, string>,
   dryRun: boolean,
+  bypassCache?: boolean,
   treeIndex?: WorkspaceTreeIndex,
 ): Promise<void> {
-  if (dryRun) return;
+  if (dryRun || bypassCache) return;
   if (!report.ok) return;
   if (!isCommandCacheable(command)) return;
   if (!cache.available) return;
@@ -806,6 +823,10 @@ async function executePipelineForSite(
           // RFC-0687: transitive cache skip — all upstream commands were cache hits.
           report = skippedExecutionReport(command, context, "transitive-cache-skip");
         } else {
+          // RFC-1130: argv is needed before the cache read — a flag listed in
+          // cacheBypassFlags skips both the read and the write.
+          const stepArgs = [...(step.args ?? []), ...pipelineFlagsToArgs(options.flags)];
+          const bypassCache = hasCacheBypassFlag(command, stepArgs);
           // RFC-0390: try cache read before executing.
           const cached = await tryCacheRead(
             cache,
@@ -817,6 +838,7 @@ async function executePipelineForSite(
             moduleHashCache,
             options.force ?? false,
             options.dryRun ?? false,
+            bypassCache,
             treeIndex,
           );
           if (cached) {
@@ -824,7 +846,6 @@ async function executePipelineForSite(
           } else {
             // Inject --site for workspace-scoped commands so they receive the site
             // name from the pipeline context (mirrors executeKernelCommand logic).
-            const stepArgs = [...(step.args ?? []), ...pipelineFlagsToArgs(options.flags)];
             if (
               command.scope === "workspace" &&
               !stepArgs.some((a) => a === "--site" || a.startsWith("--site=")) &&
@@ -862,6 +883,7 @@ async function executePipelineForSite(
               moduleSrcDir,
               moduleHashCache,
               options.dryRun ?? false,
+              bypassCache,
               treeIndex,
             );
           }
@@ -1080,6 +1102,10 @@ async function executePipelineForWorkspace(
           // RFC-0687: transitive cache skip — all upstream commands were cache hits.
           report = skippedExecutionReport(command, context, "transitive-cache-skip");
         } else {
+          // RFC-1130: argv is needed before the cache read — a flag listed in
+          // cacheBypassFlags skips both the read and the write.
+          const stepArgs = [...(step.args ?? []), ...pipelineFlagsToArgs(options.flags)];
+          const bypassCache = hasCacheBypassFlag(command, stepArgs);
           // RFC-0390: try cache read before executing.
           const cached = await tryCacheRead(
             cache,
@@ -1091,6 +1117,7 @@ async function executePipelineForWorkspace(
             moduleHashCache,
             options.force ?? false,
             options.dryRun ?? false,
+            bypassCache,
             treeIndex,
           );
           if (cached) {
@@ -1098,15 +1125,10 @@ async function executePipelineForWorkspace(
             // RFC-0687: track cache hits for transitive skip.
             runState.cacheHitCommands.add(step.command);
           } else {
-            report = await executeRegisteredCommand(
-              command,
-              context,
-              [...(step.args ?? []), ...pipelineFlagsToArgs(options.flags)],
-              {
-                timeoutMs: step.timeoutMs,
-                expectedDurationMs: budgetedExpectedDurationMs ?? step.expectedDurationMs,
-              },
-            );
+            report = await executeRegisteredCommand(command, context, stepArgs, {
+              timeoutMs: step.timeoutMs,
+              expectedDurationMs: budgetedExpectedDurationMs ?? step.expectedDurationMs,
+            });
             // RFC-0390: store successful results in cache.
             await tryCacheWrite(
               cache,
@@ -1118,6 +1140,7 @@ async function executePipelineForWorkspace(
               moduleSrcDir,
               moduleHashCache,
               options.dryRun ?? false,
+              bypassCache,
               treeIndex,
             );
           }
