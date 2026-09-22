@@ -38,6 +38,7 @@ import {
   resolveCacheClonePath,
 } from "./registry-io.ts";
 import { runSternsystemPin } from "./sternsystem-pin.ts";
+import { identityConfigPath } from "../identity/identity-io.ts";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
@@ -163,6 +164,26 @@ export async function runSternsystemRegister(
   if (hasTldSuffix(id)) {
     throw new Error(
       `[sternsystem.register] id '${id}' ends in a TLD suffix — use the business ID without domain TLD (e.g. 'warpgogol' not 'warpgogol-com')`,
+    );
+  }
+
+  // RFC-1125: identity + signing-key preflight — register either produces a signed
+  // passport or blocks. An unsigned passport is worse than no registration.
+  // Gates both register and --amend paths (amend missions close into signed bordbuch
+  // commits + passport refresh, which need the same identity material).
+  const identityExists = existsSync(identityConfigPath(workspaceRoot));
+  const signingKeyConfigured = Boolean(
+    process.env.SIGNING_PRIVATE_KEY || process.env.SIGNING_PRIVATE_KEY_PATH,
+  );
+  if (!identityExists || !signingKeyConfigured) {
+    const missing = [
+      !identityExists ? "werkstatt.identity.json" : null,
+      !signingKeyConfigured ? "signing key (SIGNING_PRIVATE_KEY/SIGNING_PRIVATE_KEY_PATH)" : null,
+    ]
+      .filter(Boolean)
+      .join(" and ");
+    throw new Error(
+      `[sternsystem.register] Missing ${missing}. Run identity.bootstrap first — it creates werkstatt.identity.json and prints the private key for SIGNING_PRIVATE_KEY.`,
     );
   }
 
@@ -308,20 +329,13 @@ export async function runSternsystemRegister(
     // RFC-0574: mirror hook removed — star topology uses explicit sternsystem.sync
     void workspaceRoot;
 
-    // RFC-0966: Generate initial passport at site birth (non-fatal if no signing key)
+    // RFC-0966: Generate initial passport at site birth. The RFC-1125 preflight
+    // guarantees a signing key is configured — generation failures are still
+    // non-fatal (e.g. malformed key material surfaces downstream).
     try {
-      const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
-      const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
-      if (privateKeyEnv || privateKeyPath) {
-        const { runSternsystemPassportGenerate } =
-          await import("./sternsystem-passport-generate.ts");
-        await runSternsystemPassportGenerate(makeInput({ id, actor: "human:operator" }), context);
-        logger.info(`  [sternsystem.register] Initial passport generated for ${id}`);
-      } else {
-        logger.info(
-          `  [sternsystem.register] No signing key configured — passport generation skipped (run sternsystem.passport.generate later)`,
-        );
-      }
+      const { runSternsystemPassportGenerate } = await import("./sternsystem-passport-generate.ts");
+      await runSternsystemPassportGenerate(makeInput({ id, actor: "human:operator" }), context);
+      logger.info(`  [sternsystem.register] Initial passport generated for ${id}`);
     } catch (passportErr) {
       logger.warn(
         `  [sternsystem.register] Passport generation failed (non-fatal): ${passportErr instanceof Error ? passportErr.message : String(passportErr)}`,
