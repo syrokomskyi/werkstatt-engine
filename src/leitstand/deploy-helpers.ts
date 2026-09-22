@@ -7,7 +7,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0866 fix D-2: writeDeploymentEffectRecord accepts optional deploymentUrl for effect-record URL discovery.</item>
   <item>RFC-0926: buildEffectRecord and writeDeploymentEffectRecord accept optional workerVersionId and releaseId for release-aware rollback.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -18,6 +17,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <item>RFC-1126: step 7 — AC evidence alignment
+
+resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <history>RFC-0865, RFC-0866</history>
 </CHANGE_SUMMARY>
 */
@@ -172,10 +174,17 @@ export async function loadMainVerificationDecision(
 /** RFC-1126: where the artifact hash was resolved from — reported for provenance. */
 export type ArtifactHashSource = "flag" | "artifact.tar.gz" | "release.yaml";
 
+export interface ResolvedArtifactHash {
+  hash: Sha256Digest;
+  source: ArtifactHashSource;
+  /** Absolute path of the file the hash was resolved from; undefined for --artifact-hash. */
+  path?: string;
+}
+
 export async function resolveArtifactHash(
   artifactHashFlag: string | undefined,
   releaseDir: string | undefined,
-): Promise<{ hash: Sha256Digest; source: ArtifactHashSource }> {
+): Promise<ResolvedArtifactHash> {
   if (artifactHashFlag && isSha256Digest(artifactHashFlag)) {
     return { hash: artifactHashFlag, source: "flag" };
   }
@@ -183,7 +192,11 @@ export async function resolveArtifactHash(
   if (releaseDir && existsSync(releaseDir)) {
     const artifactPath = path.join(releaseDir, "artifact.tar.gz");
     if (existsSync(artifactPath)) {
-      return { hash: await byteHashFile(artifactPath), source: "artifact.tar.gz" };
+      return {
+        hash: await byteHashFile(artifactPath),
+        source: "artifact.tar.gz",
+        path: artifactPath,
+      };
     }
 
     const releaseYamlPath = path.join(releaseDir, "release.yaml");
@@ -192,7 +205,7 @@ export async function resolveArtifactHash(
         const content = await fs.readFile(releaseYamlPath, "utf8");
         const match = content.match(/^distTreeHash:\s*(sha256:[a-f0-9]{64})\s*$/m);
         if (match && isSha256Digest(match[1])) {
-          return { hash: match[1], source: "release.yaml" };
+          return { hash: match[1], source: "release.yaml", path: releaseYamlPath };
         }
       } catch {
         // release.yaml unreadable — fall through to error

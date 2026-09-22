@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0929: add pre-flight accessPin check — fail early with clear message if site has PIN protection active. --force does not bypass this check.</item>
   <item>RFC-0938: auto-manage access PIN during certify — auto-remove before producers, auto-restore in finally block. --auto-manage-pin flag (default true).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -19,6 +18,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <item>RFC-1126: step 7 — AC evidence alignment
+
+resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <history>RFC-0866, RFC-0867, RFC-0929</history>
 </CHANGE_SUMMARY>
 */
@@ -252,12 +254,13 @@ export async function runLeitstandCertify(
   if (!releaseId) throw new Error("[leitstand.certify] --release is required");
 
   const releaseDir = path.join(context.workspaceRoot, "releases", releaseId);
-  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
-    artifactHashFlag,
-    releaseDir,
-  );
+  const {
+    hash: artifactHash,
+    source: artifactHashSource,
+    path: artifactHashPath,
+  } = await resolveArtifactHash(artifactHashFlag, releaseDir);
   context.logger.info(
-    `[certify] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+    `[certify] artifact hash resolved from ${artifactHashSource}${artifactHashPath ? ` (${artifactHashPath})` : ""}: ${artifactHash}`,
   );
 
   const baseUrlFlag = flagString(input, "base-url");

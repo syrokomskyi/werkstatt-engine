@@ -84,21 +84,21 @@ describe("deploy-helpers", () => {
       await fs.mkdir(releaseDir, { recursive: true });
       const artifactPath = path.join(releaseDir, "artifact.tar.gz");
       await fs.writeFile(artifactPath, "test artifact content");
-      const { hash, source } = await resolveArtifactHash(undefined, releaseDir);
+      const { hash, source, path: resolvedPath } = await resolveArtifactHash(undefined, releaseDir);
       expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
       expect(source).toBe("artifact.tar.gz");
+      expect(resolvedPath).toBe(artifactPath);
     });
 
     it("reads distTreeHash from release.yaml when artifact.tar.gz is absent", async () => {
       const releaseDir = path.join(tmpDir, "releases", "rel-002");
       await fs.mkdir(releaseDir, { recursive: true });
-      await fs.writeFile(
-        path.join(releaseDir, "release.yaml"),
-        `distTreeHash: ${testArtifactHash}\n`,
-      );
-      const { hash, source } = await resolveArtifactHash(undefined, releaseDir);
+      const releaseYamlPath = path.join(releaseDir, "release.yaml");
+      await fs.writeFile(releaseYamlPath, `distTreeHash: ${testArtifactHash}\n`);
+      const { hash, source, path: resolvedPath } = await resolveArtifactHash(undefined, releaseDir);
       expect(hash).toBe(testArtifactHash);
       expect(source).toBe("release.yaml");
+      expect(resolvedPath).toBe(releaseYamlPath);
     });
   });
 

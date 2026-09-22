@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0930: add runLeitstandVerify command handler — fetches build-identity.json from live CDN URLs for all configured channels, compares distTreeHash cross-channel, optionally compares against local system-state.yaml records.</item>
   <item>RFC-0948: add channel drift warning to runLeitstandDevDeploy — compares dev releaseId against alt/main lastPropagated and emits non-fatal warning when they differ.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -17,7 +16,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927</history>
+  <item>RFC-1126: step 7 — AC evidence alignment
+
+resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930</history>
 </CHANGE_SUMMARY>
 */
 
@@ -765,12 +767,13 @@ export async function runLeitstandDevDeploy(
   const releaseDir = releaseId
     ? path.join(context.workspaceRoot, "releases", releaseId)
     : undefined;
-  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
-    artifactHashFlag,
-    releaseDir,
-  );
+  const {
+    hash: artifactHash,
+    source: artifactHashSource,
+    path: artifactHashPath,
+  } = await resolveArtifactHash(artifactHashFlag, releaseDir);
   context.logger.info(
-    `[deploy] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+    `[deploy] artifact hash resolved from ${artifactHashSource}${artifactHashPath ? ` (${artifactHashPath})` : ""}: ${artifactHash}`,
   );
 
   const authResult = await authorizeAndDeploy({
@@ -961,12 +964,13 @@ export async function runLeitstandPropagate(
   );
 
   const releaseDir = path.join(context.workspaceRoot, "releases", releaseId);
-  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
-    artifactHashFlag,
-    releaseDir,
-  );
+  const {
+    hash: artifactHash,
+    source: artifactHashSource,
+    path: artifactHashPath,
+  } = await resolveArtifactHash(artifactHashFlag, releaseDir);
   context.logger.info(
-    `[deploy] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+    `[deploy] artifact hash resolved from ${artifactHashSource}${artifactHashPath ? ` (${artifactHashPath})` : ""}: ${artifactHash}`,
   );
 
   const r2Config = makeR2ConfigFromEnv(process.env as Record<string, string | undefined>);
@@ -1214,12 +1218,13 @@ export async function runLeitstandPromote(
   );
 
   const releaseDir = path.join(context.workspaceRoot, "releases", releaseId);
-  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
-    artifactHashFlag,
-    releaseDir,
-  );
+  const {
+    hash: artifactHash,
+    source: artifactHashSource,
+    path: artifactHashPath,
+  } = await resolveArtifactHash(artifactHashFlag, releaseDir);
   context.logger.info(
-    `[deploy] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+    `[deploy] artifact hash resolved from ${artifactHashSource}${artifactHashPath ? ` (${artifactHashPath})` : ""}: ${artifactHash}`,
   );
 
   const r2Config = makeR2ConfigFromEnv(process.env as Record<string, string | undefined>);
