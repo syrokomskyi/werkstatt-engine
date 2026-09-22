@@ -15,6 +15,9 @@ machinery (setCachedCommandResult, workspace-tree-index) stays internal.
   <item>RFC-1127: step 1 — cache barrel + parse fix
 
 Add ./kernel/cache subpath export (narrow barrel: createCacheLayer, computeModuleHash, key helpers). Fix parseCommandResultCacheKey truncating algo-prefixed hashes (sha256:hex) — list() returned garbage moduleHash for all real keys.</item>
+  <item>RFC-1128: lighthouse.budget.check cacheable via dist-input reads
+
+cacheable: true + reads covering dist/**, .lighthouse-budget-ignore, astro.config.*, system-config.yaml. Export computeInputsHash from kernel/cache barrel for reads-coverage tests. 3 new contract tests (18 total pass).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -34,6 +37,7 @@ export {
   COMMAND_RESULT_CACHE_NAMESPACE,
   COMMAND_RESULT_CACHE_SCHEMA_VERSION,
   buildCommandResultCacheKey,
+  computeInputsHash,
   computeModuleHash,
   type CachedCommandResultEntry,
   type CommandResultCacheKey,
