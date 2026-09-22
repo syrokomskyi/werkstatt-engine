@@ -302,20 +302,15 @@ export async function runSternsystemSync(
   // sender-side transfer claim for this system, then fetch/ff/verify/push the
   // claims clone. Non-fatal: claims are additive to mirror sync.
   try {
-    const { publishPendingTransferClaim, syncClaims } = await import("../fleet/claims-repo.ts");
-    const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
-    const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
-    if (privateKeyEnv || privateKeyPath) {
-      const { loadPrivateKey, toHex } = await import("@warpgogol/werkstatt-engine/signing");
-      const { derivePublicKey } = await import("./passport.ts");
-      const keyBytes = privateKeyEnv
-        ? await loadPrivateKey({ pem: privateKeyEnv })
-        : await loadPrivateKey({ filePath: privateKeyPath!, encoding: "pem" });
+    const { loadSigningKeyFromEnv, publishPendingTransferClaim, syncClaims } =
+      await import("../fleet/claims-repo.ts");
+    const signingKey = await loadSigningKeyFromEnv();
+    if (signingKey) {
       const transfer = await publishPendingTransferClaim({
         systemId: id,
         werkstattRoot: workspaceRoot,
-        signerPrivateKeyHex: toHex(keyBytes),
-        signerPublicKey: await derivePublicKey(keyBytes),
+        signerPrivateKeyHex: signingKey.privateKeyHex,
+        signerPublicKey: signingKey.publicKeyHex,
       });
       if (transfer) {
         logger.info(`[sternsystem.sync] published sender-side transfer claim for ${id}`);

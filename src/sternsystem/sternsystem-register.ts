@@ -331,24 +331,17 @@ export async function runSternsystemRegister(
     // RFC-1124: publish initial fleet claim at site birth (non-fatal — skips
     // silently without werkstatt.fleet.json or a signing key).
     try {
-      const { loadFleetClaimsConfig, publishClaim } = await import("../fleet/claims-repo.ts");
-      if (await loadFleetClaimsConfig(workspaceRoot)) {
-        const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
-        const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
-        if (privateKeyEnv || privateKeyPath) {
-          const { loadPrivateKey, toHex } = await import("@warpgogol/werkstatt-engine/signing");
-          const { derivePublicKey } = await import("./passport.ts");
-          const keyBytes = privateKeyEnv
-            ? await loadPrivateKey({ pem: privateKeyEnv })
-            : await loadPrivateKey({ filePath: privateKeyPath!, encoding: "pem" });
-          await publishClaim({
-            systemId: id,
-            werkstattRoot: workspaceRoot,
-            signerPrivateKeyHex: toHex(keyBytes),
-            signerPublicKey: await derivePublicKey(keyBytes),
-          });
-          logger.info(`  [sternsystem.register] Initial fleet claim published for ${id}`);
-        }
+      const { loadFleetClaimsConfig, loadSigningKeyFromEnv, publishClaim } =
+        await import("../fleet/claims-repo.ts");
+      const signingKey = await loadSigningKeyFromEnv();
+      if (signingKey && (await loadFleetClaimsConfig(workspaceRoot))) {
+        await publishClaim({
+          systemId: id,
+          werkstattRoot: workspaceRoot,
+          signerPrivateKeyHex: signingKey.privateKeyHex,
+          signerPublicKey: signingKey.publicKeyHex,
+        });
+        logger.info(`  [sternsystem.register] Initial fleet claim published for ${id}`);
       }
     } catch (claimErr) {
       logger.warn(

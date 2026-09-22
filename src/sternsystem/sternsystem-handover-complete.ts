@@ -355,6 +355,9 @@ export async function runSternsystemHandoverComplete(
           at,
           reason: "worker-unreachable — retry via fleet.ownership.transfer",
         });
+        // Follow-up (RFC-1124 Phase 2): a retry command should consume these
+        // journals and re-attempt the Worker transfer; until then entries
+        // accumulate harmlessly — the claims repo is the authority.
       } catch (journalErr) {
         logger.warn(
           `[sternsystem.handover.complete] retry journal write failed (non-fatal): ${journalErr instanceof Error ? journalErr.message : String(journalErr)}`,

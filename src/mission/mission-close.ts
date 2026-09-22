@@ -962,21 +962,16 @@ export async function buildCloseSteps(
         const cc = c as CloseStepCtx;
         const logger = cc.context.logger;
         try {
-          const { loadFleetClaimsConfig, publishClaim } = await import("../fleet/claims-repo.ts");
+          const { loadFleetClaimsConfig, loadSigningKeyFromEnv, publishClaim } =
+            await import("../fleet/claims-repo.ts");
           if (!(await loadFleetClaimsConfig(cc.workspaceRoot))) return;
-          const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
-          const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
-          if (!privateKeyEnv && !privateKeyPath) return;
-          const { loadPrivateKey, toHex } = await import("@warpgogol/werkstatt-engine/signing");
-          const { derivePublicKey } = await import("../sternsystem/passport.ts");
-          const keyBytes = privateKeyEnv
-            ? await loadPrivateKey({ pem: privateKeyEnv })
-            : await loadPrivateKey({ filePath: privateKeyPath!, encoding: "pem" });
+          const signingKey = await loadSigningKeyFromEnv();
+          if (!signingKey) return;
           const result = await publishClaim({
             systemId: cc.manifest.systemId,
             werkstattRoot: cc.workspaceRoot,
-            signerPrivateKeyHex: toHex(keyBytes),
-            signerPublicKey: await derivePublicKey(keyBytes),
+            signerPrivateKeyHex: signingKey.privateKeyHex,
+            signerPublicKey: signingKey.publicKeyHex,
           });
           logger.success(
             `  [claims-publish] Fleet claim published (hash: ${result.claim.passportHash.slice(0, 16)}${result.pushed ? ", pushed" : ", local-only"})`,

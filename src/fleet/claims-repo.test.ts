@@ -325,7 +325,7 @@ describe("RFC-1124: tombstone and conflict resolution", () => {
     // would invalidate the signature (correctly yielding invalid-signature).
     const claim = readLocalClaim(systemId)!;
     const { signClaim } = await import("@warpgogol/werkstatt-shared/passport/claim-sign");
-    const { signature, ...data } = claim;
+    const { signature: _signature, ...data } = claim;
     const tombstone: FleetClaim = {
       ...data,
       supersededBy: "u".repeat(64),

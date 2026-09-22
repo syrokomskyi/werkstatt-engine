@@ -20,9 +20,8 @@ precedence ported from kernel/dht/register.ts, and syncs with git remotes.
 */
 
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -33,6 +32,7 @@ import {
 } from "@warpgogol/werkstatt-shared/passport/claim-sign";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import { readPassport } from "../sternsystem/registry-io.ts";
+import { derivePublicKey } from "../sternsystem/passport.ts";
 import { deriveInstanceId } from "./ownership-registry.ts";
 
 // ---------------------------------------------------------------------------
@@ -173,18 +173,24 @@ export async function ensureClaimsClone(
   return clonePath;
 }
 
-/** Named remotes: first = "origin", rest = "remote1..N". */
+/**
+ * Named remotes: first = "origin", rest = "remote1..N". Only managed names
+ * (origin, remoteN) are removed/re-added — operator-added remotes with other
+ * names are preserved.
+ */
 function syncGitRemotes(clonePath: string, remotes: string[]): void {
+  const managed = new Set(remotes.map((_, i) => remoteName(i)));
   const existing = gitOk(clonePath, ["remote"])
     ? git(clonePath, ["remote"]).split("\n").filter(Boolean)
     : [];
   for (const name of existing) {
+    if (!managed.has(name) && name !== "origin" && !/^remote\d+$/.test(name)) continue;
     execFileSync("git", ["-C", clonePath, "remote", "remove", name], {
       stdio: ["ignore", "pipe", "pipe"],
     });
   }
   remotes.forEach((url, i) => {
-    const name = i === 0 ? "origin" : `remote${i}`;
+    const name = remoteName(i);
     execFileSync("git", ["-C", clonePath, "remote", "add", name, url], {
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -193,6 +199,30 @@ function syncGitRemotes(clonePath: string, remotes: string[]): void {
 
 function remoteName(index: number): string {
   return index === 0 ? "origin" : `remote${index}`;
+}
+
+/**
+ * Load the signing key pair from the standard env vars
+ * (SIGNING_PRIVATE_KEY / SIGNING_PRIVATE_KEY_PATH) and derive the public key.
+ * Shared by all fleet.claims.* handlers and the lifecycle call sites
+ * (mission.close, sternsystem.register, sternsystem.sync, handover.complete).
+ * Returns null when no key is configured — callers skip silently.
+ */
+export async function loadSigningKeyFromEnv(): Promise<{
+  privateKeyHex: string;
+  publicKeyHex: string;
+} | null> {
+  const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
+  const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
+  if (!privateKeyEnv && !privateKeyPath) return null;
+  const { loadPrivateKey, toHex } = await import("@warpgogol/werkstatt-engine/signing");
+  const keyBytes = privateKeyEnv
+    ? await loadPrivateKey({ pem: privateKeyEnv })
+    : await loadPrivateKey({ filePath: privateKeyPath!, encoding: "pem" });
+  return {
+    privateKeyHex: toHex(keyBytes),
+    publicKeyHex: await derivePublicKey(keyBytes),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +399,7 @@ export async function publishPendingTransferClaim(input: {
 function readClaimFile(filePath: string): FleetClaim | null {
   if (!existsSync(filePath)) return null;
   try {
-    return JSON.parse(execFileSync("cat", [filePath], { encoding: "utf8" })) as FleetClaim;
+    return JSON.parse(readFileSync(filePath, "utf8")) as FleetClaim;
   } catch {
     return null;
   }
@@ -606,7 +636,6 @@ export async function syncClaims(werkstattRoot: string): Promise<SyncClaimsResul
   // Verify all local claim signatures.
   const claimsDir = path.join(clonePath, "claims");
   if (existsSync(claimsDir)) {
-    const { readdir } = await import("node:fs/promises");
     for (const file of await readdir(claimsDir)) {
       if (!file.endsWith(".json")) continue;
       const claim = readClaimFile(path.join(claimsDir, file));
@@ -662,11 +691,11 @@ export async function claimsStatus(werkstattRoot: string): Promise<ClaimsStatusR
 
   const claimsDir = path.join(clonePath, "claims");
   if (existsSync(claimsDir)) {
-    const { readdir } = await import("node:fs/promises");
     result.claims = (await readdir(claimsDir)).filter((f) => f.endsWith(".json")).length;
   }
 
-  for (const ref of remoteRefs(clonePath)) {
+  const refs = remoteRefs(clonePath);
+  for (const ref of refs) {
     const behind = gitOk(clonePath, ["rev-list", "--count", `HEAD..${ref}`])
       ? Number.parseInt(git(clonePath, ["rev-list", "--count", `HEAD..${ref}`]), 10)
       : 0;
@@ -677,7 +706,7 @@ export async function claimsStatus(werkstattRoot: string): Promise<ClaimsStatusR
     result.unpushedCommits = Math.max(result.unpushedCommits, ahead);
   }
   // No remote refs yet — count all local commits as unpushed.
-  if (remoteRefs(clonePath).length === 0 && gitOk(clonePath, ["rev-list", "--count", "HEAD"])) {
+  if (refs.length === 0 && gitOk(clonePath, ["rev-list", "--count", "HEAD"])) {
     result.unpushedCommits = Number.parseInt(git(clonePath, ["rev-list", "--count", "HEAD"]), 10);
   }
 
@@ -692,9 +721,4 @@ export async function claimsStatus(werkstattRoot: string): Promise<ClaimsStatusR
   }
 
   return result;
-}
-
-/** sha256 helper for claim content addressing (diagnostics). */
-export function claimContentHash(claim: FleetClaim): string {
-  return createHash("sha256").update(JSON.stringify(claim), "utf8").digest("hex");
 }

@@ -20,12 +20,10 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
-import { loadPrivateKey, toHex } from "@warpgogol/werkstatt-engine/signing";
-import { derivePublicKey } from "../sternsystem/passport.ts";
 import {
   claimsStatus,
   ensureClaimsClone,
-  loadFleetClaimsConfig,
+  loadSigningKeyFromEnv,
   publishClaim,
   syncClaims,
   verifyClaimOffline,
@@ -42,23 +40,6 @@ function flagBool(input: KernelCommandInput, key: string): boolean {
 }
 
 const DEFAULT_LOCAL_PATH = ".werkstatt/fleet-claims";
-
-/** Load the workshop signing key from env — same contract as handover.complete. */
-async function loadSigningKey(): Promise<{
-  privateKeyHex: string;
-  publicKeyHex: string;
-} | null> {
-  const env = process.env;
-  const privateKeyEnv = env["SIGNING_PRIVATE_KEY"];
-  const privateKeyPath = env["SIGNING_PRIVATE_KEY_PATH"];
-  if (!privateKeyEnv && !privateKeyPath) return null;
-
-  const privateKeyBytes = privateKeyEnv
-    ? await loadPrivateKey({ pem: privateKeyEnv })
-    : await loadPrivateKey({ filePath: privateKeyPath!, encoding: "pem" });
-  const publicKeyHex = await derivePublicKey(privateKeyBytes);
-  return { privateKeyHex: toHex(privateKeyBytes), publicKeyHex };
-}
 
 // ---------------------------------------------------------------------------
 // fleet.claims.init
@@ -77,7 +58,10 @@ export async function runFleetClaimsInit(
     };
   }
 
-  const remotes = remote.split(",").map((r) => r.trim()).filter(Boolean);
+  const remotes = remote
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean);
   const localPath = flagString(input, "local-path") ?? DEFAULT_LOCAL_PATH;
   const workerUrl = flagString(input, "worker-url");
 
@@ -124,7 +108,7 @@ export async function runFleetClaimsPublish(
     };
   }
 
-  const key = await loadSigningKey();
+  const key = await loadSigningKeyFromEnv();
   if (!key) {
     return {
       exitCode: 1,
