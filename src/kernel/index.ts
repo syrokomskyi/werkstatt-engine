@@ -212,3 +212,11 @@ export type {
 
 // RFC-1026: kernel module lifecycle management
 // RFC-1038: kernelModuleModule deleted — kernel.module.load/unload/inspect removed.
+
+// RFC-1125: single-sourced workshop module loader map (site-workshop profile)
+export {
+  WORKSHOP_MODULE_MAP,
+  workshopModuleLoaders,
+  type WorkshopModuleMap,
+  type WorkshopModuleDescriptor,
+} from "./module-map.ts";
