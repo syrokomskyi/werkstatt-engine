@@ -68,8 +68,9 @@ describe("deploy-helpers", () => {
 
   describe("resolveArtifactHash", () => {
     it("returns hash from flag when valid", async () => {
-      const hash = await resolveArtifactHash(testArtifactHash, undefined);
+      const { hash, source } = await resolveArtifactHash(testArtifactHash, undefined);
       expect(hash).toBe(testArtifactHash);
+      expect(source).toBe("flag");
     });
 
     it("throws when flag is invalid and no release dir", async () => {
@@ -83,8 +84,21 @@ describe("deploy-helpers", () => {
       await fs.mkdir(releaseDir, { recursive: true });
       const artifactPath = path.join(releaseDir, "artifact.tar.gz");
       await fs.writeFile(artifactPath, "test artifact content");
-      const hash = await resolveArtifactHash(undefined, releaseDir);
+      const { hash, source } = await resolveArtifactHash(undefined, releaseDir);
       expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(source).toBe("artifact.tar.gz");
+    });
+
+    it("reads distTreeHash from release.yaml when artifact.tar.gz is absent", async () => {
+      const releaseDir = path.join(tmpDir, "releases", "rel-002");
+      await fs.mkdir(releaseDir, { recursive: true });
+      await fs.writeFile(
+        path.join(releaseDir, "release.yaml"),
+        `distTreeHash: ${testArtifactHash}\n`,
+      );
+      const { hash, source } = await resolveArtifactHash(undefined, releaseDir);
+      expect(hash).toBe(testArtifactHash);
+      expect(source).toBe("release.yaml");
     });
   });
 

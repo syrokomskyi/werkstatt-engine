@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0927: add runLeitstandHotfixDevDeploy composite command handler chaining 7 phases via executeKernelCommand.</item>
   <item>RFC-0930: add runLeitstandVerify command handler — fetches build-identity.json from live CDN URLs for all configured channels, compares distTreeHash cross-channel, optionally compares against local system-state.yaml records.</item>
   <item>RFC-0948: add channel drift warning to runLeitstandDevDeploy — compares dev releaseId against alt/main lastPropagated and emits non-fatal warning when they differ.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866</history>
+  <item>RFC-1126: step 4 — artifact-hash provenance
+
+resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927</history>
 </CHANGE_SUMMARY>
 */
 
@@ -763,7 +765,13 @@ export async function runLeitstandDevDeploy(
   const releaseDir = releaseId
     ? path.join(context.workspaceRoot, "releases", releaseId)
     : undefined;
-  const artifactHash = await resolveArtifactHash(artifactHashFlag, releaseDir);
+  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
+    artifactHashFlag,
+    releaseDir,
+  );
+  context.logger.info(
+    `[deploy] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+  );
 
   const authResult = await authorizeAndDeploy({
     gateDecisionPath,
@@ -953,7 +961,13 @@ export async function runLeitstandPropagate(
   );
 
   const releaseDir = path.join(context.workspaceRoot, "releases", releaseId);
-  const artifactHash = await resolveArtifactHash(artifactHashFlag, releaseDir);
+  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
+    artifactHashFlag,
+    releaseDir,
+  );
+  context.logger.info(
+    `[deploy] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+  );
 
   const r2Config = makeR2ConfigFromEnv(process.env as Record<string, string | undefined>);
   let durableSyncVerified = !r2Config;
@@ -1200,7 +1214,13 @@ export async function runLeitstandPromote(
   );
 
   const releaseDir = path.join(context.workspaceRoot, "releases", releaseId);
-  const artifactHash = await resolveArtifactHash(artifactHashFlag, releaseDir);
+  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
+    artifactHashFlag,
+    releaseDir,
+  );
+  context.logger.info(
+    `[deploy] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+  );
 
   const r2Config = makeR2ConfigFromEnv(process.env as Record<string, string | undefined>);
   let durableSyncVerified = !r2Config;

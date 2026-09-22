@@ -4,11 +4,14 @@
   <keywords>RFC-0938, leitstand, certify, accessPin, auto-manage, test</keywords>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0938: test auto-manage PIN — auto-remove before, auto-restore after, pinManagement in result.</item>
   <item>RFC-0938: test unprotect failure — certify fails, PIN not removed, site stays protected.</item>
   <item>RFC-0938: test restore failure — hard fail exitCode 1, restoreError set.</item>
   <item>RFC-0938: test --auto-manage-pin=false preserves RFC-0929 fail-early behavior.</item>
   <item>RFC-0938: test no PIN active — certify proceeds, pinManagement absent or autoManaged true.</item>
+  <item>RFC-1126: step 4 — artifact-hash provenance
+
+resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <history>RFC-0938</history>
 </CHANGE_SUMMARY>
 */
 
@@ -80,9 +83,10 @@ vi.mock("../leitstand/deploy-helpers.ts", async (importOriginal) => {
   return {
     ...actual,
     makeR2ConfigFromEnv: vi.fn().mockReturnValue(null),
-    resolveArtifactHash: vi
-      .fn()
-      .mockResolvedValue("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+    resolveArtifactHash: vi.fn().mockResolvedValue({
+      hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      source: "flag",
+    }),
     flagSite: vi.fn((input: KernelCommandInput) => {
       const v = input.flags["site"] ?? input.flags["system"];
       return typeof v === "string" ? v : undefined;
@@ -135,8 +139,12 @@ test("RFC-0938: no PIN active — certify proceeds, pinManagement has autoManage
   );
 
   expect(result.summary).not.toContain("access PIN protection active");
-  expect(executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.unprotect")).toHaveLength(0);
-  expect(executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.protect")).toHaveLength(0);
+  expect(
+    executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.unprotect"),
+  ).toHaveLength(0);
+  expect(
+    executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.protect"),
+  ).toHaveLength(0);
   if (result.data?.pinManagement) {
     expect(result.data.pinManagement.autoManaged).toBe(true);
     expect(result.data.pinManagement.removedBefore).toBe(false);
@@ -171,7 +179,9 @@ test("RFC-0938: PIN active, auto-manage=true, unprotect fails — exitCode 1, PI
   expect(result.data!.pinManagement!.autoManaged).toBe(true);
   expect(result.data!.pinManagement!.removedBefore).toBe(false);
   // No protect call since unprotect failed
-  expect(executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.protect")).toHaveLength(0);
+  expect(
+    executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.protect"),
+  ).toHaveLength(0);
 });
 
 test("RFC-0938: PIN active, auto-manage=false — fail-early with RFC-0929 message", async () => {
@@ -224,7 +234,9 @@ test("RFC-0938: PIN active, auto-manage=true, unprotect succeeds — unprotect c
     context,
   );
 
-  const unprotectCalls = executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.unprotect");
+  const unprotectCalls = executeKernelCommandCalls.filter(
+    (c) => c.commandName === "leitstand.access.unprotect",
+  );
   expect(unprotectCalls).toHaveLength(1);
   expect(unprotectCalls[0].argv).toContain("--site=test-sys");
 });
@@ -281,7 +293,9 @@ test("RFC-0938: PIN active, auto-manage=true, protect succeeds — pinManagement
   );
 
   // certify will fail because no real release dir, but PIN management should still work
-  const protectCalls = executeKernelCommandCalls.filter((c) => c.commandName === "leitstand.access.protect");
+  const protectCalls = executeKernelCommandCalls.filter(
+    (c) => c.commandName === "leitstand.access.protect",
+  );
   expect(protectCalls).toHaveLength(1);
   expect(protectCalls[0].argv).toContain("--site=test-sys");
   expect(protectCalls[0].argv).toContain("--pin=4092");

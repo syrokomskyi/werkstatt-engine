@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0929: skip gate decisions with status=fail in tryReuseEvidence — only reuse evidence from passing decisions.</item>
   <item>RFC-0929: add pre-flight accessPin check — fail early with clear message if site has PIN protection active. --force does not bypass this check.</item>
   <item>RFC-0938: auto-manage access PIN during certify — auto-remove before producers, auto-restore in finally block. --auto-manage-pin flag (default true).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -17,7 +16,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0866, RFC-0867</history>
+  <item>RFC-1126: step 4 — artifact-hash provenance
+
+resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <history>RFC-0866, RFC-0867, RFC-0929</history>
 </CHANGE_SUMMARY>
 */
 
@@ -250,7 +252,13 @@ export async function runLeitstandCertify(
   if (!releaseId) throw new Error("[leitstand.certify] --release is required");
 
   const releaseDir = path.join(context.workspaceRoot, "releases", releaseId);
-  const artifactHash = await resolveArtifactHash(artifactHashFlag, releaseDir);
+  const { hash: artifactHash, source: artifactHashSource } = await resolveArtifactHash(
+    artifactHashFlag,
+    releaseDir,
+  );
+  context.logger.info(
+    `[certify] artifact hash resolved from ${artifactHashSource}: ${artifactHash}`,
+  );
 
   const baseUrlFlag = flagString(input, "base-url");
   const gateChannel = gate as GateChannel;

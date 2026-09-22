@@ -6,6 +6,9 @@
 <CHANGE_SUMMARY>
   <item>RFC-0929: test accessPin pre-flight check blocks certify before producer execution.</item>
   <item>RFC-0929: test tryReuseEvidence skips gate decisions with status=fail.</item>
+  <item>RFC-1126: step 4 — artifact-hash provenance
+
+resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -62,9 +65,10 @@ vi.mock("../leitstand/deploy-helpers.ts", async (importOriginal) => {
   return {
     ...actual,
     makeR2ConfigFromEnv: vi.fn().mockReturnValue(null),
-    resolveArtifactHash: vi
-      .fn()
-      .mockResolvedValue("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+    resolveArtifactHash: vi.fn().mockResolvedValue({
+      hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      source: "flag",
+    }),
     flagSite: vi.fn((input: KernelCommandInput) => {
       const v = input.flags["site"] ?? input.flags["system"];
       return typeof v === "string" ? v : undefined;
