@@ -16,8 +16,6 @@ helpers for storing and retrieving KernelExecutionReport objects in the
   <item>Command results are cached by input hash — identical inputs skip re-execution.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0637: add modulePaths parameter to computeModuleHash for granular per-command module hashing.</item>
-  <item>RFC-0685: add tree index support to expandGlobs, byte-mode selection per extension in computeInputsHash, inputsMetadata sidecar in cache entries, wrapper format for getCachedCommandResult/setCachedCommandResult.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -27,7 +25,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1127: step 1 — cache barrel + parse fix
 
 Add ./kernel/cache subpath export (narrow barrel: createCacheLayer, computeModuleHash, key helpers). Fix parseCommandResultCacheKey truncating algo-prefixed hashes (sha256:hex) — list() returned garbage moduleHash for all real keys.</item>
-  <history>RFC-0390</history>
+  <item>RFC-1133: flagsHash in cache key + schema v2
+
+CommandResultCacheKey gains flagsHash (stableJsonHash over cache-visible resolved flags); schemaVersion bumps to 2 so v1 keys orphan naturally. get/set helpers accept the narrow KernelResultCacheStore port from werkstatt-shared so the executor-level cache block in executeRegisteredCommand can run without a concrete CacheLayer import.</item>
+  <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <history>RFC-0390, RFC-0637, RFC-0685</history>
 </CHANGE_SUMMARY>
 */
 
@@ -40,13 +42,15 @@ import picomatch from "picomatch";
 import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { fingerprintFile, fingerprintTree } from "@warpgogol/werkstatt-engine/fingerprint/semantic";
 
-import type { CacheLayer } from "./cache-layer.ts";
-import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelExecutionReport,
+  KernelResultCacheStore,
+} from "@warpgogol/werkstatt-shared/kernel";
 import type { WorkspaceTreeIndex } from "./workspace-tree-index.ts";
 import { filterTreeIndex } from "./workspace-tree-index.ts";
 
 export const COMMAND_RESULT_CACHE_NAMESPACE = "command_results";
-export const COMMAND_RESULT_CACHE_SCHEMA_VERSION = 1;
+export const COMMAND_RESULT_CACHE_SCHEMA_VERSION = 2;
 
 export interface CommandResultCacheKey {
   schemaVersion: number;
@@ -54,6 +58,8 @@ export interface CommandResultCacheKey {
   siteName: string | null;
   inputsHash: string;
   moduleHash: string;
+  /** RFC-1133: stableJsonHash over cache-visible resolved flags ("" when none). */
+  flagsHash: string;
 }
 
 export interface InputsMetadataEntry {
@@ -80,9 +86,10 @@ function selectFingerprintMode(absPath: string): "byte" | "semantic" {
 
 /**
  * RFC-1028: Build a composite string key from a CommandResultCacheKey.
- * Format: `${schemaVersion}:${commandName}:${siteName}:${inputsHash}:${moduleHash}`
- * This replaces the previous stableJsonHash approach — the composite key is
- * human-readable and enables SQL LIKE filtering by commandName in list().
+ * Format: `${schemaVersion}:${commandName}:${siteName}:${inputsHash}:${moduleHash}:${flagsHash}`
+ * (flagsHash appended last by RFC-1133). This replaces the previous
+ * stableJsonHash approach — the composite key is human-readable and enables
+ * SQL LIKE filtering by commandName in list().
  */
 export function buildCommandResultCacheKey(key: CommandResultCacheKey): string {
   return [
@@ -91,6 +98,7 @@ export function buildCommandResultCacheKey(key: CommandResultCacheKey): string {
     key.siteName ?? "",
     key.inputsHash,
     key.moduleHash,
+    key.flagsHash,
   ].join(":");
 }
 
@@ -101,32 +109,43 @@ export function buildCommandResultCacheKey(key: CommandResultCacheKey): string {
 export function parseCommandResultCacheKey(
   namespace: string,
   key: string,
-): { commandName: string; siteName: string | null; inputsHash: string; moduleHash: string } | null {
+): {
+  commandName: string;
+  siteName: string | null;
+  inputsHash: string;
+  moduleHash: string;
+  flagsHash: string;
+} | null {
   if (namespace !== COMMAND_RESULT_CACHE_NAMESPACE) return null;
   const parts = key.split(":");
-  if (parts.length < 5) return null;
+  if (parts.length < 6) return null;
   const [, commandName, siteName] = parts;
   // Hashes are "algo:hex" (e.g. sha256:abc…) — each may occupy two segments.
-  // Parse from the right: when the penultimate segment is an algo prefix it
-  // belongs to moduleHash; the same rule then applies to inputsHash.
+  // Parse from the right: flagsHash, then moduleHash, then the remainder is
+  // inputsHash (RFC-1133 appended flagsHash as the last component).
   const rest = parts.slice(3);
   const isAlgoPrefix = (s: string) => /^(sha\d+|blake2[bs]?|md5)$/.test(s);
-  let moduleHash: string;
-  let inputParts: string[];
-  if (rest.length >= 3 && isAlgoPrefix(rest[rest.length - 2])) {
-    moduleHash = rest.slice(-2).join(":");
-    inputParts = rest.slice(0, -2);
-  } else {
-    moduleHash = rest[rest.length - 1];
-    inputParts = rest.slice(0, -1);
-  }
-  const inputsHash = inputParts.join(":");
-  if (!inputsHash || !moduleHash) return null;
+  const takeHash = (segments: string[]): { hash: string; rest: string[] } | null => {
+    if (segments.length === 0) return null;
+    if (segments.length >= 2 && isAlgoPrefix(segments[segments.length - 2])) {
+      return { hash: segments.slice(-2).join(":"), rest: segments.slice(0, -2) };
+    }
+    return { hash: segments[segments.length - 1], rest: segments.slice(0, -1) };
+  };
+  const flags = takeHash(rest);
+  if (!flags) return null;
+  const mod = takeHash(flags.rest);
+  if (!mod) return null;
+  const inputsHash = mod.rest.join(":");
+  // flagsHash may legitimately be "" (no cache-visible flags) — the trailing
+  // empty segment is part of the v2 format. inputsHash/moduleHash may not.
+  if (!inputsHash || !mod.hash) return null;
   return {
     commandName,
     siteName: siteName || null,
     inputsHash,
-    moduleHash,
+    moduleHash: mod.hash,
+    flagsHash: flags.hash,
   };
 }
 
@@ -279,7 +298,7 @@ export async function computeModuleHash(
  * The wrapper is detected by checking for the `report` field.
  */
 export async function getCachedCommandResult(
-  cache: CacheLayer,
+  cache: KernelResultCacheStore,
   key: CommandResultCacheKey,
 ): Promise<CachedCommandResultEntry | null> {
   if (!cache.available) return null;
@@ -316,7 +335,7 @@ export async function getCachedCommandResult(
  * cache data payload to support the mtime fast path on subsequent reads.
  */
 export async function setCachedCommandResult(
-  cache: CacheLayer,
+  cache: KernelResultCacheStore,
   key: CommandResultCacheKey,
   report: KernelExecutionReport,
   inputsMetadata?: InputsMetadataEntry[],

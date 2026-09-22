@@ -42,6 +42,7 @@ function makeKey(overrides: Partial<CommandResultCacheKey> = {}): CommandResultC
     siteName: null,
     inputsHash: "abc",
     moduleHash: "def",
+    flagsHash: "",
     ...overrides,
   };
 }
@@ -78,6 +79,7 @@ describe("parseCommandResultCacheKey", () => {
       siteName: "app",
       inputsHash: "abc",
       moduleHash: "def",
+      flagsHash: "",
     });
   });
 
@@ -96,6 +98,7 @@ describe("parseCommandResultCacheKey", () => {
       siteName: "app",
       inputsHash: "sha256:aaa111",
       moduleHash: "sha256:bbb222",
+      flagsHash: "",
     });
   });
 
@@ -306,7 +309,7 @@ describe("COMMAND_RESULT_CACHE_NAMESPACE", () => {
 });
 
 describe("COMMAND_RESULT_CACHE_SCHEMA_VERSION", () => {
-  test("is 1", () => {
-    expect(COMMAND_RESULT_CACHE_SCHEMA_VERSION).toBe(1);
+  test("is 2 (RFC-1133: flagsHash appended to the key)", () => {
+    expect(COMMAND_RESULT_CACHE_SCHEMA_VERSION).toBe(2);
   });
 });

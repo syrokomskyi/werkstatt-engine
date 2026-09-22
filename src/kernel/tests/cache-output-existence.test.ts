@@ -2,19 +2,24 @@ import { test, expect, describe, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { tryCacheRead } from "../runtime/execute-pipeline.ts";
+import { readCommandResult, type CommandResultCacheCall } from "../runtime/result-cache.ts";
 import {
   COMMAND_RESULT_CACHE_SCHEMA_VERSION,
   setCachedCommandResult,
   type CommandResultCacheKey,
 } from "../cache/command-result-cache.ts";
 import type { CacheLayer, CacheEntry } from "../cache/cache-layer.ts";
-import type { KernelCommandDefinition, KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandDefinition,
+  KernelExecutionReport,
+  KernelResultCacheContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>
   <purpose>
-    RFC-1057: Unit tests for cache output-existence guard in tryCacheRead.
+    RFC-1057: Unit tests for cache output-existence guard in readCommandResult
+    (relocated from tryCacheRead by RFC-1133).
     Verifies that cached results are invalidated when declared output files
     are missing from disk, forcing re-execution of the generating command.
   </purpose>
@@ -54,8 +59,26 @@ function makeKey(overrides: Partial<CommandResultCacheKey> = {}): CommandResultC
     siteName: null,
     inputsHash: "aaa",
     moduleHash: "bbb",
+    flagsHash: "",
     ...overrides,
   };
+}
+
+function makeCall(command: KernelCommandDefinition, tmpDir: string): CommandResultCacheCall {
+  return {
+    command,
+    argv: [],
+    flags: {},
+    baseDir: tmpDir,
+    workspaceRoot: tmpDir,
+    siteName: null,
+    force: false,
+    dryRun: false,
+  };
+}
+
+function makeCacheCtx(cache: CacheLayer): KernelResultCacheContext {
+  return { layer: cache, moduleHashCache: new Map() };
 }
 
 class MockCacheLayer implements CacheLayer {
@@ -92,7 +115,7 @@ class MockCacheLayer implements CacheLayer {
   async close(): Promise<void> {}
 }
 
-describe("RFC-1057: tryCacheRead output-existence guard", () => {
+describe("RFC-1057: readCommandResult output-existence guard", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -116,18 +139,7 @@ describe("RFC-1057: tryCacheRead output-existence guard", () => {
     // Populate cache using the real setCachedCommandResult
     await setCachedCommandResult(cache, makeKey(), makeReport());
 
-    const result = await tryCacheRead(
-      cache,
-      cmd,
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false,
-      false,
-      undefined,
-    );
+    const result = await readCommandResult(makeCacheCtx(cache), makeCall(cmd, tmpDir));
 
     expect(result).not.toBeNull();
     expect(result?.ok).toBe(true);
@@ -143,18 +155,7 @@ describe("RFC-1057: tryCacheRead output-existence guard", () => {
 
     await setCachedCommandResult(cache, makeKey(), makeReport());
 
-    const result = await tryCacheRead(
-      cache,
-      cmd,
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false,
-      false,
-      undefined,
-    );
+    const result = await readCommandResult(makeCacheCtx(cache), makeCall(cmd, tmpDir));
 
     expect(result).toBeNull();
   });
@@ -173,18 +174,7 @@ describe("RFC-1057: tryCacheRead output-existence guard", () => {
 
     await setCachedCommandResult(cache, makeKey(), makeReport());
 
-    const result = await tryCacheRead(
-      cache,
-      cmd,
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false,
-      false,
-      undefined,
-    );
+    const result = await readCommandResult(makeCacheCtx(cache), makeCall(cmd, tmpDir));
 
     expect(result).toBeNull();
   });
@@ -198,18 +188,7 @@ describe("RFC-1057: tryCacheRead output-existence guard", () => {
 
     await setCachedCommandResult(cache, makeKey(), makeReport());
 
-    const result = await tryCacheRead(
-      cache,
-      cmd,
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false,
-      false,
-      undefined,
-    );
+    const result = await readCommandResult(makeCacheCtx(cache), makeCall(cmd, tmpDir));
 
     expect(result).not.toBeNull();
   });
@@ -223,18 +202,7 @@ describe("RFC-1057: tryCacheRead output-existence guard", () => {
 
     await setCachedCommandResult(cache, makeKey(), makeReport());
 
-    const result = await tryCacheRead(
-      cache,
-      cmd,
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false,
-      false,
-      undefined,
-    );
+    const result = await readCommandResult(makeCacheCtx(cache), makeCall(cmd, tmpDir));
 
     expect(result).not.toBeNull();
   });

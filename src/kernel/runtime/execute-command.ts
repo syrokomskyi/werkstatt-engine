@@ -14,7 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1027: aggregate remediationHints from CheckResult diagnostics into KernelExecutionReport, capped at 3 entries sorted by occurrence count.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -27,7 +26,8 @@ Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (
   <item>RFC-1126: review findings — aliased argv in input, unchanged reporting
 
 fo-review REVIEW-CODE-2026-09-22-01 (needs-revision): input.argv now carries the aliased argv so commands inspecting raw argv see canonical flags; config.regenerate reports identical files as unchanged[] instead of dropping them from both generated and skipped.</item>
-  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026</history>
+  <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027</history>
 </CHANGE_SUMMARY>
 */
 
@@ -62,6 +62,15 @@ import { assertKnownOptionKeys, skippedExecutionReport, summarizeLogs } from "./
 import { isClosedWorkpiece, mutatingCommandRunsOnClosedWorkpiece } from "./closed-workpiece.ts";
 import { buildRegistryForModule, ensureTargetSites, loadAppRuntime } from "./registry.ts";
 import { getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
+import { createCacheLayer } from "../cache/cache-layer.ts";
+import {
+  hasCacheBypassFlag,
+  isCommandCacheable,
+  readCommandResult,
+  resolveResultCache,
+  writeCommandResult,
+  type CommandResultCacheCall,
+} from "./result-cache.ts";
 import { getFactoryTelemetryPusher, recordCommandTelemetry } from "./telemetry.ts";
 import { manifestFilePath, type CommandManifest } from "../command-manifest.ts";
 import type { GeneratorOwnershipEntry } from "@warpgogol/werkstatt-shared/kernel";
@@ -253,6 +262,36 @@ export async function executeRegisteredCommand(
     input.flags.force = true;
   }
 
+  // RFC-1133: command-result cache — the single read/write point shared by the
+  // direct executeKernelCommand path and both pipeline executors. Runs on the
+  // final resolved input (post flag-alias, post pipeline --site/--system
+  // injection) so read and write always see identical flags. The closed-mission
+  // guard above already returned for mutating commands on closed workpieces, so
+  // a cached replay can never bypass it.
+  const cacheCall: CommandResultCacheCall = {
+    command,
+    argv,
+    flags: input.flags,
+    baseDir: context.site?.directory ?? context.workspaceRoot,
+    workspaceRoot: context.workspaceRoot,
+    siteName: context.site?.name ?? null,
+    force: context.force ?? false,
+    dryRun: context.dryRun ?? false,
+  };
+  const resolvedCache = await resolveResultCache(context, cacheCall);
+  if (resolvedCache) {
+    let cached: KernelExecutionReport | null = null;
+    try {
+      cached = await readCommandResult(resolvedCache.cache, cacheCall);
+    } catch {
+      // Cache read failure degrades to a fresh execution — always correct.
+    }
+    if (cached) {
+      if (resolvedCache.owned) await resolvedCache.cache.layer.close();
+      return cached;
+    }
+  }
+
   // RFC-0267: select the WorkspaceIO adapter for this invocation. A command
   // declaring mutatesState: false always gets a throwing read-only adapter,
   // regardless of --dry-run, so the metadata is provably trustworthy. A
@@ -365,6 +404,15 @@ export async function executeRegisteredCommand(
       }
     }
 
+    // RFC-1133: store successful results in the command-result cache.
+    if (resolvedCache) {
+      try {
+        await writeCommandResult(resolvedCache.cache, cacheCall, report);
+      } catch {
+        // Cache write failure is non-fatal — the report is already produced.
+      }
+    }
+
     // RFC-0340: record factory telemetry (no-op when pusher is null)
     const pusher = getFactoryTelemetryPusher();
     if (pusher) recordCommandTelemetry(pusher, report);
@@ -405,6 +453,15 @@ export async function executeRegisteredCommand(
       scopeManager.disposeRegistry({ scope: "per-command", invocationId: commandInvocationId });
     } catch {
       // best-effort — registry may already be disposed
+    }
+    // RFC-1133: close a lazily opened layer (owned). Carrier-provided layers
+    // (pipeline executors, executeKernelCommand) are closed by their owner.
+    if (resolvedCache?.owned) {
+      try {
+        await resolvedCache.cache.layer.close();
+      } catch {
+        // best-effort — cache close failure must not mask the report
+      }
     }
   }
 }
@@ -589,30 +646,47 @@ export async function executeKernelCommand(
   // vast majority of app-scoped commands from createStandardCheckModule).
   if (wsCommand) {
     assertAllSitesAllowed(wsCommand, options.allSites ?? false);
-    for (const site of targetSites) {
-      const logger = createKernelLogger(outputFormat);
-      const { io, intents } = createDefaultIO();
-      const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
-      const context: KernelRuntimeContext = {
-        workspaceRoot: options.workspaceRoot,
-        site,
-        siteExplicit: options.siteExplicit ?? false,
-        logger,
-        dryRun: options.dryRun ?? false,
-        force: options.force ?? false,
-        outputFormat,
-        io,
-        fileIntents: intents,
-        actualState: wsRegistry!,
-        ownershipMap,
-        workpieceEnv: await loadWorkpieceEnv(site.directory),
-      };
+    // RFC-1133: one cache layer per invocation, shared across --all sites.
+    // Created only when the command can actually cache — non-cacheable,
+    // dry-run, and bypassed invocations never touch SQLite.
+    const sharedResultCache =
+      isCommandCacheable(wsCommand) &&
+      !(options.dryRun ?? false) &&
+      !hasCacheBypassFlag(wsCommand, argv)
+        ? {
+            layer: await createCacheLayer(options.workspaceRoot),
+            moduleHashCache: new Map<string, string>(),
+          }
+        : undefined;
+    try {
+      for (const site of targetSites) {
+        const logger = createKernelLogger(outputFormat);
+        const { io, intents } = createDefaultIO();
+        const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
+        const context: KernelRuntimeContext = {
+          workspaceRoot: options.workspaceRoot,
+          site,
+          siteExplicit: options.siteExplicit ?? false,
+          logger,
+          dryRun: options.dryRun ?? false,
+          force: options.force ?? false,
+          outputFormat,
+          io,
+          fileIntents: intents,
+          actualState: wsRegistry!,
+          ownershipMap,
+          workpieceEnv: await loadWorkpieceEnv(site.directory),
+          resultCache: sharedResultCache,
+        };
 
-      if (outputFormat === "pretty") {
-        logger.section(`${site.name}: ${wsCommand.name}`);
+        if (outputFormat === "pretty") {
+          logger.section(`${site.name}: ${wsCommand.name}`);
+        }
+
+        reports.push(await executeRegisteredCommand(wsCommand, context, argv));
       }
-
-      reports.push(await executeRegisteredCommand(wsCommand, context, argv));
+    } finally {
+      await sharedResultCache?.layer.close();
     }
 
     return options.allSites ? reports : reports[0]!;
@@ -632,53 +706,74 @@ export async function executeKernelCommand(
     // Manifest missing or unreadable — fall back to full registry build
   }
 
-  for (const site of targetSites) {
-    let command: KernelCommandDefinition | undefined;
-    let siteRegistry: ActualState | undefined;
-    const siteConfig = await loadKernelAppConfig(site);
+  // RFC-1133: one cache layer per invocation, shared across --all sites.
+  // Created lazily on the first cacheable command — the fallback path resolves
+  // the command per site, so cacheability is known only inside the loop.
+  let sharedResultCache: KernelRuntimeContext["resultCache"];
+  try {
+    for (const site of targetSites) {
+      let command: KernelCommandDefinition | undefined;
+      let siteRegistry: ActualState | undefined;
+      const siteConfig = await loadKernelAppConfig(site);
 
-    if (siteConfig.moduleLoaders && siteManifestModule) {
-      siteRegistry = await buildRegistryForModule(siteConfig, siteManifestModule);
-      command = siteRegistry.commands.get(options.commandName);
+      if (siteConfig.moduleLoaders && siteManifestModule) {
+        siteRegistry = await buildRegistryForModule(siteConfig, siteManifestModule);
+        command = siteRegistry.commands.get(options.commandName);
+      }
+
+      if (!command) {
+        const { registry } = await loadAppRuntime(options.workspaceRoot, site);
+        siteRegistry = registry;
+        command = registry.commands.get(options.commandName);
+      }
+
+      if (!command) {
+        throw new Error(
+          `Kernel command \`${options.commandName}\` is not registered for site \`${site.name}\`.${pipelineHint(options.commandName)}`,
+        );
+      }
+
+      assertAllSitesAllowed(command, options.allSites ?? false);
+
+      if (
+        !sharedResultCache &&
+        isCommandCacheable(command) &&
+        !(options.dryRun ?? false) &&
+        !hasCacheBypassFlag(command, argv)
+      ) {
+        sharedResultCache = {
+          layer: await createCacheLayer(options.workspaceRoot),
+          moduleHashCache: new Map<string, string>(),
+        };
+      }
+
+      const logger = createKernelLogger(outputFormat);
+      const { io, intents } = createDefaultIO();
+      const ownershipMap = siteRegistry ? await computeOwnershipMap(siteRegistry) : undefined;
+      const context: KernelRuntimeContext = {
+        workspaceRoot: options.workspaceRoot,
+        site,
+        siteExplicit: options.siteExplicit ?? false,
+        logger,
+        dryRun: options.dryRun ?? false,
+        force: options.force ?? false,
+        outputFormat,
+        io,
+        fileIntents: intents,
+        actualState: siteRegistry!,
+        ownershipMap,
+        workpieceEnv: await loadWorkpieceEnv(site.directory),
+        resultCache: sharedResultCache,
+      };
+
+      if (outputFormat === "pretty") {
+        logger.section(`${site.name}: ${command.name}`);
+      }
+
+      reports.push(await executeRegisteredCommand(command, context, argv));
     }
-
-    if (!command) {
-      const { registry } = await loadAppRuntime(options.workspaceRoot, site);
-      siteRegistry = registry;
-      command = registry.commands.get(options.commandName);
-    }
-
-    if (!command) {
-      throw new Error(
-        `Kernel command \`${options.commandName}\` is not registered for site \`${site.name}\`.${pipelineHint(options.commandName)}`,
-      );
-    }
-
-    assertAllSitesAllowed(command, options.allSites ?? false);
-
-    const logger = createKernelLogger(outputFormat);
-    const { io, intents } = createDefaultIO();
-    const ownershipMap = siteRegistry ? await computeOwnershipMap(siteRegistry) : undefined;
-    const context: KernelRuntimeContext = {
-      workspaceRoot: options.workspaceRoot,
-      site,
-      siteExplicit: options.siteExplicit ?? false,
-      logger,
-      dryRun: options.dryRun ?? false,
-      force: options.force ?? false,
-      outputFormat,
-      io,
-      fileIntents: intents,
-      actualState: siteRegistry!,
-      ownershipMap,
-      workpieceEnv: await loadWorkpieceEnv(site.directory),
-    };
-
-    if (outputFormat === "pretty") {
-      logger.section(`${site.name}: ${command.name}`);
-    }
-
-    reports.push(await executeRegisteredCommand(command, context, argv));
+  } finally {
+    await sharedResultCache?.layer.close();
   }
 
   return options.allSites ? reports : reports[0]!;

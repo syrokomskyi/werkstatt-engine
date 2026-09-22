@@ -14,7 +14,6 @@ Self-healing: corrupt DB is deleted and recreated on open error.
   <item>SQLite is the persistent backend — it survives process restarts unlike the in-memory layer.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0382: initial implementation — SqliteCacheLayer with WAL mode, busy timeout, self-healing.</item>
   <item>RFC-0382 post-review: remove staleEntries placeholder from status() output.</item>
   <item>ADR-0023: add close() method for explicit SQLite connection cleanup after pipeline completion.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -23,6 +22,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <history>RFC-0382</history>
 </CHANGE_SUMMARY>
 */
 
@@ -38,9 +39,7 @@ import type {
   CacheNamespaceStatus,
   CacheStatus,
 } from "./cache-layer.ts";
-import {
-  parseCommandResultCacheKey,
-} from "./command-result-cache.ts";
+import { parseCommandResultCacheKey } from "./command-result-cache.ts";
 
 const require_ = createRequire(import.meta.url);
 
@@ -275,6 +274,7 @@ export class SqliteCacheLayer implements CacheLayer {
         siteName: parsed.siteName,
         inputsHash: parsed.inputsHash,
         moduleHash: parsed.moduleHash,
+        flagsHash: parsed.flagsHash,
         cachedAt: row.updated_at,
         hitCount: statsRow?.hits ?? 0,
       });

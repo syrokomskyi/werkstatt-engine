@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   hasCacheBypassFlag,
-  tryCacheRead,
-  tryCacheWrite,
-} from "../runtime/execute-pipeline.ts";
+  readCommandResult,
+  writeCommandResult,
+  type CommandResultCacheCall,
+} from "../runtime/result-cache.ts";
 import {
   COMMAND_RESULT_CACHE_SCHEMA_VERSION,
   getCachedCommandResult,
@@ -14,7 +15,11 @@ import {
   type CommandResultCacheKey,
 } from "../cache/command-result-cache.ts";
 import type { CacheLayer, CacheEntry } from "../cache/cache-layer.ts";
-import type { KernelCommandDefinition, KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandDefinition,
+  KernelExecutionReport,
+  KernelResultCacheContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>
@@ -60,8 +65,30 @@ function makeKey(overrides: Partial<CommandResultCacheKey> = {}): CommandResultC
     siteName: null,
     inputsHash: "aaa",
     moduleHash: "bbb",
+    flagsHash: "",
     ...overrides,
   };
+}
+
+function makeCall(
+  command: KernelCommandDefinition,
+  tmpDir: string,
+  argv: string[],
+): CommandResultCacheCall {
+  return {
+    command,
+    argv,
+    flags: {},
+    baseDir: tmpDir,
+    workspaceRoot: tmpDir,
+    siteName: null,
+    force: false,
+    dryRun: false,
+  };
+}
+
+function makeCacheCtx(cache: CacheLayer): KernelResultCacheContext {
+  return { layer: cache, moduleHashCache: new Map() };
 }
 
 class MockCacheLayer implements CacheLayer {
@@ -140,23 +167,16 @@ describe("RFC-1130: executor cache bypass", () => {
     const cmd = makeCommand();
     await setCachedCommandResult(cache, makeKey(), makeReport());
 
-    const result = await tryCacheRead(
-      cache,
-      cmd,
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false, // force
-      false, // dryRun
-      true, // bypassCache
-      undefined,
+    // RFC-1133: bypass is derived from argv inside the shared block — a listed
+    // flag in argv skips the read regardless of a populated store.
+    const result = await readCommandResult(
+      makeCacheCtx(cache),
+      makeCall(cmd, tmpDir, ["--rfc", "RFC-0001"]),
     );
 
     expect(
       result,
-      "bypassCache must skip the cache read — a filtered run must not serve the full-run entry",
+      "cacheBypassFlags must skip the cache read — a filtered run must not serve the full-run entry",
     ).toBeNull();
   });
 
@@ -164,24 +184,16 @@ describe("RFC-1130: executor cache bypass", () => {
     const cache = new MockCacheLayer();
     const cmd = makeCommand();
 
-    await tryCacheWrite(
-      cache,
-      cmd,
+    await writeCommandResult(
+      makeCacheCtx(cache),
+      makeCall(cmd, tmpDir, ["--rfc", "RFC-0001"]),
       makeReport(),
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false, // dryRun
-      true, // bypassCache
-      undefined,
     );
 
     const stored = await getCachedCommandResult(cache, makeKey());
     expect(
       stored,
-      "bypassCache must skip the cache write — a partial result must not overwrite the full-run entry",
+      "cacheBypassFlags must skip the cache write — a partial result must not overwrite the full-run entry",
     ).toBeNull();
   });
 
@@ -189,19 +201,7 @@ describe("RFC-1130: executor cache bypass", () => {
     const cache = new MockCacheLayer();
     const cmd = makeCommand();
 
-    await tryCacheWrite(
-      cache,
-      cmd,
-      makeReport(),
-      tmpDir,
-      tmpDir,
-      null,
-      join(tmpDir, "src"),
-      new Map(),
-      false, // dryRun
-      false, // bypassCache
-      undefined,
-    );
+    await writeCommandResult(makeCacheCtx(cache), makeCall(cmd, tmpDir, []), makeReport());
 
     // The stored key carries the real inputsHash — assert via the mock's entry
     // rather than a guessed hash: any entry in the namespace proves the write.
