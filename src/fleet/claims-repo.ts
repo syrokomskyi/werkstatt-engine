@@ -313,6 +313,55 @@ export async function publishClaim(input: PublishClaimInput): Promise<PublishCla
   };
 }
 
+/**
+ * Sender-side transfer claim (RFC-1124): after a handover completes on the
+ * recipient's side and the bordbuch event + new passport propagate back to the
+ * sender's clone, the OUTGOING creator publishes a transfer claim — signed by
+ * the old key, describing the new owner, bound to the authorization via
+ * authorizationHash. This completes the registry transfer even when the
+ * recipient's workshop never publishes (offline, no claims config).
+ *
+ * Returns null when there is nothing to do: no handover event, the current
+ * claim already covers the new passport, the local passport has not caught up,
+ * or our key is not the outgoing creator's.
+ */
+export async function publishPendingTransferClaim(input: {
+  systemId: string;
+  werkstattRoot: string;
+  signerPrivateKeyHex: string;
+  signerPublicKey: string;
+  push?: boolean;
+}): Promise<PublishClaimResult | null> {
+  const { systemId, werkstattRoot, signerPublicKey } = input;
+  const config = await loadFleetClaimsConfig(werkstattRoot);
+  if (!config) return null;
+  const clonePath = claimsClonePath(werkstattRoot, config);
+  if (!existsSync(path.join(clonePath, ".git"))) return null;
+
+  // Latest handover event in the system bordbuch.
+  const entries = await readBordbuch(werkstattRoot, systemId).catch(() => []);
+  const handover = [...entries].reverse().find((e) => e.kind === "handover");
+  if (!handover) return null;
+  const meta = handover.metadata as Record<string, unknown> | undefined;
+  const newPassportHash = meta?.newPassportHash as string | undefined;
+  const authorizationHash = meta?.authorizationHash as string | undefined;
+  if (!newPassportHash || !authorizationHash) return null;
+
+  // The new passport must be visible locally — otherwise buildClaim would
+  // describe the OLD passport and produce a self-claim refresh, not a transfer.
+  const passport = await readPassport(werkstattRoot, systemId).catch(() => null);
+  if (!passport || passport.passportHash !== newPassportHash) return null;
+
+  // Current local claim must exist, must be ours (we are the outgoing
+  // creator), and must not already cover the new passport.
+  const local = readClaimFile(path.join(clonePath, "claims", `${systemId}.json`));
+  if (!local) return null;
+  if (local.passportHash === newPassportHash) return null; // already claimed
+  if (local.instanceId !== deriveInstanceId(signerPublicKey)) return null; // not outgoing creator
+
+  return publishClaim({ ...input, authorizationHash });
+}
+
 // ---------------------------------------------------------------------------
 // Verify (offline)
 // ---------------------------------------------------------------------------

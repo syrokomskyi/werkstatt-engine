@@ -298,6 +298,41 @@ export async function runSternsystemSync(
     `[sternsystem.sync] ${id} mirrored (${direction}, branch: ${syncAll ? "*" : branchName})`,
   );
 
+  // RFC-1124: carry the fleet claims repo with the sync — publish any pending
+  // sender-side transfer claim for this system, then fetch/ff/verify/push the
+  // claims clone. Non-fatal: claims are additive to mirror sync.
+  try {
+    const { publishPendingTransferClaim, syncClaims } = await import("../fleet/claims-repo.ts");
+    const privateKeyEnv = process.env.SIGNING_PRIVATE_KEY;
+    const privateKeyPath = process.env.SIGNING_PRIVATE_KEY_PATH;
+    if (privateKeyEnv || privateKeyPath) {
+      const { loadPrivateKey, toHex } = await import("@warpgogol/werkstatt-engine/signing");
+      const { derivePublicKey } = await import("./passport.ts");
+      const keyBytes = privateKeyEnv
+        ? await loadPrivateKey({ pem: privateKeyEnv })
+        : await loadPrivateKey({ filePath: privateKeyPath!, encoding: "pem" });
+      const transfer = await publishPendingTransferClaim({
+        systemId: id,
+        werkstattRoot: workspaceRoot,
+        signerPrivateKeyHex: toHex(keyBytes),
+        signerPublicKey: await derivePublicKey(keyBytes),
+      });
+      if (transfer) {
+        logger.info(`[sternsystem.sync] published sender-side transfer claim for ${id}`);
+      }
+    }
+    const claimsSync = await syncClaims(workspaceRoot);
+    if (claimsSync.diverged.length > 0) {
+      logger.warn(
+        `[sternsystem.sync] fleet claims diverged — manual resolution required: ${claimsSync.diverged.map((d) => d.remote).join(", ")}`,
+      );
+    }
+  } catch (err) {
+    logger.warn(
+      `[sternsystem.sync] fleet claims sync failed (non-fatal): ${(err as Error).message}`,
+    );
+  }
+
   const data: SternsystemSyncData = {
     systemId: id,
     mirrorUrls,

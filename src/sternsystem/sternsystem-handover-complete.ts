@@ -275,7 +275,35 @@ export async function runSternsystemHandoverComplete(
       `[sternsystem.handover.complete] ${systemId} bordbuch handover event appended (hash: ${entry.hash})`,
     );
 
-    // Update fleet ownership registry (RFC-0967) — hard dependency, fails closed
+    // RFC-1124: publish the handover claim to the fleet claims repo (authoritative).
+    // Signed by the recipient key (the new owner) — the only key available here —
+    // and carries authorizationHash binding it to the bordbuch handover event.
+    // The sender-side transfer claim (signed by the outgoing key) is published by
+    // the sender's workshop via sternsystem.sync when the event propagates back.
+    // Non-fatal: workshops without werkstatt.fleet.json skip silently.
+    try {
+      const { loadFleetClaimsConfig, publishClaim } = await import("../fleet/claims-repo.ts");
+      const claimsConfig = await loadFleetClaimsConfig(workspaceRoot);
+      if (claimsConfig) {
+        const { toHex } = await import("@warpgogol/werkstatt-engine/signing");
+        await publishClaim({
+          systemId,
+          werkstattRoot: workspaceRoot,
+          signerPrivateKeyHex: toHex(privateKeyBytes),
+          signerPublicKey: recipientPublicKey,
+          authorizationHash: authorization.authorizationHash,
+        });
+        logger.info(`[sternsystem.handover.complete] ${systemId} fleet claim published`);
+      }
+    } catch (err) {
+      logger.warn(
+        `[sternsystem.handover.complete] fleet claim publish failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    // Update fleet ownership registry (RFC-0967) — best-effort accelerator/cache,
+    // never the authority (RFC-1124). On failure: warn + journaled retry entry in
+    // the cache clone's operations/journal/ — the handover itself succeeds.
     let ownershipRegistryUpdated = false;
     try {
       const { transferOwnership } = await import("../fleet/ownership-registry.ts");
@@ -288,9 +316,50 @@ export async function runSternsystemHandoverComplete(
       ownershipRegistryUpdated = true;
       logger.info(`[sternsystem.handover.complete] ${systemId} ownership registry updated`);
     } catch (err) {
-      throw new Error(
-        `[sternsystem.handover.complete] fleet.ownership.transfer failed (hard dependency): ${err instanceof Error ? err.message : String(err)}`,
+      logger.warn(
+        `[sternsystem.handover.complete] fleet.ownership.transfer failed (non-fatal, journaled for retry): ${err instanceof Error ? err.message : String(err)}`,
       );
+      try {
+        const { appendRecord } = await import("../journal/jsonl.ts");
+        const { resolveCacheClonePath } = await import("./registry-io.ts");
+        const { mkdir } = await import("node:fs/promises");
+        const path = await import("node:path");
+        const journalDir = path.join(
+          resolveCacheClonePath(workspaceRoot, systemId),
+          "operations",
+          "journal",
+        );
+        await mkdir(journalDir, { recursive: true });
+        const opId = `ownership-transfer-retry-${systemId}-${Date.now()}`;
+        const journalPath = path.join(journalDir, `${opId}.jsonl`);
+        const at = new Date().toISOString();
+        await appendRecord(journalPath, {
+          kind: "op-started",
+          opId,
+          op: "fleet.ownership.transfer",
+          missionId: "none",
+          at,
+          platformVersion: "unknown",
+        });
+        await appendRecord(journalPath, {
+          kind: "step-failed",
+          opId,
+          step: "fleet.ownership.transfer",
+          seq: 1,
+          at,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        await appendRecord(journalPath, {
+          kind: "op-abandoned",
+          opId,
+          at,
+          reason: "worker-unreachable — retry via fleet.ownership.transfer",
+        });
+      } catch (journalErr) {
+        logger.warn(
+          `[sternsystem.handover.complete] retry journal write failed (non-fatal): ${journalErr instanceof Error ? journalErr.message : String(journalErr)}`,
+        );
+      }
     }
 
     // Remove authorization file
