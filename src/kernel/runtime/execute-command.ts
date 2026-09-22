@@ -14,7 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1026: add module state check before execute (KERNEL-MODULE-02 for non-active modules), trackInFlight with try/finally release, KERNEL-MODULE-01 for disposed commands.</item>
   <item>RFC-1027: aggregate remediationHints from CheckResult diagnostics into KernelExecutionReport, capped at 3 entries sorted by occurrence count.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -25,7 +24,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1126: step 2 — kernel runtime wiring
 
 Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
-  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960</history>
+  <item>RFC-1126: review findings — aliased argv in input, unchanged reporting
+
+fo-review REVIEW-CODE-2026-09-22-01 (needs-revision): input.argv now carries the aliased argv so commands inspecting raw argv see canonical flags; config.regenerate reports identical files as unchanged[] instead of dropping them from both generated and skipped.</item>
+  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026</history>
 </CHANGE_SUMMARY>
 */
 
@@ -204,7 +206,7 @@ export async function executeRegisteredCommand(
         filesModified: [],
       };
     }
-    input = { argv: [...argv], flags: resolved.flags };
+    input = { argv: [...aliased.argv], flags: resolved.flags };
   } else {
     const parsed = parseKernelArgv(argv);
     const errorDiagnostics = parsed.diagnostics.filter((d) => d.severity === "error");
