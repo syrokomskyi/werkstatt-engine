@@ -13,7 +13,6 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1038: replace KernelRegistry with ActualState — buildRegistry uses buildActualState from reconciler.ts; remove lifecycle methods, buildRegistryWithHandles, rollbackModuleRegistrations.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -25,7 +24,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1147/RFC-1148: listStaticCommandSurface — static enumeration over the workspace registry plus SITE_MODULE_MAP replaces listRegisteredKernelCommand*; commandInfo drops the siteName param (provider union narrowed to workspace | site-module).</item>
-  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026</history>
+  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038</history>
 </CHANGE_SUMMARY>
 */
 
