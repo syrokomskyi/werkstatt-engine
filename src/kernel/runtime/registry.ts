@@ -13,7 +13,6 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0960: buildRegistry and buildRegistryForModule call config.postBuildValidation after all modules are loaded.</item>
   <item>RFC-1026: buildRegistry and buildRegistryForModule set moduleStates (loading → active, failed on throw); rollback on register() failure; buildRegistryWithHandles returns KernelModuleHandle map.</item>
   <item>RFC-1038: replace KernelRegistry with ActualState — buildRegistry uses buildActualState from reconciler.ts; remove lifecycle methods, buildRegistryWithHandles, rollbackModuleRegistrations.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -22,12 +21,14 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>ADR-0022, RFC-0303</history>
+  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
+  <history>ADR-0022, RFC-0303, RFC-0960</history>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import process from "node:process";
+import { existsSync } from "node:fs";
 import { discoverSiteWorkspaces, loadKernelAppConfig } from "../discovery.ts";
 import { getOrBuildRegistry, getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { buildActualState } from "../../runtime/reconciler.ts";
@@ -59,7 +60,11 @@ export async function buildRegistry(config: KernelAppConfig): Promise<ActualStat
 
   const actualState = buildActualState(exports);
 
-  validateDeclarations(actualState.commands);
+  // RFC-1138: pass loaded module names — module-scoped GENERATOR_OWNERSHIP_EXEMPT
+  // entries are only stale-checked when their owning module was loaded.
+  validateDeclarations(actualState.commands, {
+    loadedModules: new Set(exports.map((m) => m.name)),
+  });
 
   return actualState;
 }
@@ -93,6 +98,17 @@ export async function loadAppRuntime(workspaceRoot: string, site: DiscoveredSite
   const cacheKey = `site:${site.configPath}`;
   const registry = await getOrBuildRegistry(cacheKey, config);
   return { config, registry };
+}
+
+/**
+ * RFC-1138: a discovered site is only runtime-loadable when its directory has
+ * node_modules installed. systems-cache clones carry a configPath but no
+ * node_modules — attempting loadAppRuntime on them prints a WARNING on every
+ * registry load. Filter them out silently; genuinely broken real sites (with
+ * node_modules) still warn.
+ */
+function siteHasRuntime(site: DiscoveredSiteWorkspace): boolean {
+  return existsSync(path.join(site.directory, "node_modules"));
 }
 
 export async function listSiteWorkspaces(workspaceRoot: string): Promise<SiteWorkspacesListResult> {
@@ -155,7 +171,9 @@ export async function listRegisteredKernelCommandNames(workspaceRoot: string): P
   }
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
-  for (const site of sites.filter((candidate) => candidate.configPath)) {
+  for (const site of sites.filter(
+    (candidate) => candidate.configPath && siteHasRuntime(candidate),
+  )) {
     try {
       const { registry } = await loadAppRuntime(workspaceRoot, site);
       for (const commandName of registry.commands.keys()) names.add(commandName);
@@ -227,7 +245,9 @@ export async function listRegisteredKernelCommands(
   }
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
-  for (const site of sites.filter((candidate) => candidate.configPath)) {
+  for (const site of sites.filter(
+    (candidate) => candidate.configPath && siteHasRuntime(candidate),
+  )) {
     try {
       const { registry } = await loadAppRuntime(workspaceRoot, site);
       for (const [commandName, command] of registry.commands) {
@@ -270,7 +290,9 @@ export async function listRegisteredKernelPipelines(
   }
 
   const sites = await discoverSiteWorkspaces(workspaceRoot);
-  for (const site of sites.filter((candidate) => candidate.configPath)) {
+  for (const site of sites.filter(
+    (candidate) => candidate.configPath && siteHasRuntime(candidate),
+  )) {
     try {
       const { registry } = await loadAppRuntime(workspaceRoot, site);
       for (const [name, steps] of registry.pipelines) {

@@ -6,9 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -19,7 +16,8 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
 
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1136</history>
+  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1136</history>
 </CHANGE_SUMMARY>
 */
 
@@ -1122,6 +1120,8 @@ export interface LeitstandPromoteData {
   smokeResult?: SmokeRunResult;
   releaseState: "promoted";
   failingPhase?: string;
+  /** RFC-1138: post-promote sternsystem.sync outcome (mirrors[2+] only) */
+  mirror?: { synced: boolean; syncError: string | null };
 }
 
 /**
@@ -1348,6 +1348,39 @@ export async function runLeitstandPromote(
     "main",
   );
 
+  // RFC-1138: post-promote mirror sync — same non-fatal semantics as
+  // mission.reconcile/mission.close (RFC-0705/0762). Only runs when the
+  // promote succeeded and external mirrors (mirrors[2+]) are configured.
+  let mirror: { synced: boolean; syncError: string | null } | undefined;
+  if (!deployResult.failingPhase) {
+    try {
+      const { readSystemConfig } = await import("../sternsystem/registry-io.ts");
+      const config = await readSystemConfig(context.workspaceRoot, systemId);
+      if (config && config.mirrors.length > 2) {
+        const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+        const syncResult = (await executeKernelCommand({
+          workspaceRoot: context.workspaceRoot,
+          commandName: "sternsystem.sync",
+          argv: [`--id=${systemId}`],
+        })) as { exitCode?: number; summary?: string };
+        if (syncResult.exitCode === 0) {
+          mirror = { synced: true, syncError: null };
+          context.logger.info(`[leitstand.promote] external mirrors synced`);
+        } else {
+          mirror = { synced: false, syncError: syncResult.summary ?? "unknown error" };
+          context.logger.warn(
+            `[leitstand.promote] sternsystem.sync failed (non-fatal): ${syncResult.summary ?? ""}`,
+          );
+        }
+      }
+    } catch (err) {
+      mirror = { synced: false, syncError: err instanceof Error ? err.message : String(err) };
+      context.logger.warn(
+        `[leitstand.promote] sternsystem.sync failed (non-fatal): ${mirror.syncError}`,
+      );
+    }
+  }
+
   return {
     data: {
       releaseId,
@@ -1361,6 +1394,7 @@ export async function runLeitstandPromote(
       healthState: deployResult.healthState,
       releaseState: "promoted",
       failingPhase: deployResult.failingPhase,
+      mirror,
     },
     summary: deployResult.failingPhase
       ? `[leitstand.promote] failed at phase: ${deployResult.failingPhase}`

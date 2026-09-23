@@ -11,6 +11,7 @@
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
 </CHANGE_SUMMARY>
 */
 
@@ -27,6 +28,13 @@ import type { CommandDeclaration } from "@warpgogol/werkstatt-shared/kernel";
 export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
   command: string;
   reason: string;
+  /**
+   * RFC-1138: module that registers this command. The stale-entry check only
+   * fires when this module was loaded into the registry being validated —
+   * site registries load only site-plugin modules, so engine commands would
+   * otherwise always report as "stale".
+   */
+  module?: string;
 }> = [
   {
     command: "block.id.generate",
@@ -102,6 +110,7 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "fleet.sites.generate",
     reason:
       "Workspace-scoped fleet config generator (RFC-0964): writes fleet/fleet.sites.yaml from systems-cache discovery, not an app-scoped generated artifact.",
+    module: "fleet",
   },
   {
     command: "nachweis.manifest.generate",
@@ -117,11 +126,18 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "signing.key.generate",
     reason:
       "Workspace-scoped key generator (RFC-0921): writes to a parameterized --output-dir, not an app-scoped generated artifact.",
+    module: "signing",
   },
   {
     command: "sternsystem.passport.generate",
     reason:
       "Workspace-scoped passport generator (RFC-0966): writes signed passport.json to systems-cache/{id}/, not an app-scoped generated artifact.",
+    module: "sternsystem",
+  },
+  {
+    command: "site.exports.generate",
+    reason:
+      "Workspace-scoped exports-map generator (RFC-1101): rewrites packages/werkstatt-site/package.json exports in place — the manifest itself, not an app-scoped generated artifact.",
   },
 ];
 
@@ -145,7 +161,10 @@ function isGlobPath(path: string): boolean {
  * 4. RFC-0963: Validator commands (name matching *.validate|*.check|*.lint) SHOULD
  *    declare `contract` and `rules`. Warn-only.
  */
-export function validateDeclarations(commands: ReadonlyMap<string, CommandDeclaration>): void {
+export function validateDeclarations(
+  commands: ReadonlyMap<string, CommandDeclaration>,
+  opts?: { loadedModules?: ReadonlySet<string> },
+): void {
   const errors: string[] = [];
   const seenNonGlobPaths = new Map<string, string>();
 
@@ -210,6 +229,12 @@ export function validateDeclarations(commands: ReadonlyMap<string, CommandDeclar
   }
 
   for (const exempt of GENERATOR_OWNERSHIP_EXEMPT) {
+    // RFC-1138: module-scoped entries are only stale when their owning module
+    // was loaded — site registries never load engine modules, so checking
+    // them there produces false "stale" warnings on every registry build.
+    if (exempt.module && opts?.loadedModules && !opts.loadedModules.has(exempt.module)) {
+      continue;
+    }
     if (!commands.has(exempt.command)) {
       errors.push(
         `GENERATOR_OWNERSHIP_EXEMPT entry \`${exempt.command}\` does not match any registered command.`,

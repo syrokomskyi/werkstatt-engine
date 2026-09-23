@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0931: insert signing phase between build-identity write and wrangler-deploy; add releaseSignResult to DeployExecutionResult.</item>
   <item>RFC-0948: add post-deploy feature smoke check — fetches a page from the deployed URL and checks for feature markers in HTML. Non-fatal, warnings only.</item>
   <item>RFC-1092: replace hardcoded github-pages purge skip with adapter-aware purgeCapable() check.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -17,7 +16,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0866, RFC-0925</history>
+  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
+  <history>RFC-0866, RFC-0925, RFC-0931</history>
 </CHANGE_SUMMARY>
 */
 
@@ -420,6 +420,26 @@ export async function executeDeployPhases(
           `Release signing failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
+    }
+
+    // --- RFC-1138: DNS upsert phase ---
+    // Moved out of build.prepare — validate pipelines must not mutate external
+    // state. DNS records are upserted here, in the deploy-bound path, before
+    // the wrangler deploy so records exist when the site goes live.
+    try {
+      const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+      const dnsResult = (await executeKernelCommand({
+        workspaceRoot: ctx.workspaceRoot,
+        commandName: "dns.record.upsert",
+        argv: [`--site=${ctx.systemId}`],
+      })) as { exitCode?: number; summary?: string };
+      if (dnsResult.exitCode !== 0) {
+        failingPhase = "dns-upsert";
+        throw new Error(`dns.record.upsert failed: ${dnsResult.summary ?? "unknown error"}`);
+      }
+    } catch (err) {
+      if (failingPhase !== "dns-upsert") failingPhase = "dns-upsert";
+      throw err;
     }
 
     const distPath = ctx.releaseId

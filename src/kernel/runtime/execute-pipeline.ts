@@ -13,9 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1126: step 2 — kernel runtime wiring
 
 Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
@@ -26,6 +23,7 @@ Steps 1-4: cacheBypassFlags field on KernelCommandDefinition, executor bypass at
 
 fo-review finding (axis E): docstrings did not mention the new bypassCache skip condition. Review report persisted.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
