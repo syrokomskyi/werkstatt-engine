@@ -14,6 +14,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1125: initial WorkshopModuleMap — descriptors + workshopModuleLoaders() materializer; consumed by tools/kernel.config.ts and the site-workshop profile's scaffolded kernel.config.ts.</item>
+  <item>RFC-1140: steps 1-4 — shared resolver, queue module, registration
+
+Extract pipeline-status derivation into packages/forge/src/pipeline-status.ts, refactor rfc.pipeline.status onto it, add os/queue module with queue.validate command, register in WORKSHOP_MODULE_MAP.forge + bin/cli.ts + package.json exports.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -128,6 +131,7 @@ export const WORKSHOP_MODULE_MAP: WorkshopModuleMap = {
     "forge-notes": forge("os/notes", "createForgeNotesModule"),
     "forge-program": forge("os/program", "createForgeProgramModule"),
     "forge-plugin": forge("os/plugin", "forgePluginModule"),
+    queue: forge("os/queue-module", "createForgeQueueModule"),
   },
 };
 
