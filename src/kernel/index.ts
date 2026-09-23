@@ -214,9 +214,12 @@ export type {
 // RFC-1038: kernelModuleModule deleted — kernel.module.load/unload/inspect removed.
 
 // RFC-1125: single-sourced workshop module loader map (site-workshop profile)
+// RFC-1148: single-sourced site module loader map (Sternsystem kernel.config)
 export {
   WORKSHOP_MODULE_MAP,
+  SITE_MODULE_MAP,
   workshopModuleLoaders,
+  siteModuleLoaders,
   type WorkshopModuleMap,
   type WorkshopModuleDescriptor,
 } from "./module-map.ts";
