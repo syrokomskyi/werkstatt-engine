@@ -1,18 +1,17 @@
 /*
 <MODULE_CONTRACT>
 <purpose>Single-sourced module loader maps (RFC-1125, RFC-1148) — WORKSHOP_MODULE_MAP is the canonical list of kernel modules a Werkstatt workshop loads; SITE_MODULE_MAP is the canonical list a Sternsystem site loads, shared between kernel.wire templates and listStaticCommandSurface.</purpose>
-<keywords>kernel, module-loaders, workshop, site-workshop, profile, single-source</keywords>
-<responsibilities>
-  <item>Declares which engine/sitePlugin/forge modules a client-facing workshop loads (WORKSHOP_MODULE_MAP).</item>
-  <item>Declares which sitePlugin/forge/engine modules a Sternsystem site loads (SITE_MODULE_MAP, RFC-1148).</item>
-  <item>Materializes descriptors into moduleLoaders thunks via workshopModuleLoaders() / siteModuleLoaders().</item>
-</responsibilities>
 <non-goals>
   <item>Do not add platform-development validators (werkstatt-shared-validate, werkstatt-commands-validate, werkstatt-e2e, typescript-checks) — they stay repo-local in tools/kernel.config.ts.</item>
   <item>Do not add warpgogol-product modules (portal, billing, warpgogol-lifecycle, projektarchiv-operations) or platform codegen (icons) — they stay repo-local.</item>
   <item>Do not import module specifiers statically — werkstatt-engine does not depend on @warpgogol/werkstatt-site; specs resolve from the consumer's node_modules at runtime.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>SITE_MODULE_MAP is the single enumeration source — kernel.config.template.ts and listStaticCommandSurface share it, drift impossible.</item>
+  <item>Descriptors carry spec+export strings only — engine never imports the site plugin statically; specs resolve in consumer node_modules.</item>
+  <item>Loaders materialize lazily via dynamic import — module cost is paid only when a surface is enumerated.</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1125: initial WorkshopModuleMap — descriptors + workshopModuleLoaders() materializer; consumed by tools/kernel.config.ts and the site-workshop profile's scaffolded kernel.config.ts.</item>
   <item>RFC-1140: steps 1-4 — shared resolver, queue module, registration
@@ -24,6 +23,8 @@ Extract pipeline-status derivation into packages/forge/src/pipeline-status.ts, r
 */
 
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
+
+// @ai-invariant: SITE_MODULE_MAP is the only enumeration of the site module set — never maintain a parallel list in wire templates or consumers.
 
 /**
  * Descriptor for one kernel module. `spec` is the npm subpath specifier resolved
