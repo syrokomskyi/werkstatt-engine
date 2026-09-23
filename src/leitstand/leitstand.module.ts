@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0930: add leitstand.verify command for live deployment verification across channels.</item>
   <item>RFC-0962: add leitstand.ship composite command — resumable full-pipeline deployment via RFC-0958 operation journal.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -16,7 +15,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927</history>
+  <item>RFC-1141: KERNEL-FLAG-07 helper-mediated flag reads in kernel.flags.lint
+
+FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930</history>
 </CHANGE_SUMMARY>
 */
 
@@ -256,6 +258,10 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             kind: "string",
             description:
               "Target release ID for rollback (RFC-0926). Resolves Worker Version ID from deployment-effect-records.",
+          },
+          "gate-decision": {
+            kind: "string",
+            description: "Gate decision override read via flagString (RFC-1141).",
           },
         },
         writes: [
