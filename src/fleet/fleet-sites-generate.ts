@@ -56,10 +56,14 @@ interface FleetSitesFile {
 function extractMirrorProtocols(config: SystemConfig): string[] {
   const protocols = new Set<string>();
   for (const mirror of config.mirrors) {
-    const proto =
-      mirror.path.startsWith("http") || mirror.path.startsWith("git")
-        ? new URL(mirror.path).protocol.replace(":", "")
-        : "file";
+    let proto = "file";
+    if (mirror.path.includes("://")) {
+      proto = new URL(mirror.path).protocol.replace(":", "");
+    } else if (/^[^\s/]+@[^\s/]+:/.test(mirror.path)) {
+      // SCP-style remote (git@github.com:org/repo.git) — SSH transport, not
+      // parseable by new URL().
+      proto = "ssh";
+    }
     protocols.add(proto);
   }
   return [...protocols].sort();

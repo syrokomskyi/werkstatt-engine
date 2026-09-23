@@ -131,6 +131,23 @@ describe("fleet.sites.generate", () => {
     const data = result.data as { sites: unknown[] };
     expect(data.sites).toHaveLength(0);
   });
+
+  it("maps SCP-style git mirrors (git@host:path) to ssh protocol without crashing", async () => {
+    // Regression: extractMirrorProtocols called new URL() on any path starting
+    // with "git" — SCP-style git@github.com:org/repo.git threw Invalid URL and
+    // killed workspace.surface.validate on real fleet configs.
+    writeSystemConfig(cacheRoot, "scp-site", { mirrors: 2 });
+
+    const result = await runFleetSitesGenerate({ flags: {}, argv: [] }, makeContext(workspaceRoot));
+
+    expect(result.exitCode).toBe(0);
+    const data = result.data as {
+      sites: Array<{ id: string; mirrors: { count: number; protocols: string[] } }>;
+    };
+    const site = data.sites.find((s) => s.id === "scp-site");
+    expect(site?.mirrors.count).toBe(2);
+    expect(site?.mirrors.protocols).toEqual(["file", "ssh"]);
+  });
 });
 
 describe("validateFleetSitesDrift", () => {
