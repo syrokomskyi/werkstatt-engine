@@ -12,6 +12,7 @@
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
+  <item>RFC-1138: scope all remaining exempt entries — 15 site-plugin commands to check (ALL_COMMANDS), nachweis.manifest.generate to nachweis, sichtpass.generate to sichtpass; stops stale-entry warnings in registries without those modules.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -40,71 +41,85 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "block.id.generate",
     reason:
       "Backfill migration command (RFC-0914): modifies existing page content files in-place, does not create new generated files.",
+    module: "check",
   },
   {
     command: "docs.commands.generate",
     reason:
       "Workspace-scoped documentation generator (RFC-0222): writes docs/COMMANDS.md, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "funnel.statechart.generate",
     reason:
       "Workspace-scoped documentation generator (RFC-0219): writes docs/specs/visitor-funnel/state-chart.generated.md, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "ecosystem.manifest.generate",
     reason:
       "Workspace-scoped documentation generator (RFC-0245): writes docs/ecosystem.generated.yaml, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "maintenance.debt.queue.generate",
     reason:
       "Workspace-scoped documentation generator (RFC-0256): writes docs/maintenance-debt.queues.generated.yaml, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "gate.catalog.generate",
     reason:
       "Workspace-scoped documentation generator (RFC-0519): writes docs/gate-catalog.generated.yaml, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "agent.dns-aid.generate",
     reason:
       "Site-registered DNS record generator (RFC-0786): writes to systems-cache/<id>/dns-records.yaml outside the app directory, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "check.report.generate",
     reason:
       "Workspace-scoped report generator (RFC-0297): writes to .check-warpgogol/runs/**, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "check.action-pack.generate",
     reason:
       "Workspace-scoped report generator (RFC-0297): writes to .check-warpgogol/runs/**, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "public.artifact.generate",
     reason:
       "Aggregate generation boundary (RFC-0307): delegates to dedicated generators that own the actual files, does not produce new files itself.",
+    module: "check",
   },
   {
     command: "headers.security.generate",
     reason:
       "Security header generation boundary (RFC-0315): baseline headers are emitted by public.infrastructure.generate, this command does not produce new files itself.",
+    module: "check",
   },
   {
     command: "not-found.generate",
     reason:
       "Generation boundary (RFC-0310): routes.generate owns src/pages/404.astro, this command delegates and does not produce new files itself.",
+    module: "check",
   },
   {
     command: "ai.generate",
     reason:
       "Legacy AI policy generator (RFC-0051): ai.policy.generate (RFC-0313) now owns public/ai.txt, this command delegates and does not produce new files itself.",
+    module: "check",
   },
   {
     command: "gitattributes.generate",
     reason:
       "Workspace-scoped config generator (RFC-0336): rewrites the managed block in .gitattributes from ownership map data, not an app-scoped generated artifact.",
+    module: "check",
   },
   {
     command: "fleet.sites.generate",
@@ -116,11 +131,13 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "nachweis.manifest.generate",
     reason:
       "Workspace-scoped nachweis generator (RFC-0707): writes to <cache>/public/nachweise/manifest.json outside the app directory, not an app-scoped generated artifact.",
+    module: "nachweis",
   },
   {
     command: "sichtpass.generate",
     reason:
       "Workspace-scoped visibility snapshot generator (RFC-0947): appends Bordbuch entries, does not produce generated files in the app directory.",
+    module: "sichtpass",
   },
   {
     command: "signing.key.generate",
@@ -138,6 +155,7 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "site.exports.generate",
     reason:
       "Workspace-scoped exports-map generator (RFC-1101): rewrites packages/werkstatt-site/package.json exports in place — the manifest itself, not an app-scoped generated artifact.",
+    module: "check",
   },
 ];
 
