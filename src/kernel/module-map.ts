@@ -164,8 +164,8 @@ export const SITE_MODULE_MAP: Record<string, WorkshopModuleDescriptor> = {
   werkstatt: forge("os/werkstatt", "forgeWerkstattModule"),
   // engine guests
   "change-impact": engine("kernel", "createChangeImpactModule"),
-  bordbuch: engine("handoff-module", "createBordbuchModule"),
-  nachweis: engine("handoff-module", "createNachweisModule"),
+  bordbuch: engine("bordbuch-module", "createBordbuchModule"),
+  nachweis: engine("nachweis-module", "createNachweisModule"),
   sichtpass: engine("sichtpass-module", "createSichtpassModule"),
   dns: engine("dns-module", "createDnsModule"),
 };

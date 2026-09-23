@@ -39,10 +39,21 @@ import type {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.join(__dirname, "..", "templates", "icons");
 
-// Configuration
-const UI_PACKAGE_PATH = path.join(__dirname, "..", "..", "..", "..", "ui");
-const ASSETS_BASE = path.join(UI_PACKAGE_PATH, "src", "assets", "icons");
-const OUTPUT_BASE = path.join(UI_PACKAGE_PATH, "src", "icons", "gen");
+// Configuration — icon assets and generated components live in the
+// werkstatt-site domain/ui package (RFC-0776 consolidation; RFC-1147 path fix).
+const UI_PACKAGE_PATH = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "..",
+  "werkstatt-site",
+  "src",
+  "domain",
+  "ui",
+);
+const ASSETS_BASE = path.join(UI_PACKAGE_PATH, "assets", "icons");
+const OUTPUT_BASE = path.join(UI_PACKAGE_PATH, "icons", "gen");
 
 type IconSet = { base: string; set: string };
 
@@ -196,9 +207,9 @@ async function processIconSet(
     fs.mkdirSync(subfolderPath, { recursive: true });
 
     // Calculate relative path from component to JSON asset
-    // From: packages/ui/src/icons/gen/{base}/{subfolder}/
-    // To:   packages/ui/src/assets/icons/{base}/{set}/
-    const relativeJsonPath = `../../../../../assets/icons/${base}/${set}/${jsonFile}`;
+    // From: domain/ui/icons/gen/{base}/{subfolder}/
+    // To:   domain/ui/assets/icons/{base}/{set}/
+    const relativeJsonPath = `../../../../assets/icons/${base}/${set}/${jsonFile}`;
 
     const componentContent = generateIconComponent(name, set, relativeJsonPath);
     const componentPath = path.join(subfolderPath, componentFileName);
@@ -230,7 +241,7 @@ async function processIconSet(
 }
 
 /**
- * Main command handler for icons.generate
+ * Main command handler for ui.icons.generate
  */
 export async function runIconsGenerate(
   input: KernelCommandInput,
@@ -252,7 +263,7 @@ export async function runIconsGenerate(
       exitCode: 0,
       summary: "No icon sets found",
       data: {
-        command: "icons.generate",
+        command: "ui.icons.generate",
         status: "success",
         generated: {
           components: 0,
@@ -276,7 +287,7 @@ export async function runIconsGenerate(
     exitCode: totalErrors > 0 ? 1 : 0,
     summary: `Generated ${totalGenerated} icon components${totalErrors > 0 ? ` (${totalErrors} errors)` : ""}`,
     data: {
-      command: "icons.generate",
+      command: "ui.icons.generate",
       status: totalErrors > 0 ? "fail" : "success",
       generated: {
         components: totalGenerated,
