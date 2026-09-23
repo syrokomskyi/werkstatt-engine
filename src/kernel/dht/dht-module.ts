@@ -126,8 +126,8 @@ export async function createDhtModule(): Promise<ModuleExport> {
         description:
           "RFC-0565: publish workshop capacity to the DHT for placement decisions. " +
           "Signs the capacity entry with the operator's Ed25519 keypair. " +
-          "Required: --workshop-id <id>, --available-slots <n>, --endpoint <host:port>. " +
-          "Optional: --storage-limit-mb <n>, --bandwidth-limit-mbps <n>. Use --json for output.",
+          "Required: --workshop-id <id>, --available-slots <n>. " +
+          "Optional: --endpoint <host:port>, --storage-limit-mb <n>, --bandwidth-limit-mbps <n>. Use --json for output.",
         scope: "workspace",
         cacheable: false,
         flags: {
@@ -174,6 +174,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
           },
           workshops: {
             kind: "string[]",
+            required: true,
             description: "Candidate workshop ids (comma-separated or repeated).",
           },
         },
