@@ -1,0 +1,10 @@
+{
+  "name": "fixture-workshop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fixture workshop for smoke testing published @warpgogol/werkstatt-engine tarballs (RFC-0773).",
+  "dependencies": {
+    "@warpgogol/werkstatt-engine": "*"
+  }
+}
