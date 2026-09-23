@@ -14,7 +14,6 @@ executeKernelCommand is called multiple times within the same Node.js process.
   <item>ActualState is cached per process — rebuilding the registry per command is avoided.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>ADR-0022: initial implementation — process-lifetime Map keyed by config source path.</item>
   <item>RFC-1026: add clearModule for incremental single-module invalidation without clearing the entire cache.</item>
   <item>RFC-1038: cache ActualState instead of KernelRegistry; remove clearModule (no module unload in desired-state model).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -23,15 +22,19 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1147: getOrBuildSiteModuleStates — process-lifetime cache for materialized site-module ActualStates keyed by workspaceRoot; cleared alongside the registry cache.</item>
+  <history>ADR-0022</history>
 </CHANGE_SUMMARY>
 */
 
 import type { KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
-import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 import { buildRegistry } from "./registry.ts";
+import { buildActualState } from "../../runtime/reconciler.ts";
 import { loadWorkspaceConfig } from "../discovery.ts";
 
 const registryCache = new Map<string, ActualState>();
+const siteModuleStatesCache = new Map<string, Map<string, ActualState>>();
 let cacheEnabled = true;
 
 /**
@@ -77,11 +80,41 @@ export async function getOrBuildWorkspaceRegistry(
 }
 
 /**
+ * RFC-1147: materialize the canonical site module set once per workspace root.
+ * The loaders resolve @warpgogol/werkstatt-site specifiers from the consumer's
+ * node_modules — keyed by workspaceRoot because different workshops may pin
+ * different site-plugin versions. Returns module-name → ActualState pairs so
+ * callers keep the registering-module attribution.
+ */
+export async function getOrBuildSiteModuleStates(
+  workspaceRoot: string,
+  loaders: Record<string, () => Promise<ModuleExport>>,
+): Promise<Map<string, ActualState>> {
+  const cacheKey = `site-modules:${workspaceRoot}`;
+  if (cacheEnabled) {
+    const cached = siteModuleStatesCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  const states = new Map<string, ActualState>();
+  for (const [moduleName, loader] of Object.entries(loaders)) {
+    const mod = await loader();
+    states.set(moduleName, buildActualState([mod]));
+  }
+
+  if (cacheEnabled) {
+    siteModuleStatesCache.set(cacheKey, states);
+  }
+  return states;
+}
+
+/**
  * Clear all cached actual states. Called by the `--no-registry-cache` CLI flag
  * and by tests that need a fresh actual state between runs.
  */
 export function clearRegistryCache(): void {
   registryCache.clear();
+  siteModuleStatesCache.clear();
 }
 
 /**
@@ -93,6 +126,7 @@ export function setRegistryCacheEnabled(enabled: boolean): void {
   cacheEnabled = enabled;
   if (!enabled) {
     registryCache.clear();
+    siteModuleStatesCache.clear();
   }
 }
 
