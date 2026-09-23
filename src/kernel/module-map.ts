@@ -1,10 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Single-sourced workshop module loader map (RFC-1125) — the canonical list of kernel modules a Werkstatt workshop loads, shared between the reference monorepo and the site-workshop stack profile.</purpose>
+<purpose>Single-sourced module loader maps (RFC-1125, RFC-1148) — WORKSHOP_MODULE_MAP is the canonical list of kernel modules a Werkstatt workshop loads; SITE_MODULE_MAP is the canonical list a Sternsystem site loads, shared between kernel.wire templates and listStaticCommandSurface.</purpose>
 <keywords>kernel, module-loaders, workshop, site-workshop, profile, single-source</keywords>
 <responsibilities>
   <item>Declares which engine/sitePlugin/forge modules a client-facing workshop loads (WORKSHOP_MODULE_MAP).</item>
-  <item>Materializes descriptors into moduleLoaders thunks via workshopModuleLoaders().</item>
+  <item>Declares which sitePlugin/forge/engine modules a Sternsystem site loads (SITE_MODULE_MAP, RFC-1148).</item>
+  <item>Materializes descriptors into moduleLoaders thunks via workshopModuleLoaders() / siteModuleLoaders().</item>
 </responsibilities>
 <non-goals>
   <item>Do not add platform-development validators (werkstatt-shared-validate, werkstatt-commands-validate, werkstatt-e2e, typescript-checks) — they stay repo-local in tools/kernel.config.ts.</item>
@@ -17,6 +18,7 @@
   <item>RFC-1140: steps 1-4 — shared resolver, queue module, registration
 
 Extract pipeline-status derivation into packages/forge/src/pipeline-status.ts, refactor rfc.pipeline.status onto it, add os/queue module with queue.validate command, register in WORKSHOP_MODULE_MAP.forge + bin/cli.ts + package.json exports.</item>
+  <item>RFC-1148: SITE_MODULE_MAP + siteModuleLoaders() — canonical 18-loader site module set shared by kernel.config.template.ts and listStaticCommandSurface; materializer refactored into a shared helper.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -136,27 +138,57 @@ export const WORKSHOP_MODULE_MAP: WorkshopModuleMap = {
 };
 
 /**
- * Materialize WORKSHOP_MODULE_MAP into the `moduleLoaders` record shape that
+ * Canonical site module map (RFC-1148) — the 18 loaders kernel.wire emits into
+ * every Sternsystem's tools/kernel.config.ts. Consumed by the wire template
+ * (via siteModuleLoaders()) and by listStaticCommandSurface, so the generated
+ * site config and the command manifest share one enumeration source.
+ *
+ * Buckets: 8 plugin-owned site-stack modules (surface/* + onboarding/testing),
+ * 5 forge guests, 5 engine guests — same factories the site config loads.
+ */
+export const SITE_MODULE_MAP: Record<string, WorkshopModuleDescriptor> = {
+  // site-stack (plugin-owned definitions under surface/)
+  check: sitePlugin("surface/check-module", "createSiteCheckModule"),
+  service: sitePlugin("surface/service-module", "serviceModule"),
+  deploy: sitePlugin("surface/deploy-module", "deployModule"),
+  integrity: sitePlugin("surface/integrity-module", "integrityModule"),
+  changelog: sitePlugin("surface/changelog-module", "changelogModule"),
+  pipelines: sitePlugin("surface/pipelines-module", "pipelinesModule"),
+  onboarding: sitePlugin("onboarding/module", "createOnboardingModule"),
+  testing: sitePlugin("testing/module", "createTestingModule"),
+  // forge guests — same factories the site config loads
+  rfc: forge("os/rfc-module", "createForgeRfcModule"),
+  workflow: forge("os/workflow-module", "createForgeWorkflowModule"),
+  compass: forge("os/compass", "forgeCompassModule"),
+  naming: forge("os/naming-module", "createForgeNamingModule"),
+  werkstatt: forge("os/werkstatt", "forgeWerkstattModule"),
+  // engine guests
+  "change-impact": engine("kernel", "createChangeImpactModule"),
+  bordbuch: engine("handoff-module", "createBordbuchModule"),
+  nachweis: engine("handoff-module", "createNachweisModule"),
+  sichtpass: engine("sichtpass-module", "createSichtpassModule"),
+  dns: engine("dns-module", "createDnsModule"),
+};
+
+/**
+ * Materialize a descriptor map into the `moduleLoaders` record shape that
  * defineKernelConfig expects. Each thunk resolves its specifier lazily via
  * dynamic import — specifiers are resolved from the consumer's node_modules,
- * so this works identically in the reference monorepo and in a scaffolded
- * client workshop.
+ * so this works identically in the reference monorepo, a scaffolded client
+ * workshop, and a generated Sternsystem site.
  */
-export function workshopModuleLoaders(): Record<string, () => Promise<ModuleExport>> {
+function materializeDescriptors(
+  maps: Record<string, WorkshopModuleDescriptor>[],
+): Record<string, () => Promise<ModuleExport>> {
   const loaders: Record<string, () => Promise<ModuleExport>> = {};
-  const buckets: Record<string, WorkshopModuleDescriptor>[] = [
-    WORKSHOP_MODULE_MAP.engine,
-    WORKSHOP_MODULE_MAP.sitePlugin,
-    WORKSHOP_MODULE_MAP.forge,
-  ];
-  for (const bucket of buckets) {
-    for (const [key, desc] of Object.entries(bucket)) {
+  for (const map of maps) {
+    for (const [key, desc] of Object.entries(map)) {
       loaders[key] = async () => {
         const mod = (await import(desc.spec)) as Record<string, unknown>;
         const exported = mod[desc.export];
         if (exported === undefined) {
           throw new Error(
-            `[workshopModuleLoaders] '${desc.spec}' has no export '${desc.export}' — check WORKSHOP_MODULE_MAP entry '${key}'`,
+            `[module-map] '${desc.spec}' has no export '${desc.export}' — check descriptor entry '${key}'`,
           );
         }
         return (typeof exported === "function" ? await exported() : exported) as ModuleExport;
@@ -164,4 +196,29 @@ export function workshopModuleLoaders(): Record<string, () => Promise<ModuleExpo
     }
   }
   return loaders;
+}
+
+/**
+ * Materialize WORKSHOP_MODULE_MAP into the `moduleLoaders` record shape that
+ * defineKernelConfig expects. Each thunk resolves its specifier lazily via
+ * dynamic import — specifiers are resolved from the consumer's node_modules,
+ * so this works identically in the reference monorepo and in a scaffolded
+ * client workshop.
+ */
+export function workshopModuleLoaders(): Record<string, () => Promise<ModuleExport>> {
+  return materializeDescriptors([
+    WORKSHOP_MODULE_MAP.engine,
+    WORKSHOP_MODULE_MAP.sitePlugin,
+    WORKSHOP_MODULE_MAP.forge,
+  ]);
+}
+
+/**
+ * Materialize SITE_MODULE_MAP into the `moduleLoaders` record shape — the
+ * canonical site command surface (RFC-1148). Consumed by
+ * kernel.config.template.ts (generated site configs) and by
+ * listStaticCommandSurface (command manifest enumeration).
+ */
+export function siteModuleLoaders(): Record<string, () => Promise<ModuleExport>> {
+  return materializeDescriptors([SITE_MODULE_MAP]);
 }
