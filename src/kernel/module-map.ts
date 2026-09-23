@@ -131,7 +131,7 @@ export const WORKSHOP_MODULE_MAP: WorkshopModuleMap = {
     "forge-notes": forge("os/notes", "createForgeNotesModule"),
     "forge-program": forge("os/program", "createForgeProgramModule"),
     "forge-plugin": forge("os/plugin", "forgePluginModule"),
-    queue: forge("os/queue-module", "createForgeQueueModule"),
+    "forge-queue": forge("os/queue-module", "createForgeQueueModule"),
   },
 };
 
