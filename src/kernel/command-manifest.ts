@@ -1,13 +1,13 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-RFC-0266: generates the single machine-readable command manifest —
-docs/command-manifest.generated.yaml — from the live Site OS command
-registry (workspace + every discovered app). Every other command-surface
-projection (docs/COMMANDS.md, the ecosystem projection's command section,
-CLI --help) should read from this manifest instead of independently
-re-walking the registry, so a command's own declaration is the single source
-of truth for its documentation, IO, and pipeline membership.
+RFC-0266/RFC-1147: generates the single machine-readable command manifest —
+docs/command-manifest.generated.yaml — from the static command surface
+(workspace registry + canonical site module set, SITE_MODULE_MAP). Every other
+command-surface projection (docs/COMMANDS.md, the ecosystem projection's
+command section, CLI --help) should read from this manifest instead of
+independently re-walking the registry, so a command's own declaration is the
+single source of truth for its documentation, IO, and pipeline membership.
 </purpose>
 <non-goals>
   <item>Do not enforce reads/writes at runtime — that is rfc-0267 (WorkspaceIO port).</item>
@@ -16,10 +16,12 @@ of truth for its documentation, IO, and pipeline membership.
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
   <item>The manifest is generated, not hand-maintained — docs/command-manifest.generated.yaml is the single output.</item>
-  <item>Command metadata comes from the registry, not from doc parsing.</item>
+  <item>Command metadata comes from the static command surface (listStaticCommandSurface), not from doc parsing or discovered site instances.</item>
+  <item>Deduplication is fail-closed (CMD-MAN-04): same-name commands across providers merge only when semantic fields agree.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-0266: initial implementation.</item>
+  <item>RFC-1147: static command surface — providers[]/siteScope schema, fail-closed CMD-MAN-04 dedup, runtimeState removed.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -35,13 +37,14 @@ import { dirname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
 import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
-import { listRegisteredKernelCommands, listRegisteredKernelPipelines } from "./runtime.ts";
+import { listStaticCommandSurface } from "./runtime.ts";
 import type {
   CheckResult,
   Diagnostic,
   KernelCommandInput,
   KernelCommandResult,
   KernelFlagSpec,
+  KernelRegisteredCommandInfo,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
 
@@ -49,7 +52,10 @@ export interface CommandManifestEntry {
   name: string;
   description: string;
   scope: "app" | "workspace";
-  provider: string;
+  /** Sorted unique providers that register this command (workspace, site-module). */
+  providers: string[];
+  /** True when the command is registered by the canonical site module set (RFC-1147). */
+  siteScope: boolean;
   module: string | null;
   mutatesState: boolean;
   requiresNetwork: boolean;
@@ -61,16 +67,22 @@ export interface CommandManifestEntry {
   pipelines: string[];
 }
 
-export interface CommandManifestRuntimeState {
-  reflectedAt: string;
-  resolvedComponentSetHash: string | null;
-  catalogHash: string | null;
-}
-
 export interface CommandManifest {
   meta: { schemaVersion: 1; deterministic: true; generatedAt: null; contentHash: string };
   commands: CommandManifestEntry[];
-  runtimeState?: CommandManifestRuntimeState;
+}
+
+/** Thrown by buildCommandManifest when same-name commands diverge across providers (CMD-MAN-04). */
+export class CommandManifestDedupError extends Error {
+  readonly diagnostics: Diagnostic[];
+  constructor(diagnostics: Diagnostic[]) {
+    super(
+      `Command manifest deduplication failed: ${diagnostics.length} conflict(s). ` +
+        "Same-name commands across providers must agree on semantic fields.",
+    );
+    this.name = "CommandManifestDedupError";
+    this.diagnostics = diagnostics;
+  }
 }
 
 const MANIFEST_RELATIVE_PATH = join("docs", "command-manifest.generated.yaml");
@@ -136,15 +148,12 @@ export function collectCommandManifestDiagnostics(
   return diagnostics;
 }
 
-/** Builds the deterministic CommandManifest from the live command + pipeline registries. */
+/** Builds the deterministic CommandManifest from the static command surface (RFC-1147). */
 export async function buildCommandManifest(workspaceRoot: string): Promise<CommandManifest> {
-  const [commands, pipelinesByName] = await Promise.all([
-    listRegisteredKernelCommands(workspaceRoot),
-    listRegisteredKernelPipelines(workspaceRoot),
-  ]);
+  const surface = await listStaticCommandSurface(workspaceRoot);
 
   const pipelinesByCommand = new Map<string, Set<string>>();
-  for (const [pipelineName, memberCommands] of Object.entries(pipelinesByName)) {
+  for (const [pipelineName, memberCommands] of Object.entries(surface.pipelines)) {
     for (const commandName of memberCommands) {
       const set = pipelinesByCommand.get(commandName) ?? new Set<string>();
       set.add(pipelineName);
@@ -152,45 +161,147 @@ export async function buildCommandManifest(workspaceRoot: string): Promise<Comma
     }
   }
 
-  const entries: CommandManifestEntry[] = commands.map((command) => ({
-    name: command.name,
-    description: command.description,
-    scope: command.scope,
-    provider: command.siteName ? `${command.provider}:${command.siteName}` : command.provider,
-    module: command.module ?? null,
-    mutatesState: command.mutatesState === true,
-    requiresNetwork: command.requiresNetwork === true,
-    timeoutMs: command.timeoutMs ?? null,
-    flags: command.flags ?? {},
-    reads: command.reads ?? [],
-    writes: command.writes ?? [],
-    validatesOutputs: command.validatesOutputs ?? [],
-    pipelines: [...(pipelinesByCommand.get(command.name) ?? [])].sort(),
-  }));
-
-  entries.sort((a, b) => a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider));
-
-  const runtimeState = await buildRuntimeState();
+  const entries = dedupCommandEntries(surface.commands, pipelinesByCommand);
 
   const withoutHash: Omit<CommandManifest, "meta"> & {
     meta: Omit<CommandManifest["meta"], "contentHash">;
   } = {
     meta: { schemaVersion: 1, deterministic: true, generatedAt: null },
     commands: entries,
-    ...(runtimeState ? { runtimeState } : {}),
   };
   const contentHash = createHash("sha256").update(yamlStringify(withoutHash)).digest("hex");
 
   return { ...withoutHash, meta: { ...withoutHash.meta, contentHash } };
 }
 
-async function buildRuntimeState(): Promise<CommandManifestRuntimeState | null> {
-  try {
-    await import("../component-runtime/reflection.ts");
-    return null;
-  } catch {
-    return null;
+/**
+ * Semantic fields compared across providers for same-name commands (CMD-MAN-04).
+ * Provenance fields (module, provider, siteName) are excluded — they differ by
+ * construction.
+ */
+const SEMANTIC_FIELDS = [
+  "description",
+  "scope",
+  "mutatesState",
+  "requiresNetwork",
+  "timeoutMs",
+  "flags",
+  "reads",
+  "writes",
+  "validatesOutputs",
+] as const;
+
+type SemanticField = (typeof SEMANTIC_FIELDS)[number];
+
+/** Canonicalize a value for cross-provider comparison: sort object keys recursively, keep array order. */
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === "object") {
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      sorted[key] = canonicalize((value as Record<string, unknown>)[key]);
+    }
+    return sorted;
   }
+  return value;
+}
+
+function semanticFieldValue(command: KernelRegisteredCommandInfo, field: SemanticField): unknown {
+  switch (field) {
+    case "mutatesState":
+      return command.mutatesState === true;
+    case "requiresNetwork":
+      return command.requiresNetwork === true;
+    case "timeoutMs":
+      return command.timeoutMs ?? null;
+    case "flags":
+      return command.flags ?? {};
+    case "reads":
+      return command.reads ?? [];
+    case "writes":
+      return command.writes ?? [];
+    case "validatesOutputs":
+      return command.validatesOutputs ?? [];
+    default:
+      return command[field];
+  }
+}
+
+/**
+ * Merge per-provider command entries into one manifest entry per name.
+ * Fail-closed (CMD-MAN-04): throws CommandManifestDedupError when same-name
+ * commands disagree on any semantic field.
+ */
+function dedupCommandEntries(
+  commands: KernelRegisteredCommandInfo[],
+  pipelinesByCommand: Map<string, Set<string>>,
+): CommandManifestEntry[] {
+  const byName = new Map<string, KernelRegisteredCommandInfo[]>();
+  for (const command of commands) {
+    const group = byName.get(command.name) ?? [];
+    group.push(command);
+    byName.set(command.name, group);
+  }
+
+  const diagnostics: Diagnostic[] = [];
+  const entries: CommandManifestEntry[] = [];
+
+  for (const [name, group] of byName) {
+    const divergentFields = SEMANTIC_FIELDS.filter((field) => {
+      const fingerprints = new Set(
+        group.map((command) => JSON.stringify(canonicalize(semanticFieldValue(command, field)))),
+      );
+      return fingerprints.size > 1;
+    });
+
+    const providers = [...new Set(group.map((command) => command.provider))].sort();
+
+    if (divergentFields.length > 0) {
+      diagnostics.push({
+        ruleId: "CMD-MAN-04",
+        severity: "error",
+        message:
+          `Command "${name}" is registered by ${providers.length} providers ` +
+          `(${providers.join(", ")}) with divergent declarations: ${divergentFields.join(", ")}.`,
+        fixHint:
+          "Align the command declarations across providers, or rename one of the commands. " +
+          "The manifest is a stable surface — same-name commands must be semantically identical.",
+        data: { command: name, providers, fields: divergentFields },
+      });
+      continue;
+    }
+
+    // All providers agree — merge. Module provenance: prefer the site-module
+    // registration (canonical site surface), fall back to any non-null module.
+    const siteModuleEntry = group.find((command) => command.provider === "site-module");
+    const representative = siteModuleEntry ?? group[0];
+    const module =
+      siteModuleEntry?.module ?? group.find((command) => command.module)?.module ?? null;
+
+    entries.push({
+      name,
+      description: representative.description,
+      scope: representative.scope,
+      providers,
+      siteScope: providers.includes("site-module"),
+      module,
+      mutatesState: representative.mutatesState === true,
+      requiresNetwork: representative.requiresNetwork === true,
+      timeoutMs: representative.timeoutMs ?? null,
+      flags: representative.flags ?? {},
+      reads: representative.reads ?? [],
+      writes: representative.writes ?? [],
+      validatesOutputs: representative.validatesOutputs ?? [],
+      pipelines: [...(pipelinesByCommand.get(name) ?? [])].sort(),
+    });
+  }
+
+  if (diagnostics.length > 0) {
+    throw new CommandManifestDedupError(diagnostics);
+  }
+
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+  return entries;
 }
 
 export async function runCommandManifestGenerate(
@@ -201,10 +312,29 @@ export async function runCommandManifestGenerate(
     command: "command.manifest.generate";
     commandCount: number;
     written: boolean;
+    diagnostics?: Diagnostic[];
   }>
 > {
   const dryRun = context.dryRun || input.flags["dry-run"] === true;
-  const manifest = await buildCommandManifest(context.workspaceRoot);
+
+  let manifest: CommandManifest;
+  try {
+    manifest = await buildCommandManifest(context.workspaceRoot);
+  } catch (err) {
+    if (err instanceof CommandManifestDedupError) {
+      return {
+        data: {
+          command: "command.manifest.generate",
+          commandCount: 0,
+          written: false,
+          diagnostics: err.diagnostics,
+        },
+        exitCode: 1,
+        summary: `command.manifest.generate: aborted — ${err.diagnostics.length} dedup conflict(s) (CMD-MAN-04)`,
+      };
+    }
+    throw err;
+  }
 
   if (!dryRun) {
     const outputPath = manifestFilePath(context.workspaceRoot);
@@ -232,7 +362,15 @@ export async function runCommandManifestValidate(
   _input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<CheckResult>> {
-  const current = await buildCommandManifest(context.workspaceRoot);
+  let current: CommandManifest;
+  try {
+    current = await buildCommandManifest(context.workspaceRoot);
+  } catch (err) {
+    if (err instanceof CommandManifestDedupError) {
+      return diagnosticsResultLocal(err.diagnostics);
+    }
+    throw err;
+  }
 
   let committedRaw: string | undefined;
   try {

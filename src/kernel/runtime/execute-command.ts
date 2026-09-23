@@ -558,7 +558,7 @@ export async function executeKernelCommand(
           const manifestRaw = await readFile(manifestFilePath(options.workspaceRoot), "utf-8");
           const manifest = yamlParse(manifestRaw) as CommandManifest;
           const entry = manifest.commands.find(
-            (c) => c.name === options.commandName && c.provider === "workspace",
+            (c) => c.name === options.commandName && c.providers.includes("workspace"),
           );
           moduleName = entry?.module ?? undefined;
         } catch {

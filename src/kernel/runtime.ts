@@ -29,6 +29,8 @@ export {
   listRegisteredKernelCommandNames,
   listRegisteredKernelCommands,
   listRegisteredKernelPipelines,
+  listStaticCommandSurface,
+  type StaticCommandSurface,
   loadAppRuntime,
 } from "./runtime/registry.ts";
 export { executeKernelCommand, executeRegisteredCommand } from "./runtime/execute-command.ts";
