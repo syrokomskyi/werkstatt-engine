@@ -34,12 +34,19 @@ export async function createEffectsModule(): Promise<ModuleExport> {
         description:
           "RFC-1037: Classify an operation into one of four effect classes (revertible, " +
           "transactional, compensatable, irreversible-emission) before execution. " +
-          "Returns { operation, effectClass } as JSON.",
+          "Returns { operation, effectClass } as JSON. Required flags: --operation.",
         execute: runEffectClassify,
         scope: "workspace",
         mutatesState: false,
         cacheable: false,
         requiresNetwork: false,
+        flags: {
+          operation: {
+            kind: "string",
+            required: true,
+            description: "Operation identifier to classify.",
+          },
+        },
         reads: ["effect-registry"],
         writes: [],
         generates: [],
@@ -51,12 +58,35 @@ export async function createEffectsModule(): Promise<ModuleExport> {
           "RFC-1037: Verify that a compensating action restored the system to an equivalent " +
           "state. Runs all verification probes in parallel, stores the result in the " +
           "compensation evidence store (SQLite), and returns CompensationResult as JSON. " +
-          "Exit code 0 if verified, 1 if verification failed.",
+          "Exit code 0 if verified, 1 if verification failed. " +
+          "Required flags: --operation-hash, --compensation-hash, --operation.",
         execute: runEffectCompensationVerify,
         scope: "workspace",
         mutatesState: true,
         cacheable: false,
         requiresNetwork: true,
+        flags: {
+          "operation-hash": {
+            kind: "string",
+            required: true,
+            description: "sha256:... digest of the compensated operation.",
+          },
+          "compensation-hash": {
+            kind: "string",
+            required: true,
+            description: "sha256:... digest of the compensation action.",
+          },
+          operation: {
+            kind: "string",
+            required: true,
+            description: "Operation identifier used to resolve the compensation action.",
+          },
+          "mission-id": { kind: "string", description: "Mission id for store scoping." },
+          "missions-dir": {
+            kind: "string",
+            description: "Missions directory override (default: <workspace>/missions).",
+          },
+        },
         reads: ["effect-registry", "compensation-evidence"],
         writes: ["compensation-evidence", "file-system"],
         generates: [],
@@ -66,12 +96,25 @@ export async function createEffectsModule(): Promise<ModuleExport> {
         modulePath,
         description:
           "RFC-1037: Inspect stored compensation evidence for a given operation hash. " +
-          "Returns CompensationResult or null if no evidence exists.",
+          "Returns CompensationResult or null if no evidence exists. " +
+          "Required flags: --operation-hash.",
         execute: runEffectCompensationInspect,
         scope: "workspace",
         mutatesState: false,
         cacheable: false,
         requiresNetwork: false,
+        flags: {
+          "operation-hash": {
+            kind: "string",
+            required: true,
+            description: "sha256:... digest of the compensated operation.",
+          },
+          "mission-id": { kind: "string", description: "Mission id for store scoping." },
+          "missions-dir": {
+            kind: "string",
+            description: "Missions directory override (default: <workspace>/missions).",
+          },
+        },
         reads: ["compensation-evidence"],
         writes: [],
         generates: [],

@@ -28,121 +28,180 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createDhtModule(): Promise<ModuleExport> {
-const { runDhtNodeInit } = await import("./init.ts");
-    const { runDhtLookup } = await import("./lookup.ts");
-    const { runDhtRegister } = await import("./register.ts");
-    const { runDhtCapacityPublish } = await import("./capacity.ts");
-    const { runDhtPlacement } = await import("./placement.ts");
-    const { runDhtStatus } = await import("./status.ts");
+  const { runDhtNodeInit } = await import("./init.ts");
+  const { runDhtLookup } = await import("./lookup.ts");
+  const { runDhtRegister } = await import("./register.ts");
+  const { runDhtCapacityPublish } = await import("./capacity.ts");
+  const { runDhtPlacement } = await import("./placement.ts");
+  const { runDhtStatus } = await import("./status.ts");
   return {
-  name: "dht",
-  version: "0.1.0",
+    name: "dht",
+    version: "0.1.0",
 
     declarations: [],
-  commands: [
-    {
-      name: "dht.node.init",
-      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
-      generates: [],
-      description:
-        "RFC-0565: initialize DHT configuration. Creates werkstatt.dht.json with " +
-        "bind address, bootstrap nodes, replication factor, and timeout parameters. " +
-        "Use --bind <host:port> to specify the bind address. Use --bootstrap <host:port> " +
-        "to specify a bootstrap node (can be repeated). Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.identity.json"],
-      writes: ["werkstatt.dht.json"],
-      execute: runDhtNodeInit,
-    },
-    {
-      name: "dht.lookup",
-      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
-      generates: [],
-      description:
-        "RFC-0565: resolve a site id to its DHT entry. Queries the DHT (or local " +
-        "cache if fresh) and validates the entry signature. Routes around dead " +
-        "workshops detected by SWIM. Use --site-id <id> to specify the site. " +
-        "Use --force to bypass cache. Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: [
-        "werkstatt.dht.json",
-        "werkstatt.dht.cache.json",
-        "werkstatt.identity.json",
-        "werkstatt.swim.json",
-        "werkstatt.genome.log",
-      ],
-      writes: ["werkstatt.dht.cache.json"],
-      execute: runDhtLookup,
-    },
-    {
-      name: "dht.register",
-      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
-      generates: [],
-      description:
-        "RFC-0565: publish a local registry entry to the DHT. Signs the entry with " +
-        "the operator's Ed25519 keypair. Uses LWW on lastUpdated for conflict resolution. " +
-        "Required flags: --site-id <id>, --owner <did:web>, --endpoint <host:port>. " +
-        "Optional: --mirrors <host:port> (can be repeated). Use --json for output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.dht.json", "werkstatt.identity.json"],
-      writes: ["werkstatt.dht.cache.json"],
-      execute: runDhtRegister,
-    },
-    {
-      name: "dht.capacity.publish",
-      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
-      generates: [],
-      description:
-        "RFC-0565: publish workshop capacity to the DHT for placement decisions. " +
-        "Signs the capacity entry with the operator's Ed25519 keypair. " +
-        "Required: --workshop-id <id>, --available-slots <n>, --endpoint <host:port>. " +
-        "Optional: --storage-limit-mb <n>, --bandwidth-limit-mbps <n>. Use --json for output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.dht.json", "werkstatt.identity.json"],
-      writes: [],
-      execute: runDhtCapacityPublish,
-    },
-    {
-      name: "dht.placement",
-      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
-      generates: [],
-      description:
-        "RFC-0565: determine the best workshop for placing a site by querying DHT " +
-        "capacity entries. Uses least-loaded strategy by default. " +
-        "Required: --site-id <id>, --workshops <id1,id2,...> (or repeated). " +
-        "Optional: --strategy <least-loaded|nearest|owner-preference>. Use --json for output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.dht.json", "werkstatt.identity.json", "werkstatt.swim.json"],
-      writes: [],
-      execute: runDhtPlacement,
-    },
-    {
-      name: "dht.status",
-      modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
-      generates: [],
-      description:
-        "RFC-0565: report local DHT node status including config, cache entries, " +
-        "identity bootstrap state, and SWIM configuration. Local-only query — no network I/O. " +
-        "Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: [
-        "werkstatt.dht.json",
-        "werkstatt.dht.cache.json",
-        "werkstatt.identity.json",
-        "werkstatt.swim.json",
-      ],
-      writes: [],
-      execute: runDhtStatus,
-    }
-  ],
-  pipelines: [
-
-  ]};
+    commands: [
+      {
+        name: "dht.node.init",
+        modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+        generates: [],
+        description:
+          "RFC-0565: initialize DHT configuration. Creates werkstatt.dht.json with " +
+          "bind address, bootstrap nodes, replication factor, and timeout parameters. " +
+          "Use --bind <host:port> to specify the bind address. Use --bootstrap <host:port> " +
+          "to specify a bootstrap node (can be repeated). Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {
+          bind: { kind: "string", description: "Bind address (host:port)." },
+          bootstrap: {
+            kind: "string[]",
+            description: "Bootstrap node (host:port, repeatable).",
+          },
+        },
+        reads: ["werkstatt.identity.json"],
+        writes: ["werkstatt.dht.json"],
+        execute: runDhtNodeInit,
+      },
+      {
+        name: "dht.lookup",
+        modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+        generates: [],
+        description:
+          "RFC-0565: resolve a site id to its DHT entry. Queries the DHT (or local " +
+          "cache if fresh) and validates the entry signature. Routes around dead " +
+          "workshops detected by SWIM. Use --site-id <id> to specify the site. " +
+          "Use --force to bypass cache. Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {
+          "site-id": { kind: "string", required: true, description: "Site id to resolve." },
+          force: { kind: "boolean", description: "Bypass the local cache." },
+        },
+        reads: [
+          "werkstatt.dht.json",
+          "werkstatt.dht.cache.json",
+          "werkstatt.identity.json",
+          "werkstatt.swim.json",
+          "werkstatt.genome.log",
+        ],
+        writes: ["werkstatt.dht.cache.json"],
+        execute: runDhtLookup,
+      },
+      {
+        name: "dht.register",
+        modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+        generates: [],
+        description:
+          "RFC-0565: publish a local registry entry to the DHT. Signs the entry with " +
+          "the operator's Ed25519 keypair. Uses LWW on lastUpdated for conflict resolution. " +
+          "Required flags: --site-id <id>, --owner <did:web>, --endpoint <host:port>. " +
+          "Optional: --mirrors <host:port> (can be repeated). Use --json for output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {
+          "site-id": { kind: "string", required: true, description: "Site id to register." },
+          owner: {
+            kind: "string",
+            required: true,
+            description: "Owner identity (did:web identifier).",
+          },
+          endpoint: {
+            kind: "string",
+            required: true,
+            description: "Workshop endpoint (host:port).",
+          },
+          mirrors: {
+            kind: "string[]",
+            description: "Additional mirror endpoints (host:port, repeatable).",
+          },
+        },
+        reads: ["werkstatt.dht.json", "werkstatt.identity.json"],
+        writes: ["werkstatt.dht.cache.json"],
+        execute: runDhtRegister,
+      },
+      {
+        name: "dht.capacity.publish",
+        modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+        generates: [],
+        description:
+          "RFC-0565: publish workshop capacity to the DHT for placement decisions. " +
+          "Signs the capacity entry with the operator's Ed25519 keypair. " +
+          "Required: --workshop-id <id>, --available-slots <n>, --endpoint <host:port>. " +
+          "Optional: --storage-limit-mb <n>, --bandwidth-limit-mbps <n>. Use --json for output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {
+          "workshop-id": {
+            kind: "string",
+            required: true,
+            description: "Workshop id publishing capacity.",
+          },
+          "available-slots": {
+            kind: "string",
+            required: true,
+            description: "Number of available placement slots.",
+          },
+          endpoint: {
+            kind: "string",
+            description: "Workshop endpoint (host:port, default 0.0.0.0:0).",
+          },
+          "storage-limit-mb": { kind: "string", description: "Storage limit in MB." },
+          "bandwidth-limit-mbps": {
+            kind: "string",
+            description: "Bandwidth limit in Mbps.",
+          },
+        },
+        reads: ["werkstatt.dht.json", "werkstatt.identity.json"],
+        writes: [],
+        execute: runDhtCapacityPublish,
+      },
+      {
+        name: "dht.placement",
+        modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+        generates: [],
+        description:
+          "RFC-0565: determine the best workshop for placing a site by querying DHT " +
+          "capacity entries. Uses least-loaded strategy by default. " +
+          "Required: --site-id <id>, --workshops <id1,id2,...> (or repeated). " +
+          "Optional: --strategy <least-loaded|nearest|owner-preference>. Use --json for output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {
+          "site-id": { kind: "string", required: true, description: "Site id to place." },
+          strategy: {
+            kind: "string",
+            description: "Placement strategy (least-loaded|nearest|owner-preference).",
+          },
+          workshops: {
+            kind: "string[]",
+            description: "Candidate workshop ids (comma-separated or repeated).",
+          },
+        },
+        reads: ["werkstatt.dht.json", "werkstatt.identity.json", "werkstatt.swim.json"],
+        writes: [],
+        execute: runDhtPlacement,
+      },
+      {
+        name: "dht.status",
+        modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
+        generates: [],
+        description:
+          "RFC-0565: report local DHT node status including config, cache entries, " +
+          "identity bootstrap state, and SWIM configuration. Local-only query — no network I/O. " +
+          "Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {},
+        reads: [
+          "werkstatt.dht.json",
+          "werkstatt.dht.cache.json",
+          "werkstatt.identity.json",
+          "werkstatt.swim.json",
+        ],
+        writes: [],
+        execute: runDhtStatus,
+      },
+    ],
+    pipelines: [],
+  };
 }
-;

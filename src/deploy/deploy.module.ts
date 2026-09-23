@@ -15,19 +15,19 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createDeployModule(): Promise<ModuleExport> {
   const {
-        runDeployArtifactBuild,
-        runDeployArtifactVerify,
-        runDeployAtomicSwap,
-        runDeployAtomicRollback,
-        runDeployArtifactGc,
-        runDeployStatus,
-      } = await import("./index.ts");
+    runDeployArtifactBuild,
+    runDeployArtifactVerify,
+    runDeployAtomicSwap,
+    runDeployAtomicRollback,
+    runDeployArtifactGc,
+    runDeployStatus,
+  } = await import("./index.ts");
   return {
     name: "deploy",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "deploy.artifact.build",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -51,7 +51,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDeployArtifactBuild,
       },
-    {
+      {
         name: "deploy.artifact.verify",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description: "Verify an artifact's content hash and signature (RFC-0566). Flags: --hash.",
@@ -64,7 +64,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDeployArtifactVerify,
       },
-    {
+      {
         name: "deploy.atomic.swap",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -80,7 +80,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDeployAtomicSwap,
       },
-    {
+      {
         name: "deploy.atomic.rollback",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -89,6 +89,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
+        flags: {},
         writes: [".werkstatt/artifacts/platform/current"],
         reads: [
           ".werkstatt/artifacts/platform/previous",
@@ -97,7 +98,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDeployAtomicRollback,
       },
-    {
+      {
         name: "deploy.artifact.gc",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -115,13 +116,14 @@ export async function createDeployModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDeployArtifactGc,
       },
-    {
+      {
         name: "deploy.status",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description:
           "Report current and previous platform artifact hashes, git SHA, and deployment time (RFC-0566).",
         scope: "workspace",
         supportsAllSites: false,
+        flags: {},
         reads: [
           ".werkstatt/artifacts/platform/current",
           ".werkstatt/artifacts/platform/previous",
@@ -129,9 +131,8 @@ export async function createDeployModule(): Promise<ModuleExport> {
         ],
         cacheable: false,
         execute: runDeployStatus,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

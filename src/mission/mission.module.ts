@@ -501,6 +501,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
           "Validate OPERATOR_CONFIG_FILES list is in sync with actual workpiece/cache clone files (RFC-0840).",
         scope: "workspace",
         supportsAllSites: true,
+        flags: {},
         reads: ["missions/*/workpiece/*", "missions/*/workpiece/src/*", "systems-cache/*/"],
         cacheable: false,
         execute: runMaterializeConfigValidate,

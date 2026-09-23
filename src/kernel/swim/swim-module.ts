@@ -28,72 +28,76 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createSwimModule(): Promise<ModuleExport> {
-const { runSwimJoin, runSwimLeave, runSwimMembers, runSwimStatus } =
-      await import("./handlers.ts");
+  const { runSwimJoin, runSwimLeave, runSwimMembers, runSwimStatus } =
+    await import("./handlers.ts");
   return {
-  name: "swim",
-  version: "0.1.0",
+    name: "swim",
+    version: "0.1.0",
 
     declarations: [],
-  commands: [
-    {
-      name: "swim.join",
-      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
-      generates: [],
-      description:
-        "RFC-0564: join a SWIM workshop network. Probes the seed node via UDP, " +
-        "creates werkstatt.swim.json if missing (generating UUID v7 for workshopId), " +
-        "records alive event to the CRDT genome log with Ed25519 signature. " +
-        "Ephemeral — SWIM instance is destroyed when command exits. " +
-        "Use --seed <host:port> to specify the seed node. Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      requiresNetwork: true,
-      reads: ["werkstatt.identity.json"],
-      writes: ["werkstatt.swim.json", "werkstatt.genome.log"],
-      execute: runSwimJoin,
-    },
-    {
-      name: "swim.leave",
-      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
-      generates: [],
-      description:
-        "RFC-0564: leave a SWIM workshop network. Records left event to the CRDT " +
-        "genome log with Ed25519 signature. Ephemeral — no long-running daemon to shut down. " +
-        "Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.swim.json", "werkstatt.identity.json"],
-      writes: ["werkstatt.genome.log"],
-      execute: runSwimLeave,
-    },
-    {
-      name: "swim.members",
-      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
-      description:
-        "RFC-0564: list workshop members from the CRDT genome log. Local-only query — " +
-        "no network I/O. Reads werkstatt.genome.log, verifies signatures, derives membership " +
-        "view (latest event per workshop wins). Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.swim.json", "werkstatt.genome.log", "werkstatt.identity.json"],
-      execute: runSwimMembers,
-    },
-    {
-      name: "swim.status",
-      modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
-      description:
-        "RFC-0564: check local SWIM status. Reports configuration state, workshopId, " +
-        "genome log size (warns at 10MB), membership view, and any skipped entries. " +
-        "Local-only query — no network I/O. Use --json for machine-readable output.",
-      scope: "workspace",
-      cacheable: false,
-      reads: ["werkstatt.swim.json", "werkstatt.genome.log", "werkstatt.identity.json"],
-      execute: runSwimStatus,
-    }
-  ],
-  pipelines: [
-
-  ]};
+    commands: [
+      {
+        name: "swim.join",
+        modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
+        generates: [],
+        description:
+          "RFC-0564: join a SWIM workshop network. Probes the seed node via UDP, " +
+          "creates werkstatt.swim.json if missing (generating UUID v7 for workshopId), " +
+          "records alive event to the CRDT genome log with Ed25519 signature. " +
+          "Ephemeral — SWIM instance is destroyed when command exits. " +
+          "Use --seed <host:port> to specify the seed node. Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        requiresNetwork: true,
+        flags: {
+          seed: { kind: "string", description: "Seed node address (host:port)." },
+        },
+        reads: ["werkstatt.identity.json"],
+        writes: ["werkstatt.swim.json", "werkstatt.genome.log"],
+        execute: runSwimJoin,
+      },
+      {
+        name: "swim.leave",
+        modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
+        generates: [],
+        description:
+          "RFC-0564: leave a SWIM workshop network. Records left event to the CRDT " +
+          "genome log with Ed25519 signature. Ephemeral — no long-running daemon to shut down. " +
+          "Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {},
+        reads: ["werkstatt.swim.json", "werkstatt.identity.json"],
+        writes: ["werkstatt.genome.log"],
+        execute: runSwimLeave,
+      },
+      {
+        name: "swim.members",
+        modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
+        description:
+          "RFC-0564: list workshop members from the CRDT genome log. Local-only query — " +
+          "no network I/O. Reads werkstatt.genome.log, verifies signatures, derives membership " +
+          "view (latest event per workshop wins). Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {},
+        reads: ["werkstatt.swim.json", "werkstatt.genome.log", "werkstatt.identity.json"],
+        execute: runSwimMembers,
+      },
+      {
+        name: "swim.status",
+        modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
+        description:
+          "RFC-0564: check local SWIM status. Reports configuration state, workshopId, " +
+          "genome log size (warns at 10MB), membership view, and any skipped entries. " +
+          "Local-only query — no network I/O. Use --json for machine-readable output.",
+        scope: "workspace",
+        cacheable: false,
+        flags: {},
+        reads: ["werkstatt.swim.json", "werkstatt.genome.log", "werkstatt.identity.json"],
+        execute: runSwimStatus,
+      },
+    ],
+    pipelines: [],
+  };
 }
-;

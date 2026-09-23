@@ -187,6 +187,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
         mutatesState: false,
         cacheable: false,
         generates: [],
+        flags: {},
         execute: runCandidateInspect,
       },
     ],

@@ -59,6 +59,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
         mutatesState: false,
         cacheable: false,
         generates: [],
+        flags: {},
         execute: runReflectCapabilities,
       },
       {
@@ -90,6 +91,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
         mutatesState: false,
         cacheable: false,
         generates: [],
+        flags: {},
         execute: runReflectFibers,
       },
       {
@@ -102,6 +104,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
         scope: "workspace",
         mutatesState: true,
         cacheable: false,
+        flags: {},
         writes: ["docs/runtime-catalog.generated.yaml"],
         generates: [{ path: "docs/runtime-catalog.generated.yaml", phase: "build.prepare" }],
         execute: runReflectCatalogGenerate,
