@@ -67,6 +67,34 @@ async function resolveAppConfigPath(toolsDirectory: string): Promise<string | un
 
   return undefined;
 }
+
+/**
+ * tsx's CJS interop can fail under nested loader environments (vitest): a `.js`
+ * dep's `require("node:fs")` gets a `?tsx-namespace=` specifier that the CJS
+ * loader then opens as a path (ENOENT), or `import.meta.url` arrives with a
+ * non-file scheme. Plain `import()` goes through the host module runner
+ * (vitest) or Node type-stripping and succeeds where tsx breaks.
+ */
+function isLoaderInteropError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("tsx-namespace") || msg.includes("must be of scheme file");
+}
+
+async function importConfigModule(url: string): Promise<Record<string, unknown>> {
+  // Under vitest, prefer the host module runner: a tsx-loaded config yields
+  // tsx-bound loader closures whose internal dynamic imports hit the
+  // CJS-namespace bug later in buildRegistry — catching tsImport's own throw
+  // is not enough.
+  if (process.env.VITEST) {
+    return (await import(url)) as Record<string, unknown>;
+  }
+  try {
+    return (await tsImport(url, import.meta.url)) as Record<string, unknown>;
+  } catch (err) {
+    if (!isLoaderInteropError(err)) throw err;
+    return (await import(url)) as Record<string, unknown>;
+  }
+}
 export async function discoverSiteWorkspaces(
   workspaceRoot: string,
 ): Promise<DiscoveredSiteWorkspace[]> {
@@ -78,7 +106,7 @@ export async function loadKernelAppConfig(site: DiscoveredSiteWorkspace): Promis
   }
 
   process.stderr.write(`  [config] loading ${site.configPath} …\n`);
-  const moduleNamespace = await tsImport(pathToFileURL(site.configPath).href, import.meta.url);
+  const moduleNamespace = await importConfigModule(pathToFileURL(site.configPath).href);
   process.stderr.write(`  [config] loaded ${site.configPath}\n`);
   const candidate = unwrapConfig(moduleNamespace);
 
@@ -107,7 +135,7 @@ export async function loadWorkspaceConfig(
   }
 
   process.stderr.write(`  [config] loading ${configPath} …\n`);
-  const moduleNamespace = await tsImport(pathToFileURL(configPath).href, import.meta.url);
+  const moduleNamespace = await importConfigModule(pathToFileURL(configPath).href);
   process.stderr.write(`  [config] loaded ${configPath}\n`);
   const candidate = unwrapConfig(moduleNamespace);
 

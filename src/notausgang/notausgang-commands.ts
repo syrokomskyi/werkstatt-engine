@@ -142,7 +142,12 @@ const NOTAUSGANG_VERIFIER = {
 
 type NotausgangVerifier = typeof NOTAUSGANG_VERIFIER;
 
-const TEMPLATES_DIR = fileURLToPath(new URL("./templates/", import.meta.url));
+let templatesDir: string | undefined;
+/** Lazily resolved — module-level fileURLToPath(import.meta.url) throws under
+ *  vitest's module runner (non-file URL scheme) and kills the loader. */
+function resolveTemplatesDir(): string {
+  return (templatesDir ??= fileURLToPath(new URL("./templates/", import.meta.url)));
+}
 
 /** sha256sum-format checksum list over every package file except SHA256SUMS.txt itself. */
 async function writeSha256Sums(stagingDir: string): Promise<void> {
@@ -341,9 +346,12 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
     );
 
     // RFC-1120: offline verifier + verification guide (copied verbatim)
-    await fs.copyFile(path.join(TEMPLATES_DIR, "verify.py"), path.join(stagingDir, "verify.py"));
     await fs.copyFile(
-      path.join(TEMPLATES_DIR, "verification.md"),
+      path.join(resolveTemplatesDir(), "verify.py"),
+      path.join(stagingDir, "verify.py"),
+    );
+    await fs.copyFile(
+      path.join(resolveTemplatesDir(), "verification.md"),
       path.join(stagingDir, "verification.md"),
     );
 
