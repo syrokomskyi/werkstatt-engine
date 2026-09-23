@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0948: add channel drift warning to runLeitstandDevDeploy — compares dev releaseId against alt/main lastPropagated and emits non-fatal warning when they differ.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -19,7 +18,8 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
   <item>RFC-1126: step 7 — AC evidence alignment
 
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930</history>
+  <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1136</history>
 </CHANGE_SUMMARY>
 */
 
@@ -1900,12 +1900,28 @@ export async function runLeitstandHealth(
     };
   }
 
+  // RFC-1136: resolve the channel's deployed releaseId before probing —
+  // the adapter loads the behavior snapshot by releaseId, so an empty id
+  // made every health check report "unknown" (ADR-0089: explicit context,
+  // not ambient state).
+  const systemState = await readSystemStateSmart(context.workspaceRoot, systemId);
+  const releaseId =
+    flagString(input, "release") ?? systemState?.lastPropagated?.[channel]?.releaseId ?? null;
+
+  if (!releaseId) {
+    return {
+      data: { systemId, channel, state: "unknown", checks: [] },
+      summary: `[leitstand.health] ${systemId} channel=${channel}: no release recorded — deploy first`,
+      exitCode: 0,
+    };
+  }
+
   try {
     const result = await adapter.health({
       systemId,
       deploymentUrl: channelConfig.url,
       channel,
-      releaseId: "",
+      releaseId,
       expectedBehaviorSnapshotHash: "",
       workspaceRoot: context.workspaceRoot,
     });

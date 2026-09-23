@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0927: add leitstand.hotfix.dev-deploy composite command chaining commit → validate.postbuild → reconcile → close → release → certify → deploy.</item>
   <item>RFC-0930: add leitstand.verify command for live deployment verification across channels.</item>
   <item>RFC-0962: add leitstand.ship composite command — resumable full-pipeline deployment via RFC-0958 operation journal.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -16,7 +15,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899</history>
+  <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927</history>
 </CHANGE_SUMMARY>
 */
 
@@ -278,7 +278,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         name: "leitstand.health",
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
-          "Run health checks against a deployed channel (RFC-0379). Flags: --site, [--channel dev|alt|main].",
+          "Run health checks against a deployed channel (RFC-0379, RFC-1136). Flags: --site, [--channel dev|alt|main], [--release <id>].",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -287,6 +287,11 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           channel: {
             kind: "string",
             description: "Deployment channel: dev, alt (default), or main.",
+          },
+          release: {
+            kind: "string",
+            description:
+              "Override the deployed releaseId resolved from system-state.yaml (ad-hoc checks).",
           },
         },
         cacheable: false,
