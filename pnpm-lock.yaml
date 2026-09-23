@@ -54,11 +54,11 @@ importers:
         specifier: ^8.70.0
         version: 8.70.1(typescript@5.9.3)
       '@warpgogol/forge':
-        specifier: '*'
-        version: 5.1.2
+        specifier: ^5.2.0
+        version: 5.2.0
       '@warpgogol/werkstatt-shared':
-        specifier: '*'
-        version: 0.15.0
+        specifier: ^0.16.0
+        version: 0.16.0
       ai:
         specifier: ^7.0.99
         version: 7.0.109(zod@4.6.5)
@@ -1882,13 +1882,13 @@ packages:
   '@vitest/spy@5.0.1':
     resolution: {integrity: sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==}
 
-  '@warpgogol/forge@5.1.2':
-    resolution: {integrity: sha512-CMi0SCvZK/rPvT1spypM2xuAWfGDDHqcE7xGTDnpJU9TzQ8bvqxbTVY6tyGXOeIDLb2ubo33lKyhgjDbdu1gBg==}
+  '@warpgogol/forge@5.2.0':
+    resolution: {integrity: sha512-I0RWnl2KzVXO8TWXdIAOZ2KbC04TS+zFYU57JFaWpKZ5ShwCzy+/2a+MQxZ7HS1TZJrojf2xOqrRvRkqXyGYYw==}
     engines: {node: '>=24 <25'}
     hasBin: true
 
-  '@warpgogol/werkstatt-shared@0.15.0':
-    resolution: {integrity: sha512-4i3xYVlRwobXG+D0p0PhW6HYDE29NNuUKymKEw9mW9TOeRCQLi0HrCbeAg2ExtvL5NFKHsrzkghs3BKJ+j3ZtQ==}
+  '@warpgogol/werkstatt-shared@0.16.0':
+    resolution: {integrity: sha512-1SAC2noHdOYGkCFhGBqFSuWMD7f8IwOzSK8nD3pvXTp7GvFmJGbX3TJQq/naXp6m4oQx9thofLhN9K+EggosWg==}
     engines: {node: '>=24 <25'}
 
   '@workflow/serde@4.1.0':
@@ -6519,7 +6519,7 @@ snapshots:
 
   '@vitest/spy@5.0.1': {}
 
-  '@warpgogol/forge@5.1.2':
+  '@warpgogol/forge@5.2.0':
     dependencies:
       '@aws-sdk/client-s3': 3.1137.0
       ajv: 8.20.0
@@ -6528,7 +6528,7 @@ snapshots:
       yaml: 2.9.1
       zod: 4.6.5
 
-  '@warpgogol/werkstatt-shared@0.15.0':
+  '@warpgogol/werkstatt-shared@0.16.0':
     dependencies:
       '@lordicon/element': 2.3.1
       '@noble/ed25519': 3.2.0
@@ -6536,6 +6536,7 @@ snapshots:
       ajv: 8.20.0
       bs58: 6.0.0
       cyrillic-to-translit-js: 3.2.1
+      dotenv: 17.4.2
       expr-eval: 2.0.2
       github-slugger: 2.0.0
       gray-matter: 4.0.3
