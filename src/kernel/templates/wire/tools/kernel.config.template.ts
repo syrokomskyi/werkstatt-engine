@@ -6,7 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
-  <item>TODO: record current design decisions</item>
+  <item>moduleLoaders delegates to siteModuleLoaders() — SITE_MODULE_MAP is the single enumeration source shared with listStaticCommandSurface, so the generated config and the command manifest cannot drift.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1097: step 6 — compass.migrate codemod run

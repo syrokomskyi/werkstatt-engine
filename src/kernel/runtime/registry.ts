@@ -169,7 +169,6 @@ export async function ensureTargetSites(
 function commandInfo(
   command: KernelCommandDefinition,
   provider: KernelRegisteredCommandInfo["provider"],
-  siteName?: string,
   moduleName?: string,
 ): KernelRegisteredCommandInfo {
   return {
@@ -192,7 +191,6 @@ function commandInfo(
     ...(command.generates ? { generates: command.generates } : {}),
     ...(command.modulePath ? { moduleBasePath: deriveModuleBasePath(command.modulePath) } : {}),
     provider,
-    siteName,
   };
 }
 
@@ -234,7 +232,7 @@ export async function listStaticCommandSurface(
     for (const [commandName, command] of wsRegistry.commands) {
       byKey.set(
         `workspace:${commandName}`,
-        commandInfo(command, "workspace", undefined, wsRegistry.commandModules?.get(commandName)),
+        commandInfo(command, "workspace", wsRegistry.commandModules?.get(commandName)),
       );
     }
     for (const [name, decl] of wsRegistry.pipelines) {
@@ -252,7 +250,6 @@ export async function listStaticCommandSurface(
         commandInfo(
           command,
           "site-module",
-          undefined,
           actualState.commandModules?.get(commandName) ?? moduleName,
         ),
       );

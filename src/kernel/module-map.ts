@@ -184,7 +184,15 @@ function materializeDescriptors(
   for (const map of maps) {
     for (const [key, desc] of Object.entries(map)) {
       loaders[key] = async () => {
-        const mod = (await import(desc.spec)) as Record<string, unknown>;
+        let mod: Record<string, unknown>;
+        try {
+          mod = (await import(desc.spec)) as Record<string, unknown>;
+        } catch (error) {
+          throw new Error(
+            `[module-map] failed to load '${desc.spec}' (descriptor '${key}'): ` +
+              `${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
         const exported = mod[desc.export];
         if (exported === undefined) {
           throw new Error(
