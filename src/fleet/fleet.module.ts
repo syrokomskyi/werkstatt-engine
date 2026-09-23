@@ -55,7 +55,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.apply",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Cross-site wave orchestration: run a command or pipeline across fleet sites with canary-first waves, concurrency, stop-threshold, and journal-backed resume (RFC-0964).",
+          "Cross-site wave orchestration: run a command or pipeline across fleet sites with canary-first waves, concurrency, stop-threshold, and journal-backed resume (RFC-0964). Required flags: `--run`.",
         scope: "workspace",
         flags: {
           run: {
@@ -98,7 +98,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.ownership.register",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Register a site's ownership claim in the fleet ownership registry (RFC-0967). Reads passport from cache clone and sends it to the registry Worker.",
+          "Register a site's ownership claim in the fleet ownership registry (RFC-0967). Reads passport from cache clone and sends it to the registry Worker. Required flags: `--id`.",
         scope: "workspace",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem ID to register." },
@@ -115,7 +115,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.ownership.verify",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Verify a site's ownership claim in the fleet ownership registry (RFC-0967). Returns the current claim or not-registered status.",
+          "Verify a site's ownership claim in the fleet ownership registry (RFC-0967). Returns the current claim or not-registered status. Required flags: `--id`.",
         scope: "workspace",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem ID to verify." },
@@ -132,7 +132,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.ownership.transfer",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Transfer ownership of a site to a new instance after a handover (RFC-0967, RFC-0968). Requires a signed handover authorization file.",
+          "Transfer ownership of a site to a new instance after a handover (RFC-0967, RFC-0968). Requires a signed handover authorization file. Required flags: `--id`, `--authorization`.",
         scope: "workspace",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem ID to transfer." },
@@ -154,7 +154,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.claims.init",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Point this workshop at the per-fleet claims repository (RFC-1124). Writes werkstatt.fleet.json and clones/inits the local claims repo. Idempotent.",
+          "Point this workshop at the per-fleet claims repository (RFC-1124). Writes werkstatt.fleet.json and clones/inits the local claims repo. Idempotent. Required flags: `--remote`.",
         scope: "workspace",
         flags: {
           remote: {
@@ -182,7 +182,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.claims.publish",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Publish or refresh the signed ownership claim for a system into the fleet claims repo (RFC-1124). Called automatically by mission.close / sternsystem.register / sternsystem.handover.complete; manual use for repair.",
+          "Publish or refresh the signed ownership claim for a system into the fleet claims repo (RFC-1124). Called automatically by mission.close / sternsystem.register / sternsystem.handover.complete; manual use for repair. Required flags: `--id`.",
         scope: "workspace",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem ID to claim." },
@@ -226,7 +226,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
         name: "fleet.claims.verify",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
-          "Resolve the current ownership claim for a system entirely offline (RFC-1124): signature + legitimacy (self-claim vs transfer claim via bordbuch handover event) + LWW. Exits 1 on invalid-signature or stale; no-claim is informational.",
+          "Resolve the current ownership claim for a system entirely offline (RFC-1124): signature + legitimacy (self-claim vs transfer claim via bordbuch handover event) + LWW. Exits 1 on invalid-signature or stale; no-claim is informational. Required flags: `--id`.",
         scope: "workspace",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem ID to verify." },

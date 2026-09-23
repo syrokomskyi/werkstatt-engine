@@ -26,7 +26,7 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         name: "lagebild.connect",
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
-          "Push 4 LAGEBILD_* secrets to a channel's Cloudflare Worker, health check, record connection state in system-state.yaml, merge into .env (RFC-1065).",
+          "Push 4 LAGEBILD_* secrets to a channel's Cloudflare Worker, health check, record connection state in system-state.yaml, merge into .env (RFC-1065). Required flags: `--site`, `--api-url`, `--api-key`, `--tenant-id`.",
         scope: "workspace",
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem ID." },
@@ -57,7 +57,7 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         name: "lagebild.validate",
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
-          "Check 4 LAGEBILD_* secrets via wrangler secret list, verify .env key presence, best-effort GET /health (RFC-1065).",
+          "Check 4 LAGEBILD_* secrets via wrangler secret list, verify .env key presence, best-effort GET /health (RFC-1065). Required flags: `--site`.",
         contract: "lagebild",
         rules: [],
         scope: "workspace",
@@ -80,7 +80,7 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         name: "lagebild.status",
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
-          "Read lagebild connection state from system-state.yaml. No network calls (RFC-1065).",
+          "Read lagebild connection state from system-state.yaml. No network calls (RFC-1065). Required flags: `--site`.",
         scope: "workspace",
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem ID." },

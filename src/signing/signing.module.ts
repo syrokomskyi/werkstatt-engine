@@ -32,7 +32,7 @@ export async function createSigningModule(): Promise<ModuleExport> {
         name: "signing.key.generate",
         modulePath: "packages/werkstatt-engine/src/signing/signing.module.ts",
         description:
-          "RFC-0921: Generate an Ed25519 keypair and save to disk. Supports hex and PEM encodings.",
+          "RFC-0921: Generate an Ed25519 keypair and save to disk. Supports hex and PEM encodings. Required flags: `--output-dir`.",
         scope: "workspace",
         mutatesState: true,
         cacheable: false,

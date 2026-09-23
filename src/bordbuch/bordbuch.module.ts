@@ -37,7 +37,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         generates: [],
         description:
-          "Append a single entry to the Bordbuch through the controlled writer-role surface (RFC-0355).",
+          "Append a single entry to the Bordbuch through the controlled writer-role surface (RFC-0355). Required flags: `--system`, `--kind`, `--summary`, `--writer-role`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -153,7 +153,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         generates: [],
         description:
-          "Repair orphan-mission-close violations by inserting missing mission-open events and recomputing the hash chain (RFC-0583).",
+          "Repair orphan-mission-close violations by inserting missing mission-open events and recomputing the hash chain (RFC-0583). Required flags: `--system`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,

@@ -267,7 +267,7 @@ export const compositionModule: ModuleExport = {
     {
       name: "composition.overlay.apply",
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
-      description: "RFC-1038: Apply an overlay to the desired state and trigger reconciliation.",
+      description: "RFC-1038: Apply an overlay to the desired state and trigger reconciliation. Required flags: `--overlay-id`, `--scope`.",
       scope: "workspace",
       mutatesState: true,
       cacheable: false,

@@ -53,7 +53,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "mission.open",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Open a new mission for a Sternsystem (RFC-0355).",
+        description: "Open a new mission for a Sternsystem (RFC-0355). Required flags: `--system`, `--brief`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -86,7 +86,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       {
         name: "mission.status",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
-        description: "Print mission manifest and Bordbuch entries (RFC-0355).",
+        description: "Print mission manifest and Bordbuch entries (RFC-0355). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -99,7 +99,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "mission.close",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Close an open mission (RFC-0355).",
+        description: "Close an open mission (RFC-0355). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -169,7 +169,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "mission.abort",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Abort an open mission and discard Werkstück/Distribution (RFC-0355).",
+        description: "Abort an open mission and discard Werkstück/Distribution (RFC-0355). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -219,7 +219,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Populate the mission Werkstück from the pinned Sternsystem bundle (RFC-0356).",
+          "Populate the mission Werkstück from the pinned Sternsystem bundle (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -243,7 +243,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Apply pending migrators from the RFC-id-keyed registry to the workpiece (RFC-0479).",
+          "Apply pending migrators from the RFC-id-keyed registry to the workpiece (RFC-0479). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -269,7 +269,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         contract: "mission",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
-        description: "Validate the materialized Werkstück (RFC-0356).",
+        description: "Validate the materialized Werkstück (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -317,7 +317,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Start a blocking dev server for the mission workpiece (RFC-0480). Works for open, closed, and aborted missions.",
+          "Start a blocking dev server for the mission workpiece (RFC-0480). Works for open, closed, and aborted missions. Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -338,7 +338,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "mission.build",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Build the Werkstück into a local Distribution (RFC-0356).",
+        description: "Build the Werkstück into a local Distribution (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -356,7 +356,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       {
         name: "mission.diff",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
-        description: "Compute the data-set diff between Werkstück and pinned state (RFC-0356).",
+        description: "Compute the data-set diff between Werkstück and pinned state (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -370,7 +370,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Reconcile validated Werkstück data changes to the Sternsystem repo (RFC-0356).",
+          "Reconcile validated Werkstück data changes to the Sternsystem repo (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -400,7 +400,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "mission.git.commit",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Commit operator edits to the mission workpiece git repository (RFC-0480).",
+        description: "Commit operator edits to the mission workpiece git repository (RFC-0480). Required flags: `--mission`, `--message`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -462,7 +462,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       {
         name: "workpiece.read",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
-        description: "Read a file from a mission workpiece with DNA-22 path validation (RFC-0555).",
+        description: "Read a file from a mission workpiece with DNA-22 path validation (RFC-0555). Required flags: `--mission`, `--path`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -478,7 +478,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Write a file to a mission workpiece with DNA-22 path validation. Content via stdin. No auto-commit (RFC-0555).",
+          "Write a file to a mission workpiece with DNA-22 path validation. Content via stdin. No auto-commit (RFC-0555). Required flags: `--mission`, `--path`, `--stdin`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -512,7 +512,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         rules: [],
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
-          "Verify OPERATOR_CONFIG_FILES are present in the active workpiece before build (RFC-0844).",
+          "Verify OPERATOR_CONFIG_FILES are present in the active workpiece before build (RFC-0844). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -545,7 +545,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "mission.resume",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Resume the last incomplete lifecycle operation for a mission (RFC-0958).",
+        description: "Resume the last incomplete lifecycle operation for a mission (RFC-0958). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -568,7 +568,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       {
         name: "mission.journal.show",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
-        description: "Show the operation journal for a mission (RFC-0958).",
+        description: "Show the operation journal for a mission (RFC-0958). Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -585,7 +585,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Run ownership.sync.validate and generated.stale.validate against the cache clone before opening a mission (RFC-0971).",
+          "Run ownership.sync.validate and generated.stale.validate against the cache clone before opening a mission (RFC-0971). Required flags: `--system`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: false,
@@ -601,7 +601,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         name: "validation.state.inspect",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
-        description: "Inspect validation cache state for a mission (RFC-1028). Read-only.",
+        description: "Inspect validation cache state for a mission (RFC-1028). Read-only. Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: false,

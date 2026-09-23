@@ -37,7 +37,7 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
           "RFC-0651: upload all evidence artifacts from missions/{mission}/evidence/axiom/ to R2 " +
           "under {systemId}/{missionId}/{runTimestamp}/ key prefix. Reads runTimestamp from " +
           "evidence-metadata.json (or --run-timestamp flag). Supports --dry-run. " +
-          "Failure modes: MISSING_ENV, NOT_FOUND, INVALID_EVIDENCE, R2_UPLOAD_ERROR.",
+          "Failure modes: MISSING_ENV, NOT_FOUND, INVALID_EVIDENCE, R2_UPLOAD_ERROR. Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: false,
@@ -75,7 +75,7 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
           "RFC-0651: download a historical evidence run from R2 to a local directory, " +
           "or list available runs via ListObjectsV2. Uses --run-timestamp to select a run, " +
           "--output-dir to specify the download location, --no-raw to skip raw/ artifacts, " +
-          "--list to list available runs. Failure modes: MISSING_ENV, NOT_FOUND, R2_LIST_ERROR.",
+          "--list to list available runs. Failure modes: MISSING_ENV, NOT_FOUND, R2_LIST_ERROR. Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: false,

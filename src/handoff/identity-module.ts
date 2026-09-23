@@ -33,7 +33,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
         description:
-          "Generate operator keypair, write werkstatt.identity.json, issue self-ownership VC (RFC-0558).",
+          "Generate operator keypair, write werkstatt.identity.json, issue self-ownership VC (RFC-0558). Required flags: `--operator-name`, `--domain`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -57,7 +57,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         name: "identity.credential.issue",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
-        description: "Issue a SiteOwnershipCredential or ActorDelegationCredential (RFC-0558).",
+        description: "Issue a SiteOwnershipCredential or ActorDelegationCredential (RFC-0558). Required flags: `--type`, `--subject`, `--site`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -94,7 +94,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
     {
         name: "identity.credential.verify",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
-        description: "Verify a credential's signature, revocation status, and expiry (RFC-0558).",
+        description: "Verify a credential's signature, revocation status, and expiry (RFC-0558). Required flags: `--credential-id`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -112,7 +112,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         name: "identity.credential.revoke",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
-        description: "Revoke a credential by adding it to the revocation list (RFC-0558).",
+        description: "Revoke a credential by adding it to the revocation list (RFC-0558). Required flags: `--credential-id`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
