@@ -33,6 +33,17 @@ vi.mock("../leitstand/leitstand-commands.ts", async (importOriginal) => {
     }),
   };
 });
+
+// RFC-1138: executeDeployPhases runs dns.record.upsert via executeKernelCommand
+// before propagate — without a mock it fails in the temp workspace and
+// short-circuits the result (failingPhase: "dns-upsert").
+vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@warpgogol/werkstatt-engine/kernel")>();
+  return {
+    ...actual,
+    executeKernelCommand: vi.fn().mockResolvedValue({ exitCode: 0, summary: "ok" }),
+  };
+});
 import type { PropagationResult, HealthCheck } from "@warpgogol/werkstatt-engine/schemas";
 import type { AuthorizeResult } from "../leitstand/deploy-helpers.ts";
 import type { DeploymentStaticConfig } from "@warpgogol/werkstatt-engine/schemas";

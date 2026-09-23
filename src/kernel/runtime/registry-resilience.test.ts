@@ -44,6 +44,9 @@ let tmpDir: string;
 function makeSiteDir(name: string): string {
   const dir = path.join(tmpDir, name);
   mkdirSync(path.join(dir, "tools"), { recursive: true });
+  // RFC-1138: siteHasRuntime() filters out sites without node_modules before
+  // the load attempt — the fixture needs one to reach the path under test.
+  mkdirSync(path.join(dir, "node_modules"), { recursive: true });
   return dir;
 }
 

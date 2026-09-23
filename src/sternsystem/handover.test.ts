@@ -152,9 +152,13 @@ describe("RFC-0968: handover authorization core logic", () => {
 
   test("authorization hash determinism: same payload produces same hash", () => {
     const payload1 = makePayload();
-    const payload2 = makePayload();
+    // makePayload() calls new Date() per invocation — two calls can straddle a
+    // millisecond boundary, so share the timestamps to get identical payloads.
+    const payload2 = makePayload({
+      authorizedAt: payload1.authorizedAt,
+      expiresAt: payload1.expiresAt,
+    });
 
-    // Same content (except timestamps which are the same since makePayload is deterministic within the same call)
     expect(computeAuthorizationHash(payload1)).toBe(computeAuthorizationHash(payload2));
   });
 

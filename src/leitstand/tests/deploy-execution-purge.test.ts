@@ -40,6 +40,17 @@ vi.mock("../leitstand-commands.ts", async (importOriginal) => {
   };
 });
 
+// RFC-1138: executeDeployPhases runs dns.record.upsert via executeKernelCommand
+// before propagate/purge — without a mock it fails in the temp workspace and
+// short-circuits the result (failingPhase: "dns-upsert", purgeResult undefined).
+vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@warpgogol/werkstatt-engine/kernel")>();
+  return {
+    ...actual,
+    executeKernelCommand: vi.fn().mockResolvedValue({ exitCode: 0, summary: "ok" }),
+  };
+});
+
 function makeAdapter(purgeCapable: boolean): DeploymentAdapter {
   return {
     name: purgeCapable ? "cloudflare-workers" : "github-pages",
