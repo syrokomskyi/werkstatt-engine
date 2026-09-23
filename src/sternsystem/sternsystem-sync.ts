@@ -8,12 +8,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0472: initial sync command handler.</item>
-  <item>RFC-0477: commit and push bordbuch after appending mirror-sync entry.</item>
   <item>RFC-0480: remove pull/both directions — push-only (edits-only-through-missions invariant).</item>
   <item>RFC-0818: reorder external push + bundle creation to after bordbuch commit so bordbuch entry reaches external mirrors.</item>
   <item>ADR-0073: Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
   <item>ADR-0086: commit all dirty operational files (operations journals, status files) via commitCacheCloneIfDirty before pushing — closed missions never reconcile again, so sync is the last chance for their operational state to reach mirrors.</item>
+  <item>RFC-1139: CLI hint accuracy and agent-safety hygiene — rfc.create hint, EC-14-PARTIAL, amend delegation, ledger scope, sync footer, mission.open remnants</item>
+  <history>RFC-0472, RFC-0477</history>
 </CHANGE_SUMMARY>
 */
 
@@ -343,7 +343,7 @@ export async function runSternsystemSync(
     summary: `[sternsystem.sync] ${id} mirrored (${direction}, branch: ${syncAll ? "*" : branchName})`,
     nextSteps: [
       {
-        action: `Open a mission: pnpm exec werkstatt run mission.open --system ${id} --brief "<brief>"`,
+        action: `Verify the propagated claim: pnpm exec werkstatt run fleet.claims.verify --id ${id}`,
         kind: "optional",
       },
     ],

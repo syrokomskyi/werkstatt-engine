@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0796: add cleanupStaleMissionEntries pre-flight cleanup before createMissionDirectories; trash stale symlinks and empty dirs, skip non-empty real dirs with warning.</item>
   <item>RFC-0951: auto-materialize workpiece during mission.open with forward-only rollback on failure.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>ADR-0030, RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593</history>
+  <item>RFC-1139: CLI hint accuracy and agent-safety hygiene — rfc.create hint, EC-14-PARTIAL, amend delegation, ledger scope, sync footer, mission.open remnants</item>
+  <history>ADR-0030, RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593, RFC-0796</history>
 </CHANGE_SUMMARY>
 */
 
@@ -79,7 +79,7 @@ export interface MissionOpenData {
 
 const REPAIRABLE_RULES = new Set(["orphan-mission-close", "unmatched-mission-open"]);
 
-async function cleanupStaleMissionEntries(
+export async function cleanupStaleMissionEntries(
   workspaceRoot: string,
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
 ): Promise<StaleEntryCheck> {
@@ -120,6 +120,13 @@ async function cleanupStaleMissionEntries(
         await trashPath(entryPath);
         result.removedPaths.push(sourceRel);
         logger.info(`  Cleaned empty directory: ${sourceRel}`);
+      } else if (!existsSync(path.join(entryPath, "mission.yaml"))) {
+        // RFC-1139: non-empty dir without mission.yaml is a stale remnant
+        // (crashed materialization) — report it with the cleanup path.
+        result.skipped.push(sourceRel);
+        logger.warn(
+          `  Stale mission remnant: ${sourceRel} (no mission.yaml) — clean via \`pnpm exec werkstatt run mission.archive --clean-orphans\``,
+        );
       } else {
         result.skipped.push(sourceRel);
         logger.warn(`  Skipping non-empty real directory: ${sourceRel}`);
