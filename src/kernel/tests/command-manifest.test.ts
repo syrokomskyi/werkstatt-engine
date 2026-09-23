@@ -8,8 +8,14 @@ import {
   runCommandManifestGenerate,
   runCommandManifestValidate,
   manifestFilePath,
+  CommandManifestDedupError,
 } from "../command-manifest.ts";
-import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { listStaticCommandSurface } from "../runtime.ts";
+import type {
+  KernelCommandInput,
+  KernelRuntimeContext,
+  ModuleExport,
+} from "@warpgogol/werkstatt-shared/kernel";
 
 /*
 <MODULE_CONTRACT>
@@ -185,6 +191,120 @@ export default {
       ),
     ).toBeTruthy();
     expect(result.exitCode ?? 0).toBe(0); // warning-only, does not fail the build
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// ── RFC-1147: static command surface ─────────────────────────────────────────
+
+function siteModuleFixture(overrides: Partial<ModuleExport> = {}): ModuleExport {
+  return {
+    name: "fixture-site-module",
+    version: "0.0.0",
+    declarations: [],
+    commands: [
+      {
+        name: "site.only.command",
+        modulePath: "test-site-module",
+        description: "site-module-only command",
+        scope: "app",
+        execute() {
+          return { exitCode: 0 };
+        },
+      },
+    ],
+    pipelines: [{ name: "site.pipeline", steps: [{ command: "site.only.command" }] }],
+    ...overrides,
+  } as ModuleExport;
+}
+
+test("listStaticCommandSurface: merges workspace + injected site modules with provider tags", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const surface = await listStaticCommandSurface(root, {
+      "fixture-site": async () => siteModuleFixture(),
+    });
+    const workspaceCmd = surface.commands.find((c) => c.name === "fixture.generate");
+    const siteCmd = surface.commands.find((c) => c.name === "site.only.command");
+    expect(workspaceCmd?.provider).toBe("workspace");
+    expect(siteCmd?.provider).toBe("site-module");
+    expect(surface.pipelines["fixture.check"]).toEqual(["fixture.generate", "fixture.validate"]);
+    expect(surface.pipelines["site.pipeline"]).toEqual(["site.only.command"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("buildCommandManifest: providers[] + siteScope reflect the static surface", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const manifest = await buildCommandManifest(root, {
+      "fixture-site": async () => siteModuleFixture(),
+    });
+    const workspaceEntry = manifest.commands.find((c) => c.name === "fixture.generate");
+    const siteEntry = manifest.commands.find((c) => c.name === "site.only.command");
+    expect(workspaceEntry?.providers).toEqual(["workspace"]);
+    expect(workspaceEntry?.siteScope).toBe(false);
+    expect(siteEntry?.providers).toEqual(["site-module"]);
+    expect(siteEntry?.siteScope).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CMD-MAN-04: identical declarations across providers dedup to one entry", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    // Same name + identical semantics as the workspace fixture.generate —
+    // must merge into a single entry with both providers, not throw.
+    const manifest = await buildCommandManifest(root, {
+      "fixture-site": async () =>
+        siteModuleFixture({
+          commands: [
+            {
+              name: "fixture.generate",
+              modulePath: "test-site-module",
+              description: "fixture generator",
+              scope: "workspace",
+              mutatesState: true,
+              writes: ["docs/fixture.generated.yaml"],
+              execute() {
+                return { exitCode: 0 };
+              },
+            },
+          ],
+        }),
+    });
+    const entries = manifest.commands.filter((c) => c.name === "fixture.generate");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.providers).toEqual(["site-module", "workspace"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CMD-MAN-04: divergent same-name declarations fail closed", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    await expect(
+      buildCommandManifest(root, {
+        "fixture-site": async () =>
+          siteModuleFixture({
+            commands: [
+              {
+                name: "fixture.generate",
+                modulePath: "test-site-module",
+                description: "a DIFFERENT description — semantic divergence",
+                scope: "app",
+                execute() {
+                  return { exitCode: 0 };
+                },
+              },
+            ],
+          }),
+      }),
+    ).rejects.toThrow(CommandManifestDedupError);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -46,6 +46,7 @@ import type {
   KernelFlagSpec,
   KernelRegisteredCommandInfo,
   KernelRuntimeContext,
+  ModuleExport,
 } from "@warpgogol/werkstatt-shared/kernel";
 
 export interface CommandManifestEntry {
@@ -149,8 +150,11 @@ export function collectCommandManifestDiagnostics(
 }
 
 /** Builds the deterministic CommandManifest from the static command surface (RFC-1147). */
-export async function buildCommandManifest(workspaceRoot: string): Promise<CommandManifest> {
-  const surface = await listStaticCommandSurface(workspaceRoot);
+export async function buildCommandManifest(
+  workspaceRoot: string,
+  siteModules?: Record<string, () => Promise<ModuleExport>>,
+): Promise<CommandManifest> {
+  const surface = await listStaticCommandSurface(workspaceRoot, siteModules);
 
   const pipelinesByCommand = new Map<string, Set<string>>();
   for (const [pipelineName, memberCommands] of Object.entries(surface.pipelines)) {
