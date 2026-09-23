@@ -13,7 +13,6 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1026: buildRegistry and buildRegistryForModule set moduleStates (loading → active, failed on throw); rollback on register() failure; buildRegistryWithHandles returns KernelModuleHandle map.</item>
   <item>RFC-1038: replace KernelRegistry with ActualState — buildRegistry uses buildActualState from reconciler.ts; remove lifecycle methods, buildRegistryWithHandles, rollbackModuleRegistrations.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -22,7 +21,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
-  <history>ADR-0022, RFC-0303, RFC-0960</history>
+  <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
+
+Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
+  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026</history>
 </CHANGE_SUMMARY>
 */
 
@@ -284,8 +286,8 @@ export async function listRegisteredKernelPipelines(
 
   const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
   if (wsRegistry) {
-    for (const [name, steps] of wsRegistry.pipelines) {
-      pipelines[name] = steps.map((step) => step.command);
+    for (const [name, decl] of wsRegistry.pipelines) {
+      pipelines[name] = decl.steps.map((step) => step.command);
     }
   }
 
@@ -295,8 +297,8 @@ export async function listRegisteredKernelPipelines(
   )) {
     try {
       const { registry } = await loadAppRuntime(workspaceRoot, site);
-      for (const [name, steps] of registry.pipelines) {
-        if (!(name in pipelines)) pipelines[name] = steps.map((step) => step.command);
+      for (const [name, decl] of registry.pipelines) {
+        if (!(name in pipelines)) pipelines[name] = decl.steps.map((step) => step.command);
       }
     } catch (err) {
       process.stderr.write(

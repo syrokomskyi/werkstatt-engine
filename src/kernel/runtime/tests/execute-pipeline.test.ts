@@ -7,10 +7,14 @@ import {
   loadImportedCacheHits,
   persistCacheHits,
   clearPipelineCacheHits,
+  mergeCollectErrorsOption,
   type PipelineRunState,
 } from "../execute-pipeline.ts";
 import type { StepExecutionResult } from "../pipeline-scheduler.ts";
-import type { KernelExecutionReport, KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelExecutionReport,
+  KernelCommandDefinition,
+} from "@warpgogol/werkstatt-shared/kernel";
 
 function okReport(command: string): KernelExecutionReport {
   return {
@@ -77,10 +81,7 @@ describe("aggregateCollectErrors", () => {
   });
 
   test("excludes dependency-skipped steps from failures", () => {
-    const results = [
-      makeResult(0, failReport("a")),
-      makeResult(1, failReport("b"), true),
-    ];
+    const results = [makeResult(0, failReport("a")), makeResult(1, failReport("b"), true)];
     const result = aggregateCollectErrors(results, true);
     expect(result!.failedSteps).toEqual(["a"]);
   });
@@ -194,5 +195,45 @@ describe("pipeline cache-hits persistence", () => {
     writeFileSync(join(dir, "pipeline-cache-hits.json"), JSON.stringify(staleData));
     const hits = await loadImportedCacheHits(tmpDir, "pipeline-b");
     expect(hits.size).toBe(0);
+  });
+});
+
+describe("mergeCollectErrorsOption — RFC-1144 AC-6", () => {
+  const baseOptions = {
+    workspaceRoot: "/tmp/ws",
+    pipelineName: "build.post",
+  };
+
+  test("declaration collectErrors: true enables the mode without the flag", () => {
+    const merged = mergeCollectErrorsOption(baseOptions, {
+      name: "build.post",
+      steps: [],
+      collectErrors: true,
+    });
+    expect(merged.collectErrors).toBe(true);
+  });
+
+  test("CLI flag alone still enables the mode (OR-semantics)", () => {
+    const merged = mergeCollectErrorsOption(
+      { ...baseOptions, collectErrors: true },
+      { name: "build.post", steps: [] },
+    );
+    expect(merged.collectErrors).toBe(true);
+  });
+
+  test("neither opt-in leaves the mode off", () => {
+    const merged = mergeCollectErrorsOption(baseOptions, {
+      name: "build.post",
+      steps: [],
+    });
+    expect(merged.collectErrors).toBeUndefined();
+  });
+
+  test("declaration without collectErrors does not mutate options identity", () => {
+    const merged = mergeCollectErrorsOption(baseOptions, {
+      name: "build.post",
+      steps: [],
+    });
+    expect(merged).toBe(baseOptions);
   });
 });

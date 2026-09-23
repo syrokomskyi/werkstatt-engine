@@ -8,6 +8,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0883: initial implementation.</item>
+  <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
+
+Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -162,12 +165,12 @@ export async function runValidatePostbuild(
 
   // Skip-slow mode: resolve steps from the registry and run individually.
   const { registry } = await loadAppRuntime(workspaceRoot, siteWorkspace);
-  const pipelineSteps = registry.pipelines.get("sites-check.postbuild");
-  if (!pipelineSteps) {
+  const pipelineDecl = registry.pipelines.get("sites-check.postbuild");
+  if (!pipelineDecl) {
     throw new Error(`Pipeline "sites-check.postbuild" is not registered for site "${siteName}".`);
   }
 
-  const filteredSteps = pipelineSteps.filter((step) => !SLOW_STEPS.has(step.command));
+  const filteredSteps = pipelineDecl.steps.filter((step) => !SLOW_STEPS.has(step.command));
   const stepResults: ValidatePostbuildStepResult[] = [];
   let allOk = true;
 
@@ -204,7 +207,7 @@ export async function runValidatePostbuild(
     }
   }
 
-  for (const step of pipelineSteps) {
+  for (const step of pipelineDecl.steps) {
     if (SLOW_STEPS.has(step.command)) {
       stepResults.push({
         name: step.command,

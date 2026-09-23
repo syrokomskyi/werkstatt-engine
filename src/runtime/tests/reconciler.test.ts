@@ -336,8 +336,8 @@ describe("RFC-1038: buildActualState and buildDesiredState", () => {
     });
     const actual = buildActualState([mod]);
     const pipeline = actual.pipelines.get("test.pipeline")!;
-    expect(pipeline).toHaveLength(2);
-    expect(pipeline[1]!.dependsOn).toEqual(["test.step1"]);
+    expect(pipeline.steps).toHaveLength(2);
+    expect(pipeline.steps[1]!.dependsOn).toEqual(["test.step1"]);
   });
 
   it("AC-19: conditionalBuilder receives ModuleBuildContext and returns declarations", () => {

@@ -1,9 +1,5 @@
 import { test, expect, describe } from "vitest";
-import {
-  buildSchedule,
-  executeScheduledSteps,
-  ScheduleError,
-} from "../pipeline-scheduler.ts";
+import { buildSchedule, executeScheduledSteps, ScheduleError } from "../pipeline-scheduler.ts";
 import type { KernelExecutionReport, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
 
 function okReport(command: string): KernelExecutionReport {
@@ -53,10 +49,7 @@ describe("buildSchedule", () => {
   });
 
   test("explicit dependsOn: [] removes implicit dependency", () => {
-    const schedule = buildSchedule([
-      { command: "a" },
-      { command: "b", dependsOn: [] },
-    ]);
+    const schedule = buildSchedule([{ command: "a" }, { command: "b", dependsOn: [] }]);
     expect(schedule[1]!.dependencies.size).toBe(0);
   });
 
@@ -75,18 +68,15 @@ describe("buildSchedule", () => {
   });
 
   test("throws on missing dependency reference", () => {
-    expect(() =>
-      buildSchedule([{ command: "a", dependsOn: ["nonexistent"] }]),
-    ).toThrow(/not in the pipeline/);
+    expect(() => buildSchedule([{ command: "a", dependsOn: ["nonexistent"] }])).toThrow(
+      /not in the pipeline/,
+    );
   });
 
   test("throws on forward reference", () => {
-    expect(() =>
-      buildSchedule([
-        { command: "a", dependsOn: ["b"] },
-        { command: "b" },
-      ]),
-    ).toThrow(/forward reference/);
+    expect(() => buildSchedule([{ command: "a", dependsOn: ["b"] }, { command: "b" }])).toThrow(
+      /forward reference/,
+    );
   });
 
   test("skipped steps do not create implicit dependencies", () => {
@@ -124,11 +114,7 @@ describe("executeScheduledSteps", () => {
   });
 
   test("parallel execution with concurrency > 1", async () => {
-    const schedule = buildSchedule([
-      { command: "a" },
-      { command: "b" },
-      { command: "c" },
-    ]);
+    const schedule = buildSchedule([{ command: "a" }, { command: "b" }, { command: "c" }]);
     const results = await executeScheduledSteps(schedule, 3, async (s) => {
       return okReport(s.step.command);
     });
@@ -153,10 +139,7 @@ describe("executeScheduledSteps", () => {
   });
 
   test("independent steps continue when a step fails", async () => {
-    const schedule = buildSchedule([
-      { command: "a" },
-      { command: "b", dependsOn: [] },
-    ]);
+    const schedule = buildSchedule([{ command: "a" }, { command: "b", dependsOn: [] }]);
     const results = await executeScheduledSteps(schedule, 2, async (s) => {
       if (s.step.command === "a") return failReport(s.step.command);
       return okReport(s.step.command);
@@ -172,5 +155,128 @@ describe("executeScheduledSteps", () => {
       return okReport(s.step.command);
     });
     expect(results.map((r) => r.stepIndex)).toEqual([0, 1, 2]);
+  });
+});
+
+describe("executeScheduledSteps — RFC-1144 collect-errors", () => {
+  test("AC-1: read-only steps run to completion after a failed dependency", async () => {
+    const schedule = buildSchedule(steps("a", "b", "c"));
+    schedule[1]!.readOnly = true;
+    schedule[2]!.readOnly = true;
+    const executed: string[] = [];
+    const results = await executeScheduledSteps(
+      schedule,
+      1,
+      async (s) => {
+        executed.push(s.step.command);
+        if (s.step.command === "a") return failReport(s.step.command);
+        return okReport(s.step.command);
+      },
+      { collectErrors: true },
+    );
+    expect(executed).toEqual(["a", "b", "c"]);
+    expect(results).toHaveLength(3);
+    expect(results[1]!.dependencySkipped).toBe(false);
+    expect(results[1]!.report.ok).toBe(true);
+    expect(results[2]!.dependencySkipped).toBe(false);
+  });
+
+  test("AC-2: read-only step that ran after a failed dependency is annotated", async () => {
+    const schedule = buildSchedule(steps("a", "b"));
+    schedule[1]!.readOnly = true;
+    const seen = new Map<string, boolean | undefined>();
+    await executeScheduledSteps(
+      schedule,
+      1,
+      async (s) => {
+        seen.set(s.step.command, s.ranAfterFailedDependency);
+        if (s.step.command === "a") return failReport(s.step.command);
+        return okReport(s.step.command);
+      },
+      { collectErrors: true },
+    );
+    expect(seen.get("a")).toBeUndefined();
+    expect(seen.get("b")).toBe(true);
+  });
+
+  test("AC-3: mutating step still skips after a failed dependency under collect-errors", async () => {
+    const schedule = buildSchedule(steps("a", "b", "c"));
+    schedule[1]!.readOnly = true; // b read-only — runs tainted
+    // c has no readOnly — treated as mutating (conservative default)
+    const executed: string[] = [];
+    const results = await executeScheduledSteps(
+      schedule,
+      1,
+      async (s) => {
+        executed.push(s.step.command);
+        if (s.step.command === "a") return failReport(s.step.command);
+        return okReport(s.step.command);
+      },
+      { collectErrors: true },
+    );
+    expect(executed).toEqual(["a", "b"]);
+    expect(results[2]!.dependencySkipped).toBe(true);
+  });
+
+  test("AC-4: without collectErrors, read-only steps skip like everything else", async () => {
+    const schedule = buildSchedule(steps("a", "b"));
+    schedule[1]!.readOnly = true;
+    const executed: string[] = [];
+    const results = await executeScheduledSteps(schedule, 1, async (s) => {
+      executed.push(s.step.command);
+      if (s.step.command === "a") return failReport(s.step.command);
+      return okReport(s.step.command);
+    });
+    expect(executed).toEqual(["a"]);
+    expect(results[1]!.dependencySkipped).toBe(true);
+  });
+
+  test("transitive taint: read-only step that ran-tainted still skips mutating dependents", async () => {
+    const schedule = buildSchedule([
+      { command: "a" },
+      { command: "b", dependsOn: ["a"] },
+      { command: "c", dependsOn: ["b"] },
+      { command: "d", dependsOn: ["b"] },
+    ]);
+    schedule[1]!.readOnly = true; // b read-only — runs tainted, passes
+    schedule[3]!.readOnly = true; // d read-only — runs annotated
+    // c is mutating — must skip even though b passed
+    const executed: string[] = [];
+    const seen = new Map<string, boolean | undefined>();
+    const results = await executeScheduledSteps(
+      schedule,
+      2,
+      async (s) => {
+        executed.push(s.step.command);
+        seen.set(s.step.command, s.ranAfterFailedDependency);
+        if (s.step.command === "a") return failReport(s.step.command);
+        return okReport(s.step.command);
+      },
+      { collectErrors: true },
+    );
+    expect(executed.sort()).toEqual(["a", "b", "d"]);
+    expect(seen.get("b")).toBe(true);
+    expect(seen.get("d")).toBe(true);
+    expect(results[2]!.dependencySkipped).toBe(true); // c skipped — mutating on tainted dep
+    expect(results[3]!.dependencySkipped).toBe(false); // d ran — read-only
+  });
+
+  test("read-only step that ran-tainted and failed still taints dependents", async () => {
+    const schedule = buildSchedule(steps("a", "b", "c"));
+    schedule[1]!.readOnly = true;
+    schedule[2]!.readOnly = true;
+    const results = await executeScheduledSteps(
+      schedule,
+      1,
+      async (s) => {
+        if (s.step.command === "a" || s.step.command === "b") return failReport(s.step.command);
+        return okReport(s.step.command);
+      },
+      { collectErrors: true },
+    );
+    // b ran-tainted and failed — c (read-only) still runs, annotated.
+    expect(results[1]!.report.ok).toBe(false);
+    expect(results[2]!.dependencySkipped).toBe(false);
+    expect(results[2]!.report.ok).toBe(true);
   });
 });

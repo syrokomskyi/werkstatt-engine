@@ -13,9 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1126: step 2 — kernel runtime wiring
-
-Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
   <item>RFC-1130: qa.independent.run cacheable + cacheBypassFlags
 
 Steps 1-4: cacheBypassFlags field on KernelCommandDefinition, executor bypass at both cache call sites (hasCacheBypassFlag), qa.independent.run flipped to cacheable with narrowed reads + modulePaths, 14 new contract tests.</item>
@@ -24,7 +21,10 @@ Steps 1-4: cacheBypassFlags field on KernelCommandDefinition, executor bypass at
 fo-review finding (axis E): docstrings did not mention the new bypassCache skip condition. Review report persisted.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
-  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097</history>
+  <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
+
+Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
+  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097, RFC-1126</history>
 </CHANGE_SUMMARY>
 */
 
@@ -34,7 +34,7 @@ import os from "node:os";
 import { join } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
-import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
+import type { ActualState, PipelineDeclaration } from "@warpgogol/werkstatt-shared/kernel";
 import {
   batchAppendStepTelemetry,
   loadPipelineBudgets,
@@ -463,6 +463,12 @@ async function executePipelineForSite(
 
   const scheduled = buildSchedule(steps);
 
+  // RFC-1144: pre-resolve read-only classification — the scheduler never
+  // loads command definitions; missing mutatesState ⇒ mutating (conservative).
+  for (const sStep of scheduled) {
+    sStep.readOnly = registry.commands.get(sStep.step.command)?.mutatesState === false;
+  }
+
   // ADR-0085: closed-mission workpiece — mutating steps become no-ops unless
   // every declared write is confined to gitignored paths (dist/, .cache/, …).
   const workpieceClosed = isClosedWorkpiece(site.directory);
@@ -587,8 +593,13 @@ async function executePipelineForSite(
           runState.cacheHitCommands.add(step.command);
         }
         const endedAtMonotonicMs = Math.round(performance.now());
+        // RFC-1144: mark possibly-cascaded failures so operators can discount them.
+        const taintedNote =
+          sStep.ranAfterFailedDependency === true && !report.ok
+            ? " (ran after failed dependency — may be cascaded)"
+            : "";
         progressLine(
-          `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}`,
+          `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}${taintedNote}`,
         );
         // ADR-0023: collect telemetry in-memory; batch write at pipeline completion.
         // ADR-0085: closed-mission skips are excluded — a 0ms skip would
@@ -624,8 +635,14 @@ async function executePipelineForSite(
           exceededTimeout: report.timing.exceededTimeout,
         });
 
+        // RFC-1144: copy the scheduler's taint annotation onto the report.
+        if (sStep.ranAfterFailedDependency === true) {
+          report.ranAfterFailedDependency = true;
+        }
+
         return report;
       },
+      { collectErrors: options.collectErrors === true },
     );
 
     // Sort results by stepIndex (declaration order).
@@ -737,6 +754,12 @@ async function executePipelineForWorkspace(
 
   const scheduled = buildSchedule(steps);
 
+  // RFC-1144: pre-resolve read-only classification — the scheduler never
+  // loads command definitions; missing mutatesState ⇒ mutating (conservative).
+  for (const sStep of scheduled) {
+    sStep.readOnly = registry.commands.get(sStep.step.command)?.mutatesState === false;
+  }
+
   const stepTimings: Map<number, PipelineStepTiming> = new Map();
 
   try {
@@ -812,8 +835,13 @@ async function executePipelineForWorkspace(
           runState.cacheHitCommands.add(step.command);
         }
         const endedAtMonotonicMs = Math.round(performance.now());
+        // RFC-1144: mark possibly-cascaded failures so operators can discount them.
+        const taintedNote =
+          sStep.ranAfterFailedDependency === true && !report.ok
+            ? " (ran after failed dependency — may be cascaded)"
+            : "";
         progressLine(
-          `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}`,
+          `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}${taintedNote}`,
         );
         // ADR-0023: collect telemetry in-memory; batch write at pipeline completion.
         if (!step.skip && !report.cached && !isTransitiveSkip(report)) {
@@ -840,8 +868,14 @@ async function executePipelineForWorkspace(
           exceededTimeout: report.timing.exceededTimeout,
         });
 
+        // RFC-1144: copy the scheduler's taint annotation onto the report.
+        if (sStep.ranAfterFailedDependency === true) {
+          report.ranAfterFailedDependency = true;
+        }
+
         return report;
       },
+      { collectErrors: options.collectErrors === true },
     );
 
     // Sort results by stepIndex (declaration order).
@@ -921,6 +955,21 @@ const EXECUTE_KERNEL_PIPELINE_OPTION_KEYS = [
   "collectErrors",
 ];
 
+/**
+ * RFC-1144: OR-merge a pipeline declaration's `collectErrors` into the
+ * executor options — either opt-in enables the mode; there is no opt-out flag.
+ * Exported for unit tests (AC-6).
+ */
+export function mergeCollectErrorsOption(
+  options: ExecuteKernelPipelineOptions,
+  declaration: PipelineDeclaration,
+): ExecuteKernelPipelineOptions {
+  if (declaration.collectErrors === true && options.collectErrors !== true) {
+    return { ...options, collectErrors: true };
+  }
+  return options;
+}
+
 export async function executeKernelPipeline(
   options: ExecuteKernelPipelineOptions,
 ): Promise<KernelPipelineReport | KernelPipelineReport[]> {
@@ -939,23 +988,32 @@ export async function executeKernelPipeline(
     progressLine(`[${site.name}] loading app runtime …`);
     const { registry } = await loadAppRuntime(options.workspaceRoot, site);
     progressLine(`[${site.name}] app runtime ready`);
-    const steps = registry.pipelines.get(options.pipelineName);
-    if (!steps) {
+    const pipelineDecl = registry.pipelines.get(options.pipelineName);
+    if (!pipelineDecl) {
       throw new Error(
         `Kernel pipeline \`${options.pipelineName}\` is not registered for site \`${site.name}\`.`,
       );
     }
-    return executePipelineForSite(site, registry, options, steps);
+    return executePipelineForSite(
+      site,
+      registry,
+      mergeCollectErrorsOption(options, pipelineDecl),
+      pipelineDecl.steps,
+    );
   }
 
   if (!options.siteName && !(options.allSites ?? false)) {
     const wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot);
     if (wsRegistry) {
       progressLine(`pipeline ${options.pipelineName} — loading workspace registry …`);
-      const wsSteps = wsRegistry.pipelines.get(options.pipelineName);
-      if (wsSteps) {
+      const wsPipelineDecl = wsRegistry.pipelines.get(options.pipelineName);
+      if (wsPipelineDecl) {
         progressLine(`pipeline ${options.pipelineName} — workspace registry ready`);
-        return executePipelineForWorkspace(wsRegistry, options, wsSteps);
+        return executePipelineForWorkspace(
+          wsRegistry,
+          mergeCollectErrorsOption(options, wsPipelineDecl),
+          wsPipelineDecl.steps,
+        );
       }
     }
   }
@@ -980,14 +1038,21 @@ export async function executeKernelPipeline(
     progressLine(`[${site.name}] loading app runtime …`);
     const { registry } = await loadAppRuntime(options.workspaceRoot, site);
     progressLine(`[${site.name}] app runtime ready`);
-    const steps = registry.pipelines.get(options.pipelineName);
-    if (!steps) {
+    const pipelineDecl = registry.pipelines.get(options.pipelineName);
+    if (!pipelineDecl) {
       throw new Error(
         `Kernel pipeline \`${options.pipelineName}\` is not registered for site \`${site.name}\`.`,
       );
     }
 
-    reports.push(await executePipelineForSite(site, registry, options, steps));
+    reports.push(
+      await executePipelineForSite(
+        site,
+        registry,
+        mergeCollectErrorsOption(options, pipelineDecl),
+        pipelineDecl.steps,
+      ),
+    );
   }
 
   return options.allSites ? reports : reports[0]!;

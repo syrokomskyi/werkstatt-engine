@@ -23,6 +23,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1144: collect-errors scheduling — read-only steps (ScheduledStep.readOnly) run after dependency failures with ranAfterFailedDependency annotation; transitive ranTainted set keeps mutating dependents skipped; executeScheduledSteps accepts { collectErrors } option.</item>
+  <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
+
+Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -33,6 +37,18 @@ export interface ScheduledStep {
   stepIndex: number;
   /** Indices of steps this step depends on (resolved from dependsOn command names or implicit sequential ordering). */
   dependencies: Set<number>;
+  /**
+   * RFC-1144: resolved by the executor from the command's `mutatesState`
+   * declaration (`mutatesState === false` ⇒ true). Missing declaration ⇒
+   * false (conservative — treated as mutating).
+   */
+  readOnly?: boolean;
+  /**
+   * RFC-1144: set by the scheduler when this step is queued despite a
+   * failed/failure-skipped/tainted dependency (collect-errors mode only).
+   * Copied onto the step's KernelExecutionReport by the executor.
+   */
+  ranAfterFailedDependency?: boolean;
 }
 
 export class ScheduleError extends Error {
@@ -184,18 +200,28 @@ export interface StepExecutionResult {
  * and progress reporting. It receives a `ScheduledStep` and returns a
  * `KernelExecutionReport`.
  *
+ * RFC-1144: when `opts.collectErrors` is true, the failure cascade skips
+ * only mutating dependents — read-only steps (`ScheduledStep.readOnly`)
+ * run with `ranAfterFailedDependency` set, and their completion taints
+ * downstream steps transitively (mutating dependents still skip).
+ *
  * Returns results sorted by stepIndex (declaration order).
  */
 export async function executeScheduledSteps(
   scheduled: ScheduledStep[],
   concurrency: number,
   executeStep: (step: ScheduledStep) => Promise<KernelExecutionReport>,
+  opts?: { collectErrors?: boolean },
 ): Promise<StepExecutionResult[]> {
+  const collectErrors = opts?.collectErrors === true;
   const n = scheduled.length;
   const results: StepExecutionResult[] = [];
   const completed = new Set<number>();
   const failed = new Set<number>();
   const skippedDueToFailure = new Set<number>();
+  // RFC-1144: steps that ran after a failed dependency — they taint their
+  // dependents transitively regardless of their own outcome.
+  const ranTainted = new Set<number>();
 
   // When concurrency is 1, rebuild the schedule with full sequential
   // implicit dependencies (ignoring all dependsOn fields). This gives
@@ -206,6 +232,9 @@ export async function executeScheduledSteps(
       step: s.step,
       stepIndex: s.stepIndex,
       dependencies: new Set<number>(i > 0 && !s.step.skip ? [scheduled[i - 1]!.stepIndex] : []),
+      // RFC-1144: preserve executor-resolved fields across the sequential rebuild.
+      readOnly: s.readOnly,
+      ranAfterFailedDependency: s.ranAfterFailedDependency,
     }));
   }
 
@@ -225,11 +254,12 @@ export async function executeScheduledSteps(
       if (inFlight.has(s.stepIndex)) continue;
       if (readyQueue.includes(s.stepIndex)) continue;
 
-      // Check if any dependency failed or was skipped due to failure.
+      // Check if any dependency failed, was skipped due to failure, or ran
+      // tainted (RFC-1144: transitive upstream failure).
       let depFailed = false;
       let allDepsComplete = true;
       for (const dep of s.dependencies) {
-        if (failed.has(dep) || skippedDueToFailure.has(dep)) {
+        if (failed.has(dep) || skippedDueToFailure.has(dep) || ranTainted.has(dep)) {
           depFailed = true;
           break;
         }
@@ -240,8 +270,15 @@ export async function executeScheduledSteps(
       }
 
       if (depFailed) {
-        // Mark this step and all its transitive dependents as skipped.
-        markSkippedDueToFailure(s.stepIndex);
+        // RFC-1144: under collect-errors, read-only steps still run —
+        // annotated so the report marks them as possibly cascaded.
+        if (collectErrors && s.readOnly === true) {
+          s.ranAfterFailedDependency = true;
+          readyQueue.push(s.stepIndex);
+        } else {
+          // Mark this step and all its transitive dependents as skipped.
+          markSkippedDueToFailure(s.stepIndex);
+        }
       } else if (allDepsComplete) {
         readyQueue.push(s.stepIndex);
       }
@@ -278,6 +315,11 @@ export async function executeScheduledSteps(
           completed.add(idx);
         } else {
           failed.add(idx);
+        }
+        // RFC-1144: a step that ran after a failed dependency taints its
+        // dependents — mutating ones skip, read-only ones run annotated.
+        if (step.ranAfterFailedDependency === true) {
+          ranTainted.add(idx);
         }
         results.push({ stepIndex: idx, report, dependencySkipped: false });
         inFlight.delete(idx);
@@ -336,12 +378,19 @@ export async function executeScheduledSteps(
         for (const s of effectiveSchedule) {
           if (!results.some((r) => r.stepIndex === s.stepIndex)) {
             if (!skippedDueToFailure.has(s.stepIndex)) {
-              markSkippedDueToFailure(s.stepIndex);
+              // RFC-1144: read-only steps run even here — their dependencies
+              // can never complete, which is itself a tainted state.
+              if (collectErrors && s.readOnly === true) {
+                s.ranAfterFailedDependency = true;
+                readyQueue.push(s.stepIndex);
+              } else {
+                markSkippedDueToFailure(s.stepIndex);
+              }
             }
           }
         }
         processSkipped();
-        break;
+        if (readyQueue.length === 0) break;
       }
     }
   }

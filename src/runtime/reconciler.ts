@@ -14,6 +14,9 @@ by a simple lock (DNA-51).
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1038: initial implementation — reconciler replacing component-runtime/reconciliation.ts.</item>
+  <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
+
+Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -27,7 +30,11 @@ import type {
   ModuleExport,
   CommandDeclaration,
 } from "@warpgogol/werkstatt-shared/kernel";
-import type { ModuleFiberState, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  ModuleFiberState,
+  KernelPipelineStep,
+  PipelineDeclaration,
+} from "@warpgogol/werkstatt-shared/kernel";
 
 /**
  * Build ActualState from ModuleExport[].
@@ -36,7 +43,7 @@ import type { ModuleFiberState, KernelPipelineStep } from "@warpgogol/werkstatt-
  */
 export function buildActualState(exports: ModuleExport[]): ActualState {
   const commands = new Map<string, CommandDeclaration>();
-  const pipelines = new Map<string, KernelPipelineStep[]>();
+  const pipelines = new Map<string, PipelineDeclaration>();
   const commandModules = new Map<string, string>();
 
   for (const mod of exports) {
@@ -77,15 +84,15 @@ export function buildActualState(exports: ModuleExport[]): ActualState {
         if (pipelines.has(pipe.name)) {
           const existing = pipelines.get(pipe.name)!;
           if (
-            existing.length === pipe.steps.length &&
-            existing.every((s, i) => s === pipe.steps[i])
+            existing.steps.length === pipe.steps.length &&
+            existing.steps.every((s, i) => s === pipe.steps[i])
           )
             continue;
           throw new Error(
             `COMPOSITION-03: Duplicate pipeline "${pipe.name}" declared by module "${mod.name}" — already declared by another module.`,
           );
         }
-        pipelines.set(pipe.name, pipe.steps);
+        pipelines.set(pipe.name, pipe);
       }
       continue;
     }
@@ -104,13 +111,16 @@ export function buildActualState(exports: ModuleExport[]): ActualState {
     for (const pipe of pipelinesArray) {
       if (pipelines.has(pipe.name)) {
         const existing = pipelines.get(pipe.name)!;
-        if (existing.length === pipe.steps.length && existing.every((s, i) => s === pipe.steps[i]))
+        if (
+          existing.steps.length === pipe.steps.length &&
+          existing.steps.every((s, i) => s === pipe.steps[i])
+        )
           continue;
         throw new Error(
           `COMPOSITION-03: Duplicate pipeline "${pipe.name}" declared by module "${mod.name}" — already declared by another module.`,
         );
       }
-      pipelines.set(pipe.name, pipe.steps);
+      pipelines.set(pipe.name, pipe);
     }
   }
 
@@ -131,7 +141,10 @@ export function buildDesiredState(
   options: {
     profileId: string;
     requiredCapabilities?: string[];
-    availableArtifacts?: ReadonlyMap<string, import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest>;
+    availableArtifacts?: ReadonlyMap<
+      string,
+      import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest
+    >;
     admittedGrants?: ReadonlyArray<{ scope: string; resource: string }>;
   },
 ): DesiredState {
@@ -356,7 +369,10 @@ export async function reconcileFromPersisted(
   options: {
     profileId: string;
     requiredCapabilities?: string[];
-    availableArtifacts?: ReadonlyMap<string, import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest>;
+    availableArtifacts?: ReadonlyMap<
+      string,
+      import("@warpgogol/werkstatt-shared/fingerprint").Sha256Digest
+    >;
     admittedGrants?: ReadonlyArray<{ scope: string; resource: string }>;
     onActivate?: (decl: ComponentDeclaration) => Promise<void>;
     onDeactivate?: (id: string) => Promise<void>;
