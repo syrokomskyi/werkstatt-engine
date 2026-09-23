@@ -415,7 +415,11 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": ["src", "bin", "os"],
+  "files": [
+    "src",
+    "bin",
+    "os"
+  ],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
@@ -441,9 +445,8 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/picomatch": "^4.0.3",
     "@typescript-eslint/typescript-estree": "^8.70.0",
-    "@warpgogol/forge": "workspace:*",
-    "@warpgogol/pbp": "workspace:*",
-    "@warpgogol/werkstatt-shared": "workspace:*",
+    "@warpgogol/forge": "*",
+    "@warpgogol/werkstatt-shared": "*",
     "ai": "^7.0.99",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
@@ -491,5 +494,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "8.70.0",
     "vitest": "^5.0.0"
-  }
+  },
+  "packageManager": "pnpm@11.10.0"
 }

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "skipLibCheck": true
+  },
+  "exclude": ["src/**/*.test.ts", "src/tests/**", "src/tests-handoff/**", "src/**/*.template.*", "dist/**", "node_modules/**"]
+}
