@@ -166,30 +166,6 @@ export async function ensureTargetSites(
   return site ? [site] : [];
 }
 
-export async function listRegisteredKernelCommandNames(workspaceRoot: string): Promise<string[]> {
-  const names = new Set<string>();
-  const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
-  if (wsRegistry) {
-    for (const commandName of wsRegistry.commands.keys()) names.add(commandName);
-  }
-
-  const sites = await discoverSiteWorkspaces(workspaceRoot);
-  for (const site of sites.filter(
-    (candidate) => candidate.configPath && siteHasRuntime(candidate),
-  )) {
-    try {
-      const { registry } = await loadAppRuntime(workspaceRoot, site);
-      for (const commandName of registry.commands.keys()) names.add(commandName);
-    } catch (err) {
-      process.stderr.write(
-        `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-  }
-
-  return [...names].sort();
-}
-
 function commandInfo(
   command: KernelCommandDefinition,
   provider: KernelRegisteredCommandInfo["provider"],
@@ -230,85 +206,6 @@ export function deriveModuleBasePath(modulePath: string): string | undefined {
   const srcIndex = modulePath.indexOf("/src/");
   if (srcIndex === -1) return undefined;
   return modulePath.slice(0, srcIndex + 4); // include "/src"
-}
-
-export async function listRegisteredKernelCommands(
-  workspaceRoot: string,
-): Promise<KernelRegisteredCommandInfo[]> {
-  const byKey = new Map<string, KernelRegisteredCommandInfo>();
-
-  const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
-  if (wsRegistry) {
-    for (const [commandName, command] of wsRegistry.commands) {
-      byKey.set(
-        `workspace:${commandName}`,
-        commandInfo(command, "workspace", undefined, wsRegistry.commandModules?.get(commandName)),
-      );
-    }
-  }
-
-  const sites = await discoverSiteWorkspaces(workspaceRoot);
-  for (const site of sites.filter(
-    (candidate) => candidate.configPath && siteHasRuntime(candidate),
-  )) {
-    try {
-      const { registry } = await loadAppRuntime(workspaceRoot, site);
-      for (const [commandName, command] of registry.commands) {
-        byKey.set(
-          `site:${site.name}:${commandName}`,
-          commandInfo(command, "site", site.name, registry.commandModules?.get(commandName)),
-        );
-      }
-    } catch (err) {
-      process.stderr.write(
-        `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-  }
-
-  return [...byKey.values()].sort((a, b) => {
-    const byName = a.name.localeCompare(b.name);
-    if (byName !== 0) return byName;
-    const byProvider = a.provider.localeCompare(b.provider);
-    if (byProvider !== 0) return byProvider;
-    return (a.siteName ?? "").localeCompare(b.siteName ?? "");
-  });
-}
-
-/**
- * RFC-0266: pipeline name -> ordered list of member command names, across the
- * workspace-root registry and every discovered app's registry. Used to derive
- * each command manifest entry's `pipelines` membership.
- */
-export async function listRegisteredKernelPipelines(
-  workspaceRoot: string,
-): Promise<Record<string, string[]>> {
-  const pipelines: Record<string, string[]> = {};
-
-  const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
-  if (wsRegistry) {
-    for (const [name, decl] of wsRegistry.pipelines) {
-      pipelines[name] = decl.steps.map((step) => step.command);
-    }
-  }
-
-  const sites = await discoverSiteWorkspaces(workspaceRoot);
-  for (const site of sites.filter(
-    (candidate) => candidate.configPath && siteHasRuntime(candidate),
-  )) {
-    try {
-      const { registry } = await loadAppRuntime(workspaceRoot, site);
-      for (const [name, decl] of registry.pipelines) {
-        if (!(name in pipelines)) pipelines[name] = decl.steps.map((step) => step.command);
-      }
-    } catch (err) {
-      process.stderr.write(
-        `  [registry] WARNING: skipped site "${site.name}" — failed to load app runtime: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-  }
-
-  return pipelines;
 }
 
 /**

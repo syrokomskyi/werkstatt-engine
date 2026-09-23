@@ -23,8 +23,12 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
-import { listRegisteredKernelCommandNames } from "../runtime.ts";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { listStaticCommandSurface } from "../runtime.ts";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import {
   WORKFLOW_PHASES,
   WORKFLOW_CHAINS,
@@ -232,7 +236,9 @@ export async function runWorkflowLint(
 ): Promise<KernelCommandResult<WorkflowLintResult>> {
   const workflowDirectory = path.join(context.workspaceRoot, WORKFLOW_DIR);
   const { workflows, violations } = await loadWorkflows(context.workspaceRoot);
-  const commandNames = new Set(await listRegisteredKernelCommandNames(context.workspaceRoot));
+  const commandNames = new Set(
+    (await listStaticCommandSurface(context.workspaceRoot)).commands.map((c) => c.name),
+  );
   for (const commandName of [
     "sites-check.run",
     "sites-check.author",

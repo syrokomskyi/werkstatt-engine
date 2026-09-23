@@ -82,8 +82,8 @@ test("runProbe: file-contains — red then green fixture", async () => {
 
 test("runProbe: command-registered — red for an unregistered name, green for a fixture-registered command", async () => {
   // A minimal fixture workspace (not the real monorepo) keeps this test fast —
-  // listRegisteredKernelCommands against the full repo builds every app's
-  // registry and is far too slow for a unit test.
+  // listStaticCommandSurface against the full repo loads the canonical site
+  // module set and is far too slow for a unit test.
   const root = await mkdtemp(join(tmpdir(), "rfc-acceptance-registry-"));
   try {
     const toolsRoot = join(root, "tools");

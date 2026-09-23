@@ -26,9 +26,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 export { parseKernelArgv, resolveCommandFlags, KERNEL_UNIVERSAL_FLAGS } from "./runtime/argv.ts";
 export {
   listSiteWorkspaces,
-  listRegisteredKernelCommandNames,
-  listRegisteredKernelCommands,
-  listRegisteredKernelPipelines,
   listStaticCommandSurface,
   type StaticCommandSurface,
   loadAppRuntime,
