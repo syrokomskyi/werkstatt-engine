@@ -86,7 +86,13 @@ async function importConfigModule(url: string): Promise<Record<string, unknown>>
   // CJS-namespace bug later in buildRegistry — catching tsImport's own throw
   // is not enough.
   if (process.env.VITEST) {
-    return (await import(url)) as Record<string, unknown>;
+    try {
+      return (await import(url)) as Record<string, unknown>;
+    } catch {
+      // vite-node cannot reach config files outside the workspace root
+      // (e.g. /tmp fixture workspaces) — fall back to tsx for those.
+      return (await tsImport(url, import.meta.url)) as Record<string, unknown>;
+    }
   }
   try {
     return (await tsImport(url, import.meta.url)) as Record<string, unknown>;
