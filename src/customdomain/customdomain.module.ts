@@ -18,13 +18,13 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createCustomdomainModule(): Promise<ModuleExport> {
   const { runCustomdomainRegister } = await import("./customdomain-register.ts");
-      const { runRedirectRegister } = await import("./redirect-register.ts");
+  const { runRedirectRegister } = await import("./redirect-register.ts");
   return {
     name: "customdomain",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "customdomain.register",
         modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
@@ -38,12 +38,16 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
             required: true,
             description: "System id from systems-cache/{system}/system-config.yaml.",
           },
+          system: {
+            kind: "string",
+            description: "Legacy alias for --site (flagSite fallback).",
+          },
         },
         reads: ["systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runCustomdomainRegister,
       },
-    {
+      {
         name: "redirect.register",
         modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
@@ -57,13 +61,16 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
             required: true,
             description: "System id from systems-cache/{system}/system-config.yaml.",
           },
+          system: {
+            kind: "string",
+            description: "Legacy alias for --site (flagSite fallback).",
+          },
         },
         reads: ["systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runRedirectRegister,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }
