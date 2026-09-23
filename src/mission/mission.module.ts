@@ -292,6 +292,11 @@ export async function createMissionModule(): Promise<ModuleExport> {
             kind: "boolean",
             description: "RFC-0973: Clear all caches and stale artifacts before validation.",
           },
+          fast: {
+            kind: "boolean",
+            description:
+              "RFC-1086: Incremental validation — read previous validation-report.json, skip passed phases, cascade re-run of downstream phases.",
+          },
           "skip-auto-commit": {
             kind: "boolean",
             description:
