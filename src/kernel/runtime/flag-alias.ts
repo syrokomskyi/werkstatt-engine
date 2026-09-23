@@ -17,7 +17,7 @@ direct alias.
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
   <item>Canonical flag wins on identical targets; conflicting targets are a blocking KERNEL-FLAG-02 error, never a silent pick.</item>
-  <item>Mission resolution scans missions/<systemId>-m* manifests for state "open" — zero matches and multiple matches are both blocking errors with agent-actionable messages.</item>
+  <item>Mission resolution scans open manifests under missions/<systemId>-m* — zero or multiple matches are blocking errors.</item>
   <item>Resolution runs inside executeRegisteredCommand before resolveCommandFlags — the single choke point for pipeline steps and direct executeKernelCommand calls.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
@@ -30,6 +30,8 @@ Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (
 
 import { listMissionDirs, readMissionManifest } from "../../mission/mission-io.ts";
 import type { Diagnostic, KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
+
+// @ai-invariant: --site on a workspace-scoped command is an alias, never a target — resolve it into the canonical targeting flag or fail.
 
 interface SiteFlagOccurrence {
   /** Index of the `--site` token (or the `--site=value` token). */

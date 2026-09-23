@@ -10,6 +10,9 @@ machinery (setCachedCommandResult, workspace-tree-index) stays internal.
   <item>No new cache logic — this barrel only re-exports sibling modules.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Narrow barrel — re-exports only what cross-package consumers need; executor internals stay private.</item>
+</KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1127: initial barrel — createCacheLayer, CacheLayer types, COMMAND_RESULT_CACHE_NAMESPACE, CachedCommandResultEntry, computeModuleHash for predecessor moduleHash comparison.</item>
   <item>RFC-1127: step 1 — cache barrel + parse fix
@@ -20,6 +23,8 @@ Add ./kernel/cache subpath export (narrow barrel: createCacheLayer, computeModul
 cacheable: true + reads covering dist/**, .lighthouse-budget-ignore, astro.config.*, system-config.yaml. Export computeInputsHash from kernel/cache barrel for reads-coverage tests. 3 new contract tests (18 total pass).</item>
 </CHANGE_SUMMARY>
 */
+
+// @ai-invariant: This barrel is the only public surface of kernel/cache — never re-export executor internals.
 
 export {
   createCacheLayer,

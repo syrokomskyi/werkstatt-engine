@@ -1,12 +1,6 @@
 /*
 <MODULE_CONTRACT>
 <purpose>werkstatt.platform.update — bump @warpgogol/* platform dependencies in a workshop and report Sternsystems whose pinnedPlatform drifts from the new installed version (RFC-1125).</purpose>
-<keywords>platform, update, pnpm, pinnedPlatform, drift, workshop</keywords>
-<responsibilities>
-  <item>Runs `pnpm up` scoped to @warpgogol/* packages (latest or a target semver).</item>
-  <item>Reads the installed @warpgogol/werkstatt-engine version before/after.</item>
-  <item>Reports Sternsystems whose pinnedPlatform differs from the new version.</item>
-</responsibilities>
 <non-goals>
   <item>Do not rewrite pinnedPlatform — drift is reported, not auto-fixed (pin is a deliberate act).</item>
   <item>Do not touch non-@warpgogol dependencies.</item>
@@ -56,7 +50,13 @@ const ENGINE_PKG = "@warpgogol/werkstatt-engine";
 const UPDATE_SCOPE = "@warpgogol/*";
 
 async function defaultInstalledVersion(workspaceRoot: string): Promise<string | null> {
-  const pkgPath = join(workspaceRoot, "node_modules", "@warpgogol", "werkstatt-engine", "package.json");
+  const pkgPath = join(
+    workspaceRoot,
+    "node_modules",
+    "@warpgogol",
+    "werkstatt-engine",
+    "package.json",
+  );
   if (!existsSync(pkgPath)) return null;
   try {
     const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as { version?: string };
@@ -94,9 +94,7 @@ export async function platformUpdate(
   const from = await installedVersion(workspaceRoot);
 
   const pnpmCommand =
-    to === "latest"
-      ? `pnpm up -rL "${UPDATE_SCOPE}"`
-      : `pnpm up -r "${UPDATE_SCOPE}@${to}"`;
+    to === "latest" ? `pnpm up -rL "${UPDATE_SCOPE}"` : `pnpm up -r "${UPDATE_SCOPE}@${to}"`;
   exec(pnpmCommand, workspaceRoot);
 
   const after = await installedVersion(workspaceRoot);

@@ -77,6 +77,8 @@ import {
   type StepExecutionResult,
 } from "./pipeline-scheduler.ts";
 
+// @ai-invariant: Pipeline steps execute in declared order — a failing step halts the pipeline unless non-blocking or collectErrors read-only continuation applies.
+
 const PIPELINE_TIMING_SUMMARY_THRESHOLD_MS = 30_000;
 
 /**

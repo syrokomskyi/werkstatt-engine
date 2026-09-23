@@ -14,13 +14,12 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0290: initial Astro adapter.</item>
-  <item>RFC-0954: add createAgentSearchRoute for semantic search endpoint.</item>
   <item>RFC-1112: dispatch returns ActionReceipt; wire restRedisReceiptStore when UPSTASH_REDIS_* are configured.</item>
   <item>RFC-1114: add createAgentA2aRoute for the A2A endpoint.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
   <item>RFC-1112/1113/1114 gap fix: CORS Allow-Headers gains Idempotency-Key, MCP-Protocol-Version, A2A-Version; Expose-Headers gains X-Agent-Idempotency.</item>
+  <history>RFC-0290, RFC-0954</history>
 </CHANGE_SUMMARY>
 */
 

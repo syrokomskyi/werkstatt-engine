@@ -15,7 +15,7 @@ calls).
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
   <item>Leaf module — imported by both execute-command.ts and execute-pipeline.ts; must not import either (cycle).</item>
-  <item>Gitignored-writes exemption: a mutating command runs on a closed workpiece only when EVERY declared write resolves to a gitignored path inside the site — such writes cannot produce committable churn, and release.prepare's rebuild path depends on dist-only mutators.</item>
+  <item>Gitignored-writes exemption: mutating commands run only when every declared write resolves gitignored — uncommittable churn is impossible.</item>
   <item>No git tracking (collectGitignoredPaths → null) means no write can churn a commit — the command runs.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
@@ -30,6 +30,8 @@ import type {
   DiscoveredSiteWorkspace,
   KernelCommandDefinition,
 } from "@warpgogol/werkstatt-shared/kernel";
+
+// @ai-invariant: Closed-mission workpieces are immutable — a mutating command may run only when every declared write resolves to a gitignored path.
 
 export const CLOSED_WORKPIECE_SENTINEL = ".closed";
 

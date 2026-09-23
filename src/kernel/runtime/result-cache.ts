@@ -14,8 +14,8 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
 </non-goals>
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
-  <item>Cache read/write runs inside executeRegisteredCommand (single choke point, ADR-0087 precedent); pipeline executors pass per-run structures via context.resultCache instead of calling the helpers directly.</item>
-  <item>flagsHash uses a denylist (CACHE_INVISIBLE_FLAGS) over resolved input.flags — presentation and bypass universals never fragment the cache, while an unaliasable --site on a workspace command stays keyed.</item>
+  <item>Cache read/write runs inside executeRegisteredCommand — the single choke point; executors pass per-run state via context.resultCache.</item>
+  <item>flagsHash denylist (CACHE_INVISIBLE_FLAGS) over resolved flags — presentation/bypass universals never fragment the cache.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1133: module created — isCommandCacheable, hasCacheBypassFlag, tryMtimeFastPath, and the read/write orchestrators relocated from execute-pipeline.ts; computeFlagsHash + CACHE_INVISIBLE_FLAGS added; key gains flagsHash (schema v2).</item>
@@ -46,6 +46,8 @@ import {
 } from "../cache/command-result-cache.ts";
 import { filterTreeIndex } from "../cache/workspace-tree-index.ts";
 import { deriveModuleBasePath } from "./registry.ts";
+
+// @ai-invariant: Command-result caching lives only in executeRegisteredCommand — never read or write command_results from pipeline executors directly.
 
 /**
  * RFC-1133: universal flags that never enter flagsHash. Presentation flags
