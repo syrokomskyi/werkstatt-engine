@@ -463,11 +463,8 @@ async function executePipelineForSite(
 
   const scheduled = buildSchedule(steps);
 
-  // RFC-1144: pre-resolve read-only classification — the scheduler never
-  // loads command definitions; missing mutatesState ⇒ mutating (conservative).
-  for (const sStep of scheduled) {
-    sStep.readOnly = registry.commands.get(sStep.step.command)?.mutatesState === false;
-  }
+  // RFC-1144: pre-resolve read-only classification.
+  annotateReadOnlySteps(scheduled, registry);
 
   // ADR-0085: closed-mission workpiece — mutating steps become no-ops unless
   // every declared write is confined to gitignored paths (dist/, .cache/, …).
@@ -754,11 +751,8 @@ async function executePipelineForWorkspace(
 
   const scheduled = buildSchedule(steps);
 
-  // RFC-1144: pre-resolve read-only classification — the scheduler never
-  // loads command definitions; missing mutatesState ⇒ mutating (conservative).
-  for (const sStep of scheduled) {
-    sStep.readOnly = registry.commands.get(sStep.step.command)?.mutatesState === false;
-  }
+  // RFC-1144: pre-resolve read-only classification.
+  annotateReadOnlySteps(scheduled, registry);
 
   const stepTimings: Map<number, PipelineStepTiming> = new Map();
 
@@ -954,6 +948,17 @@ const EXECUTE_KERNEL_PIPELINE_OPTION_KEYS = [
   "flags",
   "collectErrors",
 ];
+
+/**
+ * RFC-1144: pre-resolve read-only classification on a built schedule — the
+ * scheduler never loads command definitions; missing mutatesState ⇒ mutating
+ * (conservative).
+ */
+function annotateReadOnlySteps(scheduled: ScheduledStep[], registry: ActualState): void {
+  for (const sStep of scheduled) {
+    sStep.readOnly = registry.commands.get(sStep.step.command)?.mutatesState === false;
+  }
+}
 
 /**
  * RFC-1144: OR-merge a pipeline declaration's `collectErrors` into the
