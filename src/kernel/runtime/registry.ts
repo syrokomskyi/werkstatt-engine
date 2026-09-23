@@ -35,6 +35,7 @@ import { discoverSiteWorkspaces, loadKernelAppConfig } from "../discovery.ts";
 import { getOrBuildRegistry, getOrBuildWorkspaceRegistry } from "./registry-cache.ts";
 import { buildActualState } from "../../runtime/reconciler.ts";
 import { validateDeclarations } from "../../runtime/validate-declarations.ts";
+import { siteModuleLoaders } from "../module-map.ts";
 import type {
   DiscoveredSiteWorkspace,
   KernelAppConfig,
@@ -308,4 +309,67 @@ export async function listRegisteredKernelPipelines(
   }
 
   return pipelines;
+}
+
+/**
+ * RFC-1147/RFC-1148: the static command surface — workspace registry plus the
+ * canonical site module set (SITE_MODULE_MAP), enumerated without discovering
+ * or loading any site instance. Pure function of source data: identical output
+ * with or without a mission workpiece present.
+ *
+ * `siteModules` is injectable for unit tests; production callers omit it and
+ * get siteModuleLoaders() (the same map kernel.config.template.ts delegates to).
+ */
+export interface StaticCommandSurface {
+  commands: KernelRegisteredCommandInfo[];
+  pipelines: Record<string, string[]>;
+}
+
+export async function listStaticCommandSurface(
+  workspaceRoot: string,
+  siteModules?: Record<string, () => Promise<ModuleExport>>,
+): Promise<StaticCommandSurface> {
+  const byKey = new Map<string, KernelRegisteredCommandInfo>();
+  const pipelines: Record<string, string[]> = {};
+
+  const wsRegistry = await getOrBuildWorkspaceRegistry(workspaceRoot);
+  if (wsRegistry) {
+    for (const [commandName, command] of wsRegistry.commands) {
+      byKey.set(
+        `workspace:${commandName}`,
+        commandInfo(command, "workspace", undefined, wsRegistry.commandModules?.get(commandName)),
+      );
+    }
+    for (const [name, decl] of wsRegistry.pipelines) {
+      pipelines[name] = decl.steps.map((step) => step.command);
+    }
+  }
+
+  const loaders = siteModules ?? siteModuleLoaders();
+  for (const [moduleName, loader] of Object.entries(loaders)) {
+    const mod = await loader();
+    const actualState = buildActualState([mod]);
+    for (const [commandName, command] of actualState.commands) {
+      byKey.set(
+        `site-module:${commandName}`,
+        commandInfo(
+          command,
+          "site-module",
+          undefined,
+          actualState.commandModules?.get(commandName) ?? moduleName,
+        ),
+      );
+    }
+    for (const [name, decl] of actualState.pipelines) {
+      if (!(name in pipelines)) pipelines[name] = decl.steps.map((step) => step.command);
+    }
+  }
+
+  const commands = [...byKey.values()].sort((a, b) => {
+    const byName = a.name.localeCompare(b.name);
+    if (byName !== 0) return byName;
+    return a.provider.localeCompare(b.provider);
+  });
+
+  return { commands, pipelines };
 }
