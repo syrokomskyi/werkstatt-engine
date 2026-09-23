@@ -16,12 +16,11 @@ import { createKernelLogger } from "../logger.ts";
 /*
 <MODULE_CONTRACT>
   <purpose>
-    RFC-1057: Integration test for kernel.wire. Runs runKernelWire on a minimal
-    fixture inside the monorepo, then dynamically imports the generated
-    kernel.config.ts to verify that all moduleLoaders entries resolve to real
-    exports with ModuleExport shape. Catches template regressions (broken
-    imports, missing exports, factory function mismatches) before they reach
-    mission.validate.
+    RFC-1057/RFC-1147: Integration test for kernel.wire. Runs runKernelWire on a
+    minimal fixture and verifies the generated kernel.config.ts delegates to
+    siteModuleLoaders() — the canonical SITE_MODULE_MAP surface. Guards the
+    uniform-surface contract: exactly one emitted file, no tools/modules or
+    tools/runtime output.
   </purpose>
 </MODULE_CONTRACT>
 */
@@ -84,14 +83,12 @@ async function makeContext(workspaceRoot: string, siteDir: string): Promise<Kern
   };
 }
 
-describe("RFC-1057: kernel.wire integration test", () => {
+describe("RFC-1147: kernel.wire uniform surface", () => {
   let tmpDir: string;
   let siteDir: string;
 
   beforeEach(async () => {
-    // Create fixture in OS tmpdir; symlink node_modules from workspace root
-    // so tsImport can resolve @warpgogol/* packages.
-    tmpDir = await mkdtemp(join(tmpdir(), "rfc1057-wire-"));
+    tmpDir = await mkdtemp(join(tmpdir(), "rfc1147-wire-"));
     siteDir = join(tmpDir, "test-app");
     await mkdir(join(siteDir, "src", "content"), { recursive: true });
     await mkdir(join(siteDir, "tools"), { recursive: true });
@@ -103,7 +100,7 @@ describe("RFC-1057: kernel.wire integration test", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  test("generates all expected files", async () => {
+  test("generates only tools/kernel.config.ts — no tools/modules or tools/runtime", async () => {
     const context = await makeContext(WORKSPACE_ROOT, siteDir);
     const input: KernelCommandInput = { argv: [], flags: {} };
 
@@ -111,106 +108,30 @@ describe("RFC-1057: kernel.wire integration test", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.data?.status).toBe("ok");
+    expect(result.data?.generated).toEqual(["tools/kernel.config.ts"]);
 
-    const expectedFiles = [
-      "tools/kernel.config.ts",
-      "tools/modules/check.module.ts",
-      "tools/modules/service.module.ts",
-      "tools/modules/deploy.module.ts",
-      "tools/modules/pipelines.module.ts",
-      "tools/runtime/app.ts",
-      "tools/runtime/check.ts",
-      "tools/runtime/service.ts",
-      "tools/runtime/client-export.ts",
-    ];
-
-    for (const relPath of expectedFiles) {
-      const abs = join(siteDir, relPath);
-      expect(existsSync(abs), `Expected file ${relPath} to exist`).toBe(true);
-    }
+    expect(existsSync(join(siteDir, "tools", "kernel.config.ts"))).toBe(true);
+    expect(existsSync(join(siteDir, "tools", "modules"))).toBe(false);
+    expect(existsSync(join(siteDir, "tools", "runtime"))).toBe(false);
   });
 
-  test("generated kernel.config.ts has correct structure", async () => {
+  test("generated kernel.config.ts delegates to siteModuleLoaders()", async () => {
     const context = await makeContext(WORKSPACE_ROOT, siteDir);
     const input: KernelCommandInput = { argv: [], flags: {} };
 
     await runKernelWire(input, context);
 
     const configPath = join(siteDir, "tools", "kernel.config.ts");
-    expect(existsSync(configPath), "kernel.config.ts must be generated").toBe(true);
-
     const content = await readFile(configPath, "utf-8");
 
-    // Verify defineKernelConfig import path is correct
-    expect(content).toContain('from "@warpgogol/werkstatt-engine/kernel/types"');
+    expect(content).toContain('from "@warpgogol/werkstatt-engine/kernel"');
     expect(content).toContain("defineKernelConfig");
+    expect(content).toContain("siteModuleLoaders");
+    expect(content).toContain("moduleLoaders: siteModuleLoaders()");
     expect(content).toContain('name: "test-app"');
 
-    // Verify all expected module loader keys are present
-    const expectedLoaders = [
-      "check",
-      "service",
-      "deploy",
-      "rfc",
-      "workflow",
-      "compass",
-      "naming",
-      "werkstatt",
-      "change-impact",
-      "bordbuch",
-      "nachweis",
-      "sichtpass",
-      "dns",
-      "onboarding",
-      "testing",
-      "pipelines",
-    ];
-
-    for (const key of expectedLoaders) {
-      expect(content, `moduleLoaders.${key} must be present`).toContain(key);
-    }
-
-    // Verify factory function calls (not direct exports) for RFC-1038 modules
-    expect(content).toContain("createForgeRfcModule()");
-    expect(content).toContain("createForgeWorkflowModule()");
-    expect(content).toContain("createForgeNamingModule()");
-    expect(content).toContain("createChangeImpactModule()");
-
-    // Verify compass and werkstatt are direct exports (not factory functions)
-    expect(content).toContain("forgeCompassModule");
-    expect(content).toContain("forgeWerkstattModule");
-  });
-
-  test("generated local module files have correct ModuleExport structure", async () => {
-    const context = await makeContext(WORKSPACE_ROOT, siteDir);
-    const input: KernelCommandInput = { argv: [], flags: {} };
-
-    await runKernelWire(input, context);
-
-    const localModules = [
-      "tools/modules/check.module.ts",
-      "tools/modules/service.module.ts",
-      "tools/modules/deploy.module.ts",
-      "tools/modules/pipelines.module.ts",
-    ];
-
-    for (const relPath of localModules) {
-      const abs = join(siteDir, relPath);
-      expect(existsSync(abs), `${relPath} must exist`).toBe(true);
-
-      const content = await readFile(abs, "utf-8");
-
-      // Verify ModuleExport import path
-      expect(content, `${relPath} must import ModuleExport type`).toContain("ModuleExport");
-
-      // Verify the file exports a module variable
-      const moduleMatch = content.match(/export const (\w+Module)/);
-      expect(moduleMatch, `${relPath} must export a *Module const`).not.toBeNull();
-
-      // Verify the module is typed as ModuleExport
-      expect(content, `${relPath} must have ModuleExport type annotation`).toContain(
-        ": ModuleExport",
-      );
-    }
+    // No per-module loader literals — the surface is canonical in the engine.
+    expect(content).not.toContain("./modules/");
+    expect(content).not.toContain("createForgeRfcModule");
   });
 });

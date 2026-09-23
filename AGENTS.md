@@ -415,7 +415,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 - This prevents stale cache hits when output files are deleted by failed prior runs, manual cleanup, or git operations.
 - Commands without `writes` or with empty `writes` are unaffected — the guard only checks declared output paths.
 - `readCommandResult` is exported for testing. Tests: `src/kernel/tests/cache-output-existence.test.ts`.
-- `kernel.wire` has an integration test (`src/kernel/tests/wire-integration.test.ts`) that runs `runKernelWire` on a fixture and verifies the generated `kernel.config.ts` structure, module loader keys, and factory function calls.
+- `kernel.wire` has an integration test (`src/kernel/tests/wire-integration.test.ts`) that runs `runKernelWire` on a fixture and verifies it emits only `tools/kernel.config.ts` delegating to `siteModuleLoaders()` — the canonical SITE_MODULE_MAP surface (RFC-1147/1148).
 
 ## Mission git helpers
 
