@@ -63,7 +63,7 @@ import type {
   PipelineStepTiming,
 } from "@warpgogol/werkstatt-shared/kernel";
 import { executeRegisteredCommand, computeOwnershipMap } from "./execute-command.ts";
-import { assertKnownOptionKeys, skippedExecutionReport, summarizeLogs } from "./shared.ts";
+import { assertKnownOptionKeys, skippedExecutionReport } from "./shared.ts";
 import {
   collectGitignoredPaths,
   isClosedWorkpiece,
