@@ -80,6 +80,24 @@ function contextFor(files: Record<string, string>): KernelRuntimeContext {
     async exec() {
       throw new Error("test fixture does not execute commands");
     },
+    async stat() {
+      throw new Error("test fixture is read-only");
+    },
+    async realpath(filePath) {
+      return filePath;
+    },
+    async appendFile() {
+      throw new Error("test fixture is read-only");
+    },
+    async rename() {
+      throw new Error("test fixture is read-only");
+    },
+    async copyFile() {
+      throw new Error("test fixture is read-only");
+    },
+    async mkdtemp() {
+      throw new Error("test fixture is read-only");
+    },
   };
 
   return {
