@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
 
 export interface ExternalEditCollectorOutput {
   bordbuchEntries: Array<{
@@ -23,6 +24,9 @@ export interface ExternalEditCollectorOutput {
   }>;
   rangeShas: string[];
   gitLogShas: string[];
+  // ADR-0091: optional baseline SHA from system-state.yaml — undefined when the
+  // field is absent or the state file cannot be read.
+  externalEditBaselineSha?: string;
 }
 
 export async function collectExternalEditInputs(
@@ -77,7 +81,22 @@ export async function collectExternalEditInputs(
     // No commits or git error — skip
   }
 
-  return { bordbuchEntries, rangeShas, gitLogShas };
+  // ADR-0091: loose read of the baseline field — no full schema parse, so a
+  // malformed value still reaches the guard and surfaces as the precise
+  // external-edit-baseline-missing violation instead of silently disabling the
+  // check. systemStateSchema enforces the 40-hex format on canonical readers.
+  let externalEditBaselineSha: string | undefined;
+  try {
+    const stateRaw = await fs.readFile(path.join(cacheDir, "system-state.yaml"), "utf8");
+    const stateParsed = parseYaml(stateRaw) as { externalEditBaselineSha?: unknown } | null;
+    if (typeof stateParsed?.externalEditBaselineSha === "string") {
+      externalEditBaselineSha = stateParsed.externalEditBaselineSha;
+    }
+  } catch {
+    // Missing or unparseable state file — baseline unset, guard runs unfiltered
+  }
+
+  return { bordbuchEntries, rangeShas, gitLogShas, externalEditBaselineSha };
 }
 
 export function bordbuchFileExists(cacheDir: string): boolean {
