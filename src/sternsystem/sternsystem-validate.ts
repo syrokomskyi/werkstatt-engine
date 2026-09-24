@@ -13,6 +13,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>ADR-0088: add JRN-01 rule — op-started records in cache-clone operations/*.jsonl must carry non-empty missionId.</item>
   <item>2026-09-24: add COMMITTED_GENERATED_ALLOWED — exempt shrink-only baselines (list-punctuation.baseline.generated.yaml) from bundle-contract without requiring HEAD persistence, unlike COMMITTED_MANIFEST_PATHS entries.</item>
   <item>ADR-0091: pass externalEditBaselineSha from collectExternalEditInputs into evaluateExternalEditGate.</item>
+  <item>RFC-1149: phase 1b — DRIFT-02 diagnostics promoted from warnings to violations (blocking); DRIFT-01 stays warning per ADR-0082 cleanup caveat.</item>
   <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -266,6 +267,28 @@ async function validateYamlFiles(
   }
 
   return violations;
+}
+
+/**
+ * RFC-1149 phase 1b: route generated.drift.validate diagnostics — DRIFT-02
+ * (generator lacks dryRun support) is a blocking violation now that all
+ * DRIFT-02 generators are migrated to context.io; DRIFT-01 (content drift)
+ * and other rules stay warnings per the ADR-0082 cleanup caveat.
+ */
+export function routeDriftDiagnostics(
+  diagnostics: Array<{ ruleId?: string; file?: string; message?: string }>,
+  systemId: string,
+  violations: SternsystemViolation[],
+  warnings: Array<{ systemId: string; field: string; message: string }>,
+): void {
+  for (const diag of diagnostics) {
+    const message = diag.message ?? `cache clone generated drift in ${diag.file ?? "unknown file"}`;
+    if (diag.ruleId === "DRIFT-02") {
+      violations.push({ systemId, rule: "DRIFT-02", message });
+    } else {
+      warnings.push({ systemId, field: diag.ruleId ?? "DRIFT", message });
+    }
+  }
 }
 
 export async function runSternsystemValidate(
@@ -573,8 +596,10 @@ export async function runSternsystemValidate(
 
     // ADR-0082: cache-clone generated drift — committed generated files in the
     // cache clone are drift-checked via generated.drift.validate --target=cache-clone.
-    // Emitted as warnings: pre-existing drift needs a one-time cleanup pass
-    // before this check can go blocking (see ADR consequences).
+    // RFC-1149 phase 1b: DRIFT-02 (generator lacks dryRun support) is blocking —
+    // all DRIFT-02 generators are migrated to context.io. DRIFT-01 (content
+    // drift) stays a warning: pre-existing drift needs a one-time cleanup pass
+    // before it can go blocking (see ADR consequences).
     if (existsSync(cacheDir)) {
       try {
         const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
@@ -593,14 +618,7 @@ export async function runSternsystemValidate(
           };
         };
         const driftDiagnostics = driftReport?.data?.diagnostics ?? [];
-        for (const diag of driftDiagnostics) {
-          warnings.push({
-            systemId: entry.id,
-            field: diag.ruleId ?? "DRIFT",
-            message:
-              diag.message ?? `cache clone generated drift in ${diag.file ?? "unknown file"}`,
-          });
-        }
+        routeDriftDiagnostics(driftDiagnostics, entry.id, violations, warnings);
       } catch {
         // Non-fatal — drift check skipped (site plugin or generators unavailable)
       }
