@@ -24,6 +24,9 @@ export interface ExternalEditGuardInput {
   }>;
   gitLogShas: string[];
   rangeShas: string[];
+  // ADR-0091: optional baseline SHA from system-state.yaml — commits
+  // at-or-older-than this SHA in rev-list order are grandfathered.
+  externalEditBaselineSha?: string;
 }
 
 export interface ExternalEditGuardResult extends GuardResult {
@@ -34,7 +37,30 @@ export interface ExternalEditGuardResult extends GuardResult {
 }
 
 export function evaluateExternalEditGate(input: ExternalEditGuardInput): ExternalEditGuardResult {
-  const { systemId, bordbuchEntries, gitLogShas, rangeShas } = input;
+  const { systemId, bordbuchEntries, gitLogShas, rangeShas, externalEditBaselineSha } = input;
+
+  // ADR-0091: positional grandfathering — git rev-list output is newest-first,
+  // so the baseline SHA itself and every SHA after it (older commits) are
+  // excluded from the check. A baseline that is absent from the rev-list must
+  // never silently disable the guard — emit a distinct violation instead.
+  let effectiveGitLogShas = gitLogShas;
+  if (externalEditBaselineSha) {
+    const baselineIndex = gitLogShas.indexOf(externalEditBaselineSha);
+    if (baselineIndex === -1) {
+      return {
+        verdict: "fail",
+        violations: [
+          {
+            rule: "external-edit-baseline-missing",
+            systemId,
+            message: `externalEditBaselineSha '${externalEditBaselineSha.slice(0, 12)}' is set in system-state.yaml but absent from git rev-list — fix the baseline SHA or remove the field (a wrong baseline must never disable the external-edit check unnoticed)`,
+          },
+        ],
+        summary: `external-edit baseline SHA missing from git history for ${systemId}`,
+      };
+    }
+    effectiveGitLogShas = gitLogShas.slice(0, baselineIndex);
+  }
 
   const expectedShas = new Set<string>();
   for (const entry of bordbuchEntries) {
@@ -46,7 +72,7 @@ export function evaluateExternalEditGate(input: ExternalEditGuardInput): Externa
     expectedShas.add(sha);
   }
 
-  const unexpectedShas = gitLogShas.filter((sha) => !expectedShas.has(sha));
+  const unexpectedShas = effectiveGitLogShas.filter((sha) => !expectedShas.has(sha));
 
   if (unexpectedShas.length === 0) {
     return {

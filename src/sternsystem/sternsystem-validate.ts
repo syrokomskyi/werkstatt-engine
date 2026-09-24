@@ -30,7 +30,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { StarCatalog } from "@warpgogol/werkstatt-shared/ontology/cosmic";
-import { systemPinSchema } from "@warpgogol/werkstatt-engine/schemas";
+import { systemPinSchema, systemStateSchema } from "@warpgogol/werkstatt-engine/schemas";
 import {
   discoverSystems,
   hasAppsCollision,
@@ -546,11 +546,27 @@ export async function runSternsystemValidate(
           cacheDir,
           bordbuchPath,
         );
+        // ADR-0091: optional baseline SHA from system-state.yaml — read from the
+        // same cacheDir the rev-list ran against. Parse failure leaves the
+        // baseline unset so the guard runs unfiltered (fail-closed direction).
+        let externalEditBaselineSha: string | undefined;
+        const statePath = path.join(cacheDir, "system-state.yaml");
+        if (existsSync(statePath)) {
+          try {
+            const stateParsed = systemStateSchema.parse(
+              parseYaml(await fs.readFile(statePath, "utf8")),
+            );
+            externalEditBaselineSha = stateParsed.externalEditBaselineSha;
+          } catch {
+            // Unparseable state file — baseline ignored, guard runs unfiltered
+          }
+        }
         const guardResult = evaluateExternalEditGate({
           systemId: entry.id,
           bordbuchEntries,
           gitLogShas,
           rangeShas,
+          externalEditBaselineSha,
         });
         if (guardResult.verdict === "fail") {
           for (const v of guardResult.violations) {
