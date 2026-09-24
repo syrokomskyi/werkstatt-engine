@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0520: initial extraction of Bordbuch reading and git rev-list I/O from sternsystem.validate inline block.</item>
   <item>ADR-0040: add JSDoc return-type contract to bordbuchPathFor.</item>
+  <item>ADR-0091: collect externalEditBaselineSha from system-state.yaml via loose read — malformed values reach the guard as baseline-missing.</item>
 </CHANGE_SUMMARY>
 */
 
