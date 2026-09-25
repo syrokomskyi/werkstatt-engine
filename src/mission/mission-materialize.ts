@@ -307,43 +307,55 @@ async function generateFullBoilerplate(
 
   // Step 1: Write template files into staging directory
   // RFC-0959: package.json is generated from WORKPIECE_DEPENDENCY_MANIFEST, not the template.
-  const { packageJson: generatedPkgJson } = generateWorkpiecePackageJson({
+  // RFC-1152: template readers are async — hoist the awaits out of the array
+  // literal so the .replace chain runs on strings, not Promises.
+  const templateFields = await readTemplateFields(context.io);
+  const { packageJson: generatedPkgJson } = await generateWorkpiecePackageJson({
     workspaceRoot: context.workspaceRoot,
     siteId: systemId,
-    templateFields: readTemplateFields(),
+    templateFields,
     workpieceDir: stagingDir,
+    io: context.io,
   });
+  const astroConfigTemplate = await readRuntimeTemplate("astro.config.template.mjs", context.io);
+  const basePath = await resolveBasePath(stagingDir, context.io);
   const templateFiles: Array<{ dest: string; content: string }> = [
     { dest: "package.json", content: generatedPkgJson },
     {
       dest: "astro.config.mjs",
       content: applyTokens(
-        readRuntimeTemplate("astro.config.template.mjs")
+        astroConfigTemplate
           .replace(
             "// WG_SITE_LINE",
             domain ? `  site: "https://${domain}",` : "  // site: omitted (no domain configured)",
           )
-          .replace(
-            "// WG_BASE_LINE",
-            (() => {
-              const base = resolveBasePath(stagingDir);
-              return base ? `  base: "${base}",` : "";
-            })(),
-          )
+          .replace("// WG_BASE_LINE", basePath ? `  base: "${basePath}",` : "")
           .replace("// WG_ADAPTER_BLOCK", resolveAdapterBlock(stagingDir)),
         tokens,
       ),
     },
     {
       dest: "wrangler.jsonc",
-      content: applyTokens(readTemplate("wrangler.template.jsonc"), tokens),
+      content: applyTokens(await readTemplate("wrangler.template.jsonc", context.io), tokens),
     },
-    { dest: "tsconfig.json", content: readTemplate("tsconfig.template.json") },
-    { dest: ".gitignore", content: applyTokens(readRuntimeTemplate("gitignore.template"), tokens) },
-    { dest: "postcss.config.cjs", content: readRuntimeTemplate("postcss.config.template.cjs") },
+    {
+      dest: "tsconfig.json",
+      content: await readTemplate("tsconfig.template.json", context.io),
+    },
+    {
+      dest: ".gitignore",
+      content: applyTokens(await readRuntimeTemplate("gitignore.template", context.io), tokens),
+    },
+    {
+      dest: "postcss.config.cjs",
+      content: await readRuntimeTemplate("postcss.config.template.cjs", context.io),
+    },
     {
       dest: `.github/workflows/deploy-${systemId}.yml`,
-      content: applyTokens(readRuntimeTemplate("github-deploy.template.yaml"), tokens),
+      content: applyTokens(
+        await readRuntimeTemplate("github-deploy.template.yaml", context.io),
+        tokens,
+      ),
     },
   ];
 

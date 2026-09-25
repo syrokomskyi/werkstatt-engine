@@ -116,6 +116,8 @@ export const WORKSHOP_MODULE_MAP: WorkshopModuleMap = {
   sitePlugin: {
     check: sitePlugin("checks/module", "createStandardCheckModule"),
     service: sitePlugin("surface/service-module", "serviceModule"),
+    changelog: sitePlugin("surface/changelog-module", "changelogModule"),
+    integrity: sitePlugin("surface/integrity-module", "integrityModule"),
     onboarding: sitePlugin("onboarding/module", "createOnboardingModule"),
     testing: sitePlugin("testing/module", "createTestingModule"),
   },
