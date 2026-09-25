@@ -359,10 +359,32 @@ export async function executeRegisteredCommand(
     const filesModified = capturedIntents
       ? intentsToFilesModified(capturedIntents, context.workspaceRoot)
       : [];
+    // RFC-1149 follow-up: under dryRun the recording adapter captures full
+    // text content per write intent — surface it as data.renderedFiles so
+    // generated.drift.validate (DRIFT-02) can verify every io-migrated
+    // generator without per-command emission blocks. Command-emitted
+    // renderedFiles take precedence over the auto-collected map.
+    let data = result?.data;
+    if (context.dryRun && capturedIntents) {
+      const rendered: Record<string, string> = {};
+      for (const intent of capturedIntents) {
+        if (intent.kind === "write" && typeof intent.content === "string") {
+          rendered[relative(context.workspaceRoot, intent.path).replace(/\\/g, "/")] =
+            intent.content;
+        }
+      }
+      if (Object.keys(rendered).length > 0) {
+        const base = data !== null && typeof data === "object" ? data : {};
+        data = {
+          ...base,
+          renderedFiles: { ...rendered, ...(base as { renderedFiles?: object }).renderedFiles },
+        };
+      }
+    }
     const report: KernelExecutionReport = {
       siteName: context.site?.name,
       commandName: command.name,
-      data: result?.data,
+      data,
       exitCode,
       ok: exitCode === 0,
       summary: result?.summary,

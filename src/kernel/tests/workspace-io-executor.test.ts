@@ -68,6 +68,34 @@ export default {
           return { exitCode: 0, data: { wrote: target } };
         },
       },
+      {
+        name: "fixture.manual.rendered.command",
+        modulePath: "test",
+        description: "emits its own renderedFiles — manual emission must win over the auto-collected map",
+        scope: "workspace",
+        mutatesState: true,
+        async execute(_input, context) {
+          const target = "${join(root, "docs", "generated.txt").replace(/\\/g, "\\\\")}";
+          await context.io.writeFile(target, "auto content");
+          return {
+            exitCode: 0,
+            data: { renderedFiles: { "docs/generated.txt": "manual", "docs/virtual.txt": "never written" } },
+          };
+        },
+      },
+      {
+        name: "fixture.append.file.command",
+        modulePath: "test",
+        description: "writes then appends via context.io — rendered content must be the accumulated file",
+        scope: "workspace",
+        mutatesState: true,
+        async execute(_input, context) {
+          const target = "${join(root, "docs", "appended.txt").replace(/\\/g, "\\\\")}";
+          await context.io.writeFile(target, "a");
+          await context.io.appendFile(target, "b");
+          return { exitCode: 0 };
+        },
+      },
     ],
     pipelines: [],
   }],
@@ -171,6 +199,64 @@ test("executor: mutatesState: false command reports empty filesModified", async 
     const single = Array.isArray(report) ? report[0]! : report;
     expect(single.ok).toBe(true);
     expect(single.filesModified).toEqual([]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// RFC-1149 follow-up: the recording adapter captures full text content, and
+// the executor surfaces it as data.renderedFiles under dryRun — this is what
+// makes every io-migrated generator verifiable by generated.drift.validate
+// (DRIFT-02) without per-command emission blocks.
+test("executor: dry-run mutating command reports renderedFiles with full content", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const report = await executeKernelCommand({
+      workspaceRoot: root,
+      commandName: "fixture.writes.file.command",
+      outputFormat: "json",
+      dryRun: true,
+    });
+    const single = Array.isArray(report) ? report[0]! : report;
+    expect(single.ok).toBe(true);
+    const rendered = (single.data as { renderedFiles?: Record<string, string> })?.renderedFiles;
+    expect(rendered).toEqual({ "docs/generated.txt": "generated content" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("executor: command-emitted renderedFiles win over the auto-collected map", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const report = await executeKernelCommand({
+      workspaceRoot: root,
+      commandName: "fixture.manual.rendered.command",
+      outputFormat: "json",
+      dryRun: true,
+    });
+    const single = Array.isArray(report) ? report[0]! : report;
+    const rendered = (single.data as { renderedFiles?: Record<string, string> })?.renderedFiles;
+    // Manual emission overrides the same key and keeps its extra entries.
+    expect(rendered?.["docs/generated.txt"]).toBe("manual");
+    expect(rendered?.["docs/virtual.txt"]).toBe("never written");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("executor: dry-run renderedFiles carries accumulated append content", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const report = await executeKernelCommand({
+      workspaceRoot: root,
+      commandName: "fixture.append.file.command",
+      outputFormat: "json",
+      dryRun: true,
+    });
+    const single = Array.isArray(report) ? report[0]! : report;
+    const rendered = (single.data as { renderedFiles?: Record<string, string> })?.renderedFiles;
+    expect(rendered?.["docs/appended.txt"]).toBe("ab");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
