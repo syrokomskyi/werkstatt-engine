@@ -13,11 +13,12 @@ migrator is a no-op (idempotent).</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0548: initial migrator — backup AGENTS.md and regenerate with behavioral layer.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs";
 import path from "node:path";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 
 export const RFC_0548_MIGRATOR_ID = "rfc-0548";
@@ -28,22 +29,23 @@ export const rfc0548Migrator: Migrator = {
   toVersion: "5.29.0",
   description:
     "Backup AGENTS.md to AGENTS.md.bak and regenerate with core behavioral layer (intent-to-skill routing, auto-documentation, creator-facing communication, safety net). If AGENTS.md is hand-written (no generated marker), skip regeneration — the operator must delete or rename it first.",
-  transform: async (data: SternsystemData, _ctx: MigrationContext): Promise<SternsystemData> => {
+  transform: async (data: SternsystemData, ctx: MigrationContext): Promise<SternsystemData> => {
+    const io = ctx.io ?? createDefaultIO().io;
     const agentsMdPath = path.join(data.rootPath, "AGENTS.md");
     const backupPath = path.join(data.rootPath, "AGENTS.md.bak");
 
-    if (!fs.existsSync(agentsMdPath)) {
+    if (!(await io.exists(agentsMdPath))) {
       return data;
     }
 
-    const content = fs.readFileSync(agentsMdPath, "utf8");
+    const content = await io.readFile(agentsMdPath);
 
     // Check for generated marker — if absent, this is a hand-written AGENTS.md
     // and we must not overwrite it. Backup only.
     const hasGeneratedMarker = content.includes("<!-- generated-by: forge.agents.generate");
 
     // Always backup before any changes
-    fs.writeFileSync(backupPath, content, "utf8");
+    await io.writeFile(backupPath, content);
 
     if (!hasGeneratedMarker) {
       // Hand-written AGENTS.md — backup only, do not regenerate

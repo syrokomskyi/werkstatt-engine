@@ -9,15 +9,21 @@
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export function writeSystemConfig(testRoot: string, systemId: string, deployment?: string): void {
+export async function writeSystemConfig(
+  testRoot: string,
+  systemId: string,
+  deployment?: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const cacheDir = join(testRoot, "systems-cache", systemId);
-  mkdirSync(cacheDir, { recursive: true });
+  await io.mkdir(cacheDir);
 
   const deploymentBlock = deployment ? `\ndeployment:\n${deployment}\n` : "\n";
 
@@ -32,17 +38,18 @@ status: active
 registeredAt: 2026-01-01T00:00:00Z
 notes: ""
 ${deploymentBlock}`;
-  writeFileSync(join(cacheDir, "system-config.yaml"), configContent);
+  await io.writeFile(join(cacheDir, "system-config.yaml"), configContent);
 }
 
-export function writeSystemState(
+export async function writeSystemState(
   testRoot: string,
   systemId: string,
   lastPropagated?: string,
   currentMission: string | null = null,
-): void {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const cacheDir = join(testRoot, "systems-cache", systemId);
-  mkdirSync(cacheDir, { recursive: true });
+  await io.mkdir(cacheDir);
 
   const missionField = currentMission ? currentMission : "null";
   const stateContent = `schemaVersion: system-state/v1
@@ -50,7 +57,7 @@ systemId: ${systemId}
 currentMission: ${missionField}
 lastRelease: null
 ${lastPropagated ? `lastPropagated:\n${lastPropagated}` : ""}`;
-  writeFileSync(join(cacheDir, "system-state.yaml"), stateContent);
+  await io.writeFile(join(cacheDir, "system-state.yaml"), stateContent);
 }
 
 const DEPLOYMENT_NULL = `  adapter: "null"
@@ -77,17 +84,25 @@ const DEPLOYMENT_CLOUDFLARE = `  adapter: "cloudflare-workers"
       workerName: test-main
       url: https://main.example.com`;
 
-export function createLeitstandSystem(
+export async function createLeitstandSystem(
   testRoot: string,
   systemId: string,
   opts?: {
     adapter?: "null" | "cloudflare-workers";
     lastPropagated?: string;
     currentMission?: string;
+    io?: WorkspaceIO;
   },
-): void {
+): Promise<void> {
+  const io = opts?.io ?? createDefaultIO().io;
   const deployment =
     opts?.adapter === "cloudflare-workers" ? DEPLOYMENT_CLOUDFLARE : DEPLOYMENT_NULL;
-  writeSystemConfig(testRoot, systemId, deployment);
-  writeSystemState(testRoot, systemId, opts?.lastPropagated, opts?.currentMission ?? null);
+  await writeSystemConfig(testRoot, systemId, deployment, io);
+  await writeSystemState(
+    testRoot,
+    systemId,
+    opts?.lastPropagated,
+    opts?.currentMission ?? null,
+    io,
+  );
 }

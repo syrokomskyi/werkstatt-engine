@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0522: add unit tests for dirty cache clone warning in mission.validate.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -36,33 +37,33 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test("dirty cache clone is detected by isWorkpieceDirty for validate warning", () => {
+test("dirty cache clone is detected by isWorkpieceDirty for validate warning", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "system.md"), "initial");
   gitCommit(tmpDir, "initial");
   writeFileSync(join(tmpDir, "system.md"), "modified");
 
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(1);
 });
 
-test("clean cache clone produces no warning", () => {
+test("clean cache clone produces no warning", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "system.md"), "initial");
   gitCommit(tmpDir, "initial");
 
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(false);
 });
 
-test("non-git cache clone does not trigger warning (guard skipped)", () => {
+test("non-git cache clone does not trigger warning (guard skipped)", async () => {
   writeFileSync(join(tmpDir, "system.md"), "content");
 
   // Simulate the guard: only check if .git exists
   let warningEmitted = false;
   if (existsSync(join(tmpDir, ".git"))) {
-    const result = isWorkpieceDirty(tmpDir);
+    const result = await isWorkpieceDirty(tmpDir);
     if (result.dirty) {
       warningEmitted = true;
     }

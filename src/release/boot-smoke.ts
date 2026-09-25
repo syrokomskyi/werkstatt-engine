@@ -8,11 +8,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0961: initial release.boot-smoke command handler, binding simulator, egress interceptor, and route planner.</item>
   <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
   <item>RFC-0979: add --wrangler-config and --languages flags to runBootSmokeCommand, implement wrangler config fallback resolution, write boot-smoke.json to dist directory.</item>
   <item>ADR-0067: extract buildMiniflareOptions from runBootSmoke for unit testability of Miniflare options construction without a real runtime.</item>
   <item>ADR-0068: remove unused resolvedWorkerPath field from MiniflareOptionsResult interface and buildMiniflareOptions return value — the field was never consumed by the caller.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0961</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
@@ -52,14 +53,13 @@ HARDCODED_VALUES_AUDIT (RFC-0980):
 // Any change to Miniflare options, language detection, or module enumeration
 // MUST be accompanied by a test update. See ADR-0067 for testing strategy.
 
-import fs from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ─── Public contracts ────────────────────────────────────────────────
 
@@ -94,13 +94,16 @@ interface DistRouteEntry {
 
 // ─── Language detection (RFC-0978) ───────────────────────────────────
 
-export async function detectBootSmokeLanguages(distDir: string): Promise<string[]> {
+export async function detectBootSmokeLanguages(
+  distDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const clientDistDir = path.join(distDir, "client");
   const languages: string[] = [];
-  if (existsSync(clientDistDir)) {
-    for (const entry of await fs.readdir(clientDistDir, { withFileTypes: true })) {
+  if (await io.exists(clientDistDir)) {
+    for (const entry of await io.readdir(clientDistDir)) {
       if (
-        entry.isDirectory() &&
+        entry.isDirectory &&
         !entry.name.startsWith("_") &&
         entry.name !== "api" &&
         /^[a-z]{2}$/.test(entry.name)
@@ -117,10 +120,12 @@ export async function detectBootSmokeLanguages(distDir: string): Promise<string[
 
 // ─── Route planner ───────────────────────────────────────────────────
 
-export function planBootSmokeRequests(input: {
+export async function planBootSmokeRequests(input: {
   distDir: string;
   languages: string[];
-}): BootSmokeRequestSpec[] {
+  io?: WorkspaceIO;
+}): Promise<BootSmokeRequestSpec[]> {
+  const io = input.io ?? createDefaultIO().io;
   const requests: BootSmokeRequestSpec[] = [];
 
   // 1. Root route
@@ -137,9 +142,9 @@ export function planBootSmokeRequests(input: {
 
   // 3. Route-template kinds from surface.generated.json
   const surfacePath = path.join(input.distDir, "surface.generated.json");
-  if (existsSync(surfacePath)) {
+  if (await io.exists(surfacePath)) {
     try {
-      const raw = readFileSync(surfacePath, "utf8");
+      const raw = await io.readFile(surfacePath);
       const routes = JSON.parse(raw) as DistRouteEntry[];
       const seenKinds = new Set<string>();
       for (const route of routes) {
@@ -160,13 +165,13 @@ export function planBootSmokeRequests(input: {
 
   // 4. One API route when dist/client/api/ exists
   const apiDir = path.join(input.distDir, "client", "api");
-  if (existsSync(apiDir)) {
+  if (await io.exists(apiDir)) {
     requests.push({ path: "/api/", expectStatus: [200, 404], kind: "api" });
   }
 
   // 5. One static asset
   const clientDir = path.join(input.distDir, "client");
-  if (existsSync(clientDir)) {
+  if (await io.exists(clientDir)) {
     requests.push({
       path: "/favicon.ico",
       expectStatus: [200, 404],
@@ -315,6 +320,7 @@ export interface MiniflareOptionsInput {
   wranglerConfig: Record<string, unknown>;
   bindings: Record<string, unknown>;
   egressFetch: typeof fetch;
+  io?: WorkspaceIO;
 }
 
 export interface MiniflareOptionsResult {
@@ -324,15 +330,16 @@ export interface MiniflareOptionsResult {
 export async function buildMiniflareOptions(
   input: MiniflareOptionsInput,
 ): Promise<MiniflareOptionsResult | null> {
+  const io = input.io ?? createDefaultIO().io;
   const workerMain = (input.wranglerConfig["main"] as string) ?? "./dist/_worker.js/index.js";
   const workerPath = path.resolve(input.distDir, workerMain.replace(/^\.\/dist\//, ""));
   const astroEntry = path.resolve(input.distDir, "server", "entry.mjs");
-  const resolvedWorkerPath = existsSync(workerPath)
+  const resolvedWorkerPath = (await io.exists(workerPath))
     ? workerPath
-    : existsSync(astroEntry)
+    : (await io.exists(astroEntry))
       ? astroEntry
       : workerPath;
-  if (!existsSync(resolvedWorkerPath)) {
+  if (!(await io.exists(resolvedWorkerPath))) {
     return null;
   }
   void workerMain;
@@ -342,10 +349,10 @@ export async function buildMiniflareOptions(
     { type: "ESModule", path: resolvedWorkerPath },
   ];
   const walkDir = async (dir: string): Promise<void> => {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const entries = await io.readdir(dir);
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (entry.isDirectory) {
         await walkDir(fullPath);
       } else if (entry.name.endsWith(".mjs") && fullPath !== resolvedWorkerPath) {
         moduleEntries.push({ type: "ESModule", path: fullPath });
@@ -367,7 +374,7 @@ export async function buildMiniflareOptions(
     { directory?: string; binding?: string; run_worker_first?: boolean } | undefined;
   if (assetsConfig?.directory) {
     const assetsDir = path.resolve(input.distDir, assetsConfig.directory);
-    if (existsSync(assetsDir)) {
+    if (await io.exists(assetsDir)) {
       mfOptions["assets"] = {
         directory: assetsDir,
         binding: assetsConfig.binding ?? "ASSETS",
@@ -388,14 +395,16 @@ export async function runBootSmoke(input: {
   wranglerConfigPath: string;
   requests: BootSmokeRequestSpec[];
   timeoutMs?: number;
+  io?: WorkspaceIO;
 }): Promise<BootSmokeResult> {
+  const io = input.io ?? createDefaultIO().io;
   const timeoutMs = input.timeoutMs ?? 60_000;
   const egressInterceptor = createEgressInterceptor();
 
   // Parse wrangler config
   let wranglerConfig: Record<string, unknown>;
   try {
-    const raw = await fs.readFile(input.wranglerConfigPath, "utf8");
+    const raw = await io.readFile(input.wranglerConfigPath);
     // wrangler.jsonc — strip JSONC comments
     const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
     wranglerConfig = JSON.parse(stripped) as Record<string, unknown>;
@@ -543,11 +552,12 @@ export interface WranglerResolution {
   bootSmokeDistDir: string;
 }
 
-export function resolveWranglerConfig(
+export async function resolveWranglerConfig(
   distDir: string,
   wranglerConfigFlag: string | undefined,
   workspaceRoot: string,
-): WranglerResolution | null {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<WranglerResolution | null> {
   if (wranglerConfigFlag) {
     return {
       wranglerConfigPath: path.resolve(wranglerConfigFlag),
@@ -555,21 +565,21 @@ export function resolveWranglerConfig(
     };
   }
   const astroWranglerPath = path.join(distDir, "server", "wrangler.json");
-  if (existsSync(astroWranglerPath)) {
+  if (await io.exists(astroWranglerPath)) {
     return {
       wranglerConfigPath: astroWranglerPath,
       bootSmokeDistDir: path.join(distDir, "server"),
     };
   }
   const fallbackPath = path.join(distDir, "..", "wrangler.jsonc");
-  if (existsSync(fallbackPath)) {
+  if (await io.exists(fallbackPath)) {
     return {
       wranglerConfigPath: fallbackPath,
       bootSmokeDistDir: distDir,
     };
   }
   const workpiecePath = path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc");
-  if (existsSync(workpiecePath)) {
+  if (await io.exists(workpiecePath)) {
     return {
       wranglerConfigPath: workpiecePath,
       bootSmokeDistDir: distDir,
@@ -645,7 +655,7 @@ export async function runBootSmokeCommand(
     }
   }
 
-  if (!await context.io.exists(distDir)) {
+  if (!(await context.io.exists(distDir))) {
     return {
       data: {
         booted: false,
@@ -661,7 +671,12 @@ export async function runBootSmokeCommand(
   }
 
   // Resolve wrangler config (RFC-0979): --wrangler-config flag → Astro-generated → fallback
-  const wranglerResolution = resolveWranglerConfig(distDir, wranglerConfigFlag, workspaceRoot);
+  const wranglerResolution = await resolveWranglerConfig(
+    distDir,
+    wranglerConfigFlag,
+    workspaceRoot,
+    context.io,
+  );
   if (!wranglerResolution) {
     return {
       data: {
@@ -680,7 +695,7 @@ export async function runBootSmokeCommand(
 
   // Plan requests — use --languages flag or auto-detect from dist/client/ (RFC-0978)
   const languages = await resolveLanguages(distDir, languagesFlag);
-  const requests = planBootSmokeRequests({ distDir, languages });
+  const requests = await planBootSmokeRequests({ distDir, languages, io: context.io });
 
   if (diagnose) {
     logger.info(`[release.boot-smoke] diagnose mode — planned ${requests.length} requests:`);
@@ -694,11 +709,12 @@ export async function runBootSmokeCommand(
     distDir: bootSmokeDistDir,
     wranglerConfigPath,
     requests,
+    io: context.io,
   });
 
   // Write boot-smoke.json to dist directory (RFC-0979)
   try {
-    await fs.writeFile(
+    await context.io.writeFile(
       path.join(distDir, "boot-smoke.json"),
       JSON.stringify(result, null, 2) + "\n",
     );

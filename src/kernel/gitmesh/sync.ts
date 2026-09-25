@@ -25,11 +25,11 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
 import { join } from "node:path";
-import { open } from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -60,30 +60,22 @@ async function acquireLock(
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<() => Promise<void>> {
   const lockPath = join(workspaceRoot, LOCK_FILE);
-  try {
-    const handle = await open(lockPath, "wx");
-    return async (io: WorkspaceIO = createDefaultIO().io) => {
-      await handle.close();
-      await io.rm(lockPath).catch(() => {});
-    };
-  } catch {
-    // Check if lock is stale (older than 6 minutes)
-    try {
-      const lockContent = await io.readFile(lockPath);
-      const lockTime = parseInt(lockContent.trim(), 10);
-      if (!isNaN(lockTime) && Date.now() - lockTime > STALE_LOCK_THRESHOLD_MS) {
-        await io.rm(lockPath);
-        const handle = await open(lockPath, "wx");
-        return async (io: WorkspaceIO = createDefaultIO().io) => {
-          await handle.close();
-          await io.rm(lockPath).catch(() => {});
-        };
-      }
-    } catch {
-      // Lock file unreadable or not a number — treat as active
-    }
-    throw new Error("sync-in-progress: another gitmesh.sync is already running");
+  const release = async () => {
+    await io.rm(lockPath, { recursive: true }).catch(() => {});
+  };
+  // Atomic lock claim: `mkdir` (no -p) fails EEXIST when the lock dir exists —
+  // the port has no exclusive-write primitive, so the lock is a directory.
+  const claim = await io.exec("mkdir", [lockPath]);
+  if (claim.exitCode === 0) return release;
+
+  // Check if lock is stale (mtime older than 6 minutes)
+  const stat = await io.stat(lockPath).catch(() => null);
+  if (stat && Date.now() - stat.mtimeMs > STALE_LOCK_THRESHOLD_MS) {
+    await io.rm(lockPath, { recursive: true }).catch(() => {});
+    const retry = await io.exec("mkdir", [lockPath]);
+    if (retry.exitCode === 0) return release;
   }
+  throw new Error("sync-in-progress: another gitmesh.sync is already running");
 }
 
 interface RemoteFetchResult {
@@ -98,8 +90,7 @@ export async function runGitMeshSync(
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<GitMeshSyncResult>> {
   const { workspaceRoot } = context;
-  const releaseLock = await acquireLock(workspaceRoot);
-  await context.io.writeFile(join(workspaceRoot, LOCK_FILE), String(Date.now())).catch(() => {});
+  const releaseLock = await acquireLock(workspaceRoot, context.io);
 
   try {
     const config = await loadOrCreateConfig(workspaceRoot);
@@ -110,7 +101,7 @@ export async function runGitMeshSync(
           synced: false,
           fromRemote: "",
           commitsReceived: 0,
-          currentSha: await gitRevParseHead(workspaceRoot).catch(() => ""),
+          currentSha: await gitRevParseHead(workspaceRoot, context.io).catch(() => ""),
           signaturesVerified: 0,
           signaturesFailed: 0,
           diagnostics: ["gitmesh.sync: no remotes configured in werkstatt.gitmesh.json"],
@@ -127,7 +118,7 @@ export async function runGitMeshSync(
     }
 
     // Integrity check
-    const fsckOk = await gitFsck(workspaceRoot);
+    const fsckOk = await gitFsck(workspaceRoot, context.io);
     if (!fsckOk) {
       return {
         data: {
@@ -150,14 +141,14 @@ export async function runGitMeshSync(
     }
 
     // Check for uncommitted changes
-    const hasUncommitted = await gitHasUncommittedChanges(workspaceRoot);
+    const hasUncommitted = await gitHasUncommittedChanges(workspaceRoot, context.io);
     if (hasUncommitted) {
       return {
         data: {
           synced: false,
           fromRemote: "",
           commitsReceived: 0,
-          currentSha: await gitRevParseHead(workspaceRoot),
+          currentSha: await gitRevParseHead(workspaceRoot, context.io),
           signaturesVerified: 0,
           signaturesFailed: 0,
           diagnostics: ["gitmesh.sync: uncommitted local changes — commit or stash before sync"],
@@ -176,9 +167,14 @@ export async function runGitMeshSync(
 
     for (const remote of config.remotes) {
       try {
-        await gitFetch(remote.name, config.trackedBranch, workspaceRoot);
-        const sha = await gitRevParseRemote(remote.name, config.trackedBranch, workspaceRoot);
-        const timestamp = await gitCommitTimestamp(sha, workspaceRoot);
+        await gitFetch(remote.name, config.trackedBranch, workspaceRoot, context.io);
+        const sha = await gitRevParseRemote(
+          remote.name,
+          config.trackedBranch,
+          workspaceRoot,
+          context.io,
+        );
+        const timestamp = await gitCommitTimestamp(sha, workspaceRoot, context.io);
         fetchResults.push({ remote: remote.name, success: true, sha, timestamp });
       } catch {
         warnings.push(`remote ${remote.name} unreachable`);
@@ -193,7 +189,7 @@ export async function runGitMeshSync(
           synced: false,
           fromRemote: "",
           commitsReceived: 0,
-          currentSha: await gitRevParseHead(workspaceRoot),
+          currentSha: await gitRevParseHead(workspaceRoot, context.io),
           signaturesVerified: 0,
           signaturesFailed: 0,
           diagnostics: warnings.map((w) => `gitmesh.sync: ${w}`),
@@ -214,10 +210,10 @@ export async function runGitMeshSync(
       current.timestamp > best.timestamp ? current : best,
     );
 
-    const currentHead = await gitRevParseHead(workspaceRoot);
+    const currentHead = await gitRevParseHead(workspaceRoot, context.io);
 
     // Check for non-fast-forward
-    const isFastForward = await gitIsAncestor(currentHead, latest.sha, workspaceRoot);
+    const isFastForward = await gitIsAncestor(currentHead, latest.sha, workspaceRoot, context.io);
     if (!isFastForward) {
       return {
         data: {
@@ -246,6 +242,7 @@ export async function runGitMeshSync(
     const commitsToReceive = await gitLogSignatureStatus(
       `${currentHead}..${latest.sha}`,
       workspaceRoot,
+      context.io,
     );
 
     // Signature verification
@@ -292,7 +289,7 @@ export async function runGitMeshSync(
     }
 
     // Advance HEAD
-    await gitMergeFfOnly(latest.sha, workspaceRoot);
+    await gitMergeFfOnly(latest.sha, workspaceRoot, context.io);
 
     // Write last-sync timestamp
     const lastSyncPath = join(workspaceRoot, LAST_SYNC_FILE);

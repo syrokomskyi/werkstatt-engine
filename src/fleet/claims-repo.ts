@@ -16,13 +16,12 @@ precedence ported from kernel/dht/register.ts, and syncs with git remotes.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1124: initial claims repository — config, clone management, build/publish/verify/sync/status, transfer-claim legitimacy via bordbuch handover events.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 import {
   signClaim,
@@ -99,10 +98,11 @@ const CONFIG_FILE = "werkstatt.fleet.json";
 
 export async function loadFleetClaimsConfig(
   werkstattRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<FleetClaimsConfig | null> {
   const configPath = path.join(werkstattRoot, CONFIG_FILE);
-  if (!existsSync(configPath)) return null;
-  const raw = await readFile(configPath, "utf8");
+  if (!(await io.exists(configPath))) return null;
+  const raw = await io.readFile(configPath);
   const parsed = JSON.parse(raw) as Partial<FleetClaimsConfig>;
   return {
     remotes: parsed.remotes ?? [],
@@ -117,20 +117,19 @@ export function claimsClonePath(werkstattRoot: string, config: FleetClaimsConfig
     : path.join(werkstattRoot, config.localPath);
 }
 
-function git(clonePath: string, args: string[]): string {
-  return execFileSync("git", ["-C", clonePath, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
+async function git(clonePath: string, args: string[], io: WorkspaceIO): Promise<string> {
+  const result = await io.exec("git", ["-C", clonePath, ...args]);
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `git ${args[0] ?? ""} failed (exit ${result.exitCode}): ${result.stderr.trim()}`,
+    );
+  }
+  return result.stdout.trim();
 }
 
-function gitOk(clonePath: string, args: string[]): boolean {
-  try {
-    git(clonePath, args);
-    return true;
-  } catch {
-    return false;
-  }
+async function gitOk(clonePath: string, args: string[], io: WorkspaceIO): Promise<boolean> {
+  const result = await io.exec("git", ["-C", clonePath, ...args]);
+  return result.exitCode === 0;
 }
 
 /**
@@ -141,35 +140,29 @@ function gitOk(clonePath: string, args: string[]): boolean {
 export async function ensureClaimsClone(
   werkstattRoot: string,
   config: FleetClaimsConfig,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const clonePath = claimsClonePath(werkstattRoot, config);
-  if (existsSync(path.join(clonePath, ".git"))) {
+  if (await io.exists(path.join(clonePath, ".git"))) {
     // Keep remote list in sync with config (idempotent re-init).
-    syncGitRemotes(clonePath, config.remotes);
+    await syncGitRemotes(clonePath, config.remotes, io);
     return clonePath;
   }
 
-  await mkdir(path.dirname(clonePath), { recursive: true });
+  await io.mkdir(path.dirname(clonePath));
 
   let cloned = false;
   if (config.remotes.length > 0) {
-    try {
-      execFileSync("git", ["clone", config.remotes[0], clonePath], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      cloned = true;
-    } catch {
-      cloned = false; // remote missing/empty/unreachable — init locally
-    }
+    const cloneResult = await io.exec("git", ["clone", config.remotes[0], clonePath]);
+    cloned = cloneResult.exitCode === 0; // remote missing/empty/unreachable — init locally
   }
 
   if (!cloned) {
-    await mkdir(clonePath, { recursive: true });
-    execFileSync("git", ["-C", clonePath, "init"], { stdio: ["ignore", "pipe", "pipe"] });
+    await io.mkdir(clonePath);
+    await io.exec("git", ["-C", clonePath, "init"]);
   }
 
-  syncGitRemotes(clonePath, config.remotes);
+  await syncGitRemotes(clonePath, config.remotes, io);
   return clonePath;
 }
 
@@ -178,23 +171,23 @@ export async function ensureClaimsClone(
  * (origin, remoteN) are removed/re-added — operator-added remotes with other
  * names are preserved.
  */
-function syncGitRemotes(clonePath: string, remotes: string[]): void {
+async function syncGitRemotes(
+  clonePath: string,
+  remotes: string[],
+  io: WorkspaceIO,
+): Promise<void> {
   const managed = new Set(remotes.map((_, i) => remoteName(i)));
-  const existing = gitOk(clonePath, ["remote"])
-    ? git(clonePath, ["remote"]).split("\n").filter(Boolean)
+  const existing = (await gitOk(clonePath, ["remote"], io))
+    ? (await git(clonePath, ["remote"], io)).split("\n").filter(Boolean)
     : [];
   for (const name of existing) {
     if (!managed.has(name) && name !== "origin" && !/^remote\d+$/.test(name)) continue;
-    execFileSync("git", ["-C", clonePath, "remote", "remove", name], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    await io.exec("git", ["-C", clonePath, "remote", "remove", name]);
   }
-  remotes.forEach((url, i) => {
+  for (const [i, url] of remotes.entries()) {
     const name = remoteName(i);
-    execFileSync("git", ["-C", clonePath, "remote", "add", name, url], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  });
+    await io.exec("git", ["-C", clonePath, "remote", "add", name, url]);
+  }
 }
 
 function remoteName(index: number): string {
@@ -280,6 +273,7 @@ export async function buildClaim(input: BuildClaimInput): Promise<FleetClaim> {
 }
 
 export interface PublishClaimInput extends BuildClaimInput {
+  io?: WorkspaceIO;
   /** Push to all configured remotes after committing (default true). */
   push?: boolean;
 }
@@ -297,35 +291,42 @@ export async function publishClaim(input: PublishClaimInput): Promise<PublishCla
       `[fleet.claims] ${CONFIG_FILE} not found — run: pnpm exec werkstatt run fleet.claims.init --remote <url>`,
     );
   }
-  const clonePath = await ensureClaimsClone(werkstattRoot, config);
+  const io = input.io ?? createDefaultIO().io;
+  const clonePath = await ensureClaimsClone(werkstattRoot, config, io);
 
   const claim = await buildClaim(input);
   const claimsDir = path.join(clonePath, "claims");
-  await mkdir(claimsDir, { recursive: true });
+  await io.mkdir(claimsDir);
   const claimPath = path.join(claimsDir, `${systemId}.json`);
-  await writeFile(claimPath, JSON.stringify(claim, null, 2) + "\n", "utf8");
+  await io.writeFile(claimPath, JSON.stringify(claim, null, 2) + "\n");
 
-  git(clonePath, ["add", `claims/${systemId}.json`]);
-  const hasStaged = !gitOk(clonePath, ["diff", "--cached", "--quiet"]);
-  let commit = gitOk(clonePath, ["rev-parse", "HEAD"]) ? git(clonePath, ["rev-parse", "HEAD"]) : "";
+  await git(clonePath, ["add", `claims/${systemId}.json`], io);
+  const hasStaged = !(await gitOk(clonePath, ["diff", "--cached", "--quiet"], io));
+  let commit = (await gitOk(clonePath, ["rev-parse", "HEAD"], io))
+    ? await git(clonePath, ["rev-parse", "HEAD"], io)
+    : "";
   if (hasStaged) {
-    git(clonePath, [
-      "-c",
-      "user.name=werkstatt-fleet-claims",
-      "-c",
-      "user.email=fleet-claims@werkstatt.local",
-      "commit",
-      "-m",
-      `claim: ${systemId} ${claim.passportHash.slice(0, 16)}`,
-    ]);
-    commit = git(clonePath, ["rev-parse", "HEAD"]);
+    await git(
+      clonePath,
+      [
+        "-c",
+        "user.name=werkstatt-fleet-claims",
+        "-c",
+        "user.email=fleet-claims@werkstatt.local",
+        "commit",
+        "-m",
+        `claim: ${systemId} ${claim.passportHash.slice(0, 16)}`,
+      ],
+      io,
+    );
+    commit = await git(clonePath, ["rev-parse", "HEAD"], io);
   }
 
   const pushErrors: string[] = [];
   if (input.push !== false) {
     for (let i = 0; i < config.remotes.length; i++) {
       try {
-        git(clonePath, ["push", remoteName(i), "HEAD:refs/heads/main"]);
+        await git(clonePath, ["push", remoteName(i), "HEAD:refs/heads/main"], io);
       } catch (err) {
         pushErrors.push(
           `${remoteName(i)}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`,
@@ -361,12 +362,14 @@ export async function publishPendingTransferClaim(input: {
   signerPrivateKeyHex: string;
   signerPublicKey: string;
   push?: boolean;
+  io?: WorkspaceIO;
 }): Promise<PublishClaimResult | null> {
   const { systemId, werkstattRoot, signerPublicKey } = input;
-  const config = await loadFleetClaimsConfig(werkstattRoot);
+  const io = input.io ?? createDefaultIO().io;
+  const config = await loadFleetClaimsConfig(werkstattRoot, io);
   if (!config) return null;
   const clonePath = claimsClonePath(werkstattRoot, config);
-  if (!existsSync(path.join(clonePath, ".git"))) return null;
+  if (!(await io.exists(path.join(clonePath, ".git")))) return null;
 
   // Latest handover event in the system bordbuch.
   const entries = await readBordbuch(werkstattRoot, systemId).catch(() => []);
@@ -384,7 +387,7 @@ export async function publishPendingTransferClaim(input: {
 
   // Current local claim must exist, must be ours (we are the outgoing
   // creator), and must not already cover the new passport.
-  const local = readClaimFile(path.join(clonePath, "claims", `${systemId}.json`));
+  const local = await readClaimFile(path.join(clonePath, "claims", `${systemId}.json`), io);
   if (!local) return null;
   if (local.passportHash === newPassportHash) return null; // already claimed
   if (local.instanceId !== deriveInstanceId(signerPublicKey)) return null; // not outgoing creator
@@ -396,18 +399,23 @@ export async function publishPendingTransferClaim(input: {
 // Verify (offline)
 // ---------------------------------------------------------------------------
 
-function readClaimFile(filePath: string): FleetClaim | null {
-  if (!existsSync(filePath)) return null;
+async function readClaimFile(filePath: string, io: WorkspaceIO): Promise<FleetClaim | null> {
+  if (!(await io.exists(filePath))) return null;
   try {
-    return JSON.parse(readFileSync(filePath, "utf8")) as FleetClaim;
+    return JSON.parse(await io.readFile(filePath)) as FleetClaim;
   } catch {
     return null;
   }
 }
 
-function claimAtRef(clonePath: string, ref: string, systemId: string): FleetClaim | null {
+async function claimAtRef(
+  clonePath: string,
+  ref: string,
+  systemId: string,
+  io: WorkspaceIO,
+): Promise<FleetClaim | null> {
   try {
-    const raw = git(clonePath, ["show", `${ref}:claims/${systemId}.json`]);
+    const raw = await git(clonePath, ["show", `${ref}:claims/${systemId}.json`], io);
     return JSON.parse(raw) as FleetClaim;
   } catch {
     return null;
@@ -415,22 +423,30 @@ function claimAtRef(clonePath: string, ref: string, systemId: string): FleetClai
 }
 
 /** Previous version of the claim file on the given ref (second commit back). */
-function previousClaimAtRef(clonePath: string, ref: string, systemId: string): FleetClaim | null {
+async function previousClaimAtRef(
+  clonePath: string,
+  ref: string,
+  systemId: string,
+  io: WorkspaceIO,
+): Promise<FleetClaim | null> {
   try {
-    const commits = git(clonePath, ["log", "--format=%H", ref, "--", `claims/${systemId}.json`])
+    const commits = (
+      await git(clonePath, ["log", "--format=%H", ref, "--", `claims/${systemId}.json`], io)
+    )
       .split("\n")
       .filter(Boolean);
     if (commits.length < 2) return null;
-    const raw = git(clonePath, ["show", `${commits[1]}:claims/${systemId}.json`]);
+    const raw = await git(clonePath, ["show", `${commits[1]}:claims/${systemId}.json`], io);
     return JSON.parse(raw) as FleetClaim;
   } catch {
     return null;
   }
 }
 
-function remoteRefs(clonePath: string): string[] {
-  if (!gitOk(clonePath, ["for-each-ref", "--format=%(refname)", "refs/remotes/"])) return [];
-  return git(clonePath, ["for-each-ref", "--format=%(refname)", "refs/remotes/"])
+async function remoteRefs(clonePath: string, io: WorkspaceIO): Promise<string[]> {
+  if (!(await gitOk(clonePath, ["for-each-ref", "--format=%(refname)", "refs/remotes/"], io)))
+    return [];
+  return (await git(clonePath, ["for-each-ref", "--format=%(refname)", "refs/remotes/"], io))
     .split("\n")
     .filter(Boolean);
 }
@@ -496,6 +512,7 @@ async function isLegitimateClaim(
 export async function verifyClaimOffline(input: {
   systemId: string;
   werkstattRoot: string;
+  io?: WorkspaceIO;
 }): Promise<ClaimsVerifyResult> {
   const { systemId, werkstattRoot } = input;
   const result: ClaimsVerifyResult = {
@@ -505,19 +522,20 @@ export async function verifyClaimOffline(input: {
     conflicts: [],
   };
 
-  const config = await loadFleetClaimsConfig(werkstattRoot);
+  const io = input.io ?? createDefaultIO().io;
+  const config = await loadFleetClaimsConfig(werkstattRoot, io);
   if (!config) return result;
   const clonePath = claimsClonePath(werkstattRoot, config);
-  if (!existsSync(path.join(clonePath, ".git"))) return result;
+  if (!(await io.exists(path.join(clonePath, ".git")))) return result;
 
   // Candidates: local file + every diverged remote-ref version.
   const candidates: Array<{ claim: FleetClaim; ref: string }> = [];
-  const local = readClaimFile(path.join(clonePath, "claims", `${systemId}.json`));
+  const local = await readClaimFile(path.join(clonePath, "claims", `${systemId}.json`), io);
   if (local) candidates.push({ claim: local, ref: "HEAD" });
 
   const seen = new Set<string>(local ? [JSON.stringify(local)] : []);
-  for (const ref of remoteRefs(clonePath)) {
-    const remote = claimAtRef(clonePath, ref, systemId);
+  for (const ref of await remoteRefs(clonePath, io)) {
+    const remote = await claimAtRef(clonePath, ref, systemId, io);
     if (remote && !seen.has(JSON.stringify(remote))) {
       seen.add(JSON.stringify(remote));
       candidates.push({ claim: remote, ref });
@@ -531,7 +549,7 @@ export async function verifyClaimOffline(input: {
   for (const c of candidates) {
     const sigOk = await verifyClaimSignature(c.claim).catch(() => false);
     if (!sigOk) continue;
-    const previous = previousClaimAtRef(clonePath, c.ref, systemId);
+    const previous = await previousClaimAtRef(clonePath, c.ref, systemId, io);
     if (await isLegitimateClaim(c.claim, previous, werkstattRoot)) {
       valid.push(c);
     }
@@ -595,13 +613,14 @@ export async function syncClaims(werkstattRoot: string): Promise<SyncClaimsResul
     result.errors.push(`${CONFIG_FILE} not found — run fleet.claims.init first`);
     return result;
   }
-  const clonePath = await ensureClaimsClone(werkstattRoot, config);
+  const io = createDefaultIO().io;
+  const clonePath = await ensureClaimsClone(werkstattRoot, config, io);
 
   // Fetch all remotes.
   for (let i = 0; i < config.remotes.length; i++) {
     const name = remoteName(i);
     try {
-      git(clonePath, ["fetch", name, `+refs/heads/*:refs/remotes/${name}/*`]);
+      await git(clonePath, ["fetch", name, `+refs/heads/*:refs/remotes/${name}/*`], io);
       result.fetched.push(name);
     } catch (err) {
       result.errors.push(
@@ -611,20 +630,24 @@ export async function syncClaims(werkstattRoot: string): Promise<SyncClaimsResul
   }
 
   // Fast-forward local main to the best remote state; record divergence.
-  const hasHead = gitOk(clonePath, ["rev-parse", "HEAD"]);
-  for (const ref of remoteRefs(clonePath)) {
+  const hasHead = await gitOk(clonePath, ["rev-parse", "HEAD"], io);
+  for (const ref of await remoteRefs(clonePath, io)) {
     if (!hasHead) {
       // No local commits — adopt the remote ref wholesale.
-      git(clonePath, ["checkout", "-B", "main", ref]);
+      await git(clonePath, ["checkout", "-B", "main", ref], io);
       result.fastForwarded = true;
       break;
     }
-    if (gitOk(clonePath, ["merge-base", "--is-ancestor", "HEAD", ref])) {
-      git(clonePath, ["merge", "--ff-only", ref]);
+    if (await gitOk(clonePath, ["merge-base", "--is-ancestor", "HEAD", ref], io)) {
+      await git(clonePath, ["merge", "--ff-only", ref], io);
       result.fastForwarded = true;
-    } else if (!gitOk(clonePath, ["merge-base", "--is-ancestor", ref, "HEAD"])) {
-      const files = gitOk(clonePath, ["diff", "--name-only", "HEAD", ref, "--", "claims/"])
-        ? git(clonePath, ["diff", "--name-only", "HEAD", ref, "--", "claims/"])
+    } else if (!(await gitOk(clonePath, ["merge-base", "--is-ancestor", ref, "HEAD"], io))) {
+      const files = (await gitOk(
+        clonePath,
+        ["diff", "--name-only", "HEAD", ref, "--", "claims/"],
+        io,
+      ))
+        ? (await git(clonePath, ["diff", "--name-only", "HEAD", ref, "--", "claims/"], io))
             .split("\n")
             .filter(Boolean)
         : [];
@@ -635,10 +658,11 @@ export async function syncClaims(werkstattRoot: string): Promise<SyncClaimsResul
 
   // Verify all local claim signatures.
   const claimsDir = path.join(clonePath, "claims");
-  if (existsSync(claimsDir)) {
-    for (const file of await readdir(claimsDir)) {
+  if (await io.exists(claimsDir)) {
+    for (const entry of await io.readdir(claimsDir)) {
+      const file = entry.name;
       if (!file.endsWith(".json")) continue;
-      const claim = readClaimFile(path.join(claimsDir, file));
+      const claim = await readClaimFile(path.join(claimsDir, file), io);
       if (!claim || !(await verifyClaimSignature(claim).catch(() => false))) {
         result.invalidClaims.push(file);
       }
@@ -649,7 +673,7 @@ export async function syncClaims(werkstattRoot: string): Promise<SyncClaimsResul
   let pushFailed = false;
   for (let i = 0; i < config.remotes.length; i++) {
     try {
-      git(clonePath, ["push", remoteName(i), "HEAD:refs/heads/main"]);
+      await git(clonePath, ["push", remoteName(i), "HEAD:refs/heads/main"], io);
     } catch (err) {
       pushFailed = true;
       result.errors.push(
@@ -659,17 +683,19 @@ export async function syncClaims(werkstattRoot: string): Promise<SyncClaimsResul
   }
   result.pushed = config.remotes.length > 0 && !pushFailed;
 
-  await writeFile(
+  await io.writeFile(
     path.join(werkstattRoot, STATE_FILE),
     JSON.stringify({ lastSyncAt: new Date().toISOString() }, null, 2) + "\n",
-    "utf8",
   );
 
   return result;
 }
 
 /** Local clone vs remote state, pending unpushed claims, last sync. */
-export async function claimsStatus(werkstattRoot: string): Promise<ClaimsStatusResult> {
+export async function claimsStatus(
+  werkstattRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<ClaimsStatusResult> {
   const result: ClaimsStatusResult = {
     configured: false,
     clonePath: null,
@@ -686,34 +712,37 @@ export async function claimsStatus(werkstattRoot: string): Promise<ClaimsStatusR
   result.remotes = config.remotes;
 
   const clonePath = claimsClonePath(werkstattRoot, config);
-  if (!existsSync(path.join(clonePath, ".git"))) return result;
+  if (!(await io.exists(path.join(clonePath, ".git")))) return result;
   result.clonePath = clonePath;
 
   const claimsDir = path.join(clonePath, "claims");
-  if (existsSync(claimsDir)) {
-    result.claims = (await readdir(claimsDir)).filter((f) => f.endsWith(".json")).length;
+  if (await io.exists(claimsDir)) {
+    result.claims = (await io.readdir(claimsDir)).filter((f) => f.name.endsWith(".json")).length;
   }
 
-  const refs = remoteRefs(clonePath);
+  const refs = await remoteRefs(clonePath, io);
   for (const ref of refs) {
-    const behind = gitOk(clonePath, ["rev-list", "--count", `HEAD..${ref}`])
-      ? Number.parseInt(git(clonePath, ["rev-list", "--count", `HEAD..${ref}`]), 10)
+    const behind = (await gitOk(clonePath, ["rev-list", "--count", `HEAD..${ref}`], io))
+      ? Number.parseInt(await git(clonePath, ["rev-list", "--count", `HEAD..${ref}`], io), 10)
       : 0;
-    const ahead = gitOk(clonePath, ["rev-list", "--count", `${ref}..HEAD`])
-      ? Number.parseInt(git(clonePath, ["rev-list", "--count", `${ref}..HEAD`]), 10)
+    const ahead = (await gitOk(clonePath, ["rev-list", "--count", `${ref}..HEAD`], io))
+      ? Number.parseInt(await git(clonePath, ["rev-list", "--count", `${ref}..HEAD`], io), 10)
       : 0;
     if (behind > 0) result.behindRemotes.push({ remote: ref, behind });
     result.unpushedCommits = Math.max(result.unpushedCommits, ahead);
   }
   // No remote refs yet — count all local commits as unpushed.
-  if (refs.length === 0 && gitOk(clonePath, ["rev-list", "--count", "HEAD"])) {
-    result.unpushedCommits = Number.parseInt(git(clonePath, ["rev-list", "--count", "HEAD"]), 10);
+  if (refs.length === 0 && (await gitOk(clonePath, ["rev-list", "--count", "HEAD"], io))) {
+    result.unpushedCommits = Number.parseInt(
+      await git(clonePath, ["rev-list", "--count", "HEAD"], io),
+      10,
+    );
   }
 
   const statePath = path.join(werkstattRoot, STATE_FILE);
-  if (existsSync(statePath)) {
+  if (await io.exists(statePath)) {
     try {
-      const state = JSON.parse(await readFile(statePath, "utf8")) as { lastSyncAt?: string };
+      const state = JSON.parse(await io.readFile(statePath)) as { lastSyncAt?: string };
       result.lastSyncAt = state.lastSyncAt ?? null;
     } catch {
       // corrupt state file — ignore

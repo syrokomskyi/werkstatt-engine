@@ -7,17 +7,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0797: add commitCacheCloneIfDirty helper for auto-committing all dirty files in cache clone before reconcile dirty guard.</item>
   <item>RFC-0820: add noChanges field to MissionGitCommitData and prominent stderr warning when no changes to commit.</item>
   <item>RFC-0878: add .closed sentinel check to commitWorkpieceIfDirty — refuse to commit closed workpieces (defence-in-depth, since --no-verify bypasses the hook).</item>
   <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
   <item>RFC-1095: review findings: execFileSync git add, drop speculative barrel exports</item>
-  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797</history>
 </CHANGE_SUMMARY>
 */
 
-import { execFileSync, execSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -205,8 +204,8 @@ export async function investigateUntrackedFiles(
     let createdAt = "unknown";
     let sizeBytes = 0;
     try {
-      const stat = statSync(fullPath);
-      createdAt = stat.mtime.toISOString();
+      const stat = await createDefaultIO().io.stat(fullPath);
+      createdAt = new Date(stat.mtimeMs).toISOString();
       sizeBytes = stat.size;
     } catch {
       // File may have been removed between detection and investigation
@@ -247,35 +246,32 @@ export interface OperatorCommitsResult {
   commits: string[];
 }
 
-export function countOperatorCommits(
+export async function countOperatorCommits(
   workpieceDir: string,
   migratedAt: string | null,
-): OperatorCommitsResult {
-  if (!existsSync(path.join(workpieceDir, ".git"))) {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<OperatorCommitsResult> {
+  if (!(await io.exists(path.join(workpieceDir, ".git")))) {
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
   }
 
   let rootSha: string;
-  try {
-    rootSha = execSync("git rev-list --max-parents=0 HEAD", {
-      cwd: workpieceDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-  } catch {
+  const rootResult = await io.exec("git", ["rev-list", "--max-parents=0", "HEAD"], {
+    cwd: workpieceDir,
+  });
+  if (rootResult.exitCode !== 0) {
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
   }
+  rootSha = rootResult.stdout.trim();
 
   let output: string;
-  try {
-    output = execSync(`git rev-list ${rootSha}..HEAD --oneline`, {
-      cwd: workpieceDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-  } catch {
+  const listResult = await io.exec("git", ["rev-list", `${rootSha}..HEAD`, "--oneline"], {
+    cwd: workpieceDir,
+  });
+  if (listResult.exitCode !== 0) {
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
   }
+  output = listResult.stdout.trim();
 
   const allCommits = output ? output.split("\n") : [];
   const baselineCount = migratedAt ? 1 : 0;
@@ -293,56 +289,52 @@ export interface WorkpieceCommitResult {
   commitSha: string | null;
 }
 
-function commitDirIfDirty(dir: string, commitMessage: string): WorkpieceCommitResult {
-  const dirtyCheck = isWorkpieceDirty(dir);
+async function commitDirIfDirty(
+  dir: string,
+  commitMessage: string,
+  io: WorkspaceIO,
+): Promise<WorkpieceCommitResult> {
+  const dirtyCheck = await isWorkpieceDirty(dir, io);
   if (!dirtyCheck.dirty) {
     return { committed: false, commitSha: null };
   }
 
-  execSync("git add -A", {
-    cwd: dir,
-    stdio: ["pipe", "pipe", "pipe"],
-    encoding: "utf-8",
-  });
+  await io.exec("git", ["add", "-A"], { cwd: dir });
 
-  execSync(`git commit --no-verify -m ${JSON.stringify(commitMessage)}`, {
-    cwd: dir,
-    stdio: ["pipe", "pipe", "pipe"],
-    encoding: "utf-8",
-  });
+  await io.exec("git", ["commit", "--no-verify", "-m", commitMessage], { cwd: dir });
 
-  const commitSha = execSync("git rev-parse HEAD", {
-    cwd: dir,
-    stdio: ["pipe", "pipe", "pipe"],
-    encoding: "utf-8",
-  }).trim();
+  const shaResult = await io.exec("git", ["rev-parse", "HEAD"], { cwd: dir });
+  const commitSha = shaResult.stdout.trim();
 
   return { committed: true, commitSha };
 }
 
-export function commitWorkpieceIfDirty(
+export async function commitWorkpieceIfDirty(
   workpieceDir: string,
   missionId: string,
   message?: string,
-): WorkpieceCommitResult {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<WorkpieceCommitResult> {
   // RFC-0878: Defence-in-depth — refuse to commit if .closed sentinel exists.
   // commitDirIfDirty uses --no-verify which bypasses the pre-commit hook.
-  if (existsSync(path.join(workpieceDir, ".closed"))) {
+  if (await io.exists(path.join(workpieceDir, ".closed"))) {
     throw new Error(
       `[commitWorkpieceIfDirty] workpiece is closed (RFC-0878) — mission '${missionId}' has a .closed sentinel file. No commits are allowed in a closed workpiece.`,
     );
   }
   const commitMessage = message ?? `workpiece: auto-commit before reconcile ${missionId}`;
-  return commitDirIfDirty(workpieceDir, commitMessage);
+  return commitDirIfDirty(workpieceDir, commitMessage, io);
 }
 
-export function commitCacheCloneIfDirty(
+export async function commitCacheCloneIfDirty(
   systemDir: string,
   systemId: string,
-): WorkpieceCommitResult {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<WorkpieceCommitResult> {
   return commitDirIfDirty(
     systemDir,
     `cache-clone: auto-commit generated files before reconcile ${systemId}`,
+    io,
   );
 }
 
@@ -350,61 +342,56 @@ export function commitCacheCloneIfDirty(
  * Centralized cache-clone git commit helper (RFC-0821).
  *
  * Always passes MISSION_GIT_COMMIT=1 to bypass the cache-clone pre-commit hook.
- * Use this instead of raw execSync("git commit ...") or gitExec(..., "commit ...")
+ * Use this instead of raw execSync("git commit ...") or await gitExec(..., "commit ...")
  * when committing to a Sternsystem cache clone.
  *
  * @param systemDir - cache clone directory path
  * @param message - commit message
  * @param options.noEdit - use --no-edit (for merge commits)
  */
-export function cacheCloneCommit(
+export async function cacheCloneCommit(
   systemDir: string,
   message: string,
   options?: { noEdit?: boolean },
-): string {
-  const commitArgs = options?.noEdit ? "--no-edit" : `-m ${JSON.stringify(message)}`;
-  return execSync(`git commit ${commitArgs}`, {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  const commitArgs = options?.noEdit ? ["--no-edit"] : ["-m", message];
+  const result = await io.exec("git", ["commit", ...commitArgs], {
     cwd: systemDir,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-  }).trim();
+    env: { MISSION_GIT_COMMIT: "1" },
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(`git commit failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
+  }
+  return result.stdout.trim();
 }
 
-export function isWorkpieceDirty(workpieceDir: string): WorkpieceDirtyResult {
-  if (!existsSync(path.join(workpieceDir, ".git"))) {
+export async function isWorkpieceDirty(
+  workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<WorkpieceDirtyResult> {
+  if (!(await io.exists(path.join(workpieceDir, ".git")))) {
     return { dirty: false, fileCount: 0, files: [] };
   }
-  let output: string;
-  try {
-    // Use execSync directly (not the git() helper) to avoid trimming leading spaces
-    // in git status --porcelain output (e.g. " M file.txt" → "M file.txt" would break slice(3))
-    output = execSync("git status --porcelain", {
-      cwd: workpieceDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
+  const statusResult = await io.exec("git", ["status", "--porcelain"], {
+    cwd: workpieceDir,
+  });
+  if (statusResult.exitCode !== 0) {
     return { dirty: false, fileCount: 0, files: [] };
   }
-  const lines = output.split("\n").filter((l) => l.trim().length > 0);
+  // Use raw stdout (not trimmed) — leading spaces in " M file.txt" matter for slice(3).
+  const lines = statusResult.stdout.split("\n").filter((l) => l.trim().length > 0);
   // Filter out files that match a .gitignore pattern even if still tracked.
   // This prevents mission.close from blocking on generated files like
   // derived-prices.generated.json that are gitignored but still tracked.
   const files: string[] = [];
   for (const line of lines) {
     const file = line.slice(3).trim();
-    try {
-      execSync(`git check-ignore --no-index -- "${file}"`, {
-        cwd: workpieceDir,
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      // git check-ignore exits 0 → file matches a .gitignore pattern → skip
-    } catch {
-      // git check-ignore exits non-zero → file is NOT gitignored → include it
-      files.push(file);
-    }
+    const ignoreResult = await io.exec("git", ["check-ignore", "--no-index", "--", file], {
+      cwd: workpieceDir,
+    });
+    // exit 0 → file matches a .gitignore pattern → skip
+    if (ignoreResult.exitCode !== 0) files.push(file);
   }
   return { dirty: files.length > 0, fileCount: files.length, files };
 }
@@ -414,13 +401,17 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
   return typeof v === "string" ? v : undefined;
 }
 
-function git(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
+async function git(cwd: string, args: string[], io: WorkspaceIO): Promise<string> {
+  const result = await io.exec("git", args, {
     cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-  }).trim();
+    env: { MISSION_GIT_COMMIT: "1" },
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `git ${args[0] ?? ""} failed (exit ${result.exitCode}): ${result.stderr.trim()}`,
+    );
+  }
+  return result.stdout.trim();
 }
 
 export async function runMissionGitCommit(
@@ -444,28 +435,28 @@ export async function runMissionGitCommit(
     );
   }
 
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDir = path.join(missionDir, "workpiece");
 
-  if (!await context.io.exists(workpieceDir)) {
+  if (!(await context.io.exists(workpieceDir))) {
     throw new Error(
       `[mission.git.commit] workpiece not found for mission '${missionId}' — run mission.materialize first`,
     );
   }
 
-  if (!await context.io.exists(path.join(workpieceDir, ".git"))) {
+  if (!(await context.io.exists(path.join(workpieceDir, ".git")))) {
     throw new Error(
       `[mission.git.commit] workpiece is not a git repository — run mission.materialize first`,
     );
   }
 
   // Stage all changes
-  git(workpieceDir, "add -A");
+  await git(workpieceDir, ["add", "-A"], context.io);
 
   // Check if there are changes to commit
   let hasChanges: boolean;
   try {
-    git(workpieceDir, "diff --cached --quiet");
+    await git(workpieceDir, ["diff", "--cached", "--quiet"], context.io);
     hasChanges = false;
   } catch {
     hasChanges = true;
@@ -480,7 +471,7 @@ export async function runMissionGitCommit(
     );
     const data: MissionGitCommitData = {
       missionId,
-      commitSha: git(workpieceDir, "rev-parse HEAD"),
+      commitSha: await git(workpieceDir, ["rev-parse", "HEAD"], context.io),
       message: "(no changes — workpiece is clean)",
       committedAt: new Date().toISOString(),
       signed: false,
@@ -500,7 +491,9 @@ export async function runMissionGitCommit(
   const governanceId = rfcId ?? adrId;
   if (governanceId) {
     try {
-      const staged = git(workpieceDir, "diff --cached --name-only").split("\n").filter(Boolean);
+      const staged = (await git(workpieceDir, ["diff", "--cached", "--name-only"], context.io))
+        .split("\n")
+        .filter(Boolean);
       const recordResult = await runCompassSummaryRecord(
         {
           argv: [],
@@ -516,10 +509,9 @@ export async function runMissionGitCommit(
       const recorded = recordResult.data?.recorded ?? [];
       if (recorded.length > 0) {
         // Array form — no shell: filenames with $(...) or quotes cannot inject.
-        execFileSync("git", ["add", ...recorded], {
+        await context.io.exec("git", ["add", ...recorded], {
           cwd: workpieceDir,
-          stdio: ["pipe", "pipe", "pipe"],
-          env: { ...process.env, MISSION_GIT_COMMIT: "1" },
+          env: { MISSION_GIT_COMMIT: "1" },
         });
       }
       for (const reminder of recordResult.data?.keyDecisionsReminders ?? []) {
@@ -538,7 +530,7 @@ export async function runMissionGitCommit(
     : message;
 
   // RFC-0594: run targeted content validators based on changed file paths
-  const dirtyResult = isWorkpieceDirty(workpieceDir);
+  const dirtyResult = await isWorkpieceDirty(workpieceDir, context.io);
   const preCommitValidation = await runPreCommitValidation(
     dirtyResult.files,
     manifest.systemId,
@@ -600,7 +592,7 @@ export async function runMissionGitCommit(
   // No signing key — produce unsigned commit
   process.stderr.write(`[warn] PASSPORT_SIGNING_KEY not set — producing unsigned commit.\n`);
 
-  const commitSha = git(workpieceDir, `commit -m ${JSON.stringify(commitMessage)}`);
+  const commitSha = await git(workpieceDir, ["commit", "-m", commitMessage], context.io);
 
   const data: MissionGitCommitData = {
     missionId,

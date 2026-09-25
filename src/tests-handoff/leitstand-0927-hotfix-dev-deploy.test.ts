@@ -5,13 +5,13 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0927: initial test suite for hotfix composite command.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
 import { test, expect, vi, beforeEach } from "vitest";
 import { runLeitstandHotfixDevDeploy } from "../leitstand/leitstand-commands.ts";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
-import { execSync } from "node:child_process";
 import { assertNoUnknownFlags } from "./composite-phase-assert.ts";
 import type {
   KernelRuntimeContext,
@@ -28,19 +28,17 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   };
 });
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
-  return {
-    ...actual,
-    execSync: vi.fn(),
-  };
-});
-
 vi.mock("../kernel/runtime/registry-cache.ts", () => ({
   getOrBuildWorkspaceRegistry: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
+const mockIoExec = vi.fn();
+function ioExecOk(stdout: string): void {
+  mockIoExec.mockResolvedValue({ exitCode: 0, stdout, stderr: "" });
+}
+function ioExecOkOnce(stdout: string): void {
+  mockIoExec.mockResolvedValueOnce({ exitCode: 0, stdout, stderr: "" });
+}
 const mockExecuteKernelCommand = executeKernelCommand as unknown as ReturnType<typeof vi.fn>;
 
 // Command-specific flags (excluding KERNEL_UNIVERSAL_FLAGS) for each sub-command
@@ -90,7 +88,7 @@ function assertAllPhaseCallsValid(): void {
 }
 
 const context = {
-  io: createDefaultIO().io,
+  io: { ...createDefaultIO().io, exec: mockIoExec },
   workspaceRoot: "/tmp/test-hotfix",
   logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 } as unknown as KernelRuntimeContext;
@@ -113,13 +111,13 @@ function mockPhaseResult(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockExecSync.mockReturnValue("");
+  ioExecOk("");
 });
 
 test("all phases succeed — returns deploymentUrl, no failingPhase", async () => {
-  mockExecSync.mockReturnValueOnce("M file.ts\n"); // git status --porcelain (dirty)
+  ioExecOkOnce("M file.ts\n"); // git status --porcelain (dirty)
   mockPhaseResult("mission.git.commit", 0);
-  mockExecSync.mockReturnValueOnce("abc123\n"); // git rev-parse HEAD after commit
+  ioExecOkOnce("abc123\n"); // git rev-parse HEAD after commit
   mockPhaseResult("validate.postbuild", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
@@ -145,7 +143,7 @@ test("all phases succeed — returns deploymentUrl, no failingPhase", async () =
 });
 
 test("workpiece clean — phase 1 skipped, pipeline continues", async () => {
-  mockExecSync.mockReturnValue(""); // clean workpiece
+  ioExecOk(""); // clean workpiece
   mockPhaseResult("validate.postbuild", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
@@ -167,7 +165,7 @@ test("workpiece clean — phase 1 skipped, pipeline continues", async () => {
 });
 
 test("validate.postbuild fails, mission.validate succeeds — mode: full", async () => {
-  mockExecSync.mockReturnValue(""); // clean
+  ioExecOk(""); // clean
   mockPhaseResult("validate.postbuild", 1);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -189,7 +187,7 @@ test("validate.postbuild fails, mission.validate succeeds — mode: full", async
 });
 
 test("validate.postbuild fails, mission.validate fails — failingPhase: validate", async () => {
-  mockExecSync.mockReturnValue(""); // clean
+  ioExecOk(""); // clean
   mockPhaseResult("validate.postbuild", 1);
   mockPhaseResult("mission.validate", 1);
 
@@ -204,7 +202,7 @@ test("validate.postbuild fails, mission.validate fails — failingPhase: validat
 });
 
 test("mission.close fails — failingPhase: close, phases 5-7 not executed", async () => {
-  mockExecSync.mockReturnValue(""); // clean
+  ioExecOk(""); // clean
   mockPhaseResult("validate.postbuild", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 1);
@@ -221,7 +219,7 @@ test("mission.close fails — failingPhase: close, phases 5-7 not executed", asy
 });
 
 test("leitstand.certify fails — failingPhase: certify, phase 7 not executed", async () => {
-  mockExecSync.mockReturnValue(""); // clean
+  ioExecOk(""); // clean
   mockPhaseResult("validate.postbuild", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
@@ -241,9 +239,9 @@ test("leitstand.certify fails — failingPhase: certify, phase 7 not executed", 
 });
 
 test("--message flag passed to mission.git.commit", async () => {
-  mockExecSync.mockReturnValueOnce("M file.ts\n"); // git status (dirty)
+  ioExecOkOnce("M file.ts\n"); // git status (dirty)
   mockPhaseResult("mission.git.commit", 0);
-  mockExecSync.mockReturnValueOnce("def456\n"); // git rev-parse HEAD
+  ioExecOkOnce("def456\n"); // git rev-parse HEAD
   mockPhaseResult("validate.postbuild", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
@@ -266,7 +264,7 @@ test("--message flag passed to mission.git.commit", async () => {
 });
 
 test("release.prepare is called without --release flag (derives releaseId internally)", async () => {
-  mockExecSync.mockReturnValue(""); // clean
+  ioExecOk(""); // clean
   mockPhaseResult("validate.postbuild", 0);
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);

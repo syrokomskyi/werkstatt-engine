@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0883: initial unit tests for runValidatePostbuild.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -216,7 +217,7 @@ test("--mission resolves workpiece via readMissionManifest", async () => {
     brief: "test",
     status: "materialized",
   } as never);
-  mockResolveMissionDir.mockReturnValue(missionDir);
+  mockResolveMissionDir.mockResolvedValue(missionDir);
 
   mockExecuteKernelPipeline.mockResolvedValue(
     makePipelineReport(true, [
@@ -231,8 +232,8 @@ test("--mission resolves workpiece via readMissionManifest", async () => {
 
   expect(result.exitCode).toBe(0);
   expect(result.data?.status).toBe("pass");
-  expect(mockReadMissionManifest).toHaveBeenCalledWith(tmpDir, "test-bundle-m000001");
-  expect(mockResolveMissionDir).toHaveBeenCalledWith(tmpDir, "test-bundle-m000001");
+  expect(mockReadMissionManifest).toHaveBeenCalledWith(tmpDir, "test-bundle-m000001", expect.anything());
+  expect(mockResolveMissionDir).toHaveBeenCalledWith(tmpDir, "test-bundle-m000001", expect.anything());
   const pipelineCall = mockExecuteKernelPipeline.mock.calls[0]![0] as {
     siteWorkspace: { directory: string };
     siteName: string;

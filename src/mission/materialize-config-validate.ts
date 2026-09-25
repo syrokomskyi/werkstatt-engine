@@ -14,11 +14,10 @@ MAT-CONFIG-02 (error: dead entry in OPERATOR_CONFIG_FILES).
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0840: initial materialize.config.validate command handler.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -84,13 +83,13 @@ export async function runMaterializeConfigValidate(
   const missionsDir = join(root, "missions");
 
   const workpieceRoots: string[] = [];
-  if (existsSync(missionsDir)) {
-    const missionEntries = await readdir(missionsDir, { withFileTypes: true });
+  if (await context.io.exists(missionsDir)) {
+    const missionEntries = await context.io.readdir(missionsDir);
     for (const entry of missionEntries) {
-      if (!entry.isDirectory()) continue;
+      if (!entry.isDirectory) continue;
       if (entry.name === "archive") continue;
       const wp = join(missionsDir, entry.name, "workpiece");
-      if (existsSync(wp)) {
+      if (await context.io.exists(wp)) {
         workpieceRoots.push(wp);
       }
     }
@@ -102,7 +101,7 @@ export async function runMaterializeConfigValidate(
     for (const sys of systems) {
       try {
         const cacheDir = resolveCacheClonePath(root, sys.id);
-        if (existsSync(cacheDir)) {
+        if (await context.io.exists(cacheDir)) {
           cacheCloneDirs.push(cacheDir);
         }
       } catch {
@@ -114,9 +113,9 @@ export async function runMaterializeConfigValidate(
   }
 
   for (const wp of workpieceRoots) {
-    const rootEntries = await readdir(wp, { withFileTypes: true });
+    const rootEntries = await context.io.readdir(wp);
     for (const entry of rootEntries) {
-      if (!entry.isFile()) continue;
+      if (!entry.isFile) continue;
       const name = entry.name;
       if (isBoilerplate(name)) continue;
       if (isEnvFile(name)) continue;
@@ -132,10 +131,10 @@ export async function runMaterializeConfigValidate(
     }
 
     const srcDir = join(wp, "src");
-    if (existsSync(srcDir)) {
-      const srcEntries = await readdir(srcDir, { withFileTypes: true });
+    if (await context.io.exists(srcDir)) {
+      const srcEntries = await context.io.readdir(srcDir);
       for (const entry of srcEntries) {
-        if (!entry.isFile()) continue;
+        if (!entry.isFile) continue;
         if (entry.name === "system.md") continue;
         if (isGenerated(entry.name)) continue;
         const srcPath = `src/${entry.name}`;
@@ -154,8 +153,12 @@ export async function runMaterializeConfigValidate(
   }
 
   for (const entry of OPERATOR_CONFIG_FILES) {
-    const foundInWorkpiece = workpieceRoots.some((wp) => existsSync(join(wp, entry)));
-    const foundInCacheClone = cacheCloneDirs.some((cc) => existsSync(join(cc, entry)));
+    const foundInWorkpiece = (
+      await Promise.all(workpieceRoots.map((wp) => context.io.exists(join(wp, entry))))
+    ).some(Boolean);
+    const foundInCacheClone = (
+      await Promise.all(cacheCloneDirs.map((cc) => context.io.exists(join(cc, entry))))
+    ).some(Boolean);
     if (!foundInWorkpiece && !foundInCacheClone) {
       diagnostics.push({
         ruleId: "MAT-CONFIG-02",

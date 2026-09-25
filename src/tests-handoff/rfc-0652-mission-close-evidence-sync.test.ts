@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0652: initial tests for mandatory evidence sync in mission.close.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -98,15 +99,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setupWorkspace(options?: {
+async function setupWorkspace(options?: {
   withAxiomEvidence?: boolean;
   withAxiomDirOnly?: boolean;
-}): string {
+}): Promise<string> {
   gitInit(tmpWorkspace);
   writeFileSync(join(tmpWorkspace, "README.md"), "# test\n");
   gitCommit(tmpWorkspace, "initial");
 
-  createLeitstandSystem(testRoot, "test-system", {
+  await createLeitstandSystem(testRoot, "test-system", {
     currentMission: "test-system-m000001",
   });
 
@@ -196,7 +197,7 @@ function makeContext(): KernelRuntimeContext {
 }
 
 test("mission.close invokes evidence.sync when evidence/axiom/ with metadata exists", async () => {
-  setupWorkspace({ withAxiomEvidence: true });
+  await setupWorkspace({ withAxiomEvidence: true });
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
   await runMissionClose(
@@ -208,7 +209,7 @@ test("mission.close invokes evidence.sync when evidence/axiom/ with metadata exi
 });
 
 test("mission.close throws EVIDENCE_SYNC_FAILED when evidence.sync fails", async () => {
-  setupWorkspace({ withAxiomEvidence: true });
+  await setupWorkspace({ withAxiomEvidence: true });
   mockState.syncShouldFail = true;
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
@@ -221,7 +222,7 @@ test("mission.close throws EVIDENCE_SYNC_FAILED when evidence.sync fails", async
 });
 
 test("mission.close --skip-evidence-sync skips sync and does not call evidence.sync", async () => {
-  setupWorkspace({ withAxiomEvidence: true });
+  await setupWorkspace({ withAxiomEvidence: true });
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
   await runMissionClose(
@@ -233,7 +234,7 @@ test("mission.close --skip-evidence-sync skips sync and does not call evidence.s
 });
 
 test("mission.close skips sync with warning when evidence/axiom/ exists but metadata missing", async () => {
-  setupWorkspace({ withAxiomDirOnly: true });
+  await setupWorkspace({ withAxiomDirOnly: true });
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
   await runMissionClose(
@@ -245,7 +246,7 @@ test("mission.close skips sync with warning when evidence/axiom/ exists but meta
 });
 
 test("mission.close skips sync silently when evidence/axiom/ does not exist", async () => {
-  setupWorkspace();
+  await setupWorkspace();
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
   await runMissionClose(
@@ -257,7 +258,7 @@ test("mission.close skips sync silently when evidence/axiom/ does not exist", as
 });
 
 test("mission.close --json includes evidenceSynced and evidenceSyncResult fields", async () => {
-  setupWorkspace({ withAxiomEvidence: true });
+  await setupWorkspace({ withAxiomEvidence: true });
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
   const result = await runMissionClose(
@@ -274,7 +275,7 @@ test("mission.close --json includes evidenceSynced and evidenceSyncResult fields
 });
 
 test("mission.close --skip-evidence-sync sets evidenceSynced=false in output", async () => {
-  setupWorkspace({ withAxiomEvidence: true });
+  await setupWorkspace({ withAxiomEvidence: true });
   const { runMissionClose } = await import("../mission/mission-close.ts");
 
   const result = await runMissionClose(

@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0991: add behavior-snapshot-refresh step to buildCloseSteps for auto-generating behavior snapshot during mission close.</item>
   <item>RFC-0992: behavior-snapshot-refresh now updates workpieceHeadAtReconcile in reconciliation-report.json after commit, preventing false unreconciled-commit freshness-check failure.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -15,13 +14,11 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>ADR-0084: abandon-incomplete-operations step before transition-state — sweeps systems-cache operations/*.jsonl for incomplete ops referencing the closing mission and appends op-abandoned, then commits the journal updates to the cache clone.</item>
-  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991</history>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { execSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parse as yamlParse } from "yaml";
 import type {
@@ -51,11 +48,12 @@ import {
   type MissionValidateData,
 } from "./mission-materialization-commands.ts";
 import { acquireLock, releaseLock, commitWerkstattSideEffects } from "../werkstatt/index.ts";
+import { gitExec } from "../werkstatt/git-exec.ts";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { resolveActor } from "./actor-identity.ts";
 import { persistEnvFilesToCacheClone } from "./env-persist.ts";
 import { persistOperatorConfigFiles } from "./operator-config-files.ts";
-import { readFileSync } from "node:fs";
 import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import {
@@ -70,16 +68,16 @@ import { removeOverlay } from "../runtime/overlay-store.ts";
 // RFC-0597: Media cache directories to persist across missions
 const MEDIA_CACHE_DIRS = [".cache/video", ".cache/video-live"];
 
-async function copyDirRecursive(src: string, dest: string): Promise<void> {
-  await fs.mkdir(dest, { recursive: true });
-  const entries = await fs.readdir(src, { withFileTypes: true });
+async function copyDirRecursive(src: string, dest: string, io: WorkspaceIO): Promise<void> {
+  await io.mkdir(dest);
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      await copyDirRecursive(srcPath, destPath);
+    if (entry.isDirectory) {
+      await copyDirRecursive(srcPath, destPath, io);
     } else {
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -177,27 +175,18 @@ async function runInlineValidate(
 async function updateReconcileReportHead(
   evidenceDir: string,
   commitSha: string | null,
+  io: WorkspaceIO,
 ): Promise<void> {
   try {
     const reconcileReportPath = path.join(evidenceDir, "reconciliation-report.json");
-    if (existsSync(reconcileReportPath)) {
-      const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
+    if (await io.exists(reconcileReportPath)) {
+      const report = JSON.parse(await io.readFile(reconcileReportPath));
       report.workpieceHeadAtReconcile = commitSha;
       await atomicWriteFile(reconcileReportPath, JSON.stringify(report, null, 2) + "\n");
     }
   } catch {
     // Non-fatal
   }
-}
-
-function gitExec(cwd: string, args: string, options?: { env?: NodeJS.ProcessEnv }): string {
-  return execSync(`git ${args}`, {
-    cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    timeout: 30_000,
-    ...(options?.env ? { env: options.env } : {}),
-  }).trim();
 }
 
 export async function runMissionClose(
@@ -302,10 +291,10 @@ export async function runMissionClose(
     }
 
     const now = new Date().toISOString();
-    const missionDir = resolveMissionDir(workspaceRoot, missionId);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
     const workpieceDir = path.join(missionDir, "workpiece");
     const evidenceDir = path.join(missionDir, "evidence");
-    await fs.mkdir(evidenceDir, { recursive: true });
+    await context.io.mkdir(evidenceDir);
 
     // RFC-0958: Build step context and run post-lock lifecycle via journal
     const stepCtx: CloseStepCtx = {
@@ -454,8 +443,8 @@ export async function buildCloseSteps(
       name: "stop-dev-servers",
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
-        if (existsSync(cc.workpieceDir)) {
-          spawnSync("pnpm", ["run", "stop"], { cwd: cc.workpieceDir, stdio: "ignore" });
+        if (await cc.context.io.exists(cc.workpieceDir)) {
+          await cc.context.io.exec("pnpm", ["run", "stop"], { cwd: cc.workpieceDir });
         }
       },
       verify: async () => true,
@@ -464,12 +453,17 @@ export async function buildCloseSteps(
       name: "auto-commit-workpiece",
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
-        const workpieceCommit = commitWorkpieceIfDirty(cc.workpieceDir, cc.missionId);
+        const workpieceCommit = await commitWorkpieceIfDirty(
+          cc.workpieceDir,
+          cc.missionId,
+          undefined,
+          cc.context.io,
+        );
         if (workpieceCommit.committed) {
           logger.info(
             `  Auto-committed dirty workpiece (${workpieceCommit.commitSha?.slice(0, 8)}) before close`,
           );
-          await updateReconcileReportHead(cc.evidenceDir, workpieceCommit.commitSha);
+          await updateReconcileReportHead(cc.evidenceDir, workpieceCommit.commitSha, cc.context.io);
         }
       },
     },
@@ -488,13 +482,18 @@ export async function buildCloseSteps(
             commandName: "behavior.snapshot.generate",
             siteName: cc.manifest.systemId,
           });
-          const snapshotCommit = commitWorkpieceIfDirty(
+          const snapshotCommit = await commitWorkpieceIfDirty(
             cc.workpieceDir,
             cc.missionId,
             "behavior-snapshot-refresh",
+            cc.context.io,
           );
           if (snapshotCommit.committed) {
-            await updateReconcileReportHead(cc.evidenceDir, snapshotCommit.commitSha);
+            await updateReconcileReportHead(
+              cc.evidenceDir,
+              snapshotCommit.commitSha,
+              cc.context.io,
+            );
           }
           logger.info("  [behavior-snapshot-refresh] Snapshot regenerated and committed");
         } catch (err) {
@@ -509,7 +508,11 @@ export async function buildCloseSteps(
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
         if (!cc.allowNoOp) {
-          const operatorCommits = countOperatorCommits(cc.workpieceDir, cc.manifest.migratedAt);
+          const operatorCommits = await countOperatorCommits(
+            cc.workpieceDir,
+            cc.manifest.migratedAt,
+            cc.context.io,
+          );
           if (!operatorCommits.hasOperatorCommits) {
             throw new Error(
               `[mission.close] ZERO-COMMIT-GUARD: Mission '${cc.missionId}' has zero operator commits since materialization.\n` +
@@ -528,7 +531,7 @@ export async function buildCloseSteps(
           const reconcileReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
           let reconciledWorkpieceSha: string | null = null;
           try {
-            const report = JSON.parse(readFileSync(reconcileReportPath, "utf8"));
+            const report = JSON.parse(await cc.context.io.readFile(reconcileReportPath));
             reconciledWorkpieceSha = report.workpieceHeadAtReconcile ?? null;
           } catch {
             throw new Error(
@@ -540,11 +543,11 @@ export async function buildCloseSteps(
               `[mission.close] reconciliation report missing workpieceHeadAtReconcile field`,
             );
           }
-          cc.workpieceHead = gitExec(cc.workpieceDir, "rev-parse HEAD");
+          cc.workpieceHead = await gitExec(cc.workpieceDir, "rev-parse HEAD");
           cc.reconciledSha = reconciledWorkpieceSha;
           if (cc.workpieceHead !== reconciledWorkpieceSha) {
             try {
-              const countOutput = gitExec(
+              const countOutput = await gitExec(
                 cc.workpieceDir,
                 `rev-list --count ${reconciledWorkpieceSha}..${cc.workpieceHead}`,
               );
@@ -564,13 +567,15 @@ export async function buildCloseSteps(
       name: "create-git-bundle",
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
-        if (existsSync(path.join(cc.workpieceDir, ".git"))) {
+        if (await cc.context.io.exists(path.join(cc.workpieceDir, ".git"))) {
           const bundlePath = path.join(cc.evidenceDir, "workpiece.git-bundle");
           try {
-            execSync(`git bundle create ${JSON.stringify(bundlePath)} --all`, {
-              cwd: cc.workpieceDir,
-              stdio: ["pipe", "pipe", "pipe"],
-            });
+            await gitExec(
+              cc.workpieceDir,
+              `bundle create ${JSON.stringify(bundlePath)} --all`,
+              undefined,
+              cc.context.io,
+            );
           } catch {
             // Non-fatal
           }
@@ -587,10 +592,10 @@ export async function buildCloseSteps(
             cc.workspaceRoot,
             cc.manifest.systemId,
           );
-          if (existsSync(path.join(preCheckSystemDir, ".git"))) {
+          if (await cc.context.io.exists(path.join(preCheckSystemDir, ".git"))) {
             try {
-              const branch = gitExec(preCheckSystemDir, "rev-parse --abbrev-ref HEAD");
-              gitExec(preCheckSystemDir, `push origin ${JSON.stringify(branch)}`);
+              const branch = await gitExec(preCheckSystemDir, "rev-parse --abbrev-ref HEAD");
+              await gitExec(preCheckSystemDir, `push origin ${JSON.stringify(branch)}`);
               logger.info(`  Pushed cache clone to origin before mirror sync check`);
             } catch (pushErr) {
               logger.warn(
@@ -615,22 +620,24 @@ export async function buildCloseSteps(
           }
           const bareMirror = config.mirrors[1];
           const bareRepoPath = resolveMirrorPath(cc.workspaceRoot, bareMirror.path);
-          if (existsSync(bareRepoPath)) {
+          if (await cc.context.io.exists(bareRepoPath)) {
             try {
               let branch: string;
               try {
-                branch = gitExec(bareRepoPath, "symbolic-ref HEAD").replace("refs/heads/", "");
+                branch = (
+                  await gitExec(bareRepoPath, "symbolic-ref HEAD", undefined, cc.context.io)
+                ).replace("refs/heads/", "");
               } catch {
                 branch = "main";
               }
               try {
-                cc.originSha = gitExec(bareRepoPath, `rev-parse ${branch}`);
+                cc.originSha = await gitExec(bareRepoPath, `rev-parse ${branch}`);
               } catch {
                 cc.originSha = null;
               }
               if (config.mirrors.length > 2) {
                 try {
-                  cc.mirrorSha = gitExec(bareRepoPath, `rev-parse refs/mirror/${branch}`);
+                  cc.mirrorSha = await gitExec(bareRepoPath, `rev-parse refs/mirror/${branch}`);
                 } catch {
                   cc.mirrorSha = null;
                 }
@@ -669,7 +676,7 @@ export async function buildCloseSteps(
         const cc = c as CloseStepCtx;
         const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
         const operationsDir = path.join(systemDir, "operations");
-        if (!existsSync(operationsDir)) {
+        if (!(await cc.context.io.exists(operationsDir))) {
           return;
         }
         const sweep = await abandonIncompleteOperationsForMission(operationsDir, cc.missionId);
@@ -693,9 +700,15 @@ export async function buildCloseSteps(
         try {
           const touched = [...new Set(sweep.abandoned.map((op) => op.journalPath))];
           for (const journalPath of touched) {
-            gitExec(systemDir, `add ${JSON.stringify(path.relative(systemDir, journalPath))}`);
+            await gitExec(
+              systemDir,
+              `add ${JSON.stringify(path.relative(systemDir, journalPath))}`,
+            );
           }
-          cacheCloneCommit(systemDir, `journal: abandon incomplete operations for ${cc.missionId}`);
+          await cacheCloneCommit(
+            systemDir,
+            `journal: abandon incomplete operations for ${cc.missionId}`,
+          );
         } catch (commitErr) {
           logger.warn(
             `  [abandon-incomplete-operations] could not commit journal updates (non-fatal): ${commitErr instanceof Error ? commitErr.message : String(commitErr)}`,
@@ -706,7 +719,7 @@ export async function buildCloseSteps(
         const cc = c as CloseStepCtx;
         const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
         const operationsDir = path.join(systemDir, "operations");
-        if (!existsSync(operationsDir)) {
+        if (!(await cc.context.io.exists(operationsDir))) {
           return true;
         }
         try {
@@ -793,7 +806,10 @@ export async function buildCloseSteps(
         }
         const axiomEvidenceDir = path.join(cc.missionDir, "evidence", "axiom");
         const metadataPath = path.join(axiomEvidenceDir, "evidence-metadata.json");
-        if (existsSync(axiomEvidenceDir) && existsSync(metadataPath)) {
+        if (
+          (await cc.context.io.exists(axiomEvidenceDir)) &&
+          (await cc.context.io.exists(metadataPath))
+        ) {
           try {
             const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
             const syncResult = (await executeKernelCommand({
@@ -821,7 +837,7 @@ export async function buildCloseSteps(
               `EVIDENCE_SYNC_FAILED: ${syncError instanceof Error ? syncError.message : String(syncError)}`,
             );
           }
-        } else if (existsSync(axiomEvidenceDir)) {
+        } else if (await cc.context.io.exists(axiomEvidenceDir)) {
           logger.warn(
             `  Evidence directory exists but evidence-metadata.json is missing — skipping sync`,
           );
@@ -894,9 +910,8 @@ export async function buildCloseSteps(
             signature,
           });
           // Stage passport.json so subsequent commit steps include it
-          const { execFileSync } = await import("node:child_process");
           const cacheClonePath = resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
-          execFileSync("git", ["-C", cacheClonePath, "add", "passport.json"], { stdio: "pipe" });
+          await cc.context.io.exec("git", ["-C", cacheClonePath, "add", "passport.json"]);
           logger.success(`  [passport-refresh] Passport refreshed (hash: ${passportHash})`);
         } catch (err) {
           logger.warn(
@@ -989,7 +1004,7 @@ export async function buildCloseSteps(
         const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
         let dirtyFiles: string[] = [];
         try {
-          const status = gitExec(systemDir, "status --porcelain");
+          const status = await gitExec(systemDir, "status --porcelain");
           dirtyFiles = status
             .split("\n")
             .filter((l) => l.trim().length > 0)
@@ -1061,7 +1076,9 @@ export async function buildCloseSteps(
       },
       verify: async (c: unknown) => {
         const cc = c as CloseStepCtx;
-        return existsSync(path.join(cc.missionDir, "evidence", "close-report.json"));
+        return await cc.context.io.exists(
+          path.join(cc.missionDir, "evidence", "close-report.json"),
+        );
       },
     },
     {
@@ -1100,8 +1117,8 @@ export async function buildCloseSteps(
         }
         try {
           const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
-          gitExec(systemDir, "add system.pin.json system-config.yaml");
-          cacheCloneCommit(systemDir, `chore: auto-pin platform version for ${cc.missionId}`);
+          await gitExec(systemDir, "add system.pin.json system-config.yaml");
+          await cacheCloneCommit(systemDir, `chore: auto-pin platform version for ${cc.missionId}`);
           logger.info(`  Committed system.pin.json to cache clone`);
         } catch (pinCommitError) {
           logger.warn(
@@ -1177,11 +1194,7 @@ export async function buildCloseSteps(
           const systemDir = await resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
           let cacheCloneHead: string | null = null;
           try {
-            cacheCloneHead = execSync("git rev-parse HEAD", {
-              cwd: systemDir,
-              stdio: "pipe",
-              encoding: "utf-8",
-            }).trim();
+            cacheCloneHead = await gitExec(systemDir, "rev-parse HEAD", undefined, cc.context.io);
           } catch {
             // skip
           }
@@ -1200,8 +1213,8 @@ export async function buildCloseSteps(
               `  Wrote .materialization-state.json (HEAD: ${cacheCloneHead.slice(0, 12)})`,
             );
             try {
-              gitExec(systemDir, "add .materialization-state.json");
-              cacheCloneCommit(
+              await gitExec(systemDir, "add .materialization-state.json");
+              await cacheCloneCommit(
                 systemDir,
                 `chore: update materialization state for ${cc.missionId}`,
               );
@@ -1237,14 +1250,14 @@ export async function buildCloseSteps(
           }
           for (const cacheDir of MEDIA_CACHE_DIRS) {
             const srcCache = path.join(cc.workpieceDir, cacheDir);
-            if (existsSync(srcCache)) {
+            if (await cc.context.io.exists(srcCache)) {
               const destCache = path.join(systemDir, cacheDir);
               try {
-                if (existsSync(destCache)) {
-                  await fs.rm(destCache, { recursive: true, force: true });
+                if (await cc.context.io.exists(destCache)) {
+                  await cc.context.io.rm(destCache, { recursive: true });
                 }
-                await fs.mkdir(path.dirname(destCache), { recursive: true });
-                await copyDirRecursive(srcCache, destCache);
+                await cc.context.io.mkdir(path.dirname(destCache));
+                await copyDirRecursive(srcCache, destCache, cc.context.io);
                 logger.info(`  Copied ${cacheDir} from workpiece to cache clone`);
               } catch (err) {
                 logger.info(
@@ -1260,10 +1273,10 @@ export async function buildCloseSteps(
               "content-regression",
               "current.snapshot.yaml",
             );
-            if (existsSync(contentRegressionSrc)) {
+            if (await cc.context.io.exists(contentRegressionSrc)) {
               let currentHash: string | null = null;
               try {
-                const raw = await fs.readFile(contentRegressionSrc, "utf8");
+                const raw = await cc.context.io.readFile(contentRegressionSrc);
                 const parsed = yamlParse(raw) as { contentHash?: string };
                 currentHash = parsed?.contentHash ?? null;
               } catch {
@@ -1276,9 +1289,9 @@ export async function buildCloseSteps(
                 "content-regression",
                 `${cc.manifest.systemId}.snapshot.yaml`,
               );
-              if (existsSync(goldenSnapshotPath)) {
+              if (await cc.context.io.exists(goldenSnapshotPath)) {
                 try {
-                  const raw = await fs.readFile(goldenSnapshotPath, "utf8");
+                  const raw = await cc.context.io.readFile(goldenSnapshotPath);
                   const parsed = yamlParse(raw) as { contentHash?: string };
                   goldenHash = parsed?.contentHash ?? null;
                 } catch {
@@ -1293,9 +1306,9 @@ export async function buildCloseSteps(
                   "apply-result.json",
                 );
                 let hasValidApplyResult = false;
-                if (existsSync(applyResultPath)) {
+                if (await cc.context.io.exists(applyResultPath)) {
                   try {
-                    const raw = await fs.readFile(applyResultPath, "utf8");
+                    const raw = await cc.context.io.readFile(applyResultPath);
                     const result = JSON.parse(raw) as { pending?: number; errors?: string[] };
                     if ((result.pending ?? 0) === 0 && (result.errors?.length ?? 0) === 0) {
                       hasValidApplyResult = true;
@@ -1318,15 +1331,15 @@ export async function buildCloseSteps(
             "content-regression",
             "current.snapshot.yaml",
           );
-          if (existsSync(contentRegressionSrc)) {
+          if (await cc.context.io.exists(contentRegressionSrc)) {
             const contentRegressionDestDir = path.join(systemDir, ".cache", "content-regression");
             const contentRegressionDest = path.join(
               contentRegressionDestDir,
               `${cc.manifest.systemId}.snapshot.yaml`,
             );
             try {
-              await fs.mkdir(contentRegressionDestDir, { recursive: true });
-              await fs.copyFile(contentRegressionSrc, contentRegressionDest);
+              await cc.context.io.mkdir(contentRegressionDestDir);
+              await cc.context.io.copyFile(contentRegressionSrc, contentRegressionDest);
               logger.info(
                 `  Copied content regression snapshot → ${cc.manifest.systemId}.snapshot.yaml`,
               );
@@ -1348,7 +1361,7 @@ export async function buildCloseSteps(
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
         try {
-          await fs.writeFile(path.join(cc.workpieceDir, ".closed"), `${cc.now}\n`);
+          await cc.context.io.writeFile(path.join(cc.workpieceDir, ".closed"), `${cc.now}\n`);
         } catch (sentinelErr) {
           logger.warn(
             `  Warning: failed to write .closed sentinel: ${sentinelErr instanceof Error ? sentinelErr.message : String(sentinelErr)}`,
@@ -1357,7 +1370,7 @@ export async function buildCloseSteps(
       },
       verify: async (c: unknown) => {
         const cc = c as CloseStepCtx;
-        return existsSync(path.join(cc.workpieceDir, ".closed"));
+        return await cc.context.io.exists(path.join(cc.workpieceDir, ".closed"));
       },
     },
     {

@@ -20,16 +20,16 @@ calls).
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>ADR-0087: extract closed-workpiece helpers from execute-pipeline.ts into this leaf module so execute-command.ts can enforce the same guard without an import cycle; add mutatingCommandRunsOnClosedWorkpiece (single-call predicate for the executor path).</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
   DiscoveredSiteWorkspace,
   KernelCommandDefinition,
 } from "@warpgogol/werkstatt-shared/kernel";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // @ai-invariant: Closed-mission workpieces are immutable — a mutating command may run only when every declared write resolves to a gitignored path.
 
@@ -41,8 +41,8 @@ export const CLOSED_WORKPIECE_SENTINEL = ".closed";
  * writes to git-tracked files can never be committed and produce only
  * uncommittable churn.
  */
-export function isClosedWorkpiece(siteDirectory: string): boolean {
-  return existsSync(join(siteDirectory, CLOSED_WORKPIECE_SENTINEL));
+export async function isClosedWorkpiece(siteDirectory: string, io: WorkspaceIO): Promise<boolean> {
+  return io.exists(join(siteDirectory, CLOSED_WORKPIECE_SENTINEL));
 }
 
 /**
@@ -71,28 +71,27 @@ export function writePatternToCheckPath(pattern: string, siteName: string): stri
  * git tracking no write can produce committable churn, so callers treat every
  * path as untracked.
  */
-export function collectGitignoredPaths(
+export async function collectGitignoredPaths(
   siteDirectory: string,
   candidatePaths: string[],
-): Set<string> | null {
+  io: WorkspaceIO,
+): Promise<Set<string> | null> {
   if (candidatePaths.length === 0) return new Set();
   try {
-    const output = execSync("git check-ignore --stdin", {
+    const result = await io.exec("git", ["check-ignore", "--", ...candidatePaths], {
       cwd: siteDirectory,
-      input: `${candidatePaths.join("\n")}\n`,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
     });
+    if (result.exitCode === 1) return new Set();
+    if (result.exitCode !== 0) return null;
     return new Set(
-      output
+      result.stdout
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean),
     );
-  } catch (err) {
-    // exit 1 → no path is ignored (empty set); exit 128 / ENOENT → no git
-    // tracking at all → null (nothing can churn a non-repo workpiece).
-    if ((err as { status?: number }).status === 1) return new Set();
+  } catch {
+    // ENOENT (no git binary) → no git tracking at all → null (nothing can
+    // churn a non-repo workpiece).
     return null;
   }
 }
@@ -126,13 +125,14 @@ export function mutatingStepRunsOnClosedWorkpiece(
  * closed workpieces). The pipeline keeps its own batched resolution across
  * all steps; direct executeKernelCommand callers get the same decision here.
  */
-export function mutatingCommandRunsOnClosedWorkpiece(
+export async function mutatingCommandRunsOnClosedWorkpiece(
   command: KernelCommandDefinition,
   site: DiscoveredSiteWorkspace,
-): boolean {
+  io: WorkspaceIO,
+): Promise<boolean> {
   const candidates = (command.writes ?? [])
     .map((pattern) => writePatternToCheckPath(pattern, site.name))
     .filter((p): p is string => p !== null);
-  const ignoredPaths = collectGitignoredPaths(site.directory, candidates);
+  const ignoredPaths = await collectGitignoredPaths(site.directory, candidates, io);
   return mutatingStepRunsOnClosedWorkpiece(command, site.name, ignoredPaths);
 }

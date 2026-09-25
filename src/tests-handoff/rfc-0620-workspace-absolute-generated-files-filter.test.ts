@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0620: initial regression tests — bordbuch files filtered, mock entry filtered, authored files preserved.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -122,8 +123,8 @@ afterEach(() => {
   rmSync(testRoot, { recursive: true, force: true });
 });
 
-function setupWorkspaceWithGeneratedFiles(): string {
-  const systemDir = createMaterializeWorkspace(testRoot);
+async function setupWorkspaceWithGeneratedFiles(): Promise<string> {
+  const systemDir = await createMaterializeWorkspace(testRoot);
 
   // Add bordbuch generated files to cache clone's public/
   const wellKnownDir = join(systemDir, "public", ".well-known");
@@ -150,7 +151,7 @@ function setupWorkspaceWithGeneratedFiles(): string {
 }
 
 async function materializeAndGetWorkpiecePublic(): Promise<string> {
-  setupWorkspaceWithGeneratedFiles();
+  await setupWorkspaceWithGeneratedFiles();
 
   const { runMissionMaterialize } = await import("../mission/mission-materialize.ts");
 

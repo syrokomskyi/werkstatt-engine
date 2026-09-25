@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 describe("planBootSmokeRequests", () => {
-  it("includes root, language routes, 404 probe", () => {
+  it("includes root, language routes, 404 probe", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-plan-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "en"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "en"] });
 
     const paths = requests.map((r) => r.path);
     expect(paths).toContain("/");
@@ -16,39 +16,39 @@ describe("planBootSmokeRequests", () => {
     expect(paths).toContain("/__boot-smoke-404-probe__");
   });
 
-  it("includes asset probe when dist/client/ exists", () => {
+  it("includes asset probe when dist/client/ exists", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-asset-"));
     mkdirSync(join(tmpDist, "client"), { recursive: true });
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["en"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["en"] });
 
     const paths = requests.map((r) => r.path);
     expect(paths).toContain("/favicon.ico");
   });
 
-  it("includes API route when dist/client/api/ exists", () => {
+  it("includes API route when dist/client/api/ exists", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-api-"));
     mkdirSync(join(tmpDist, "client", "api"), { recursive: true });
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
 
     const apiRequests = requests.filter((r) => r.kind === "api");
     expect(apiRequests.length).toBeGreaterThan(0);
   });
 
-  it("includes route from surface.generated.json when present", () => {
+  it("includes route from surface.generated.json when present", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-surface-"));
     writeFileSync(
       join(tmpDist, "surface.generated.json"),
       JSON.stringify([{ path: "/about", kind: "page" }]),
     );
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["en"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["en"] });
 
     const paths = requests.map((r) => r.path);
     expect(paths).toContain("/about");
   });
 
-  it("marks 404 probe as not-found kind", () => {
+  it("marks 404 probe as not-found kind", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-404-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["en"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["en"] });
 
     const notFound = requests.find((r) => r.kind === "not-found");
     expect(notFound).toBeDefined();

@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0355: initial mission IO helpers.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -21,15 +22,20 @@ export { resolveMissionDir };
 
 const MISSIONS_DIR = "missions";
 
-export function resolveMissionManifestPath(workspaceRoot: string, missionId: string): string {
-  return path.join(resolveMissionDir(workspaceRoot, missionId), "mission.yaml");
+export async function resolveMissionManifestPath(
+  workspaceRoot: string,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  return path.join(await resolveMissionDir(workspaceRoot, missionId, io), "mission.yaml");
 }
 
 export async function readMissionManifest(
   workspaceRoot: string,
-  missionId: string, io: WorkspaceIO = createDefaultIO().io,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<MissionManifest> {
-  const filePath = resolveMissionManifestPath(workspaceRoot, missionId);
+  const filePath = await resolveMissionManifestPath(workspaceRoot, missionId, io);
   const raw = await io.readFile(filePath);
   const parsed = parseYaml(raw);
   return missionManifestSchema.parse(parsed);
@@ -38,32 +44,46 @@ export async function readMissionManifest(
 export async function writeMissionManifest(
   workspaceRoot: string,
   manifest: MissionManifest,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
-  const filePath = resolveMissionManifestPath(workspaceRoot, manifest.missionId);
+  const filePath = await resolveMissionManifestPath(workspaceRoot, manifest.missionId, io);
   const yaml = stringifyYaml(manifest);
   await atomicWriteFile(filePath, yaml + "\n");
 }
 
-export async function missionExists(workspaceRoot: string, missionId: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
-  return await io.exists(resolveMissionManifestPath(workspaceRoot, missionId));
+export async function missionExists(
+  workspaceRoot: string,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
+  return await io.exists(await resolveMissionManifestPath(workspaceRoot, missionId, io));
 }
 
 export async function createMissionDirectories(
   workspaceRoot: string,
-  missionId: string, io: WorkspaceIO = createDefaultIO().io,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, io);
   await io.mkdir(path.join(missionDir, "workpiece"));
   await io.mkdir(path.join(missionDir, "evidence"));
 }
 
-export function resolveMissionEvidenceDir(workspaceRoot: string, missionId: string): string {
-  return path.join(resolveMissionDir(workspaceRoot, missionId), "evidence", "axiom");
+export async function resolveMissionEvidenceDir(
+  workspaceRoot: string,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  return path.join(await resolveMissionDir(workspaceRoot, missionId, io), "evidence", "axiom");
 }
 
-export async function listMissionDirs(workspaceRoot: string, systemId?: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+export async function listMissionDirs(
+  workspaceRoot: string,
+  systemId?: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const missionsPath = path.join(workspaceRoot, MISSIONS_DIR);
-  if (!await io.exists(missionsPath)) return [];
+  if (!(await io.exists(missionsPath))) return [];
 
   const entries = await io.readdir(missionsPath);
   const dirs = entries.filter((e) => e.isDirectory && e.name !== "archive").map((e) => e.name);

@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0615: initial tests for dist/ cleanup before astro build.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,19 +38,25 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   };
 });
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
+function makeInterceptedIo(): ReturnType<typeof createDefaultIO>["io"] {
+  const baseIo = createDefaultIO().io;
   return {
-    ...actual,
-    execSync: vi.fn((cmd: string, opts?: Record<string, unknown>) => {
-      if (cmd === "pnpm exec astro build") {
-        mockPipeline.execSyncCalled = true;
-        return "10 page(s)";
-      }
-      return actual.execSync(cmd, opts as never);
-    }),
+    ...baseIo,
+    exec: vi.fn(
+      async (
+        command: string,
+        args: string[],
+        opts?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+      ) => {
+        if (command === "pnpm" && args.join(" ") === "exec astro build") {
+          mockPipeline.execSyncCalled = true;
+          return { exitCode: 0, stdout: "10 page(s)", stderr: "" };
+        }
+        return baseIo.exec(command, args, opts);
+      },
+    ),
   };
-});
+}
 
 function gitInit(dir: string): void {
   execSync("git init", { cwd: dir, stdio: "pipe" });
@@ -167,7 +174,7 @@ test("mission.validate removes stale dist/ before astro build", async () => {
     argv: [],
   };
   const context: KernelRuntimeContext = {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

@@ -6,22 +6,17 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <item>ADR-0082: extend generated.drift.validate coverage to cache clones</item>
   <item>ADR-0088: add JRN-01 rule — op-started records in cache-clone operations/*.jsonl must carry non-empty missionId.</item>
   <item>2026-09-24: add COMMITTED_GENERATED_ALLOWED — exempt shrink-only baselines (list-punctuation.baseline.generated.yaml) from bundle-contract without requiring HEAD persistence, unlike COMMITTED_MANIFEST_PATHS entries.</item>
   <item>ADR-0091: pass externalEditBaselineSha from collectExternalEditInputs into evaluateExternalEditGate.</item>
   <item>RFC-1149: phase 1b — DRIFT-02 diagnostics promoted from warnings to violations (blocking); DRIFT-01 stays warning per ADR-0082 cleanup caveat.</item>
-  <history>RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0082, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { parse as parseYaml } from "yaml";
 import type {
   KernelCommandInput,
@@ -111,25 +106,25 @@ const COMMITTED_GENERATED_ALLOWED = ["list-punctuation.baseline.generated.yaml"]
  * tracked. Only files that ARE tracked but missing from HEAD trigger
  * STERN-MANIFEST-01 — untracked files (new systems) are not flagged.
  */
-function checkManifestPresence(cacheDir: string, systemId: string): SternsystemViolation[] {
+async function checkManifestPresence(
+  cacheDir: string,
+  systemId: string,
+  io: WorkspaceIO,
+): Promise<SternsystemViolation[]> {
   const violations: SternsystemViolation[] = [];
   for (const manifestPath of COMMITTED_MANIFEST_PATHS) {
     try {
       // Check if the file is tracked in git history (any commit)
-      const tracked = execSync(`git log --oneline -1 -- ${manifestPath}`, {
+      const trackedResult = await io.exec("git", ["log", "--oneline", "-1", "--", manifestPath], {
         cwd: cacheDir,
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
-      if (!tracked) continue; // Not tracked — new system, skip
+      });
+      if (trackedResult.exitCode !== 0 || !trackedResult.stdout.trim()) continue; // Not tracked — new system, skip
 
       // Check if the file exists in HEAD
-      const headContent = execSync(`git ls-tree HEAD -- ${manifestPath}`, {
+      const headResult = await io.exec("git", ["ls-tree", "HEAD", "--", manifestPath], {
         cwd: cacheDir,
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
-      if (!headContent) {
+      });
+      if (headResult.exitCode === 0 && !headResult.stdout.trim()) {
         violations.push({
           systemId,
           rule: "STERN-MANIFEST-01",
@@ -153,14 +148,17 @@ async function checkJournalAttribution(
   cacheDir: string,
   systemId: string,
   warnings: Array<{ systemId: string; field: string; message: string }>,
+  io: WorkspaceIO,
 ): Promise<SternsystemViolation[]> {
   const violations: SternsystemViolation[] = [];
   const operationsDir = path.join(cacheDir, "operations");
-  if (!existsSync(operationsDir)) return violations;
+  if (!(await io.exists(operationsDir))) return violations;
 
   let files: string[];
   try {
-    files = (await fs.readdir(operationsDir)).filter((f) => f.endsWith(".jsonl"));
+    files = (await io.readdir(operationsDir))
+      .map((e) => e.name)
+      .filter((f) => f.endsWith(".jsonl"));
   } catch (err) {
     warnings.push({
       systemId,
@@ -199,19 +197,16 @@ async function checkJournalAttribution(
 async function checkBundleContract(
   cacheDir: string,
   systemId: string,
+  io: WorkspaceIO,
 ): Promise<SternsystemViolation[]> {
   const violations: SternsystemViolation[] = [];
-  if (!existsSync(cacheDir)) return violations;
+  if (!(await io.exists(cacheDir))) return violations;
 
   let trackedFiles: string[] = [];
-  try {
-    const output = execSync("git ls-files", {
-      cwd: cacheDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    trackedFiles = output.split("\n").filter(Boolean);
-  } catch {
+  const lsResult = await io.exec("git", ["ls-files"], { cwd: cacheDir });
+  if (lsResult.exitCode === 0) {
+    trackedFiles = lsResult.stdout.split("\n").filter(Boolean);
+  } else {
     return violations;
   }
 
@@ -244,18 +239,19 @@ async function checkBundleContract(
 async function validateYamlFiles(
   cacheDir: string,
   systemId: string,
+  io: WorkspaceIO,
 ): Promise<SternsystemViolation[]> {
   const violations: SternsystemViolation[] = [];
-  if (!existsSync(cacheDir)) return violations;
+  if (!(await io.exists(cacheDir))) return violations;
 
-  const entries = await fs.readdir(cacheDir, { withFileTypes: true });
+  const entries = await io.readdir(cacheDir);
   for (const entry of entries) {
     if (!entry.isFile) continue;
     if (!entry.name.endsWith(".yaml") && !entry.name.endsWith(".yml")) continue;
 
     const filePath = path.join(cacheDir, entry.name);
     try {
-      const raw = await fs.readFile(filePath, "utf8");
+      const raw = await io.readFile(filePath);
       parseYaml(raw);
     } catch (err) {
       violations.push({
@@ -373,7 +369,7 @@ export async function runSternsystemValidate(
     }
 
     // apps/ collision
-    if (hasAppsCollision(workspaceRoot, entry.id)) {
+    if (await hasAppsCollision(workspaceRoot, entry.id, context.io)) {
       violations.push({
         systemId: entry.id,
         rule: "apps-collision",
@@ -383,14 +379,14 @@ export async function runSternsystemValidate(
 
     // Bundle contract (if cache clone exists)
     const cacheDir = resolveMirrors(workspaceRoot, entry).cachePath;
-    const bundleViolations = await checkBundleContract(cacheDir, entry.id);
+    const bundleViolations = await checkBundleContract(cacheDir, entry.id, context.io);
     violations.push(...bundleViolations);
 
     // Pin file validation (if cache clone exists)
     const pinPath = path.join(cacheDir, "system.pin.json");
     if (await context.io.exists(pinPath)) {
       try {
-        const raw = await fs.readFile(pinPath, "utf8");
+        const raw = await context.io.readFile(pinPath);
         const parsed = JSON.parse(raw);
         systemPinSchema.parse(parsed);
         const pin = parsed as { platform: { version: string }; systemId: string };
@@ -470,11 +466,11 @@ export async function runSternsystemValidate(
 
       if (await context.io.exists(bareRepoPath)) {
         try {
-          const remoteUrl = execSync("git remote get-url mirror", {
+          const remoteResult = await context.io.exec("git", ["remote", "get-url", "mirror"], {
             cwd: bareRepoPath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
+          });
+          if (remoteResult.exitCode !== 0) throw new Error(remoteResult.stderr.trim());
+          const remoteUrl = remoteResult.stdout.trim();
           if (entry.mirrors.length > 2 && remoteUrl !== entry.mirrors[2].path) {
             violations.push({
               systemId: entry.id,
@@ -507,13 +503,11 @@ export async function runSternsystemValidate(
     const cacheGitDir = path.join(cacheDir, ".git");
     if (await context.io.exists(cacheGitDir)) {
       try {
-        const cacheBranch = execSync("git symbolic-ref HEAD", {
+        const branchResult = await context.io.exec("git", ["symbolic-ref", "HEAD"], {
           cwd: cacheDir,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        })
-          .replace("refs/heads/", "")
-          .trim();
+        });
+        if (branchResult.exitCode !== 0) throw new Error(branchResult.stderr.trim());
+        const cacheBranch = branchResult.stdout.replace("refs/heads/", "").trim();
         if (cacheBranch !== "main") {
           violations.push({
             systemId: entry.id,
@@ -535,13 +529,11 @@ export async function runSternsystemValidate(
       const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
       if (await context.io.exists(bareRepoPath)) {
         try {
-          const bareBranch = execSync("git symbolic-ref HEAD", {
+          const bareBranchResult = await context.io.exec("git", ["symbolic-ref", "HEAD"], {
             cwd: bareRepoPath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          })
-            .replace("refs/heads/", "")
-            .trim();
+          });
+          if (bareBranchResult.exitCode !== 0) throw new Error(bareBranchResult.stderr.trim());
+          const bareBranch = bareBranchResult.stdout.replace("refs/heads/", "").trim();
           if (bareBranch !== "main") {
             violations.push({
               systemId: entry.id,
@@ -560,11 +552,11 @@ export async function runSternsystemValidate(
     }
 
     // RFC-0520: Bordbuch-vs-git-log check delegated to evaluateExternalEditGate
-    if (bordbuchFileExists(cacheDir)) {
+    if (await bordbuchFileExists(cacheDir, context.io)) {
       try {
         const bordbuchPath = bordbuchPathFor(cacheDir);
         const { bordbuchEntries, rangeShas, gitLogShas, externalEditBaselineSha } =
-          await collectExternalEditInputs(cacheDir, bordbuchPath);
+          await collectExternalEditInputs(cacheDir, bordbuchPath, context.io);
         const guardResult = evaluateExternalEditGate({
           systemId: entry.id,
           bordbuchEntries,
@@ -583,15 +575,20 @@ export async function runSternsystemValidate(
     }
 
     // RFC-0792: YAML syntax checking for all top-level YAML files in cache clone
-    const yamlViolations = await validateYamlFiles(cacheDir, entry.id);
+    const yamlViolations = await validateYamlFiles(cacheDir, entry.id, context.io);
     violations.push(...yamlViolations);
 
     // RFC-0870: Manifest presence check — committed generated manifests must exist in cache clone HEAD
-    const manifestViolations = checkManifestPresence(cacheDir, entry.id);
+    const manifestViolations = await checkManifestPresence(cacheDir, entry.id, context.io);
     violations.push(...manifestViolations);
 
     // ADR-0088: JRN-01 — journal mission attribution in cache clone operations/
-    const journalViolations = await checkJournalAttribution(cacheDir, entry.id, warnings);
+    const journalViolations = await checkJournalAttribution(
+      cacheDir,
+      entry.id,
+      warnings,
+      context.io,
+    );
     violations.push(...journalViolations);
 
     // ADR-0082: cache-clone generated drift — committed generated files in the

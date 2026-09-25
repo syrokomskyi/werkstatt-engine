@@ -9,6 +9,7 @@ SemVer-based Migrator type that operated on in-memory AuthoredSet.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0479: new Migrator, SternsystemData, MigrationContext, MigrationError, MigrationViolation types.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -21,6 +22,8 @@ export interface MigrationContext {
   systemId: string;
   missionId: string;
   logger: { info: (msg: string) => void };
+  /** Optional WorkspaceIO port — migrators fall back to createDefaultIO when absent. */
+  io?: import("@warpgogol/werkstatt-shared/kernel/workspace-io").WorkspaceIO;
 }
 
 export interface Migrator {

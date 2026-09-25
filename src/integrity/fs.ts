@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY> 
 *******************************************************************************/
 
@@ -25,29 +26,40 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
  * Provides async wrappers for directory creation, file read/write, and path checks.
  */
 
-import { promises as fs } from "node:fs";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function ensureDir(dirPath: string): Promise<void> {
-  await fs.mkdir(dirPath, { recursive: true });
+export async function ensureDir(
+  dirPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  await io.mkdir(dirPath);
 }
 
-export async function pathExists(targetPath: string): Promise<boolean> {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
+export async function pathExists(
+  targetPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
+  return io.exists(targetPath);
 }
 
-export async function readText(filePath: string): Promise<string> {
-  return fs.readFile(filePath, "utf8");
+export async function readText(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  return io.readFile(filePath);
 }
 
-export async function writeText(filePath: string, content: string): Promise<void> {
-  await fs.writeFile(filePath, content, "utf8");
+export async function writeText(
+  filePath: string,
+  content: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  await io.writeFile(filePath, content);
 }
 
-export async function readBuffer(filePath: string): Promise<Buffer> {
-  return fs.readFile(filePath);
+export async function readBuffer(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Buffer> {
+  return Buffer.from(await io.readFileBytes(filePath));
 }

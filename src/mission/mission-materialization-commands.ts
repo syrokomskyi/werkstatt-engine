@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1028: write .validation-state.json after mission.validate completes (pass, fail, and distribution-reuse paths) with per-validator states for inspection.</item>
   <item>RFC-1074: extract persistDistribution helper — shared by runMissionValidate and runMissionBuild to copy dist, write build-input-hash.json, and write build-manifest.json.</item>
   <item>RFC-1086: add --fast flag to mission.validate for incremental validation — reads previous validation-report.json, skips passed phases, cascades re-run of downstream phases.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,13 +14,12 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028</history>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import { parse as yamlParse } from "yaml";
 import type {
@@ -114,17 +112,31 @@ async function cleanupBordbuchOnFailure(
   }
 }
 
-async function copyDir(src: string, dest: string): Promise<void> {
-  if (!existsSync(src)) return;
-  await fs.mkdir(dest, { recursive: true });
-  const entries = await fs.readdir(src, { withFileTypes: true });
+// RFC-1149: shell-string exec preserved verbatim via sh -c — commands with
+// interpolated shell quoting (JSON.stringify args, -- ${paths}) keep identical
+// semantics without re-tokenizing into argv.
+async function shExec(cmd: string, cwd: string, io: WorkspaceIO): Promise<string> {
+  const result = await io.exec("sh", ["-c", cmd], { cwd });
+  if (result.exitCode !== 0) {
+    const err = new Error(
+      `command failed (exit ${result.exitCode}): ${cmd}\n${result.stderr.trim()}`,
+    );
+    throw err;
+  }
+  return result.stdout;
+}
+
+async function copyDir(src: string, dest: string, io: WorkspaceIO): Promise<void> {
+  if (!(await io.exists(src))) return;
+  await io.mkdir(dest);
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      await copyDir(srcPath, destPath);
+    if (entry.isDirectory) {
+      await copyDir(srcPath, destPath, io);
     } else {
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -147,15 +159,16 @@ async function persistDistribution(params: {
   routeCount: number;
   sitemapHash: string;
   builtAt: string;
+  io: WorkspaceIO;
   error?: string;
 }): Promise<void> {
   const distSrc = path.join(params.workpieceDir, "dist");
   const distDest = path.join(params.distributionDir, "dist");
-  if (existsSync(distSrc)) {
-    if (existsSync(distDest)) {
-      await fs.rm(distDest, { recursive: true, force: true });
+  if (await params.io.exists(distSrc)) {
+    if (await params.io.exists(distDest)) {
+      await params.io.rm(distDest, { recursive: true });
     }
-    await copyDir(distSrc, distDest);
+    await copyDir(distSrc, distDest, params.io);
   }
 
   if (params.succeeded) {
@@ -187,29 +200,31 @@ async function persistDistribution(params: {
 // RFC-0976: Shared auto-commit logic for both distribution-reuse and full-build success paths.
 // Commits generated artifacts via commitWorkpieceIfDirty, then re-checks dirty state.
 // Returns the post-commit dirty check so the caller can warn if files remain uncommitted.
-function autoCommitAfterValidation(
+async function autoCommitAfterValidation(
   workpieceDir: string,
   missionId: string,
   skipAutoCommit: boolean,
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
-): { dirty: boolean; fileCount: number; files?: string[] } {
-  let dirtyCheck = isWorkpieceDirty(workpieceDir);
+  io: WorkspaceIO,
+): Promise<{ dirty: boolean; fileCount: number; files?: string[] }> {
+  let dirtyCheck = await isWorkpieceDirty(workpieceDir, io);
   // ADR-0085: never attempt commits on a closed workpiece — RFC-0878 blocks
   // them anyway; report the dirty state without the misleading failure warn.
-  const workpieceClosed = existsSync(path.join(workpieceDir, ".closed"));
+  const workpieceClosed = await io.exists(path.join(workpieceDir, ".closed"));
   if (dirtyCheck.dirty && !skipAutoCommit && !workpieceClosed) {
     try {
-      const autoCommit = commitWorkpieceIfDirty(
+      const autoCommit = await commitWorkpieceIfDirty(
         workpieceDir,
         missionId,
         "chore: post-validation artifacts (mission.validate)",
+        io,
       );
       if (autoCommit.committed) {
         logger.info(
           `[mission.validate] auto-committed ${dirtyCheck.fileCount} generated artifact(s) (${autoCommit.commitSha?.slice(0, 8)})`,
         );
       }
-      dirtyCheck = isWorkpieceDirty(workpieceDir);
+      dirtyCheck = await isWorkpieceDirty(workpieceDir, io);
     } catch (err) {
       logger.warn(
         `[mission.validate] auto-commit failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
@@ -226,36 +241,33 @@ function autoCommitAfterValidation(
 
 // RFC-0796: Workspace-level advisory check for stale entries in missions/ root.
 // Warns about stale symlinks or terminal-state directories. Non-blocking.
-export function validateNoStaleMissionEntries(workspaceRoot: string): StaleEntryViolation[] {
+export async function validateNoStaleMissionEntries(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<StaleEntryViolation[]> {
   const missionsPath = path.join(workspaceRoot, "missions");
-  if (!existsSync(missionsPath)) return [];
+  if (!(await io.exists(missionsPath))) return [];
 
   const warnings: StaleEntryViolation[] = [];
-  const entries = readdirSync(missionsPath, { withFileTypes: true });
+  const entries = await io.readdir(missionsPath);
   for (const entry of entries) {
     if (entry.name === "archive") continue;
     const entryPath = path.join(missionsPath, entry.name);
     const sourceRel = `missions/${entry.name}`;
 
-    let stat;
-    try {
-      stat = lstatSync(entryPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isSymbolicLink()) {
+    const linkCheck = await io.exec("test", ["-L", entryPath]);
+    if (linkCheck.exitCode === 0) {
       warnings.push({
         path: sourceRel,
         kind: "symlink",
         message: "stale symlink in missions/ root — run mission.archive to clean up",
       });
-    } else if (stat.isDirectory()) {
+    } else if (entry.isDirectory) {
       // Check if this is a terminal-state mission directory
       const manifestPath = path.join(entryPath, "mission.yaml");
-      if (existsSync(manifestPath)) {
+      if (await io.exists(manifestPath)) {
         try {
-          const content = readFileSync(manifestPath, "utf8");
+          const content = await io.readFile(manifestPath);
           const m = yamlParse(content);
           if (m.state === "closed" || m.state === "aborted") {
             warnings.push({
@@ -410,10 +422,11 @@ export interface PreviousValidationReport {
 // RFC-1086: read and parse the previous validation-report.json
 export async function readPreviousValidationReport(
   evidenceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<PreviousValidationReport | null> {
   const reportPath = path.join(evidenceDir, "validation-report.json");
   try {
-    const raw = await fs.readFile(reportPath, "utf8");
+    const raw = await io.readFile(reportPath);
     return JSON.parse(raw) as PreviousValidationReport;
   } catch {
     return null;
@@ -460,6 +473,7 @@ export interface ValidateStepCtx {
   dirtyBeforeBuildPost: { dirty: boolean; fileCount: number };
   preliminaryBuildIdentityPath: string | null;
   now: string;
+  io: WorkspaceIO;
 }
 
 // RFC-1086: create a minimally valid KernelPipelineReport for skipped phases
@@ -608,9 +622,9 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
 
         // RFC-0615: clean stale dist/ before build to prevent false positives
         const distDir = path.join(c.workpieceDir, "dist");
-        if (existsSync(distDir)) {
+        if (await c.io.exists(distDir)) {
           c.logger.info(`  Cleaning stale dist/ before build…`);
-          await fs.rm(distDir, { recursive: true, force: true });
+          await c.io.rm(distDir, { recursive: true });
         }
 
         c.preliminaryBuildIdentityPath = await writePreliminaryBuildIdentity(
@@ -626,12 +640,16 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
 
         c.logger.info(`  Running astro build in ${c.workpieceDir}…`);
         try {
-          const buildOutput = execSync("pnpm exec astro build", {
+          const buildResult = await c.io.exec("pnpm", ["exec", "astro", "build"], {
             cwd: c.workpieceDir,
-            stdio: "pipe",
-            timeout: 300_000,
-            encoding: "utf-8",
+            timeoutMs: 300_000,
           });
+          if (buildResult.exitCode !== 0) {
+            throw new Error(
+              buildResult.stderr.trim() || `astro build exited ${buildResult.exitCode}`,
+            );
+          }
+          const buildOutput = buildResult.stdout;
           c.buildSucceeded = true;
           const routeMatches = buildOutput.match(/\d+ page\(s\)/g);
           if (routeMatches) {
@@ -639,7 +657,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
             c.routeCount = Math.max(...nums, 0);
           }
           const sitemapPath = path.join(c.workpieceDir, "dist", "sitemap-index.xml");
-          if (existsSync(sitemapPath)) {
+          if (await c.io.exists(sitemapPath)) {
             const { byteHashFile } = await import("@warpgogol/werkstatt-engine/fingerprint");
             c.sitemapHash = await byteHashFile(sitemapPath);
           } else {
@@ -651,7 +669,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
         }
 
         // RFC-0615: check dirty state before build.post
-        c.dirtyBeforeBuildPost = isWorkpieceDirty(c.workpieceDir);
+        c.dirtyBeforeBuildPost = await isWorkpieceDirty(c.workpieceDir, c.io);
         if (c.dirtyBeforeBuildPost.dirty) {
           c.logger.info(
             `  [warn] workpiece has ${c.dirtyBeforeBuildPost.fileCount} uncommitted file(s) — snapshot auto-regeneration will be skipped`,
@@ -816,7 +834,7 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
       },
       verify: async (c: ValidateStepCtx) => {
         // Report is written — check file exists
-        return existsSync(path.join(c.evidenceDir, "validation-report.json"));
+        return c.io.exists(path.join(c.evidenceDir, "validation-report.json"));
       },
     },
   ];
@@ -844,11 +862,11 @@ export async function runMissionValidate(
     );
   }
 
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDir = path.join(missionDir, "workpiece");
   const evidenceDir = path.join(missionDir, "evidence");
   const distributionDir = path.join(missionDir, "distribution");
-  await fs.mkdir(evidenceDir, { recursive: true });
+  await context.io.mkdir(evidenceDir);
 
   // ADR-0085: for closed missions, registry.currentMission is null and site
   // discovery would resolve to the cache clone — point pipelines at the
@@ -900,7 +918,7 @@ export async function runMissionValidate(
     } else if (isPreviousReportAllPassed(previousReport)) {
       // All phases passed — short-circuit, do NOT overwrite the existing report
       logger.info("  All phases passed in previous report — skipping validation.");
-      const staleEntryWarnings = validateNoStaleMissionEntries(workspaceRoot);
+      const staleEntryWarnings = await validateNoStaleMissionEntries(workspaceRoot, context.io);
       if (staleEntryWarnings.length > 0) {
         for (const w of staleEntryWarnings) {
           logger.warn(`  [stale-entry] ${w.path}: ${w.message}`);
@@ -929,7 +947,7 @@ export async function runMissionValidate(
   // RFC-1086: guard deletion when --fast is active so the previous report can be read.
   const validationReportPath = path.join(evidenceDir, "validation-report.json");
   if (!effectiveFast) {
-    await fs.unlink(validationReportPath).catch(() => {});
+    await context.io.rm(validationReportPath).catch(() => {});
   }
 
   // RFC-0724: Auto-commit dirty bordbuch files on all paths (not just reuse).
@@ -953,11 +971,14 @@ export async function runMissionValidate(
   if (!force && !effectiveFast) {
     const distributionMetaPath = path.join(distributionDir, "build-input-hash.json");
     const distributionDistDir = path.join(distributionDir, "dist");
-    if (await context.io.exists(distributionMetaPath) && await context.io.exists(distributionDistDir)) {
+    if (
+      (await context.io.exists(distributionMetaPath)) &&
+      (await context.io.exists(distributionDistDir))
+    ) {
       let canReuse = false;
       let storedHash: string | null = null;
       try {
-        const meta = JSON.parse(await fs.readFile(distributionMetaPath, "utf8"));
+        const meta = JSON.parse(await context.io.readFile(distributionMetaPath));
         storedHash = meta.buildInputHash ?? null;
       } catch {
         // Corrupt or unreadable — fall through to full build
@@ -979,9 +1000,9 @@ export async function runMissionValidate(
         logger.info(`  Distribution reuse: build-input-hash matched — skipping build cycle`);
         // Copy distribution/dist/ to workpiece/dist/ if missing
         const workpieceDistDir = path.join(workpieceDir, "dist");
-        if (!await context.io.exists(workpieceDistDir)) {
+        if (!(await context.io.exists(workpieceDistDir))) {
           logger.info(`  Copying distribution/dist/ to workpiece/dist/…`);
-          await copyDir(distributionDistDir, workpieceDistDir);
+          await copyDir(distributionDistDir, workpieceDistDir, context.io);
         }
 
         // Read build-manifest.json for routeCount and sitemapHash if available
@@ -990,7 +1011,7 @@ export async function runMissionValidate(
         try {
           const buildManifestPath = path.join(distributionDir, "build-manifest.json");
           if (await context.io.exists(buildManifestPath)) {
-            const manifestData = JSON.parse(await fs.readFile(buildManifestPath, "utf8"));
+            const manifestData = JSON.parse(await context.io.readFile(buildManifestPath));
             reusedRouteCount = manifestData.routeCount ?? 0;
             reusedSitemapHash = manifestData.sitemapHash ?? "sha256:reused";
           }
@@ -1019,11 +1040,12 @@ export async function runMissionValidate(
         );
 
         // RFC-0976: auto-commit generated artifacts after successful validation (reuse path).
-        const dirtyCheck = autoCommitAfterValidation(
+        const dirtyCheck = await autoCommitAfterValidation(
           workpieceDir,
           missionId,
           input.flags["skip-auto-commit"] === true,
           logger,
+          context.io,
         );
 
         // RFC-0724: bordbuch auto-commit is now done at the top of mission.validate (covers all paths).
@@ -1032,7 +1054,7 @@ export async function runMissionValidate(
         const reuseNextSteps = buildValidateNextSteps(missionId, dirtyCheck);
 
         // RFC-0796: stale entry warnings (non-blocking)
-        const staleEntryWarnings = validateNoStaleMissionEntries(workspaceRoot);
+        const staleEntryWarnings = await validateNoStaleMissionEntries(workspaceRoot, context.io);
         if (staleEntryWarnings.length > 0) {
           for (const w of staleEntryWarnings) {
             logger.warn(`  [stale-entry] ${w.path}: ${w.message}`);
@@ -1196,6 +1218,7 @@ export async function runMissionValidate(
     buildError: undefined,
     routeCount: 0,
     sitemapHash: "sha256:not-built",
+    io: context.io,
     postPipelineReport: undefined,
     dirtyBeforeBuildPost: { dirty: false, fileCount: 0 },
     preliminaryBuildIdentityPath: null,
@@ -1255,9 +1278,9 @@ export async function runMissionValidate(
       );
     }
     // 3. Delete stale journal (safe — checkDifferentKindOperation already passed)
-    await fs.unlink(path.join(missionDir, "journal.jsonl")).catch(() => {});
+    await context.io.rm(path.join(missionDir, "journal.jsonl")).catch(() => {});
     // 4. Delete stale validation report
-    await fs.unlink(path.join(evidenceDir, "validation-report.json")).catch(() => {});
+    await context.io.rm(path.join(evidenceDir, "validation-report.json")).catch(() => {});
   }
 
   const opResult = await runOperation(
@@ -1364,6 +1387,7 @@ export async function runMissionValidate(
       routeCount: validateCtx.routeCount,
       sitemapHash: validateCtx.sitemapHash,
       builtAt: validateCtx.now,
+      io: context.io,
     });
     logger.info(
       `  Distribution persisted to missions/${missionId}/distribution/ (reusable by release.prepare)`,
@@ -1375,11 +1399,12 @@ export async function runMissionValidate(
   }
 
   // RFC-0976: auto-commit generated artifacts after successful validation.
-  const dirtyCheck = autoCommitAfterValidation(
+  const dirtyCheck = await autoCommitAfterValidation(
     workpieceDir,
     missionId,
     input.flags["skip-auto-commit"] === true,
     logger,
+    context.io,
   );
 
   // RFC-0797: post-validation cache clone cleanup — commit ALL generated files
@@ -1387,7 +1412,11 @@ export async function runMissionValidate(
   // warning from firing for any generated file and unblocks mission.reconcile.
   try {
     const postValidateCachePath = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-    const postValidateCache = commitCacheCloneIfDirty(postValidateCachePath, manifest.systemId);
+    const postValidateCache = await commitCacheCloneIfDirty(
+      postValidateCachePath,
+      manifest.systemId,
+      context.io,
+    );
     if (postValidateCache.committed) {
       logger.info(
         `  Cache clone post-validate cleanup: committed generated file(s) (${postValidateCache.commitSha?.slice(0, 8)})`,
@@ -1402,7 +1431,7 @@ export async function runMissionValidate(
   // RFC-0522: warn on dirty cache clone — reconcile will fail until resolved
   const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
   if (await context.io.exists(path.join(systemDir, ".git"))) {
-    const cacheDirtyCheck = isWorkpieceDirty(systemDir);
+    const cacheDirtyCheck = await isWorkpieceDirty(systemDir, context.io);
     if (cacheDirtyCheck.dirty) {
       logger.warn(
         `[mission.validate] cache clone for system '${manifest.systemId}' has ${cacheDirtyCheck.fileCount} uncommitted file(s) — reconcile will fail until resolved`,
@@ -1411,7 +1440,7 @@ export async function runMissionValidate(
   }
 
   // RFC-0796: stale entry warnings (non-blocking)
-  const staleEntryWarnings = validateNoStaleMissionEntries(workspaceRoot);
+  const staleEntryWarnings = await validateNoStaleMissionEntries(workspaceRoot, context.io);
   if (staleEntryWarnings.length > 0) {
     for (const w of staleEntryWarnings) {
       logger.warn(`  [stale-entry] ${w.path}: ${w.message}`);
@@ -1463,7 +1492,7 @@ export async function runMissionBuild(
     );
   }
 
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDir = path.join(missionDir, "workpiece");
   const distributionDir = path.join(missionDir, "distribution");
 
@@ -1513,12 +1542,14 @@ export async function runMissionBuild(
     );
     logger.info(`  Running astro build in ${workpieceDir}…`);
     try {
-      const buildOutput = execSync("pnpm exec astro build", {
+      const buildResult = await context.io.exec("pnpm", ["exec", "astro", "build"], {
         cwd: workpieceDir,
-        stdio: "pipe",
-        timeout: 300_000,
-        encoding: "utf-8",
+        timeoutMs: 300_000,
       });
+      if (buildResult.exitCode !== 0) {
+        throw new Error(buildResult.stderr.trim() || `astro build exited ${buildResult.exitCode}`);
+      }
+      const buildOutput = buildResult.stdout;
       const routeMatches = buildOutput.match(/\d+ page\(s\)/g);
       if (routeMatches) {
         const nums = routeMatches.map((m) => parseInt(m, 10));
@@ -1564,11 +1595,12 @@ export async function runMissionBuild(
     routeCount: buildRouteCount,
     sitemapHash: buildSitemapHash,
     builtAt: now,
+    io: context.io,
     error: buildError,
   });
 
   const evidenceDir = path.join(missionDir, "evidence");
-  await fs.mkdir(evidenceDir, { recursive: true });
+  await context.io.mkdir(evidenceDir);
   const buildManifest = {
     builtAt: now,
     missionId,
@@ -1622,8 +1654,12 @@ export interface MissionDiffData {
   removed: string[];
 }
 
-async function collectRelativeFiles(dir: string, base: string = dir): Promise<string[]> {
-  if (!existsSync(dir)) return [];
+async function collectRelativeFiles(
+  dir: string,
+  base: string = dir,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
+  if (!(await io.exists(dir))) return [];
   const files = await collectFiles(dir, { ignore: (name) => name === ".git" });
   return files.map((filePath) => path.relative(base, filePath).replace(/\\/g, "/"));
 }
@@ -1638,10 +1674,13 @@ export async function runMissionDiff(
 
   const manifest = await readMissionManifest(workspaceRoot, missionId);
   const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-  const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
+  const workpieceDir = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "workpiece",
+  );
 
-  const systemFiles = new Set(await collectRelativeFiles(systemDir));
-  const workpieceFiles = new Set(await collectRelativeFiles(workpieceDir));
+  const systemFiles = new Set(await collectRelativeFiles(systemDir, undefined, context.io));
+  const workpieceFiles = new Set(await collectRelativeFiles(workpieceDir, undefined, context.io));
 
   const added = [...workpieceFiles].filter((f) => !systemFiles.has(f));
   const removed = [...systemFiles].filter((f) => !workpieceFiles.has(f));
@@ -1649,15 +1688,15 @@ export async function runMissionDiff(
 
   for (const f of workpieceFiles) {
     if (systemFiles.has(f)) {
-      const sysContent = await fs.readFile(path.join(systemDir, f), "utf8").catch(() => "");
-      const wpContent = await fs.readFile(path.join(workpieceDir, f), "utf8").catch(() => "");
+      const sysContent = await context.io.readFile(path.join(systemDir, f)).catch(() => "");
+      const wpContent = await context.io.readFile(path.join(workpieceDir, f)).catch(() => "");
       if (sysContent !== wpContent) modified.push(f);
     }
   }
 
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const evidenceDir = path.join(missionDir, "evidence");
-  await fs.mkdir(evidenceDir, { recursive: true });
+  await context.io.mkdir(evidenceDir);
   const diffReport = {
     schemaVersion: "1.0.0",
     missionId,
@@ -1707,12 +1746,8 @@ export interface MissionReconcileData {
 }
 
 // RFC-0584: shared merge-abort helper — attempts git merge --abort, silently catches failure
-function abortMerge(systemDir: string): void {
-  try {
-    execSync("git merge --abort", { cwd: systemDir, stdio: "pipe" });
-  } catch {
-    // merge --abort also failed — continue to throw
-  }
+async function abortMerge(systemDir: string, io: WorkspaceIO): Promise<void> {
+  await io.exec("git", ["merge", "--abort"], { cwd: systemDir }).catch(() => {});
 }
 
 export async function runMissionReconcile(
@@ -1733,9 +1768,12 @@ export async function runMissionReconcile(
   }
 
   // Check validation has passed
-  const evidenceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "evidence");
+  const evidenceDir = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "evidence",
+  );
   const validationPath = path.join(evidenceDir, "validation-report.json");
-  if (!await context.io.exists(validationPath)) {
+  if (!(await context.io.exists(validationPath))) {
     throw new Error(
       `[mission.reconcile] mission '${missionId}' has not passed validation — run mission.validate first`,
     );
@@ -1757,7 +1795,7 @@ export async function runMissionReconcile(
   );
 
   // RFC-0356 §6: verify validation passed before reconciling.
-  const validationRaw = await fs.readFile(validationPath, "utf8").catch(() => null);
+  const validationRaw = await context.io.readFile(validationPath).catch(() => null);
   if (!validationRaw) {
     throw new Error(
       `[mission.reconcile] mission '${missionId}' has not passed validation — run mission.validate first`,
@@ -1770,12 +1808,15 @@ export async function runMissionReconcile(
     );
   }
 
-  const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
+  const workpieceDir = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "workpiece",
+  );
   const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
 
   try {
     const now = new Date().toISOString();
-    const missionDir = resolveMissionDir(workspaceRoot, missionId);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
 
     const reconcileCtx: ReconcileStepCtx = {
       workspaceRoot,
@@ -1919,7 +1960,7 @@ export async function buildReconcileSteps(
       name: "workpiece-git-check",
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
-        if (!existsSync(path.join(cc.workpieceDir, ".git"))) {
+        if (!(await cc.context.io.exists(path.join(cc.workpieceDir, ".git")))) {
           throw new Error(
             `[mission.reconcile] workpiece is not a git repository — run mission.materialize first`,
           );
@@ -1930,7 +1971,12 @@ export async function buildReconcileSteps(
       name: "auto-commit-workpiece",
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
-        const result = commitWorkpieceIfDirty(cc.workpieceDir, cc.missionId);
+        const result = await commitWorkpieceIfDirty(
+          cc.workpieceDir,
+          cc.missionId,
+          undefined,
+          cc.context.io,
+        );
         cc.workpieceCommit = result;
         if (result.committed) {
           cc.context.logger.info(
@@ -1944,8 +1990,12 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
-        const cacheCommit = commitCacheCloneIfDirty(cc.systemDir, cc.manifest.systemId);
+        if (!(await cc.context.io.exists(gitDir))) return;
+        const cacheCommit = await commitCacheCloneIfDirty(
+          cc.systemDir,
+          cc.manifest.systemId,
+          cc.context.io,
+        );
         if (cacheCommit.committed) {
           cc.context.logger.info(
             `  Auto-committed cache clone (${cacheCommit.commitSha?.slice(0, 8)}) before reconcile`,
@@ -1958,8 +2008,8 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
-        const cacheDirtyCheck = isWorkpieceDirty(cc.systemDir);
+        if (!(await cc.context.io.exists(gitDir))) return;
+        const cacheDirtyCheck = await isWorkpieceDirty(cc.systemDir, cc.context.io);
         if (cacheDirtyCheck.dirty) {
           const untrackedReport = await investigateUntrackedFiles(
             cc.workspaceRoot,
@@ -1989,29 +2039,27 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
+        if (!(await cc.context.io.exists(gitDir))) return;
         try {
-          cc.preReconcileSha = execSync("git rev-parse HEAD", {
-            cwd: cc.systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          }).trim();
+          cc.preReconcileSha = (
+            await shExec("git rev-parse HEAD", cc.systemDir, cc.context.io)
+          ).trim();
         } catch {
           cc.preReconcileSha = null;
         }
         const prevReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
-        if (existsSync(prevReportPath)) {
+        if (await cc.context.io.exists(prevReportPath)) {
           try {
-            const prevReport = JSON.parse(await fs.readFile(prevReportPath, "utf8")) as {
+            const prevReport = JSON.parse(await cc.context.io.readFile(prevReportPath)) as {
               preReconcileSha?: string;
             };
             if (prevReport.preReconcileSha) {
               try {
-                execSync(`git reset --hard ${prevReport.preReconcileSha}`, {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                });
+                await shExec(
+                  `git reset --hard ${prevReport.preReconcileSha}`,
+                  cc.systemDir,
+                  cc.context.io,
+                );
                 cc.context.logger.info(
                   `  Reset cache clone to pre-reconcile SHA ${prevReport.preReconcileSha.slice(0, 12)}`,
                 );
@@ -2030,52 +2078,47 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) {
+        if (!(await cc.context.io.exists(gitDir))) {
           for (const dataPath of STERNSYSTEM_DATA_PATHS) {
             const src = path.join(cc.workpieceDir, dataPath);
             const dest = path.join(cc.systemDir, dataPath);
-            if (existsSync(src)) {
-              if (existsSync(dest)) {
-                await fs.rm(dest, { recursive: true, force: true });
+            if (await cc.context.io.exists(src)) {
+              if (await cc.context.io.exists(dest)) {
+                await cc.context.io.rm(dest, { recursive: true });
               }
-              await copyDir(src, dest);
+              await copyDir(src, dest, cc.context.io);
               cc.copiedPaths.push(dataPath);
               cc.context.logger.info(`  Reconciled ${dataPath}`);
             }
           }
           return;
         }
-        const workpieceBranch = execSync("git rev-parse --abbrev-ref HEAD", {
-          cwd: cc.workpieceDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
-        execSync(
+        const workpieceBranch = (
+          await shExec("git rev-parse --abbrev-ref HEAD", cc.workpieceDir, cc.context.io)
+        ).trim();
+        await shExec(
           `git fetch ${JSON.stringify(cc.workpieceDir)} ${JSON.stringify(workpieceBranch)}`,
-          {
-            cwd: cc.systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          },
+          cc.systemDir,
+          cc.context.io,
         );
         const mergeMessage = `reconcile mission ${cc.missionId}`;
         try {
-          execSync(`git merge --no-ff FETCH_HEAD -m ${JSON.stringify(mergeMessage)}`, {
-            cwd: cc.systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          });
+          await shExec(
+            `git merge --no-ff FETCH_HEAD -m ${JSON.stringify(mergeMessage)}`,
+            cc.systemDir,
+            cc.context.io,
+          );
         } catch (err) {
           const isAutoResolvablePath = (p: string) =>
             CACHE_CLONE_ONLY_PATHS.some((pattern) => p.startsWith(pattern));
           const conflictedPaths: string[] = [];
           const bordbuchDeletedPaths: string[] = [];
           try {
-            const statusOutput = execSync("git status --porcelain", {
-              cwd: cc.systemDir,
-              stdio: "pipe",
-              encoding: "utf-8",
-            });
+            const statusOutput = await shExec(
+              "git status --porcelain",
+              cc.systemDir,
+              cc.context.io,
+            );
             for (const line of statusOutput.split("\n")) {
               if (!line) continue;
               const status = line.slice(0, 2);
@@ -2101,16 +2144,8 @@ export async function buildReconcileSteps(
             try {
               if (bordbuchDeletedPaths.length > 0) {
                 const delPathArgs = bordbuchDeletedPaths.map((p) => JSON.stringify(p)).join(" ");
-                execSync(`git checkout HEAD -- ${delPathArgs}`, {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                });
-                execSync(`git add -- ${delPathArgs}`, {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                });
+                await shExec(`git checkout HEAD -- ${delPathArgs}`, cc.systemDir, cc.context.io);
+                await shExec(`git add -- ${delPathArgs}`, cc.systemDir, cc.context.io);
               }
               const isGeneratedUntracked = (p: string) =>
                 CACHE_CLONE_GENERATED_PATTERNS.some(
@@ -2120,32 +2155,20 @@ export async function buildReconcileSteps(
               const generatedConflicted = conflictedPaths.filter((p) => isGeneratedUntracked(p));
               if (trackedConflicted.length > 0) {
                 const trackedArgs = trackedConflicted.map((p) => JSON.stringify(p)).join(" ");
-                execSync(`git checkout HEAD -- ${trackedArgs}`, {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                });
-                execSync(`git add -- ${trackedArgs}`, {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                });
+                await shExec(`git checkout HEAD -- ${trackedArgs}`, cc.systemDir, cc.context.io);
+                await shExec(`git add -- ${trackedArgs}`, cc.systemDir, cc.context.io);
               }
               if (generatedConflicted.length > 0) {
                 const generatedArgs = generatedConflicted.map((p) => JSON.stringify(p)).join(" ");
-                execSync(`git add -- ${generatedArgs}`, {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                });
+                await shExec(`git add -- ${generatedArgs}`, cc.systemDir, cc.context.io);
               }
-              cacheCloneCommit(cc.systemDir, "", { noEdit: true });
+              await cacheCloneCommit(cc.systemDir, "", { noEdit: true }, cc.context.io);
               cc.autoResolvedPaths = conflictedPaths;
               cc.context.logger.info(
                 `  Auto-resolved ${cc.autoResolvedPaths.length} cache-clone-only conflict(s)`,
               );
             } catch (resolveErr) {
-              abortMerge(cc.systemDir);
+              await abortMerge(cc.systemDir, cc.context.io);
               throw new Error(
                 `[mission.reconcile] bordbuch auto-resolution failed: ${(resolveErr as Error).message}.\n` +
                   `Merge has been aborted. Inspect the cache clone state manually.\n` +
@@ -2153,7 +2176,7 @@ export async function buildReconcileSteps(
               );
             }
           } else {
-            abortMerge(cc.systemDir);
+            await abortMerge(cc.systemDir, cc.context.io);
             throw new Error(
               `[mission.reconcile] git merge --no-ff failed: ${(err as Error).message}.\n` +
                 `Resolve conflicts in the workpiece (not the cache clone), commit via mission.git.commit, then re-run reconcile.\n` +
@@ -2168,21 +2191,15 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
+        if (!(await cc.context.io.exists(gitDir))) return;
         try {
-          cc.workpieceHeadAtReconcile = execSync("git rev-parse HEAD", {
-            cwd: cc.workpieceDir,
-            stdio: ["pipe", "pipe", "pipe"],
-            encoding: "utf-8",
-          }).trim();
+          cc.workpieceHeadAtReconcile = (
+            await shExec("git rev-parse HEAD", cc.workpieceDir, cc.context.io)
+          ).trim();
         } catch {
           cc.workpieceHeadAtReconcile = null;
         }
-        cc.commitSha = execSync("git rev-parse HEAD", {
-          cwd: cc.systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
+        cc.commitSha = (await shExec("git rev-parse HEAD", cc.systemDir, cc.context.io)).trim();
       },
     },
     {
@@ -2190,17 +2207,17 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
+        if (!(await cc.context.io.exists(gitDir))) return;
         const criticalFiles = ["system-config.yaml", "system-state.yaml"];
         const restoredFiles: string[] = [];
         for (const cf of criticalFiles) {
-          if (!existsSync(path.join(cc.systemDir, cf)) && cc.preReconcileSha) {
+          if (!(await cc.context.io.exists(path.join(cc.systemDir, cf))) && cc.preReconcileSha) {
             try {
-              execSync(`git checkout ${cc.preReconcileSha} -- ${JSON.stringify(cf)}`, {
-                cwd: cc.systemDir,
-                stdio: "pipe",
-                encoding: "utf-8",
-              });
+              await shExec(
+                `git checkout ${cc.preReconcileSha} -- ${JSON.stringify(cf)}`,
+                cc.systemDir,
+                cc.context.io,
+              );
               restoredFiles.push(cf);
               cc.context.logger.info(`  Restored ${cf} after merge (was missing)`);
             } catch {
@@ -2210,12 +2227,13 @@ export async function buildReconcileSteps(
         }
         if (restoredFiles.length > 0) {
           const addArgs = restoredFiles.map((f) => JSON.stringify(f)).join(" ");
-          execSync(`git add -- ${addArgs}`, {
-            cwd: cc.systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          });
-          cacheCloneCommit(cc.systemDir, "restore critical config files after merge");
+          await shExec(`git add -- ${addArgs}`, cc.systemDir, cc.context.io);
+          await cacheCloneCommit(
+            cc.systemDir,
+            "restore critical config files after merge",
+            undefined,
+            cc.context.io,
+          );
         }
       },
     },
@@ -2224,23 +2242,28 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
+        if (!(await cc.context.io.exists(gitDir))) return;
         try {
-          cc.gitignoreRestored = await restoreCacheCloneGitignore(cc.systemDir);
+          cc.gitignoreRestored = await restoreCacheCloneGitignore(cc.systemDir, cc.context.io);
           if (cc.gitignoreRestored) {
             cc.context.logger.info(`  Restored cache-clone-only .gitignore patterns after merge`);
-            execSync("git add .gitignore", { cwd: cc.systemDir, stdio: "pipe", encoding: "utf-8" });
+            await shExec("git add .gitignore", cc.systemDir, cc.context.io);
           }
-          cc.forbiddenFilesUntracked = untrackForbiddenGeneratedFiles(cc.systemDir);
+          cc.forbiddenFilesUntracked = await untrackForbiddenGeneratedFiles(
+            cc.systemDir,
+            cc.context.io,
+          );
           if (cc.forbiddenFilesUntracked.length > 0) {
             cc.context.logger.info(
               `  Untracked ${cc.forbiddenFilesUntracked.length} forbidden/generated file(s)`,
             );
           }
           if (cc.gitignoreRestored || cc.forbiddenFilesUntracked.length > 0) {
-            cacheCloneCommit(
+            await cacheCloneCommit(
               cc.systemDir,
               "restore cache-clone .gitignore and untrack forbidden files (RFC-0913)",
+              undefined,
+              cc.context.io,
             );
           }
         } catch (restoreErr) {
@@ -2255,19 +2278,19 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
-        cc.mergeCommitSha = execSync("git rev-parse HEAD^1", {
-          cwd: cc.systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
+        if (!(await cc.context.io.exists(gitDir))) return;
+        cc.mergeCommitSha = (
+          await shExec("git rev-parse HEAD^1", cc.systemDir, cc.context.io)
+        ).trim();
         if (cc.preReconcileSha) {
           try {
-            const countOutput = execSync(`git rev-list --count ${cc.preReconcileSha}..FETCH_HEAD`, {
-              cwd: cc.systemDir,
-              stdio: "pipe",
-              encoding: "utf-8",
-            }).trim();
+            const countOutput = (
+              await shExec(
+                `git rev-list --count ${cc.preReconcileSha}..FETCH_HEAD`,
+                cc.systemDir,
+                cc.context.io,
+              )
+            ).trim();
             cc.transferredCommits = parseInt(countOutput, 10);
           } catch {
             cc.transferredCommits = 0;
@@ -2290,21 +2313,15 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
-        const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-          cwd: cc.systemDir,
-          stdio: "pipe",
-          encoding: "utf-8",
-        }).trim();
+        if (!(await cc.context.io.exists(gitDir))) return;
+        const branch = (
+          await shExec("git rev-parse --abbrev-ref HEAD", cc.systemDir, cc.context.io)
+        ).trim();
         const pushBackoffMs = [1000, 2000, 4000];
         let pushSucceeded = false;
         for (let attempt = 0; attempt < pushBackoffMs.length; attempt++) {
           try {
-            execSync(`git push origin ${JSON.stringify(branch)}`, {
-              cwd: cc.systemDir,
-              stdio: "pipe",
-              timeout: 30_000,
-            });
+            await shExec(`git push origin ${JSON.stringify(branch)}`, cc.systemDir, cc.context.io);
             pushSucceeded = true;
             break;
           } catch {
@@ -2326,18 +2343,14 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
+        if (!(await cc.context.io.exists(gitDir))) return;
         try {
-          const cacheCloneHead = execSync("git rev-parse HEAD", {
-            cwd: cc.systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          }).trim();
-          const originHead = execSync("git rev-parse origin/main", {
-            cwd: cc.systemDir,
-            stdio: "pipe",
-            encoding: "utf-8",
-          }).trim();
+          const cacheCloneHead = (
+            await shExec("git rev-parse HEAD", cc.systemDir, cc.context.io)
+          ).trim();
+          const originHead = (
+            await shExec("git rev-parse origin/main", cc.systemDir, cc.context.io)
+          ).trim();
           if (cacheCloneHead !== originHead) {
             cc.divergenceWarning = { cacheCloneHead, originHead, diverged: true };
             cc.context.logger.warn(
@@ -2355,7 +2368,7 @@ export async function buildReconcileSteps(
       run: async (c: unknown) => {
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
-        if (!existsSync(gitDir)) return;
+        if (!(await cc.context.io.exists(gitDir))) return;
         try {
           const config = await readSystemConfig(cc.workspaceRoot, cc.manifest.systemId);
           if (config && config.mirrors.length > 2) {

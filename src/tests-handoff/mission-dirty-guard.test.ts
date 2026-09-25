@@ -6,6 +6,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0480: add unit tests for isWorkpieceDirty() and reconcile dirty guard.</item>
   <item>RFC-0522: update tests to assert files[] field in WorkpieceDirtyResult.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,60 +38,60 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test("isWorkpieceDirty returns false for a clean workpiece", () => {
+test("isWorkpieceDirty returns false for a clean workpiece", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "file.txt"), "hello");
   gitCommit(tmpDir, "initial");
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(false);
   expect(result.fileCount).toBe(0);
   expect(result.files).toEqual([]);
 });
 
-test("isWorkpieceDirty returns true when there are uncommitted changes", () => {
+test("isWorkpieceDirty returns true when there are uncommitted changes", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "file.txt"), "hello");
   gitCommit(tmpDir, "initial");
   writeFileSync(join(tmpDir, "file.txt"), "modified");
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(1);
   expect(result.files).toEqual(["file.txt"]);
 });
 
-test("isWorkpieceDirty returns true for untracked files", () => {
+test("isWorkpieceDirty returns true for untracked files", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "file.txt"), "hello");
   gitCommit(tmpDir, "initial");
   writeFileSync(join(tmpDir, "new-file.txt"), "new");
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(1);
   expect(result.files).toEqual(["new-file.txt"]);
 });
 
-test("isWorkpieceDirty returns false for a non-git directory", () => {
-  const result = isWorkpieceDirty(tmpDir);
+test("isWorkpieceDirty returns false for a non-git directory", async () => {
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(false);
   expect(result.fileCount).toBe(0);
   expect(result.files).toEqual([]);
 });
 
-test("isWorkpieceDirty counts multiple dirty files", () => {
+test("isWorkpieceDirty counts multiple dirty files", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "a.txt"), "a");
   writeFileSync(join(tmpDir, "b.txt"), "b");
   gitCommit(tmpDir, "initial");
   writeFileSync(join(tmpDir, "a.txt"), "modified");
   writeFileSync(join(tmpDir, "c.txt"), "new");
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(2);
   expect(result.files).toContain("a.txt");
   expect(result.files).toContain("c.txt");
 });
 
-test("isWorkpieceDirty ignores gitignored-but-tracked files", () => {
+test("isWorkpieceDirty ignores gitignored-but-tracked files", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "file.txt"), "hello");
   writeFileSync(join(tmpDir, "generated.json"), '{"v":1}');
@@ -98,13 +99,13 @@ test("isWorkpieceDirty ignores gitignored-but-tracked files", () => {
   gitCommit(tmpDir, "initial");
   // Modify the gitignored-but-tracked file
   writeFileSync(join(tmpDir, "generated.json"), '{"v":2}');
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(false);
   expect(result.fileCount).toBe(0);
   expect(result.files).toEqual([]);
 });
 
-test("isWorkpieceDirty reports dirty when both gitignored and non-gitignored files change", () => {
+test("isWorkpieceDirty reports dirty when both gitignored and non-gitignored files change", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "file.txt"), "hello");
   writeFileSync(join(tmpDir, "generated.json"), '{"v":1}');
@@ -112,7 +113,7 @@ test("isWorkpieceDirty reports dirty when both gitignored and non-gitignored fil
   gitCommit(tmpDir, "initial");
   writeFileSync(join(tmpDir, "generated.json"), '{"v":2}');
   writeFileSync(join(tmpDir, "file.txt"), "modified");
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(1);
   expect(result.files).toEqual(["file.txt"]);

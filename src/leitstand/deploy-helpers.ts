@@ -7,7 +7,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0926: buildEffectRecord and writeDeploymentEffectRecord accept optional workerVersionId and releaseId for release-aware rollback.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -20,7 +19,8 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
   <item>RFC-1126: step 7 — AC evidence alignment
 
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
-  <history>RFC-0865, RFC-0866</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0865, RFC-0866, RFC-0926</history>
 </CHANGE_SUMMARY>
 */
 
@@ -110,8 +110,11 @@ function formatGateDecisionMissingHint(filePath: string): string {
   }
 }
 
-export async function loadGateDecision(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<GateDecisionV1> {
-  if (!await io.exists(filePath)) {
+export async function loadGateDecision(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<GateDecisionV1> {
+  if (!(await io.exists(filePath))) {
     const hint = formatGateDecisionMissingHint(filePath);
     throw new Error(`[deploy] gate decision file not found: ${filePath}${hint}`);
   }
@@ -127,13 +130,15 @@ export async function loadGateDecision(filePath: string, io: WorkspaceIO = creat
 }
 
 export async function loadMainVerificationDecision(
-  filePath: string, io: WorkspaceIO = createDefaultIO().io,
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<MainVerificationDecisionV1> {
-  if (!await io.exists(filePath)) {
+  if (!(await io.exists(filePath))) {
     const dir = path.dirname(filePath);
     let available: string[] = [];
     try {
-      available = ((await io.readdir(dir)).map(e => e.name))
+      available = (await io.readdir(dir))
+        .map((e) => e.name)
         .filter((f) => f.endsWith("-main-verification.json"))
         .sort();
     } catch {
@@ -156,7 +161,10 @@ export async function loadMainVerificationDecision(
     const releasePrefix = path.basename(filePath).replace(/-main-verification\.json$/, "");
     let available: string[] = [];
     try {
-      available = ((await io.readdir(dir)).map(e => e.name)).filter((f) => f.startsWith(releasePrefix)).sort();
+      available = (await io.readdir(dir))
+        .map((e) => e.name)
+        .filter((f) => f.startsWith(releasePrefix))
+        .sort();
     } catch {
       /* ignore */
     }
@@ -182,13 +190,14 @@ export interface ResolvedArtifactHash {
 
 export async function resolveArtifactHash(
   artifactHashFlag: string | undefined,
-  releaseDir: string | undefined, io: WorkspaceIO = createDefaultIO().io,
+  releaseDir: string | undefined,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ResolvedArtifactHash> {
   if (artifactHashFlag && isSha256Digest(artifactHashFlag)) {
     return { hash: artifactHashFlag, source: "flag" };
   }
 
-  if (releaseDir && await io.exists(releaseDir)) {
+  if (releaseDir && (await io.exists(releaseDir))) {
     const artifactPath = path.join(releaseDir, "artifact.tar.gz");
     if (await io.exists(artifactPath)) {
       return {
@@ -377,7 +386,8 @@ export async function writeDeploymentEffectRecord(
   record: DeploymentEffectRecordV1,
   deploymentUrl?: string,
   workerVersionId?: string,
-  releaseId?: string, io: WorkspaceIO = createDefaultIO().io,
+  releaseId?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const dir = path.join(cacheCloneDir, "deployment-operations");
   await io.mkdir(dir);
@@ -390,13 +400,13 @@ export async function writeDeploymentEffectRecord(
 
   const relPath = path.join("deployment-operations", `${record.operationId}.json`);
   try {
-    gitExec(cacheCloneDir, `add ${relPath}`);
-    cacheCloneCommit(
+    await gitExec(cacheCloneDir, `add ${relPath}`);
+    await cacheCloneCommit(
       cacheCloneDir,
       `deployment-operations: ${record.operationId} (${record.state})`,
     );
-    const branch = gitExec(cacheCloneDir, "rev-parse --abbrev-ref HEAD").trim();
-    gitExec(cacheCloneDir, `push origin ${branch}`);
+    const branch = (await gitExec(cacheCloneDir, "rev-parse --abbrev-ref HEAD")).trim();
+    await gitExec(cacheCloneDir, `push origin ${branch}`);
   } catch {
     // Best-effort commit+push — file is written, sync will propagate later
   }

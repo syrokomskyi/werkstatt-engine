@@ -6,6 +6,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0635: initial tests for distribution reuse paths in mission.validate.</item>
   <item>RFC-0702: add test verifying commitBordbuchProjections is called in the reuse path.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -40,19 +41,25 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   };
 });
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
+function makeInterceptedIo(): ReturnType<typeof createDefaultIO>["io"] {
+  const baseIo = createDefaultIO().io;
   return {
-    ...actual,
-    execSync: vi.fn((cmd: string, opts?: Record<string, unknown>) => {
-      if (cmd === "pnpm exec astro build") {
-        mockPipeline.execSyncCalled = true;
-        return "10 page(s)";
-      }
-      return actual.execSync(cmd, opts as never);
-    }),
+    ...baseIo,
+    exec: vi.fn(
+      async (
+        command: string,
+        args: string[],
+        opts?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+      ) => {
+        if (command === "pnpm" && args.join(" ") === "exec astro build") {
+          mockPipeline.execSyncCalled = true;
+          return { exitCode: 0, stdout: "10 page(s)", stderr: "" };
+        }
+        return baseIo.exec(command, args, opts);
+      },
+    ),
   };
-});
+}
 
 vi.mock("../handoff/build-pipeline-helpers.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../handoff/build-pipeline-helpers.ts")>();
@@ -225,7 +232,7 @@ function makeInput(flags: Record<string, unknown> = {}): KernelCommandInput {
 
 function makeContext(): KernelRuntimeContext {
   return {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

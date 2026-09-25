@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0951: auto-materialize workpiece during mission.open with forward-only rollback on failure.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -15,14 +14,13 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1139: CLI hint accuracy and agent-safety hygiene — rfc.create hint, EC-14-PARTIAL, amend delegation, ledger scope, sync footer, mission.open remnants</item>
-  <history>ADR-0030, RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593, RFC-0796</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0030, RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593, RFC-0796, RFC-0951</history>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync, lstatSync, readdirSync, writeFileSync, rmSync } from "node:fs";
-import fs from "node:fs/promises";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -82,36 +80,31 @@ const REPAIRABLE_RULES = new Set(["orphan-mission-close", "unmatched-mission-ope
 export async function cleanupStaleMissionEntries(
   workspaceRoot: string,
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<StaleEntryCheck> {
   const missionsPath = path.join(workspaceRoot, "missions");
   const result: StaleEntryCheck = { removedPaths: [], skipped: [] };
 
-  if (!existsSync(missionsPath)) return result;
+  if (!(await io.exists(missionsPath))) return result;
 
   // Scan all entries in missions/ root for stale symlinks and empty dirs
-  const entries = readdirSync(missionsPath, { withFileTypes: true });
+  const entries = await io.readdir(missionsPath);
   for (const entry of entries) {
     if (entry.name === "archive") continue;
     const entryPath = path.join(missionsPath, entry.name);
     const sourceRel = `missions/${entry.name}`;
 
-    // Use lstatSync to detect symlinks (statSync follows symlinks)
-    let stat;
-    try {
-      stat = lstatSync(entryPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isSymbolicLink()) {
+    // Detect symlinks via test -L (port DirEntry/stat follow symlinks)
+    const linkCheck = await io.exec("test", ["-L", entryPath]);
+    if (linkCheck.exitCode === 0) {
       await trashPath(entryPath);
       result.removedPaths.push(sourceRel);
       logger.info(`  Cleaned stale symlink: ${sourceRel}`);
-    } else if (stat.isDirectory()) {
+    } else if (entry.isDirectory) {
       // Check if directory is empty
       let isEmpty = true;
       try {
-        const dirEntries = readdirSync(entryPath);
+        const dirEntries = await io.readdir(entryPath);
         isEmpty = dirEntries.length === 0;
       } catch {
         isEmpty = false;
@@ -120,7 +113,7 @@ export async function cleanupStaleMissionEntries(
         await trashPath(entryPath);
         result.removedPaths.push(sourceRel);
         logger.info(`  Cleaned empty directory: ${sourceRel}`);
-      } else if (!existsSync(path.join(entryPath, "mission.yaml"))) {
+      } else if (!(await io.exists(path.join(entryPath, "mission.yaml")))) {
         // RFC-1139: non-empty dir without mission.yaml is a stale remnant
         // (crashed materialization) — report it with the cleanup path.
         result.skipped.push(sourceRel);
@@ -180,13 +173,10 @@ export async function runMissionOpen(
   const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
   if (await context.io.exists(path.join(cacheDir, ".git"))) {
     // Check detached HEAD — fail-fast (requires operator decision)
-    try {
-      execSync("git symbolic-ref HEAD", {
-        cwd: cacheDir,
-        stdio: ["pipe", "pipe", "pipe"],
-        encoding: "utf-8",
-      });
-    } catch {
+    const symRef = await context.io.exec("git", ["symbolic-ref", "HEAD"], {
+      cwd: cacheDir,
+    });
+    if (symRef.exitCode !== 0) {
       throw new Error(
         `[mission.open] cache clone for '${systemId}' is in detached HEAD. ` +
           `Run: git -C ${cacheDir} checkout main`,
@@ -198,20 +188,19 @@ export async function runMissionOpen(
         `[mission.open] cache clone for '${systemId}' has stale rebase-merge — auto-aborting before bordbuch validation.`,
       );
       let abortSucceeded = false;
-      try {
-        execSync("git rebase --abort", {
-          cwd: cacheDir,
-          stdio: ["pipe", "pipe", "pipe"],
-          timeout: 10_000,
-        });
+      const abortResult = await context.io.exec("git", ["rebase", "--abort"], {
+        cwd: cacheDir,
+        timeoutMs: 10_000,
+      });
+      if (abortResult.exitCode === 0) {
         abortSucceeded = true;
-      } catch {
+      } else {
         // If git rebase --abort fails, manually remove the rebase state directories
         try {
-          rmSync(path.join(cacheDir, ".git", "rebase-merge"), { recursive: true, force: true });
-          try {
-            rmSync(path.join(cacheDir, ".git", "rebase-apply"), { recursive: true, force: true });
-          } catch {}
+          await context.io.rm(path.join(cacheDir, ".git", "rebase-merge"), { recursive: true });
+          await context.io
+            .rm(path.join(cacheDir, ".git", "rebase-apply"), { recursive: true })
+            .catch(() => {});
           abortSucceeded = true;
         } catch {}
       }
@@ -294,14 +283,14 @@ export async function runMissionOpen(
     // Check pin file exists
     const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
     const pinPath = path.join(cacheDir, "system.pin.json");
-    if (!await context.io.exists(pinPath)) {
+    if (!(await context.io.exists(pinPath))) {
       throw new Error(
         `[mission.open] system '${systemId}' has no system.pin.json — run sternsystem.pin first`,
       );
     }
 
     // Read pin to get platform version
-    const pinRaw = await import("node:fs/promises").then((fs) => fs.readFile(pinPath, "utf8"));
+    const pinRaw = await context.io.readFile(pinPath);
     const pin = JSON.parse(pinRaw);
     const pinAtOpen = pin.platform?.version ?? "unknown";
 
@@ -403,7 +392,7 @@ export async function runMissionOpen(
       if (failedStep === "bordbuch-append") {
         const missionDir = path.join(workspaceRoot, "missions", missionId);
         try {
-          await fs.rm(missionDir, { recursive: true, force: true });
+          await context.io.rm(missionDir, { recursive: true });
         } catch {
           // best-effort cleanup
         }
@@ -442,9 +431,9 @@ export async function runMissionOpen(
           try {
             // If a previous workpiece-failed/ exists, remove it first
             if (await context.io.exists(workpieceFailedDir)) {
-              await fs.rm(workpieceFailedDir, { recursive: true, force: true });
+              await context.io.rm(workpieceFailedDir, { recursive: true });
             }
-            await fs.rename(workpieceDir, workpieceFailedDir);
+            await context.io.rename(workpieceDir, workpieceFailedDir);
           } catch {
             // best-effort — if rename fails, continue with deletion
           }
@@ -458,11 +447,11 @@ export async function runMissionOpen(
             failedStep,
             error: detail,
             rolledBackAt: new Date().toISOString(),
-            preservedAt: await context.io.exists(workpieceFailedDir)
+            preservedAt: (await context.io.exists(workpieceFailedDir))
               ? "missions/" + missionId + "/workpiece-failed"
               : null,
           };
-          writeFileSync(
+          await context.io.writeFile(
             path.join(missionDir, "failure-report.json"),
             JSON.stringify(failureReport, null, 2) + "\n",
           );
@@ -472,17 +461,17 @@ export async function runMissionOpen(
 
         // RFC-0985 Measure 7: Write rollback marker before cleanup for crash safety
         try {
-          writeFileSync(path.join(missionDir, ".rollback-pending"), missionId);
+          await context.io.writeFile(path.join(missionDir, ".rollback-pending"), missionId);
         } catch {
           // best-effort — mission dir may not exist
         }
 
         // Remove everything except workpiece-failed/ and failure-report.json
         try {
-          const entries = await fs.readdir(missionDir);
+          const entries = await context.io.readdir(missionDir);
           for (const entry of entries) {
-            if (entry === "workpiece-failed" || entry === "failure-report.json") continue;
-            await fs.rm(path.join(missionDir, entry), { recursive: true, force: true });
+            if (entry.name === "workpiece-failed" || entry.name === "failure-report.json") continue;
+            await context.io.rm(path.join(missionDir, entry.name), { recursive: true });
           }
         } catch {
           // best-effort cleanup
@@ -498,14 +487,13 @@ export async function runMissionOpen(
         const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
         if (await context.io.exists(path.join(cacheCloneDir, ".git"))) {
           try {
-            execSync(
-              'git add system-state.yaml && git commit -m "mission.open rollback: clear currentMission"',
-              {
-                cwd: cacheCloneDir,
-                stdio: ["pipe", "pipe", "pipe"],
-                encoding: "utf-8",
-                env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-              },
+            await context.io.exec(
+              "sh",
+              [
+                "-c",
+                'git add system-state.yaml && git commit -m "mission.open rollback: clear currentMission"',
+              ],
+              { cwd: cacheCloneDir, env: { MISSION_GIT_COMMIT: "1" } },
             );
           } catch {
             // Non-fatal — system-state.yaml may already be committed or unchanged
@@ -576,22 +564,19 @@ export async function buildOpenSteps(
         const cc = c as OpenStepCtx;
         // RFC-0985 Measure 4: Pre-flight cache clone git sanity check.
         const cacheDir = resolveCacheClonePath(cc.workspaceRoot, cc.systemId);
-        if (!existsSync(path.join(cacheDir, ".git"))) return;
+        if (!(await cc.context.io.exists(path.join(cacheDir, ".git")))) return;
         // Check detached HEAD
-        try {
-          execSync("git symbolic-ref HEAD", {
-            cwd: cacheDir,
-            stdio: ["pipe", "pipe", "pipe"],
-            encoding: "utf-8",
-          });
-        } catch {
+        const symRef = await cc.context.io.exec("git", ["symbolic-ref", "HEAD"], {
+          cwd: cacheDir,
+        });
+        if (symRef.exitCode !== 0) {
           throw new Error(
             `[mission.open] cache clone for '${cc.systemId}' is in detached HEAD. ` +
               `Run: git -C ${cacheDir} checkout main`,
           );
         }
         // Check stale rebase-merge
-        if (existsSync(path.join(cacheDir, ".git", "rebase-merge"))) {
+        if (await cc.context.io.exists(path.join(cacheDir, ".git", "rebase-merge"))) {
           throw new Error(
             `[mission.open] stale rebase-merge found in cache clone for '${cc.systemId}'. ` +
               `Run: git -C ${cacheDir} rebase --abort`,
@@ -606,16 +591,16 @@ export async function buildOpenSteps(
         // RFC-0985 Measure 7: Crash-safe rollback — if a previous mission.open
         // was killed during rollback, complete the cleanup before proceeding.
         const missionsDir = path.join(cc.workspaceRoot, "missions");
-        if (!existsSync(missionsDir)) return;
-        const entries = readdirSync(missionsDir, { withFileTypes: true });
+        if (!(await cc.context.io.exists(missionsDir))) return;
+        const entries = await cc.context.io.readdir(missionsDir);
         for (const entry of entries) {
           if (!entry.isDirectory || entry.name === "archive") continue;
           const marker = path.join(missionsDir, entry.name, ".rollback-pending");
-          if (existsSync(marker)) {
+          if (await cc.context.io.exists(marker)) {
             // Complete the rollback: remove mission dir, clear system-state
             const staleDir = path.join(missionsDir, entry.name);
             try {
-              rmSync(staleDir, { recursive: true, force: true });
+              await cc.context.io.rm(staleDir, { recursive: true });
             } catch {
               // best-effort
             }
@@ -656,7 +641,7 @@ export async function buildOpenSteps(
         if (!pushResult.pushed) {
           const cacheDir = resolveCacheClonePath(cc.workspaceRoot, cc.systemId);
           try {
-            gitExec(cacheDir, "reset --hard HEAD~1");
+            await gitExec(cacheDir, "reset --hard HEAD~1");
           } catch {
             // best-effort rollback
           }

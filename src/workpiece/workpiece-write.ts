@@ -13,6 +13,7 @@ mission.git.commit separately to group multiple writes into one commit.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0555: initial workpiece.write command handler.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -60,7 +61,7 @@ export async function runWorkpieceWrite(
 
   const { workspaceRoot, logger } = context;
 
-  const manifestPath = path.join(resolveMissionDir(workspaceRoot, missionId), "mission.yaml");
+  const manifestPath = path.join(await resolveMissionDir(workspaceRoot, missionId, context.io), "mission.yaml");
   if (!await context.io.exists(manifestPath)) {
     throw new Error(`[workpiece.write] Mission '${missionId}' is not open or does not exist`);
   }
@@ -72,7 +73,7 @@ export async function runWorkpieceWrite(
     );
   }
 
-  const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
+  const workpieceDir = path.join(await resolveMissionDir(workspaceRoot, missionId, context.io), "workpiece");
   if (!await context.io.exists(workpieceDir)) {
     throw new Error(
       `[workpiece.write] Workpiece for mission '${missionId}' not found. Run mission.materialize first.`,

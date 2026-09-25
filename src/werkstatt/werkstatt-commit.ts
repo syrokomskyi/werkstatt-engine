@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0580: initial commitWerkstattSideEffects helper.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,7 +27,7 @@ export async function commitWerkstattSideEffects(
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<CommitWerkstattResult> {
   for (const file of files) {
-    gitExec(workspaceRoot, `add -- ${JSON.stringify(file)}`, { allowNonZero: true });
+    await gitExec(workspaceRoot, `add -- ${JSON.stringify(file)}`, { allowNonZero: true });
   }
 
   let hasStagedChanges: boolean;
@@ -44,10 +45,10 @@ export async function commitWerkstattSideEffects(
     return { committed: false, commitSha: null };
   }
 
-  gitExec(workspaceRoot, `commit -m ${JSON.stringify(message)}`, {
+  await gitExec(workspaceRoot, `commit -m ${JSON.stringify(message)}`, {
     env: { ...process.env, ECOSYSTEM_COMMIT: "1" },
   });
-  const commitSha = gitExec(workspaceRoot, "rev-parse HEAD");
+  const commitSha = await gitExec(workspaceRoot, "rev-parse HEAD");
 
   return { committed: true, commitSha };
 }

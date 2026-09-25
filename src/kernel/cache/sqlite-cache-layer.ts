@@ -14,7 +14,6 @@ Self-healing: corrupt DB is deleted and recreated on open error.
   <item>SQLite is the persistent backend — it survives process restarts unlike the in-memory layer.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0382 post-review: remove staleEntries placeholder from status() output.</item>
   <item>ADR-0023: add close() method for explicit SQLite connection cleanup after pipeline completion.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -23,13 +22,14 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <history>RFC-0382</history>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync, statSync, unlinkSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createRequire } from "node:module";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 import type {
   CacheEntry,
@@ -86,38 +86,47 @@ export class SqliteCacheLayer implements CacheLayer {
   readonly available = true;
   readonly unavailableReason: undefined;
   private readonly dbPath: string;
-  private db: import("better-sqlite3").Database;
+  private readonly io: WorkspaceIO;
+  private db!: import("better-sqlite3").Database;
 
-  constructor(dbPath: string) {
+  private constructor(dbPath: string, io: WorkspaceIO) {
     this.dbPath = dbPath;
+    this.io = io;
+  }
 
+  private openDb(): void {
+    const BetterSqlite3 = require_("better-sqlite3") as typeof import("better-sqlite3");
+    this.db = new BetterSqlite3(this.dbPath);
+    this.db.pragma("journal_mode = WAL");
+    this.db.pragma("busy_timeout = 5000");
+    this.db.exec(SCHEMA_DDL);
+  }
+
+  static async create(
+    dbPath: string,
+    io: WorkspaceIO = createDefaultIO().io,
+  ): Promise<SqliteCacheLayer> {
+    const layer = new SqliteCacheLayer(dbPath, io);
     try {
-      const BetterSqlite3 = require_("better-sqlite3") as typeof import("better-sqlite3");
-      mkdirSync(dirname(dbPath), { recursive: true });
-      this.db = new BetterSqlite3(dbPath);
-      this.db.pragma("journal_mode = WAL");
-      this.db.pragma("busy_timeout = 5000");
-      this.db.exec(SCHEMA_DDL);
+      await io.mkdir(dirname(dbPath));
+      layer.openDb();
     } catch (err) {
       // Self-healing: delete corrupt DB and retry once
-      if (existsSync(dbPath)) {
+      if (await io.exists(dbPath)) {
         try {
-          unlinkSync(dbPath);
+          await io.rm(dbPath);
         } catch {
           // ignore unlink errors
         }
       }
-      const BetterSqlite3 = require_("better-sqlite3") as typeof import("better-sqlite3");
-      mkdirSync(dirname(dbPath), { recursive: true });
-      this.db = new BetterSqlite3(dbPath);
-      this.db.pragma("journal_mode = WAL");
-      this.db.pragma("busy_timeout = 5000");
-      this.db.exec(SCHEMA_DDL);
+      await io.mkdir(dirname(dbPath));
+      layer.openDb();
       if (err instanceof Error) {
         // pipeline-log-ok: self-healing corrupt cache DB — operational runtime warning, not a pipeline diagnostic
         console.warn(`cache DB was corrupt and has been recreated: ${err.message}`);
       }
     }
+    return layer;
   }
 
   async get(namespace: string, key: string): Promise<CacheEntry | null> {
@@ -178,7 +187,7 @@ export class SqliteCacheLayer implements CacheLayer {
   async status(): Promise<CacheStatus> {
     let dbSizeBytes = 0;
     try {
-      dbSizeBytes = statSync(this.dbPath).size;
+      dbSizeBytes = (await this.io.stat(this.dbPath)).size;
     } catch {
       dbSizeBytes = 0;
     }

@@ -13,9 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1130: qa.independent.run cacheable + cacheBypassFlags
-
-Steps 1-4: cacheBypassFlags field on KernelCommandDefinition, executor bypass at both cache call sites (hasCacheBypassFlag), qa.independent.run flipped to cacheable with narrowed reads + modulePaths, 14 new contract tests.</item>
   <item>RFC-1130: document bypassCache in tryCacheRead/tryCacheWrite docstrings
 
 fo-review finding (axis E): docstrings did not mention the new bypassCache skip condition. Review report persisted.</item>
@@ -24,7 +21,8 @@ fo-review finding (axis E): docstrings did not mention the new bypassCache skip 
   <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
-  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097, RFC-1126</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097, RFC-1126, RFC-1130</history>
 </CHANGE_SUMMARY>
 */
 
@@ -475,9 +473,9 @@ async function executePipelineForSite(
 
   // ADR-0085: closed-mission workpiece — mutating steps become no-ops unless
   // every declared write is confined to gitignored paths (dist/, .cache/, …).
-  const workpieceClosed = isClosedWorkpiece(site.directory);
+  const workpieceClosed = await isClosedWorkpiece(site.directory, createDefaultIO().io);
   const closedIgnoredPaths = workpieceClosed
-    ? collectGitignoredPaths(
+    ? await collectGitignoredPaths(
         site.directory,
         steps.flatMap((s) => {
           const cmd = registry.commands.get(s.command);
@@ -486,6 +484,7 @@ async function executePipelineForSite(
             .map((w) => writePatternToCheckPath(w, site.name))
             .filter((p): p is string => p !== null);
         }),
+        createDefaultIO().io,
       )
     : null;
   if (workpieceClosed) {

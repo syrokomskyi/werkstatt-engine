@@ -6,6 +6,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0973: initial unit tests for --force auto-clears all caches and stale artifacts.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -151,7 +152,7 @@ beforeEach(async () => {
   hoisted.mockComputeBuildInputHash.mockReset();
 
   hoisted.mockReadMissionManifest.mockResolvedValue(baseManifest);
-  hoisted.mockResolveMissionDir.mockReturnValue(missionDir);
+  hoisted.mockResolveMissionDir.mockResolvedValue(missionDir);
   hoisted.mockCheckDifferentKindOperation.mockResolvedValue({ blocked: false });
   hoisted.mockCommitBordbuchProjections.mockResolvedValue({ committed: false, filesCommitted: [] });
   hoisted.mockRunOperation.mockResolvedValue({ completed: true });

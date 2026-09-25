@@ -18,10 +18,11 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1147: uniform surface â€” wire emits only tools/kernel.config.ts delegating to siteModuleLoaders(); module templates, runtime re-export shims, and conditional module decisions deleted.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { promises as fs, readFileSync } from "node:fs";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -30,7 +31,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
 import { discoverSiteWorkspaces } from "./discovery.ts";
-import { loadSystemManifestSync } from "@warpgogol/werkstatt-shared/content";
+import { loadSystemManifest } from "@warpgogol/werkstatt-shared/content";
 import { buildGeneratedHeader, hasGeneratedMarker } from "./generated-marker.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,9 +63,9 @@ function wireContent(templateRelPath: string, siteName: string, content: string)
   return `${header}${content}`;
 }
 
-async function readFileIfExists(filePath: string): Promise<string | null> {
+async function readFileIfExists(filePath: string, io: WorkspaceIO): Promise<string | null> {
   try {
-    return await fs.readFile(filePath, "utf8");
+    return await io.readFile(filePath);
   } catch {
     return null;
   }
@@ -76,8 +77,9 @@ async function writeGeneratedFile(
   appDir: string,
   dryRun: boolean,
   warnings: WireWarning[],
+  io: WorkspaceIO,
 ): Promise<boolean> {
-  const existing = await readFileIfExists(absolutePath);
+  const existing = await readFileIfExists(absolutePath, io);
   if (existing === content) {
     return false;
   }
@@ -89,8 +91,8 @@ async function writeGeneratedFile(
     return false;
   }
   if (!dryRun) {
-    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fs.writeFile(absolutePath, content, "utf8");
+    await io.mkdir(path.dirname(absolutePath));
+    await io.writeFile(absolutePath, content);
   }
   return true;
 }
@@ -99,19 +101,19 @@ function rel(appDirectory: string, absolutePath: string): string {
   return path.relative(appDirectory, absolutePath).replace(/\\/g, "/");
 }
 
-function readTemplate(templatePath: string): string {
-  return readFileSync(path.join(TEMPLATES_DIR, templatePath), "utf8");
+async function readTemplate(templatePath: string, io: WorkspaceIO): Promise<string> {
+  return io.readFile(path.join(TEMPLATES_DIR, templatePath));
 }
 
 function applyTokens(template: string, tokens: Record<string, string>): string {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_match, key) => tokens[key] ?? "");
 }
 
-function buildKernelConfigFile(appName: string): string {
+async function buildKernelConfigFile(appName: string, io: WorkspaceIO): Promise<string> {
   return wireContent(
     "tools/kernel.config.template.ts",
     appName,
-    applyTokens(readTemplate("tools/kernel.config.template.ts"), {
+    applyTokens(await readTemplate("tools/kernel.config.template.ts", io), {
       APP_NAME: appName,
     }),
   );
@@ -176,7 +178,7 @@ export async function runKernelWire(
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<KernelWireResult>> {
   const paths = await resolveWirePaths(_input, context);
-  const { manifest } = loadSystemManifestSync(paths.contentDirectory);
+  const { manifest } = await loadSystemManifest(paths.contentDirectory, context.io);
   const warnings: WireWarning[] = [];
   const generated: string[] = [];
 
@@ -187,7 +189,7 @@ export async function runKernelWire(
   const files: Array<{ absolutePath: string; content: string }> = [
     {
       absolutePath: path.join(paths.appDirectory, "tools", "kernel.config.ts"),
-      content: buildKernelConfigFile(manifest.app),
+      content: await buildKernelConfigFile(manifest.app, context.io),
     },
   ];
 
@@ -198,6 +200,7 @@ export async function runKernelWire(
       paths.appDirectory,
       context.dryRun ?? false,
       warnings,
+      context.io,
     );
     if (changed) {
       generated.push(rel(paths.appDirectory, file.absolutePath));

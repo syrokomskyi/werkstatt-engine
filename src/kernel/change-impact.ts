@@ -22,12 +22,16 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -211,20 +215,28 @@ export function recommendProfile(
 
 // ─── Command handler ─────────────────────────────────────────────────────────
 
-function gitDiffNames(workspaceRoot: string, args: string[]): string[] {
-  const result = execSync(`git diff --name-only ${args.join(" ")}`, {
+async function gitDiffNames(
+  workspaceRoot: string,
+  args: string[],
+  io: WorkspaceIO,
+): Promise<string[]> {
+  const result = await io.exec("git", ["diff", "--name-only", ...args], {
     cwd: workspaceRoot,
-    encoding: "utf-8",
   });
-  return result.trim().split("\n").filter(Boolean);
+  if (result.exitCode !== 0) {
+    throw new Error(`git diff failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
+  }
+  return result.stdout.trim().split("\n").filter(Boolean);
 }
 
-function gitStatusPorcelain(workspaceRoot: string): string[] {
-  const result = execSync("git status --porcelain", {
+async function gitStatusPorcelain(workspaceRoot: string, io: WorkspaceIO): Promise<string[]> {
+  const result = await io.exec("git", ["status", "--porcelain"], {
     cwd: workspaceRoot,
-    encoding: "utf-8",
   });
-  return result
+  if (result.exitCode !== 0) {
+    throw new Error(`git status failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
+  }
+  return result.stdout
     .trim()
     .split("\n")
     .filter(Boolean)
@@ -254,16 +266,16 @@ export async function runChangeImpactDerive(
   } else if (gitBase) {
     mode = "git-base";
     try {
-      paths = gitDiffNames(workspaceRoot, [`${gitBase}...HEAD`]);
+      paths = await gitDiffNames(workspaceRoot, [`${gitBase}...HEAD`], context.io);
     } catch (err) {
       throw new Error(`git diff failed: ${String(err)}`);
     }
   } else {
     mode = "working-tree";
     try {
-      const unstaged = gitDiffNames(workspaceRoot, []);
-      const staged = gitDiffNames(workspaceRoot, ["--cached"]);
-      const untracked = gitStatusPorcelain(workspaceRoot).filter(
+      const unstaged = await gitDiffNames(workspaceRoot, [], context.io);
+      const staged = await gitDiffNames(workspaceRoot, ["--cached"], context.io);
+      const untracked = (await gitStatusPorcelain(workspaceRoot, context.io)).filter(
         (p) => !unstaged.includes(p) && !staged.includes(p),
       );
       paths = [...new Set([...unstaged, ...staged, ...untracked])];

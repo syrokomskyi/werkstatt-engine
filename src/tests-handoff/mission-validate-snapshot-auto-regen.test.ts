@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0615: initial tests for SNAP-01 auto-regeneration, dirty workpiece skip, non-SNAP-01 skip, and persistent failure.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -105,18 +106,24 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   };
 });
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
+function makeInterceptedIo(): ReturnType<typeof createDefaultIO>["io"] {
+  const baseIo = createDefaultIO().io;
   return {
-    ...actual,
-    execSync: vi.fn((cmd: string, opts?: { [key: string]: unknown }) => {
-      if (cmd === "pnpm exec astro build") {
-        return "10 page(s)";
-      }
-      return actual.execSync(cmd, opts as never);
-    }),
+    ...baseIo,
+    exec: vi.fn(
+      async (
+        command: string,
+        args: string[],
+        opts?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+      ) => {
+        if (command === "pnpm" && args.join(" ") === "exec astro build") {
+          return { exitCode: 0, stdout: "10 page(s)", stderr: "" };
+        }
+        return baseIo.exec(command, args, opts);
+      },
+    ),
   };
-});
+}
 
 vi.mock("../mission/mission-git-commit.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../mission/mission-git-commit.ts")>();
@@ -234,7 +241,7 @@ systems:
 
 function makeContext(): KernelRuntimeContext {
   return {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0560: use resolveActor(input) for actor resolution with --actor-from-auth flag.</item>
   <item>RFC-0580: auto-commit werkstatt side-effects (registry.yaml, mission.yaml) after writeRegistry.</item>
   <item>RFC-0958: wrap post-lock lifecycle in runOperation with journal for crash-safe resume.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0355, RFC-0477, RFC-0480</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0355, RFC-0477, RFC-0480, RFC-0560</history>
 </CHANGE_SUMMARY>
 */
 
@@ -94,7 +94,7 @@ export async function runMissionAbort(
   );
 
   try {
-    const missionDir = resolveMissionDir(workspaceRoot, missionId);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
     const workpieceDir = path.join(missionDir, "workpiece");
     const evidenceDir = path.join(missionDir, "evidence");
     await context.io.mkdir(evidenceDir);
@@ -202,7 +202,7 @@ export async function buildAbortSteps(
       name: "dirty-workpiece-check",
       run: async (c: unknown) => {
         const cc = c as AbortStepCtx;
-        const dirtyCheck = isWorkpieceDirty(cc.workpieceDir);
+        const dirtyCheck = await isWorkpieceDirty(cc.workpieceDir, cc.io);
         if (dirtyCheck.dirty) {
           throw new Error(
             `[mission.abort] workpiece has ${dirtyCheck.fileCount} uncommitted file(s). Run \`pnpm exec werkstatt run mission.git.commit --mission ${cc.missionId} --message "<msg>"\` first, then re-run abort.`,
@@ -214,7 +214,11 @@ export async function buildAbortSteps(
       name: "unreconciled-commits-check",
       run: async (c: unknown) => {
         const cc = c as AbortStepCtx;
-        const operatorCommits = countOperatorCommits(cc.workpieceDir, cc.manifest.migratedAt);
+        const operatorCommits = await countOperatorCommits(
+          cc.workpieceDir,
+          cc.manifest.migratedAt,
+          cc.io,
+        );
         if (operatorCommits.hasOperatorCommits && !cc.manifest.reconciledAt) {
           throw new Error(
             `[mission.abort] workpiece has ${operatorCommits.commitCount} unreconciled operator commit(s). These changes will be LOST on abort. Either:\n  1. Run \`pnpm exec werkstatt run mission.reconcile --mission ${cc.missionId}\` then \`mission.close\` to preserve changes, OR\n  2. Manually revert the operator commits if the changes are not needed:\n${operatorCommits.commits.map((c2) => `     ${c2}`).join("\n")}`,

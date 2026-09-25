@@ -6,6 +6,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1086: initial unit tests for --fast flag — skip passed phases, cascade re-run, fallback on missing/corrupt/mismatched report.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,13 +27,24 @@ const hoisted = vi.hoisted(() => ({
   mockComputeBuildInputHash: vi.fn(),
 }));
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const original = await importOriginal<typeof import("node:child_process")>();
+function makeInterceptedIo(): ReturnType<typeof createDefaultIO>["io"] {
+  const baseIo = createDefaultIO().io;
   return {
-    ...original,
-    execSync: vi.fn().mockReturnValue("10 page(s)"),
+    ...baseIo,
+    exec: vi.fn(
+      async (
+        command: string,
+        args: string[],
+        opts?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+      ) => {
+        if (command === "pnpm" && args.join(" ") === "exec astro build") {
+          return { exitCode: 0, stdout: "10 page(s)", stderr: "" };
+        }
+        return baseIo.exec(command, args, opts);
+      },
+    ),
   };
-});
+}
 
 vi.mock("@warpgogol/werkstatt-engine/fingerprint", () => ({
   byteHashFile: vi.fn().mockResolvedValue("sha256:mocked"),
@@ -134,7 +146,7 @@ const baseManifest = {
 
 function makeContext(tmpDir: string) {
   return {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},
@@ -165,7 +177,7 @@ beforeEach(async () => {
   hoisted.mockComputeBuildInputHash.mockReset();
 
   hoisted.mockReadMissionManifest.mockResolvedValue(baseManifest);
-  hoisted.mockResolveMissionDir.mockReturnValue(missionDir);
+  hoisted.mockResolveMissionDir.mockResolvedValue(missionDir);
   hoisted.mockCheckDifferentKindOperation.mockResolvedValue({ blocked: false });
   hoisted.mockCommitBordbuchProjections.mockResolvedValue({ committed: false, filesCommitted: [] });
   hoisted.mockRunOperation.mockResolvedValue({ completed: true });
@@ -271,7 +283,7 @@ test("AC-5: --fast with all-passed previous report does NOT overwrite validation
 test("AC-2 + AC-3: --fast with no previous report falls back to full run and warns", async () => {
   const warnCalls: string[] = [];
   const ctx = {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},
@@ -305,7 +317,7 @@ test("AC-8 + AC-9: --fast with corrupt previous report falls back to full run an
 
   const warnCalls: string[] = [];
   const ctx = {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},
@@ -342,7 +354,7 @@ test("AC-10 + AC-11: --fast with mismatched missionId falls back to full run and
 
   const warnCalls: string[] = [];
   const ctx = {
-    io: createDefaultIO().io,
+    io: makeInterceptedIo(),
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},

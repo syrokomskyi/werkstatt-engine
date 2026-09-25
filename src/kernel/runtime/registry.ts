@@ -13,22 +13,19 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1147/RFC-1148: listStaticCommandSurface — static enumeration over the workspace registry plus SITE_MODULE_MAP replaces listRegisteredKernelCommand*; commandInfo drops the siteName param (provider union narrowed to workspace | site-module).</item>
   <item>RFC-1147: site-module materialization memoized via getOrBuildSiteModuleStates — one materialization per workspaceRoot instead of 18 dynamic imports per call.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import process from "node:process";
-import { existsSync } from "node:fs";
 import { discoverSiteWorkspaces, loadKernelAppConfig } from "../discovery.ts";
 import {
   getOrBuildRegistry,
@@ -103,17 +100,6 @@ export async function loadAppRuntime(workspaceRoot: string, site: DiscoveredSite
   const cacheKey = `site:${site.configPath}`;
   const registry = await getOrBuildRegistry(cacheKey, config);
   return { config, registry };
-}
-
-/**
- * RFC-1138: a discovered site is only runtime-loadable when its directory has
- * node_modules installed. systems-cache clones carry a configPath but no
- * node_modules — attempting loadAppRuntime on them prints a WARNING on every
- * registry load. Filter them out silently; genuinely broken real sites (with
- * node_modules) still warn.
- */
-function siteHasRuntime(site: DiscoveredSiteWorkspace): boolean {
-  return existsSync(path.join(site.directory, "node_modules"));
 }
 
 export async function listSiteWorkspaces(workspaceRoot: string): Promise<SiteWorkspacesListResult> {

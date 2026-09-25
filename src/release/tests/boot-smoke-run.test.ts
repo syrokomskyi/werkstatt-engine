@@ -6,56 +6,56 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 describe("resolveWranglerConfig", () => {
-  it("uses --wrangler-config flag when provided", () => {
+  it("uses --wrangler-config flag when provided", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-wflag-"));
     const customConfig = join(tmpDist, "custom-wrangler.jsonc");
     writeFileSync(customConfig, "{}");
-    const result = resolveWranglerConfig(tmpDist, customConfig, "/fake/workspace");
+    const result = await resolveWranglerConfig(tmpDist, customConfig, "/fake/workspace");
     expect(result).not.toBeNull();
     expect(result!.wranglerConfigPath).toBe(customConfig);
     expect(result!.bootSmokeDistDir).toBe(tmpDist);
   });
 
-  it("defaults to dist/server/wrangler.json when Astro output exists", () => {
+  it("defaults to dist/server/wrangler.json when Astro output exists", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-astro-"));
     mkdirSync(join(tmpDist, "server"), { recursive: true });
     const astroWrangler = join(tmpDist, "server", "wrangler.json");
     writeFileSync(astroWrangler, "{}");
-    const result = resolveWranglerConfig(tmpDist, undefined, "/fake/workspace");
+    const result = await resolveWranglerConfig(tmpDist, undefined, "/fake/workspace");
     expect(result).not.toBeNull();
     expect(result!.wranglerConfigPath).toBe(astroWrangler);
     expect(result!.bootSmokeDistDir).toBe(join(tmpDist, "server"));
   });
 
-  it("falls back to dist/../wrangler.jsonc when no Astro output", () => {
+  it("falls back to dist/../wrangler.jsonc when no Astro output", async () => {
     const tmpParent = mkdtempSync(join(tmpdir(), "boot-smoke-fallback-"));
     const tmpDist = join(tmpParent, "dist");
     mkdirSync(tmpDist, { recursive: true });
     const fallbackWrangler = join(tmpParent, "wrangler.jsonc");
     writeFileSync(fallbackWrangler, "{}");
-    const result = resolveWranglerConfig(tmpDist, undefined, "/fake/workspace");
+    const result = await resolveWranglerConfig(tmpDist, undefined, "/fake/workspace");
     expect(result).not.toBeNull();
     expect(result!.wranglerConfigPath).toBe(fallbackWrangler);
     expect(result!.bootSmokeDistDir).toBe(tmpDist);
   });
 
-  it("falls back to workpiece wrangler.jsonc when no Astro and no dist/../wrangler.jsonc", () => {
+  it("falls back to workpiece wrangler.jsonc when no Astro and no dist/../wrangler.jsonc", async () => {
     const tmpWorkspace = mkdtempSync(join(tmpdir(), "boot-smoke-workspace-"));
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-wpdist-"));
     const workpieceDir = join(tmpWorkspace, "missions", "workpiece");
     mkdirSync(workpieceDir, { recursive: true });
     const workpieceWrangler = join(workpieceDir, "wrangler.jsonc");
     writeFileSync(workpieceWrangler, "{}");
-    const result = resolveWranglerConfig(tmpDist, undefined, tmpWorkspace);
+    const result = await resolveWranglerConfig(tmpDist, undefined, tmpWorkspace);
     expect(result).not.toBeNull();
     expect(result!.wranglerConfigPath).toBe(workpieceWrangler);
     expect(result!.bootSmokeDistDir).toBe(tmpDist);
   });
 
-  it("returns null when no wrangler config found anywhere", () => {
+  it("returns null when no wrangler config found anywhere", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-nowrangler-"));
     const tmpWorkspace = mkdtempSync(join(tmpdir(), "boot-smoke-nows-"));
-    const result = resolveWranglerConfig(tmpDist, undefined, tmpWorkspace);
+    const result = await resolveWranglerConfig(tmpDist, undefined, tmpWorkspace);
     expect(result).toBeNull();
   });
 });

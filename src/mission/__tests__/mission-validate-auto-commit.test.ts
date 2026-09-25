@@ -6,6 +6,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0976: initial unit tests for auto-commit on full-build and distribution-reuse paths.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -155,7 +156,7 @@ beforeEach(async () => {
   hoisted.mockValidateNoStaleMissionEntries.mockReset();
 
   hoisted.mockReadMissionManifest.mockResolvedValue(baseManifest);
-  hoisted.mockResolveMissionDir.mockReturnValue(missionDir);
+  hoisted.mockResolveMissionDir.mockResolvedValue(missionDir);
   hoisted.mockCheckDifferentKindOperation.mockResolvedValue({ blocked: false });
   hoisted.mockCommitBordbuchProjections.mockResolvedValue({ committed: false, filesCommitted: [] });
   hoisted.mockComputeBuildInputHash.mockResolvedValue({ buildInputHash: "sha256:mismatch" });

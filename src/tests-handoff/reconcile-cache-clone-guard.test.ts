@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0522: add unit tests for dirty cache clone guard and non-git fallback.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -36,37 +37,37 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test("isWorkpieceDirty detects dirty cache clone directory", () => {
+test("isWorkpieceDirty detects dirty cache clone directory", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "system.md"), "initial");
   gitCommit(tmpDir, "initial");
 
   writeFileSync(join(tmpDir, "system.md"), "modified");
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(1);
   expect(result.files).toHaveLength(1);
 });
 
-test("isWorkpieceDirty returns false for clean cache clone", () => {
+test("isWorkpieceDirty returns false for clean cache clone", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "system.md"), "initial");
   gitCommit(tmpDir, "initial");
 
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(false);
 });
 
-test("isWorkpieceDirty returns false for non-git cache clone (copyDir fallback)", () => {
+test("isWorkpieceDirty returns false for non-git cache clone (copyDir fallback)", async () => {
   writeFileSync(join(tmpDir, "system.md"), "content");
 
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(false);
   expect(result.fileCount).toBe(0);
   expect(result.files).toEqual([]);
 });
 
-test("isWorkpieceDirty files[] can be used for error messages", () => {
+test("isWorkpieceDirty files[] can be used for error messages", async () => {
   gitInit(tmpDir);
   writeFileSync(join(tmpDir, "file1.txt"), "a");
   writeFileSync(join(tmpDir, "file2.txt"), "b");
@@ -75,7 +76,7 @@ test("isWorkpieceDirty files[] can be used for error messages", () => {
   writeFileSync(join(tmpDir, "file1.txt"), "modified");
   writeFileSync(join(tmpDir, "file3.txt"), "new");
 
-  const result = isWorkpieceDirty(tmpDir);
+  const result = await isWorkpieceDirty(tmpDir);
   expect(result.dirty).toBe(true);
   expect(result.files).toHaveLength(2);
 });

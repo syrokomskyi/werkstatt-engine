@@ -11,6 +11,7 @@ lock, wrangler deploy, health check, and prod state recording.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0806: initial promote command handler (replaces leitstand.service.deploy).</item>
   <item>RFC-0829: add test evidence gate (L1+L2+L5) via shared runTestEvidenceGate helper; throw after grace period if git HEAD unresolvable.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -61,12 +62,12 @@ export async function runLeitstandServicePromote(
   }
 
   const serviceDir = path.join(workspaceRoot, "services", serviceId);
-  if (!await context.io.exists(serviceDir)) {
+  if (!(await context.io.exists(serviceDir))) {
     throw new Error(`[leitstand.service.promote] services/${serviceId}/ does not exist`);
   }
 
   const wranglerPath = path.join(serviceDir, "wrangler.jsonc");
-  if (!await context.io.exists(wranglerPath)) {
+  if (!(await context.io.exists(wranglerPath))) {
     throw new Error(
       `[leitstand.service.promote] services/${serviceId}/wrangler.jsonc not found — not a Cloudflare Worker service`,
     );
@@ -173,13 +174,13 @@ export async function runLeitstandServicePromote(
 
     // RFC-0829: Test evidence gate — verify L1 (unit), L2 (integration), L5 (smoke) evidence
     {
-      const { execSync } = await import("node:child_process");
       let commitSha = "";
       try {
-        commitSha = execSync("git rev-parse HEAD", {
+        const headResult = await context.io.exec("git", ["rev-parse", "HEAD"], {
           cwd: workspaceRoot,
-          encoding: "utf-8",
-        }).trim();
+        });
+        if (headResult.exitCode !== 0) throw new Error(headResult.stderr.trim());
+        commitSha = headResult.stdout.trim();
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const { GRACE_PERIOD_END } = await import("./test-evidence-gate.js");

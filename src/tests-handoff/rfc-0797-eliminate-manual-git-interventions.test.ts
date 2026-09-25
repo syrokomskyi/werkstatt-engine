@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0797: initial tests for auto-commit workpiece, pre-mirror-check sync, --skip-auto-sync flag, and commitCacheCloneIfDirty helper.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -407,7 +408,7 @@ test("commitCacheCloneIfDirty commits all dirty files and returns commit SHA", a
   mkdirSync(join(repoDir, "bordbuch"), { recursive: true });
   writeFileSync(join(repoDir, "bordbuch", "status.generated.yaml"), "status: ok\n");
 
-  const result = commitCacheCloneIfDirty(repoDir, "test-system");
+  const result = await commitCacheCloneIfDirty(repoDir, "test-system");
 
   expect(result.committed).toBe(true);
   expect(result.commitSha).toBeTruthy();
@@ -440,7 +441,7 @@ test("commitCacheCloneIfDirty returns committed=false when nothing dirty", async
   writeFileSync(join(repoDir, "file1.txt"), "content1\n");
   gitCommit(repoDir, "initial");
 
-  const result = commitCacheCloneIfDirty(repoDir, "test-system");
+  const result = await commitCacheCloneIfDirty(repoDir, "test-system");
 
   expect(result.committed).toBe(false);
   expect(result.commitSha).toBeNull();
@@ -456,7 +457,7 @@ test("commitCacheCloneIfDirty returns committed=false when no .git directory", a
   // No git init
   writeFileSync(join(repoDir, "file1.txt"), "content1\n");
 
-  const result = commitCacheCloneIfDirty(repoDir, "test-system");
+  const result = await commitCacheCloneIfDirty(repoDir, "test-system");
 
   expect(result.committed).toBe(false);
   expect(result.commitSha).toBeNull();

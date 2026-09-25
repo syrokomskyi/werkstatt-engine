@@ -11,7 +11,6 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0966: add readPassport, writePassport, resolvePassportPath helpers and passportRequired to default state.</item>
   <item>RFC-0967: add ownershipRequired to default state.</item>
   <item>RFC-0981: fix writeSystemState push to use symbolic-ref and fully-qualified refspec HEAD:refs/heads/{branch} instead of broken rev-parse --abbrev-ref HEAD in detached HEAD state.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -20,14 +19,13 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966</history>
 </CHANGE_SUMMARY>
 */
 
-import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { gitExec } from "../werkstatt/git-exec.js";
 import { cacheCloneCommit } from "../mission/mission-git-commit.js";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
@@ -76,17 +74,21 @@ export function resolveWorkpiecePath(workspaceRoot: string, missionId: string): 
 export async function readSystemConfig(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SystemConfig> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, systemId);
   const filePath = path.join(cacheClone, "system-config.yaml");
-  const raw = await readFile(filePath, "utf8");
+  const raw = await io.readFile(filePath);
   const parsed = parseYaml(raw);
   return systemConfigSchema.parse(parsed);
 }
 
-export async function readSystemConfigFromWorkpiece(workpieceDir: string): Promise<SystemConfig> {
+export async function readSystemConfigFromWorkpiece(
+  workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SystemConfig> {
   const filePath = path.join(workpieceDir, "system-config.yaml");
-  const raw = await readFile(filePath, "utf8");
+  const raw = await io.readFile(filePath);
   const parsed = parseYaml(raw);
   return systemConfigSchema.parse(parsed);
 }
@@ -95,21 +97,23 @@ export async function writeSystemConfig(
   workspaceRoot: string,
   systemId: string,
   config: SystemConfig,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, systemId);
   const filePath = path.join(cacheClone, "system-config.yaml");
-  await mkdir(path.dirname(filePath), { recursive: true });
+  await io.mkdir(path.dirname(filePath));
   const yaml = stringifyYaml(config);
-  await atomicWriteFile(filePath, yaml + "\n");
+  await atomicWriteFile(filePath, yaml + "\n", io);
 }
 
 export async function readSystemState(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SystemState> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, systemId);
   const filePath = path.join(cacheClone, "system-state.yaml");
-  if (!existsSync(filePath)) {
+  if (!(await io.exists(filePath))) {
     return {
       schemaVersion: "1.0.0",
       systemId,
@@ -121,19 +125,22 @@ export async function readSystemState(
       ownershipRequired: false,
     };
   }
-  const raw = await readFile(filePath, "utf8");
+  const raw = await io.readFile(filePath);
   const parsed = parseYaml(raw);
   return systemStateSchema.parse(parsed);
 }
 
-export async function readSystemStateFromWorkpiece(workpieceDir: string): Promise<SystemState> {
+export async function readSystemStateFromWorkpiece(
+  workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SystemState> {
   const filePath = path.join(workpieceDir, "system-state.yaml");
-  if (!existsSync(filePath)) {
+  if (!(await io.exists(filePath))) {
     throw new Error(
       `[readSystemStateFromWorkpiece] system-state.yaml not found in workpiece ${workpieceDir}`,
     );
   }
-  const raw = await readFile(filePath, "utf8");
+  const raw = await io.readFile(filePath);
   const parsed = parseYaml(raw);
   return systemStateSchema.parse(parsed);
 }
@@ -141,32 +148,31 @@ export async function readSystemStateFromWorkpiece(workpieceDir: string): Promis
 export async function writeSystemStateToWorkpiece(
   workpieceDir: string,
   state: SystemState,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const filePath = path.join(workpieceDir, "system-state.yaml");
-  await mkdir(path.dirname(filePath), { recursive: true });
+  await io.mkdir(path.dirname(filePath));
   const yaml = stringifyYaml(state);
-  await atomicWriteFile(filePath, yaml + "\n");
+  await atomicWriteFile(filePath, yaml + "\n", io);
 }
 
 export async function writeSystemState(
   workspaceRoot: string,
   systemId: string,
   state: SystemState,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, systemId);
   const filePath = path.join(cacheClone, "system-state.yaml");
-  await mkdir(path.dirname(filePath), { recursive: true });
+  await io.mkdir(path.dirname(filePath));
   const yaml = stringifyYaml(state);
-  await atomicWriteFile(filePath, yaml + "\n");
+  await atomicWriteFile(filePath, yaml + "\n", io);
 
   // Auto-commit to cache clone git
-  if (existsSync(path.join(cacheClone, ".git"))) {
+  if (await io.exists(path.join(cacheClone, ".git"))) {
     try {
-      execSync(`git add system-state.yaml`, {
-        cwd: cacheClone,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      cacheCloneCommit(cacheClone, `system-state: update ${systemId}`);
+      await io.exec("git", ["add", "system-state.yaml"], { cwd: cacheClone });
+      await cacheCloneCommit(cacheClone, `system-state: update ${systemId}`);
     } catch {
       // Git commit may fail if nothing changed — non-fatal
     }
@@ -180,7 +186,7 @@ export async function writeSystemState(
     try {
       let branch = "main";
       try {
-        const ref = gitExec(cacheClone, "symbolic-ref --short refs/remotes/origin/HEAD", {
+        const ref = await gitExec(cacheClone, "symbolic-ref --short refs/remotes/origin/HEAD", {
           allowNonZero: true,
         });
         branch = ref.replace("origin/", "") || "main";
@@ -189,7 +195,7 @@ export async function writeSystemState(
       }
       // RFC-0986: Use --force-with-lease — cache clone is the source of truth.
       // Fixes non-fast-forward errors when bare repo diverged after last fetch.
-      gitExec(cacheClone, `push --force-with-lease origin HEAD:refs/heads/${branch}`);
+      await gitExec(cacheClone, `push --force-with-lease origin HEAD:refs/heads/${branch}`);
     } catch (err) {
       // Push may fail if no bare repo is configured or branch diverged — non-fatal
       const msg = err instanceof Error ? err.message : String(err);
@@ -205,23 +211,26 @@ export interface DiscoveryResult {
   errors: Array<{ id: string; error: string }>;
 }
 
-export async function discoverSystems(workspaceRoot: string): Promise<DiscoveryResult> {
+export async function discoverSystems(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<DiscoveryResult> {
   const cacheRoot = path.resolve(workspaceRoot, SYSTEMS_CACHE_DIR);
   const systems: SystemConfig[] = [];
   const errors: Array<{ id: string; error: string }> = [];
 
-  if (!existsSync(cacheRoot)) {
+  if (!(await io.exists(cacheRoot))) {
     return { systems, errors };
   }
 
-  const entries = await readdir(cacheRoot, { withFileTypes: true });
+  const entries = await io.readdir(cacheRoot);
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory) continue;
     const systemId = entry.name;
     if (systemId.startsWith(".")) continue;
 
     try {
-      const config = await readSystemConfigSmart(workspaceRoot, systemId);
+      const config = await readSystemConfigSmart(workspaceRoot, systemId, io);
       systems.push(config);
     } catch (err) {
       errors.push({
@@ -242,22 +251,23 @@ export async function discoverSystems(workspaceRoot: string): Promise<DiscoveryR
 export async function resolveActiveWorkpieceDir(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string | null> {
   // Read state from cache clone to find currentMission
   const cacheClone = resolveCacheClonePath(workspaceRoot, systemId);
   const statePath = path.join(cacheClone, "system-state.yaml");
-  if (!existsSync(statePath)) return null;
+  if (!(await io.exists(statePath))) return null;
 
   try {
-    const raw = await readFile(statePath, "utf8");
+    const raw = await io.readFile(statePath);
     const parsed = parseYaml(raw);
     const state = systemStateSchema.parse(parsed);
     if (!state.currentMission) return null;
 
     const workpieceDir = resolveWorkpiecePath(workspaceRoot, state.currentMission);
-    if (!existsSync(workpieceDir)) return null;
+    if (!(await io.exists(workpieceDir))) return null;
     // Verify system-config.yaml exists in workpiece (materialized)
-    if (!existsSync(path.join(workpieceDir, "system-config.yaml"))) return null;
+    if (!(await io.exists(path.join(workpieceDir, "system-config.yaml")))) return null;
     return workpieceDir;
   } catch {
     return null;
@@ -267,65 +277,72 @@ export async function resolveActiveWorkpieceDir(
 export async function readSystemConfigSmart(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SystemConfig> {
-  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId);
+  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId, io);
   if (workpieceDir) {
-    return readSystemConfigFromWorkpiece(workpieceDir);
+    return readSystemConfigFromWorkpiece(workpieceDir, io);
   }
-  return readSystemConfig(workspaceRoot, systemId);
+  return readSystemConfig(workspaceRoot, systemId, io);
 }
 
 export async function readSystemStateSmart(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SystemState> {
-  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId);
+  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId, io);
   if (workpieceDir) {
     const filePath = path.join(workpieceDir, "system-state.yaml");
-    if (existsSync(filePath)) {
-      const raw = await readFile(filePath, "utf8");
+    if (await io.exists(filePath)) {
+      const raw = await io.readFile(filePath);
       const parsed = parseYaml(raw);
       return systemStateSchema.parse(parsed);
     }
     // Fallback: read from cache clone if not yet in workpiece
   }
-  return readSystemState(workspaceRoot, systemId);
+  return readSystemState(workspaceRoot, systemId, io);
 }
 
 export async function writeSystemStateSmart(
   workspaceRoot: string,
   systemId: string,
   state: SystemState,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
-  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId);
+  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId, io);
   if (workpieceDir) {
-    await writeSystemStateToWorkpiece(workpieceDir, state);
+    await writeSystemStateToWorkpiece(workpieceDir, state, io);
     return;
   }
-  await writeSystemState(workspaceRoot, systemId, state);
+  await writeSystemState(workspaceRoot, systemId, state, io);
 }
 
 export async function writeSystemConfigSmart(
   workspaceRoot: string,
   systemId: string,
   config: SystemConfig,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
-  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId);
+  const workpieceDir = await resolveActiveWorkpieceDir(workspaceRoot, systemId, io);
   if (workpieceDir) {
     const filePath = path.join(workpieceDir, "system-config.yaml");
-    await mkdir(path.dirname(filePath), { recursive: true });
+    await io.mkdir(path.dirname(filePath));
     const yaml = stringifyYaml(config);
-    await atomicWriteFile(filePath, yaml + "\n");
+    await atomicWriteFile(filePath, yaml + "\n", io);
     return;
   }
-  await writeSystemConfig(workspaceRoot, systemId, config);
+  await writeSystemConfig(workspaceRoot, systemId, config, io);
 }
 
 // --- RFC-0790: Services registry (remains in monorepo) ---
 
-export async function readServicesRegistry(workspaceRoot: string): Promise<ServicesRegistry> {
+export async function readServicesRegistry(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<ServicesRegistry> {
   const filePath = path.join(workspaceRoot, SERVICES_REGISTRY_PATH);
-  const raw = await readFile(filePath, "utf8");
+  const raw = await io.readFile(filePath);
   const parsed = parseYaml(raw);
   return servicesRegistrySchema.parse(parsed);
 }
@@ -337,17 +354,22 @@ export function findServiceEntry(registry: ServicesRegistry, id: string): Servic
 export async function writeServicesRegistry(
   workspaceRoot: string,
   registry: ServicesRegistry,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const filePath = path.join(workspaceRoot, SERVICES_REGISTRY_PATH);
   const yaml = stringifyYaml(registry) + "\n";
-  await writeFile(filePath, yaml, "utf8");
+  await io.writeFile(filePath, yaml);
 }
 
 // --- Existing helpers (preserved) ---
 
-export function hasAppsCollision(workspaceRoot: string, id: string): boolean {
+export async function hasAppsCollision(
+  workspaceRoot: string,
+  id: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   const appsDir = path.join(workspaceRoot, "apps", id);
-  return existsSync(appsDir);
+  return io.exists(appsDir);
 }
 
 // --- RFC-0574: Mirror path resolution (signature updated for SystemConfig) ---
@@ -422,10 +444,11 @@ export function resolvePassportPath(workspaceRoot: string, systemId: string): st
 export async function readPassport(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SignedSitePassport | null> {
   const filePath = resolvePassportPath(workspaceRoot, systemId);
-  if (!existsSync(filePath)) return null;
-  const raw = await readFile(filePath, "utf8");
+  if (!(await io.exists(filePath))) return null;
+  const raw = await io.readFile(filePath);
   return JSON.parse(raw) as SignedSitePassport;
 }
 
@@ -433,9 +456,10 @@ export async function writePassport(
   workspaceRoot: string,
   systemId: string,
   doc: SignedSitePassport,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const filePath = resolvePassportPath(workspaceRoot, systemId);
   const content = JSON.stringify(doc, null, 2) + "\n";
-  await atomicWriteFile(filePath, content);
+  await atomicWriteFile(filePath, content, io);
   return filePath;
 }

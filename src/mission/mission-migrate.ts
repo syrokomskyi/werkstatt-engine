@@ -12,6 +12,7 @@ the cursor, and writes a migration report to evidence/.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0479: initial mission.migrate command handler.</item>
   <item>RFC-0580: auto-commit werkstatt side-effects (mission.yaml) after writeMissionManifest.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -89,7 +90,7 @@ export async function runMissionMigrate(
   await acquireLock(workspaceRoot, `mission:${missionId}`, operationId, "mission.migrate", "agent");
 
   try {
-    const missionDir = resolveMissionDir(workspaceRoot, missionId);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
     const workpieceDir = path.join(missionDir, "workpiece");
 
     if (!await context.io.exists(workpieceDir)) {

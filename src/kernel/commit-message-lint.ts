@@ -25,10 +25,11 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execFileSync } from "node:child_process";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type {
   CheckResult,
   Diagnostic,
@@ -167,13 +168,12 @@ export function parseNameOnlyOutput(raw: string, marker: string): Map<string, st
   return result;
 }
 
-function resolveDefaultRange(workspaceRoot: string): string | null {
+async function resolveDefaultRange(workspaceRoot: string, io: WorkspaceIO): Promise<string | null> {
   try {
-    execFileSync("git", ["rev-parse", "--verify", "origin/main"], {
+    const result = await io.exec("git", ["rev-parse", "--verify", "origin/main"], {
       cwd: workspaceRoot,
-      stdio: "pipe",
     });
-    return "origin/main..HEAD";
+    return result.exitCode === 0 ? "origin/main..HEAD" : null;
   } catch {
     return null; // no origin/main (e.g. fresh repo, no remote) — nothing to lint.
   }
@@ -184,7 +184,9 @@ export async function runCommitMessageLint(
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<CheckResult>> {
   const { workspaceRoot } = context;
-  const range = (input.flags.range as string | undefined) ?? resolveDefaultRange(workspaceRoot);
+  const range =
+    (input.flags.range as string | undefined) ??
+    (await resolveDefaultRange(workspaceRoot, context.io));
 
   if (!range) {
     return {
@@ -200,13 +202,14 @@ export async function runCommitMessageLint(
   }
 
   let logRaw: string;
-  try {
-    logRaw = execFileSync(
-      "git",
-      ["log", range, `--format=${RECORD_SEP}%H${FIELD_SEP}%P${FIELD_SEP}%s${FIELD_SEP}%b`],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-  } catch {
+  const logResult = await context.io.exec(
+    "git",
+    ["log", range, `--format=${RECORD_SEP}%H${FIELD_SEP}%P${FIELD_SEP}%s${FIELD_SEP}%b`],
+    { cwd: workspaceRoot },
+  );
+  if (logResult.exitCode === 0) {
+    logRaw = logResult.stdout;
+  } else {
     return {
       data: {
         command: "commit.message.lint",
@@ -234,16 +237,12 @@ export async function runCommitMessageLint(
   }
 
   const NAME_ONLY_MARKER = "\x02COMMIT:";
-  let nameOnlyRaw = "";
-  try {
-    nameOnlyRaw = execFileSync(
-      "git",
-      ["log", range, "--name-only", `--format=${NAME_ONLY_MARKER}%H`],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-  } catch {
-    nameOnlyRaw = "";
-  }
+  const nameOnlyResult = await context.io.exec(
+    "git",
+    ["log", range, "--name-only", `--format=${NAME_ONLY_MARKER}%H`],
+    { cwd: workspaceRoot },
+  );
+  const nameOnlyRaw = nameOnlyResult.exitCode === 0 ? nameOnlyResult.stdout : "";
   const changedFilesByHash = parseNameOnlyOutput(nameOnlyRaw, NAME_ONLY_MARKER);
 
   const diagnostics: Diagnostic[] = [];

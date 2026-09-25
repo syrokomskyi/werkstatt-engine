@@ -4,6 +4,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1034: initial tests for config resolution warning.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -17,8 +18,8 @@ vi.mock("../kernel/runtime/registry.ts", () => ({
 }));
 
 vi.mock("./registry-io.ts", () => ({
-  discoverSystems: vi.fn().mockReturnValue([]),
-  hasAppsCollision: vi.fn().mockReturnValue(false),
+  discoverSystems: vi.fn().mockResolvedValue([]),
+  hasAppsCollision: vi.fn().mockResolvedValue(false),
   resolveMirrors: vi.fn().mockReturnValue({ cachePath: "", gitMirrors: [], backupMirrors: [] }),
   resolveMirrorPath: vi.fn(),
   resolveWorkpiecePath: vi.fn(),
@@ -48,7 +49,7 @@ vi.mock("./external-edit-guard.ts", () => ({
 
 vi.mock("./external-edit-collector.ts", () => ({
   collectExternalEditInputs: vi.fn().mockResolvedValue({}),
-  bordbuchFileExists: vi.fn().mockReturnValue(false),
+  bordbuchFileExists: vi.fn().mockResolvedValue(false),
   bordbuchPathFor: vi.fn(),
 }));
 
@@ -64,7 +65,8 @@ vi.mock("./passport.ts", () => ({
 }));
 
 vi.mock("../schemas/naming-policy.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@warpgogol/werkstatt-shared/ontology/operations")>();
+  const actual =
+    await importOriginal<typeof import("@warpgogol/werkstatt-shared/ontology/operations")>();
   return {
     ...actual,
     hasTldSuffix: vi.fn().mockReturnValue(false),

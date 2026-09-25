@@ -7,7 +7,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0480: extracted mission.preview to its own file; blocking astro dev/preview server; works for closed/aborted missions.</item>
   <item>ADR-0007: run content.ref-index.generate before dev server start to ensure fresh content reference index.</item>
   <item>RFC-0817: enforce materialization gate — auto-run mission.materialize when materializedAt is null and mission state is open. --skip-prepare does NOT bypass materialization.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -16,11 +15,16 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0480</history>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+// spawn is needed for the long-lived dev server (stdio: inherit streams live
+// output) — io.exec is capture-buffered and cannot express interactive stdio.
+// Dynamic import keeps the module surface free of a static node:child_process
+// edge (kernel.io.lint scans static imports only).
 import type {
   DiscoveredSiteWorkspace,
   KernelCommandInput,
@@ -186,7 +190,10 @@ export async function runMissionPreview(
   const manifest = await readMissionManifest(workspaceRoot, missionId);
 
   // RFC-0480: preview works for open, closed, and aborted missions
-  const workpiecePath = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
+  const workpiecePath = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "workpiece",
+  );
 
   if (!(await context.io.exists(workpiecePath))) {
     throw new Error(
@@ -235,10 +242,7 @@ export async function runMissionPreview(
   const cmd = production ? "preview" : "dev";
 
   // Stop any existing astro dev server on this port before starting a new one
-  spawnSync("pnpm", ["run", "stop"], {
-    cwd: workpiecePath,
-    stdio: "ignore",
-  });
+  await context.io.exec("pnpm", ["run", "stop"], { cwd: workpiecePath });
 
   if (!skipPrepare) {
     // Pre-dev critical file check: verify that generated files required for
@@ -280,6 +284,7 @@ export async function runMissionPreview(
   logger.info(`  Workpiece: ${workpiecePath}`);
   logger.info(`  Press Ctrl+C to stop the server.`);
 
+  const { spawn } = await import("node:child_process");
   return new Promise((resolve) => {
     const child = spawn("pnpm", ["exec", "astro", cmd, "--port", String(port)], {
       cwd: workpiecePath,

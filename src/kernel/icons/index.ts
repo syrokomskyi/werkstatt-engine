@@ -16,6 +16,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,9 +27,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
  * @module
  */
 
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -62,8 +63,8 @@ type IconSet = { base: string; set: string };
  * Structure: ASSETS_BASE/{base}/{set}/icon.json
  * Examples: lordicon/doodle-outline/, heroicons/24-outline/
  */
-function discoverIconSets(logger: KernelLogger): IconSet[] {
-  if (!fs.existsSync(ASSETS_BASE)) {
+async function discoverIconSets(logger: KernelLogger, io: WorkspaceIO): Promise<IconSet[]> {
+  if (!(await io.exists(ASSETS_BASE))) {
     logger.event({
       severity: "notice",
       kind: "expected-fallback",
@@ -78,13 +79,13 @@ function discoverIconSets(logger: KernelLogger): IconSet[] {
   const iconSets: IconSet[] = [];
 
   // Find base sets (top-level directories)
-  const baseEntries = fs.readdirSync(ASSETS_BASE, { withFileTypes: true });
-  const baseSets = baseEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const baseEntries = await io.readdir(ASSETS_BASE);
+  const baseSets = baseEntries.filter((entry) => entry.isDirectory).map((entry) => entry.name);
 
   for (const base of baseSets) {
     const basePath = path.join(ASSETS_BASE, base);
-    const setEntries = fs.readdirSync(basePath, { withFileTypes: true });
-    const sets = setEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    const setEntries = await io.readdir(basePath);
+    const sets = setEntries.filter((entry) => entry.isDirectory).map((entry) => entry.name);
 
     for (const set of sets) {
       iconSets.push({ base, set });
@@ -129,8 +130,8 @@ function parseIconFilename(filename: string, set: string): { name: string; id: s
   return { name: rawName, id };
 }
 
-function readTemplate(templatePath: string): string {
-  return fs.readFileSync(path.join(TEMPLATES_DIR, templatePath), "utf8");
+async function readTemplate(templatePath: string, io: WorkspaceIO): Promise<string> {
+  return io.readFile(path.join(TEMPLATES_DIR, templatePath));
 }
 
 function applyTokens(template: string, tokens: Record<string, string>): string {
@@ -140,8 +141,13 @@ function applyTokens(template: string, tokens: Record<string, string>): string {
 /**
  * Generate Astro component content for an icon from template.
  */
-function generateIconComponent(_iconName: string, _set: string, relativeJsonPath: string): string {
-  return applyTokens(readTemplate("lord-icon-component.template.astro"), {
+async function generateIconComponent(
+  _iconName: string,
+  _set: string,
+  relativeJsonPath: string,
+  io: WorkspaceIO,
+): Promise<string> {
+  return applyTokens(await readTemplate("lord-icon-component.template.astro", io), {
     RELATIVE_JSON_PATH: relativeJsonPath,
   });
 }
@@ -149,15 +155,16 @@ function generateIconComponent(_iconName: string, _set: string, relativeJsonPath
 /**
  * Generate index.ts content for an icon set from template.
  */
-function generateIndexExports(
+async function generateIndexExports(
   exports: Array<{ fileName: string; exportName: string; subfolder: string }>,
-): string {
+  io: WorkspaceIO,
+): Promise<string> {
   const exportsList = exports
     .map(({ fileName, exportName, subfolder }) => {
       return `export { default as ${exportName} } from "./${subfolder}/${fileName}";`;
     })
     .join("\n");
-  return applyTokens(readTemplate("index.template.ts"), {
+  return applyTokens(await readTemplate("index.template.ts", io), {
     EXPORTS_LIST: exportsList,
   });
 }
@@ -168,20 +175,23 @@ function generateIndexExports(
 async function processIconSet(
   iconSet: IconSet,
   logger: KernelLogger,
+  io: WorkspaceIO,
 ): Promise<{ generated: number; errors: number }> {
   const { base, set } = iconSet;
   const inputDir = path.join(ASSETS_BASE, base, set);
   const outputDir = path.join(OUTPUT_BASE, base, set);
 
-  if (!fs.existsSync(inputDir)) {
+  if (!(await io.exists(inputDir))) {
     logger.warn(`Input directory not found: ${inputDir}`);
     return { generated: 0, errors: 0 };
   }
 
   // Ensure output directory exists
-  fs.mkdirSync(outputDir, { recursive: true });
+  await io.mkdir(outputDir);
 
-  const jsonFiles = fs.readdirSync(inputDir).filter((f) => f.endsWith(".json"));
+  const jsonFiles = (await io.readdir(inputDir))
+    .map((e) => e.name)
+    .filter((f) => f.endsWith(".json"));
   const exports: Array<{ fileName: string; exportName: string; subfolder: string }> = [];
 
   let generated = 0;
@@ -204,17 +214,17 @@ async function processIconSet(
     const subfolder = name.charAt(0).toLowerCase();
     const subfolderPath = path.join(outputDir, subfolder);
 
-    fs.mkdirSync(subfolderPath, { recursive: true });
+    await io.mkdir(subfolderPath);
 
     // Calculate relative path from component to JSON asset
     // From: domain/ui/icons/gen/{base}/{subfolder}/
     // To:   domain/ui/assets/icons/{base}/{set}/
     const relativeJsonPath = `../../../../assets/icons/${base}/${set}/${jsonFile}`;
 
-    const componentContent = generateIconComponent(name, set, relativeJsonPath);
+    const componentContent = await generateIconComponent(name, set, relativeJsonPath, io);
     const componentPath = path.join(subfolderPath, componentFileName);
 
-    fs.writeFileSync(componentPath, componentContent, "utf8");
+    await io.writeFile(componentPath, componentContent);
 
     exports.push({
       fileName: componentFileName,
@@ -232,8 +242,8 @@ async function processIconSet(
   });
 
   // Generate index.ts
-  const indexContent = generateIndexExports(exports);
-  fs.writeFileSync(path.join(outputDir, "index.ts"), indexContent, "utf8");
+  const indexContent = await generateIndexExports(exports, io);
+  await io.writeFile(path.join(outputDir, "index.ts"), indexContent);
 
   logger.info(`Generated ${generated} components for ${set} (index.ts: ${exports.length} exports)`);
 
@@ -255,7 +265,7 @@ export async function runIconsGenerate(
   let totalErrors = 0;
 
   // Discover icon sets dynamically
-  const iconSets = discoverIconSets(logger);
+  const iconSets = await discoverIconSets(logger, context.io);
 
   if (iconSets.length === 0) {
     logger.warn("No icon sets found to process");
@@ -274,7 +284,7 @@ export async function runIconsGenerate(
   }
 
   for (const set of iconSets) {
-    const result = await processIconSet(set, logger);
+    const result = await processIconSet(set, logger, context.io);
     totalGenerated += result.generated;
     totalErrors += result.errors;
   }

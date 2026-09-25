@@ -6,6 +6,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0878: initial tests for .closed sentinel — hook blocks raw git commit, hook blocks MISSION_GIT_COMMIT bypass, commitWorkpieceIfDirty throws on closed workpiece.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -123,13 +124,15 @@ test("commitWorkpieceIfDirty throws on closed workpiece (defence-in-depth)", asy
   await fs.writeFile(path.join(workpieceDir, ".closed"), "2026-08-18T00:00:00.000Z\n");
   await fs.writeFile(path.join(workpieceDir, "dirty-file.txt"), "content\n");
 
-  expect(() => commitWorkpieceIfDirty(workpieceDir, "test-mission")).toThrow(/closed.*RFC-0878/);
+  await expect(commitWorkpieceIfDirty(workpieceDir, "test-mission")).rejects.toThrow(
+    /closed.*RFC-0878/,
+  );
 });
 
 test("commitWorkpieceIfDirty succeeds on open workpiece (no .closed sentinel)", async () => {
   await fs.writeFile(path.join(workpieceDir, "dirty-file.txt"), "content\n");
 
-  const result = commitWorkpieceIfDirty(workpieceDir, "test-mission");
+  const result = await commitWorkpieceIfDirty(workpieceDir, "test-mission");
 
   expect(result.committed).toBe(true);
   expect(result.commitSha).not.toBeNull();

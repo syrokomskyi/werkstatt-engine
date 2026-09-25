@@ -16,20 +16,20 @@ afterEach(() => {
 });
 
 describe("SqliteCacheLayer", () => {
-  test("available is true", () => {
-    const layer = new SqliteCacheLayer(dbPath);
+  test("available is true", async () => {
+    const layer = await SqliteCacheLayer.create(dbPath);
     expect(layer.available).toBe(true);
     layer.close();
   });
 
   test("get returns null for missing key", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     expect(await layer.get("ns", "missing")).toBeNull();
     await layer.close();
   });
 
   test("set and get round-trip", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await layer.set("ns", "key1", { foo: "bar" }, 12345, "hash123");
     const entry = await layer.get("ns", "key1");
     expect(entry).not.toBeNull();
@@ -40,7 +40,7 @@ describe("SqliteCacheLayer", () => {
   });
 
   test("set overwrites existing entry", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await layer.set("ns", "key1", { v: 1 }, 100, "hash1");
     await layer.set("ns", "key1", { v: 2 }, 200, "hash2");
     const entry = await layer.get("ns", "key1");
@@ -50,7 +50,7 @@ describe("SqliteCacheLayer", () => {
   });
 
   test("clear with namespace removes only that namespace", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await layer.set("ns-a", "key1", "data-a", 100, "hash");
     await layer.set("ns-b", "key1", "data-b", 100, "hash");
     await layer.clear("ns-a");
@@ -60,7 +60,7 @@ describe("SqliteCacheLayer", () => {
   });
 
   test("clear without namespace removes all", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await layer.set("ns-a", "key1", "data-a", 100, "hash");
     await layer.set("ns-b", "key1", "data-b", 100, "hash");
     await layer.clear();
@@ -70,7 +70,7 @@ describe("SqliteCacheLayer", () => {
   });
 
   test("status returns available with namespaces", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await layer.set("ns-a", "key1", "data", 100, "hash");
     await layer.set("ns-a", "key2", "data", 100, "hash");
     const status = await layer.status();
@@ -83,7 +83,7 @@ describe("SqliteCacheLayer", () => {
   });
 
   test("hit ratio is computed from stats", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await layer.set("ns", "key1", "data", 100, "hash");
     await layer.get("ns", "key1");
     await layer.get("ns", "key1");
@@ -96,12 +96,12 @@ describe("SqliteCacheLayer", () => {
   });
 
   test("close does not throw", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     await expect(layer.close()).resolves.toBeUndefined();
   });
 
   test("list returns empty for no entries", async () => {
-    const layer = new SqliteCacheLayer(dbPath);
+    const layer = await SqliteCacheLayer.create(dbPath);
     expect(await layer.list()).toEqual([]);
     await layer.close();
   });

@@ -23,8 +23,8 @@ afterEach(() => {
 });
 
 describe("resolveMissionManifestPath", () => {
-  test("joins workspaceRoot with missions/<id>/mission.yaml", () => {
-    const p = resolveMissionManifestPath("/tmp/ws", "m000001");
+  test("joins workspaceRoot with missions/<id>/mission.yaml", async () => {
+    const p = await resolveMissionManifestPath("/tmp/ws", "m000001");
     expect(p).toBe(join("/tmp/ws", "missions", "m000001", "mission.yaml"));
   });
 });
@@ -80,8 +80,8 @@ describe("createMissionDirectories", () => {
 });
 
 describe("resolveMissionEvidenceDir", () => {
-  test("resolves to evidence/axiom subdirectory", () => {
-    const dir = resolveMissionEvidenceDir(tmpDir, "test-system-m000001");
+  test("resolves to evidence/axiom subdirectory", async () => {
+    const dir = await resolveMissionEvidenceDir(tmpDir, "test-system-m000001");
     expect(dir).toBe(join(tmpDir, "missions", "test-system-m000001", "evidence", "axiom"));
   });
 });

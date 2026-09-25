@@ -9,13 +9,12 @@
   <item>RFC-0520: initial extraction of Bordbuch reading and git rev-list I/O from sternsystem.validate inline block.</item>
   <item>ADR-0040: add JSDoc return-type contract to bordbuchPathFor.</item>
   <item>ADR-0091: collect externalEditBaselineSha from system-state.yaml via loose read — malformed values reach the guard as baseline-missing.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { parse as parseYaml } from "yaml";
 
 export interface ExternalEditCollectorOutput {
@@ -33,8 +32,9 @@ export interface ExternalEditCollectorOutput {
 export async function collectExternalEditInputs(
   cacheDir: string,
   bordbuchPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ExternalEditCollectorOutput> {
-  const bordbuchRaw = await fs.readFile(bordbuchPath, "utf8");
+  const bordbuchRaw = await io.readFile(bordbuchPath);
   const lines = bordbuchRaw.split("\n").filter((l) => l.trim().length > 0);
 
   const bordbuchEntries: ExternalEditCollectorOutput["bordbuchEntries"] = [];
@@ -49,17 +49,17 @@ export async function collectExternalEditInputs(
       bordbuchEntries.push(entry);
       if (entry.type === "mission-reconcile" && entry.metadata?.commitSha) {
         if (entry.metadata.preReconcileSha) {
-          try {
-            const range = execSync(
-              `git rev-list ${entry.metadata.preReconcileSha}..${entry.metadata.commitSha}`,
-              { cwd: cacheDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
-            ).trim();
-            for (const sha of range.split("\n").filter((l) => l.trim())) {
+          const rangeResult = await io.exec(
+            "git",
+            ["rev-list", `${entry.metadata.preReconcileSha}..${entry.metadata.commitSha}`],
+            { cwd: cacheDir },
+          );
+          if (rangeResult.exitCode === 0) {
+            for (const sha of rangeResult.stdout.split("\n").filter((l) => l.trim())) {
               rangeShas.push(sha.trim());
             }
-          } catch {
-            // Range may be invalid if history was rewritten — skip
           }
+          // Non-zero exit: range may be invalid if history was rewritten — skip
         }
       }
     } catch {
@@ -68,18 +68,12 @@ export async function collectExternalEditInputs(
   }
 
   let gitLogShas: string[] = [];
-  try {
-    const log = execSync("git rev-list --all", {
-      cwd: cacheDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-    gitLogShas = log
+  const logResult = await io.exec("git", ["rev-list", "--all"], { cwd: cacheDir });
+  if (logResult.exitCode === 0) {
+    gitLogShas = logResult.stdout
       .split("\n")
       .map((s) => s.trim())
       .filter((l) => l.length > 0);
-  } catch {
-    // No commits or git error — skip
   }
 
   // ADR-0091: loose read of the baseline field — no full schema parse, so a
@@ -88,7 +82,7 @@ export async function collectExternalEditInputs(
   // check. systemStateSchema enforces the 40-hex format on canonical readers.
   let externalEditBaselineSha: string | undefined;
   try {
-    const stateRaw = await fs.readFile(path.join(cacheDir, "system-state.yaml"), "utf8");
+    const stateRaw = await io.readFile(path.join(cacheDir, "system-state.yaml"));
     const stateParsed = parseYaml(stateRaw) as { externalEditBaselineSha?: unknown } | null;
     if (typeof stateParsed?.externalEditBaselineSha === "string") {
       externalEditBaselineSha = stateParsed.externalEditBaselineSha;
@@ -100,10 +94,13 @@ export async function collectExternalEditInputs(
   return { bordbuchEntries, rangeShas, gitLogShas, externalEditBaselineSha };
 }
 
-export function bordbuchFileExists(cacheDir: string): boolean {
+export async function bordbuchFileExists(
+  cacheDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   const bordbuchPath = path.join(cacheDir, "bordbuch", "events.ndjson");
   const gitDir = path.join(cacheDir, ".git");
-  return existsSync(bordbuchPath) && existsSync(gitDir);
+  return (await io.exists(bordbuchPath)) && (await io.exists(gitDir));
 }
 
 /**

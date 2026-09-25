@@ -48,13 +48,13 @@ describe("isClosedWorkpiece", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test("returns false when .closed sentinel is absent", () => {
-    expect(isClosedWorkpiece(tmpDir)).toBe(false);
+  test("returns false when .closed sentinel is absent", async () => {
+    expect(await isClosedWorkpiece(tmpDir, createDefaultIO().io)).toBe(false);
   });
 
-  test("returns true when .closed sentinel exists", () => {
+  test("returns true when .closed sentinel exists", async () => {
     writeFileSync(join(tmpDir, ".closed"), "closed\n");
-    expect(isClosedWorkpiece(tmpDir)).toBe(true);
+    expect(await isClosedWorkpiece(tmpDir, createDefaultIO().io)).toBe(true);
   });
 });
 
@@ -173,14 +173,15 @@ describe("collectGitignoredPaths integration (real git repo)", () => {
     expect(mutatingStepRunsOnClosedWorkpiece(tracked, "site", ignored)).toBe(false);
   });
 
-  test("mutatingCommandRunsOnClosedWorkpiece resolves gitignore internally", () => {
+  test("mutatingCommandRunsOnClosedWorkpiece resolves gitignore internally", async () => {
     const site = { name: "site", directory: tmpDir } as DiscoveredSiteWorkspace;
     const distOnly = makeCommand("passport.emit", true, [
       "<app>/dist/.well-known/cosmic-passport.json",
     ]);
     const tracked = makeCommand("config.regenerate", true, ["<app>/package.json"]);
-    expect(mutatingCommandRunsOnClosedWorkpiece(distOnly, site)).toBe(true);
-    expect(mutatingCommandRunsOnClosedWorkpiece(tracked, site)).toBe(false);
+    const io = createDefaultIO().io;
+    expect(await mutatingCommandRunsOnClosedWorkpiece(distOnly, site, io)).toBe(true);
+    expect(await mutatingCommandRunsOnClosedWorkpiece(tracked, site, io)).toBe(false);
   });
 });
 

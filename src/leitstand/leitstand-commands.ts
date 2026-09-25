@@ -6,9 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
@@ -17,12 +14,11 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1136</history>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, readdirSync, statSync } from "node:fs";
 import path, { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -67,7 +63,6 @@ import {
 } from "./cache-purge.ts";
 import { artifactStorePreflight } from "../artifact-store/index.ts";
 import { verifyBuildIdentitySignature } from "../integrity/signing.ts";
-import { execSync } from "node:child_process";
 import { executeKernelCommand, KERNEL_UNIVERSAL_FLAGS } from "@warpgogol/werkstatt-engine/kernel";
 import { getOrBuildWorkspaceRegistry } from "../kernel/runtime/registry-cache.ts";
 import type { SmokeRunResult } from "@warpgogol/werkstatt-engine/testing/smoke";
@@ -86,25 +81,6 @@ import {
 import { buildAuthHeader } from "./deploy-execution.ts";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
-
-function _logCacheDirSize(cacheDir: string, logger: { info: (msg: string) => void }): void {
-  try {
-    const entries = readdirSync(cacheDir, { withFileTypes: true });
-    let totalSize = 0;
-    let fileCount = 0;
-    for (const entry of entries) {
-      if (entry.isFile()) {
-        fileCount++;
-        totalSize += statSync(join(cacheDir, entry.name)).size;
-      }
-    }
-    logger.info(
-      `[leitstand.dev-deploy] Axiom cache: ${fileCount} file(s), ${(totalSize / 1024 / 1024).toFixed(1)} MiB — clearing…`,
-    );
-  } catch {
-    // Non-fatal — log nothing if we can't read the directory
-  }
-}
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -173,9 +149,12 @@ function _getChannelConfig(dep: DeploymentStaticConfig, channel: Channel): Deplo
   return channelConfig;
 }
 
-function resolveConventionSecretsPath(basePath: string): string | undefined {
+async function resolveConventionSecretsPath(
+  basePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | undefined> {
   const filePath = path.join(basePath, ".env");
-  return existsSync(filePath) ? filePath : undefined;
+  return (await io.exists(filePath)) ? filePath : undefined;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -503,7 +482,7 @@ async function _runPreflight(
   }
 
   // 7. Cloudflare API token valid (pre-flight check to avoid stale CDN after deploy)
-  const secretsFilePath = basePath ? resolveConventionSecretsPath(basePath) : undefined;
+  const secretsFilePath = basePath ? await resolveConventionSecretsPath(basePath) : undefined;
   const secretsEnv = secretsFilePath ? await sourceDotenv(secretsFilePath) : {};
   const env = { ...filterEnv(process.env), ...secretsEnv };
   const zoneId = env["CLOUDFLARE_ZONE_ID"];
@@ -582,13 +561,14 @@ async function checkWranglerAvailable(
 async function checkDistSize(
   distPath: string,
   limits: DeploymentLimits,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ withinLimit: boolean; detail: string }> {
   let totalSize = 0;
   let largestFile = 0;
   let largestFilePath = "";
   const { collectFiles } = await import("@warpgogol/werkstatt-shared/node/fs");
   for (const file of await collectFiles(distPath)) {
-    const stat = await fs.stat(file);
+    const stat = await io.stat(file);
     totalSize += stat.size;
     if (stat.size > largestFile) {
       largestFile = stat.size;
@@ -667,23 +647,17 @@ function resolveSecretsFilePath(
 async function resolveMissionContext(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ missionId: string; commitSha: string }> {
   try {
     const state = await readSystemStateSmart(workspaceRoot, systemId);
     const missionId = state.currentMission ?? "";
     if (!missionId) return { missionId: "", commitSha: "" };
     const workpieceDir = path.join(workspaceRoot, "missions", missionId, "workpiece");
-    if (!existsSync(workpieceDir)) return { missionId, commitSha: "" };
+    if (!(await io.exists(workpieceDir))) return { missionId, commitSha: "" };
     let commitSha = "";
-    try {
-      commitSha = execSync("git rev-parse HEAD", {
-        cwd: workpieceDir,
-        encoding: "utf-8",
-        stdio: "pipe",
-      }).trim();
-    } catch {
-      // workpiece may not be a git repo
-    }
+    const headResult = await io.exec("git", ["rev-parse", "HEAD"], { cwd: workpieceDir });
+    if (headResult.exitCode === 0) commitSha = headResult.stdout.trim();
     return { missionId, commitSha };
   } catch {
     return { missionId: "", commitSha: "" };
@@ -1138,44 +1112,26 @@ export async function checkMirrorSyncPreFlight(
   workspaceRoot: string,
   systemId: string,
   logger: { warn: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   try {
     const { readSystemConfig, resolveMirrorPath } = await import("../sternsystem/registry-io.ts");
-    const { execSync } = await import("node:child_process");
     const config = await readSystemConfig(workspaceRoot, systemId);
     if (config && config.mirrors.length > 2) {
       const bareMirror = config.mirrors[1];
       const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
-      if (existsSync(bareRepoPath)) {
+      if (await io.exists(bareRepoPath)) {
         let branch = "main";
-        try {
-          branch = execSync("git symbolic-ref HEAD", {
-            cwd: bareRepoPath,
-            encoding: "utf-8",
-          })
-            .trim()
-            .replace("refs/heads/", "");
-        } catch {
-          // default to main
-        }
+        const symRef = await io.exec("git", ["symbolic-ref", "HEAD"], { cwd: bareRepoPath });
+        if (symRef.exitCode === 0) branch = symRef.stdout.trim().replace("refs/heads/", "");
         let originSha: string | null = null;
         let mirrorSha: string | null = null;
-        try {
-          originSha = execSync(`git rev-parse ${branch}`, {
-            cwd: bareRepoPath,
-            encoding: "utf-8",
-          }).trim();
-        } catch {
-          // bare repo empty
-        }
-        try {
-          mirrorSha = execSync(`git rev-parse refs/mirror/${branch}`, {
-            cwd: bareRepoPath,
-            encoding: "utf-8",
-          }).trim();
-        } catch {
-          // no mirror ref
-        }
+        const originResult = await io.exec("git", ["rev-parse", branch], { cwd: bareRepoPath });
+        if (originResult.exitCode === 0) originSha = originResult.stdout.trim();
+        const mirrorResult = await io.exec("git", ["rev-parse", `refs/mirror/${branch}`], {
+          cwd: bareRepoPath,
+        });
+        if (mirrorResult.exitCode === 0) mirrorSha = mirrorResult.stdout.trim();
         if (originSha && mirrorSha && originSha !== mirrorSha) {
           logger.warn(
             `[leitstand.promote] external mirrors are out of sync (origin=${originSha?.slice(0, 8)}, mirror=${mirrorSha?.slice(0, 8)}) — run sternsystem.sync --id ${systemId} after promote to align`,
@@ -1464,10 +1420,10 @@ export async function runLeitstandStatus(
 
   for (const ch of ["dev", "alt", "main"] as const) {
     try {
-      const entries = await fs.readdir(opsDir).catch(() => []);
+      const entries = await context.io.readdir(opsDir).catch(() => []);
       const channelRecords = entries
-        .filter((f) => f.endsWith(".json"))
-        .map((f) => path.join(opsDir, f));
+        .filter((f) => f.name.endsWith(".json"))
+        .map((f) => path.join(opsDir, f.name));
 
       let latest: {
         releaseId: string;
@@ -1477,7 +1433,7 @@ export async function runLeitstandStatus(
       } | null = null;
       for (const recordPath of channelRecords) {
         try {
-          const content = await fs.readFile(recordPath, "utf8");
+          const content = await context.io.readFile(recordPath);
           const record = JSON.parse(content);
           if (record.channel === ch) {
             const at = record.timestamp ?? "";
@@ -1536,11 +1492,12 @@ async function resolveRollbackVersionId(
   cacheCloneDir: string,
   channel: Channel,
   targetRelease?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ResolvedRollbackTarget> {
   const opsDir = join(cacheCloneDir, "deployment-operations");
-  if (!existsSync(opsDir)) return {};
+  if (!(await io.exists(opsDir))) return {};
 
-  const files = readdirSync(opsDir).filter((f) => f.endsWith(".json"));
+  const files = (await io.readdir(opsDir)).map((f) => f.name).filter((f) => f.endsWith(".json"));
   const records: Array<{
     workerVersionId?: string;
     releaseId?: string;
@@ -1551,7 +1508,7 @@ async function resolveRollbackVersionId(
 
   for (const file of files) {
     try {
-      const content = await fs.readFile(join(opsDir, file), "utf8");
+      const content = await io.readFile(join(opsDir, file));
       const parsed = JSON.parse(content);
       if (parsed.state === "succeeded" && parsed.workerVersionId) {
         records.push({
@@ -1646,10 +1603,19 @@ export async function runLeitstandRollback(
       operationId,
       startedAt,
       logger,
+      context.io,
       toRelease,
     );
   } else {
-    return runServiceRollback(workspaceRoot, serviceId!, operationId, startedAt, logger, toRelease);
+    return runServiceRollback(
+      workspaceRoot,
+      serviceId!,
+      operationId,
+      startedAt,
+      logger,
+      context.io,
+      toRelease,
+    );
   }
 }
 
@@ -1660,6 +1626,7 @@ async function runSiteRollback(
   operationId: string,
   startedAt: string,
   logger: { info: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
   toRelease?: string,
 ): Promise<KernelCommandResult<LeitstandRollbackData>> {
   const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
@@ -1681,7 +1648,7 @@ async function runSiteRollback(
 
   // Resolve Worker Version ID for targeted rollback (RFC-0926)
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
-  const rollbackTarget = await resolveRollbackVersionId(cacheCloneDir, channel, toRelease);
+  const rollbackTarget = await resolveRollbackVersionId(cacheCloneDir, channel, toRelease, io);
   if (rollbackTarget.versionId) {
     logger.info(
       `[leitstand.rollback] resolved Worker Version ID ${rollbackTarget.versionId} for release ${rollbackTarget.releaseId ?? toRelease ?? "previous"}`,
@@ -1698,9 +1665,9 @@ async function runSiteRollback(
 
   // Create temp directory with minimal wrangler.json for wrangler rollback
   const os = await import("node:os");
-  const tmpDir = await fs.mkdtemp(join(os.tmpdir(), "wrangler-rollback-"));
+  const tmpDir = await io.mkdtemp(join(os.tmpdir(), "wrangler-rollback-"));
   const wranglerConfigPath = join(tmpDir, "wrangler.json");
-  await fs.writeFile(wranglerConfigPath, JSON.stringify({ name: workerName }));
+  await io.writeFile(wranglerConfigPath, JSON.stringify({ name: workerName }));
 
   try {
     logger.info(
@@ -1790,7 +1757,7 @@ async function runSiteRollback(
     } as unknown as KernelCommandResult<LeitstandRollbackData>;
   } finally {
     // Clean up temp directory
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    await io.rm(tmpDir, { recursive: true }).catch(() => {});
   }
 }
 
@@ -1800,6 +1767,7 @@ async function runServiceRollback(
   operationId: string,
   startedAt: string,
   logger: { info: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
   _toRelease?: string,
 ): Promise<KernelCommandResult<LeitstandRollbackData>> {
   const { readServicesRegistry, findServiceEntry } = await import("../sternsystem/registry-io.ts");
@@ -1820,12 +1788,12 @@ async function runServiceRollback(
   }
 
   const serviceDir = join(workspaceRoot, "services", serviceId);
-  if (!existsSync(serviceDir)) {
+  if (!(await io.exists(serviceDir))) {
     throw new Error(`[leitstand.rollback] services/${serviceId}/ does not exist`);
   }
 
   const wranglerPath = join(serviceDir, "wrangler.jsonc");
-  if (!existsSync(wranglerPath)) {
+  if (!(await io.exists(wranglerPath))) {
     throw new Error(
       `[leitstand.rollback] services/${serviceId}/wrangler.jsonc not found — not a Cloudflare Worker service`,
     );
@@ -2028,11 +1996,11 @@ export async function runLeitstandPipelineCheck(
 
   const channelStates: Record<string, { state: string; at: string }> = {};
   try {
-    const entries = await fs.readdir(opsDir);
+    const entries = await context.io.readdir(opsDir);
     for (const f of entries) {
-      if (!f.endsWith(".json")) continue;
+      if (!f.name.endsWith(".json")) continue;
       try {
-        const record = JSON.parse(await fs.readFile(path.join(opsDir, f), "utf8"));
+        const record = JSON.parse(await context.io.readFile(path.join(opsDir, f.name)));
         const ch = record.channel as string | undefined;
         if (!ch) continue;
         const at = record.timestamp ?? "";
@@ -2206,10 +2174,10 @@ export async function runLeitstandHotfixDevDeploy(
 
   // Phase 1: Commit (skip if workpiece is clean)
   try {
-    const gitStatus = execSync("git status --porcelain", {
+    const statusResult = await context.io.exec("git", ["status", "--porcelain"], {
       cwd: workpieceDir,
-      encoding: "utf-8",
-    }).trim();
+    });
+    const gitStatus = statusResult.exitCode === 0 ? statusResult.stdout.trim() : "";
     if (gitStatus === "") {
       phases.commit.skipped = true;
       logger.info("  [hotfix] Phase 1 (commit): workpiece clean, skipping");
@@ -2220,10 +2188,10 @@ export async function runLeitstandHotfixDevDeploy(
       if (commitResult.exitCode !== 0) {
         return failResult("commit", commitResult.summary ?? "mission.git.commit failed");
       }
-      const commitSha = execSync("git rev-parse HEAD", {
+      const headResult = await context.io.exec("git", ["rev-parse", "HEAD"], {
         cwd: workpieceDir,
-        encoding: "utf-8",
-      }).trim();
+      });
+      const commitSha = headResult.exitCode === 0 ? headResult.stdout.trim() : "";
       phases.commit.commitSha = commitSha;
       logger.info(`  [hotfix] Phase 1 (commit): committed as ${commitSha}`);
     }

@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0938: auto-manage access PIN during certify — auto-remove before producers, auto-restore in finally block. --auto-manage-pin flag (default true).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -21,7 +20,8 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
   <item>RFC-1126: step 7 — AC evidence alignment
 
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
-  <history>RFC-0866, RFC-0867, RFC-0929</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938</history>
 </CHANGE_SUMMARY>
 */
 
@@ -93,7 +93,8 @@ async function tryReuseEvidence(
   cacheCloneDir: string,
   releaseId: string,
   artifactHash: Sha256Digest,
-  forceRequested: boolean, io: WorkspaceIO = createDefaultIO().io,
+  forceRequested: boolean,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<EvidenceCacheEntry | null> {
   // RFC-0867: The sequential deployment pipeline (dev → alt → main) uses the same
   // certification profile and policy bundle for all gates of a given release.
@@ -106,7 +107,7 @@ async function tryReuseEvidence(
   const gateDecisionsDir = path.join(cacheCloneDir, "gate-decisions");
   let entries: string[];
   try {
-    entries = (await io.readdir(gateDecisionsDir)).map(e => e.name);
+    entries = (await io.readdir(gateDecisionsDir)).map((e) => e.name);
   } catch {
     return null;
   }
@@ -192,7 +193,8 @@ async function writeEvidenceSidecar(
   artifactHash: Sha256Digest,
   evidence: EvidenceEnvelopeV1[],
   producedAt: string,
-  producedByGate: GateChannel, io: WorkspaceIO = createDefaultIO().io,
+  producedByGate: GateChannel,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const sidecar: EvidenceCacheSidecar = {
     schema: "werkstatt/evidence-cache@1",
@@ -357,7 +359,9 @@ export async function runLeitstandCertify(
 
   // Inner function containing all certification logic. The try/finally wrapper
   // below ensures the PIN is restored even on early returns or thrown errors.
-  const certifyCore = async (io: WorkspaceIO = createDefaultIO().io): Promise<KernelCommandResult<CertifyResult>> => {
+  const certifyCore = async (
+    io: WorkspaceIO = createDefaultIO().io,
+  ): Promise<KernelCommandResult<CertifyResult>> => {
     const reuseEntry = await tryReuseEvidence(
       cacheCloneDir,
       releaseId,
@@ -456,7 +460,8 @@ export async function runLeitstandCertify(
     };
 
     const handler: ProducerExecutionHandlerV1 = async (
-      execInput: ProducerExecutionInputV1, io: WorkspaceIO = createDefaultIO().io,
+      execInput: ProducerExecutionInputV1,
+      io: WorkspaceIO = createDefaultIO().io,
     ): Promise<EvidenceEnvelopeV1> => {
       const evidenceId = `ev-${execInput.producerId}-${now.toLowerCase().replace(/[:.]/g, "-")}`;
       const diagnostics: Array<{
@@ -744,22 +749,22 @@ export async function runLeitstandCertify(
     const sidecarRelPath = path.join("gate-decisions", `${releaseId}-evidence.json`);
     const sidecarExists = !reuseEntry;
     try {
-      gitExec(cacheCloneDir, `add ${relPath}`);
+      await gitExec(cacheCloneDir, `add ${relPath}`);
       if (sidecarExists) {
-        gitExec(cacheCloneDir, `add ${sidecarRelPath}`);
+        await gitExec(cacheCloneDir, `add ${sidecarRelPath}`);
       }
       if (mainVerificationPath) {
-        gitExec(
+        await gitExec(
           cacheCloneDir,
           `add ${path.join("gate-decisions", `${releaseId}-main-verification.json`)}`,
         );
       }
-      cacheCloneCommit(
+      await cacheCloneCommit(
         cacheCloneDir,
         `gate-decisions: ${releaseId}-${gate} (${gateDecision.status})`,
       );
-      const branch = gitExec(cacheCloneDir, "rev-parse --abbrev-ref HEAD").trim();
-      gitExec(cacheCloneDir, `push origin ${branch}`);
+      const branch = (await gitExec(cacheCloneDir, "rev-parse --abbrev-ref HEAD")).trim();
+      await gitExec(cacheCloneDir, `push origin ${branch}`);
     } catch {
       // Best-effort commit+push — file is written, sync will propagate later
     }
@@ -885,7 +890,8 @@ export async function runLeitstandCertify(
 
 async function resolveDevBaseUrl(
   cacheCloneDir: string,
-  baseUrlFlag: string | undefined, io: WorkspaceIO = createDefaultIO().io,
+  baseUrlFlag: string | undefined,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string | undefined> {
   const opsDir = path.join(cacheCloneDir, "deployment-operations");
   let latestDevUrl: string | undefined;

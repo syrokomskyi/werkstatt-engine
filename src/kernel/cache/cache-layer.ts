@@ -16,7 +16,6 @@ and falls back to NoopCacheLayer when the native module is unavailable.
   <item>CacheLayer is a port interface — storage backends implement it, callers depend on the port.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>ADR-0023: add close() method for explicit resource cleanup after pipeline completion.</item>
   <item>RFC-1028: add CacheEntryInfo interface and optional list() method for cache entry inspection.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -25,7 +24,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
-  <history>RFC-0382</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0023, RFC-0382</history>
 </CHANGE_SUMMARY>
 */
 
@@ -99,8 +99,7 @@ export async function createCacheLayer(workspaceRoot: string): Promise<CacheLaye
   const dbPath = cacheDbPath(workspaceRoot);
   try {
     const { SqliteCacheLayer } = await import("./sqlite-cache-layer.ts");
-    const layer = new SqliteCacheLayer(dbPath);
-    return layer;
+    return await SqliteCacheLayer.create(dbPath);
   } catch (err) {
     const reason =
       err instanceof Error

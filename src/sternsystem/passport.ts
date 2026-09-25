@@ -20,11 +20,11 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, readdirSync } from "node:fs";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import {
   snapshotCanonicalJsonObjectV1,
@@ -113,12 +113,12 @@ function parseSecretNames(envExampleContent: string): string[] {
   return [...new Set(names)].sort();
 }
 
-function countMissions(cacheClonePath: string): number {
+async function countMissions(cacheClonePath: string, io: WorkspaceIO): Promise<number> {
   const missionsDir = path.join(cacheClonePath, "missions");
-  if (!existsSync(missionsDir)) return 0;
+  if (!(await io.exists(missionsDir))) return 0;
   try {
-    const entries = readdirSync(missionsDir, { withFileTypes: true });
-    return entries.filter((e) => e.isDirectory()).length;
+    const entries = await io.readdir(missionsDir);
+    return entries.filter((e) => e.isDirectory).length;
   } catch {
     return 0;
   }
@@ -140,8 +140,10 @@ export async function buildPassportPayload(input: {
   werkstattRoot: string;
   creatorIdentity: string;
   creatorPublicKey: string;
+  io?: WorkspaceIO;
 }): Promise<SitePassportV1> {
   const { systemId, werkstattRoot, creatorIdentity, creatorPublicKey } = input;
+  const io = input.io ?? createDefaultIO().io;
   const cacheClonePath = resolveCacheClonePath(werkstattRoot, systemId);
 
   const config = await readSystemConfig(werkstattRoot, systemId);
@@ -150,8 +152,8 @@ export async function buildPassportPayload(input: {
   let platformVersion = "0.0.0";
   let platformSemanticHash =
     "sha256:0000000000000000000000000000000000000000000000000000000000000000";
-  if (existsSync(pinPath)) {
-    const pinRaw = await fs.readFile(pinPath, "utf8");
+  if (await io.exists(pinPath)) {
+    const pinRaw = await io.readFile(pinPath);
     const pinParsed = partialPinSchema.safeParse(JSON.parse(pinRaw));
     if (pinParsed.success) {
       platformVersion = pinParsed.data.platform.version;
@@ -161,8 +163,8 @@ export async function buildPassportPayload(input: {
 
   const envExamplePath = path.join(cacheClonePath, ".env.example");
   let secretNames: string[] = [];
-  if (existsSync(envExamplePath)) {
-    const envContent = await fs.readFile(envExamplePath, "utf8");
+  if (await io.exists(envExamplePath)) {
+    const envContent = await io.readFile(envExamplePath);
     secretNames = parseSecretNames(envContent);
   }
 
@@ -176,7 +178,7 @@ export async function buildPassportPayload(input: {
     // Bordbuch not readable — treat as null
   }
 
-  const missionCounter = countMissions(cacheClonePath);
+  const missionCounter = await countMissions(cacheClonePath, io);
 
   const mirrors: Array<{ role: "cache" | "bare" | "external"; locator: string }> =
     config.mirrors.map((m, i) => ({

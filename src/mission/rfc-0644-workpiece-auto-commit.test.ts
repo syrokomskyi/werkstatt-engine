@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0644: initial unit tests for commitWorkpieceIfDirty — dirty, clean, and idempotent scenarios.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -50,7 +51,7 @@ test("dirty workpiece → auto-commit created", async () => {
   await fs.mkdir(path.join(workpieceDir, "src", "content"), { recursive: true });
   await fs.writeFile(path.join(workpieceDir, "src/content/system.md"), "# Updated System\n");
 
-  const result = commitWorkpieceIfDirty(workpieceDir, "test-mission");
+  const result = await commitWorkpieceIfDirty(workpieceDir, "test-mission");
 
   expect(result.committed).toBe(true);
   expect(result.commitSha).not.toBeNull();
@@ -66,7 +67,7 @@ test("dirty workpiece → auto-commit created", async () => {
 test("clean workpiece → no auto-commit", async () => {
   const initialSha = git(workpieceDir, "rev-parse HEAD");
 
-  const result = commitWorkpieceIfDirty(workpieceDir, "test-mission");
+  const result = await commitWorkpieceIfDirty(workpieceDir, "test-mission");
 
   expect(result.committed).toBe(false);
   expect(result.commitSha).toBeNull();
@@ -79,11 +80,11 @@ test("idempotent re-run on clean workpiece after first auto-commit", async () =>
   await fs.mkdir(path.join(workpieceDir, "public", "icons"), { recursive: true });
   await fs.writeFile(path.join(workpieceDir, "public/icons/generated.svg"), "<svg/>");
 
-  const first = commitWorkpieceIfDirty(workpieceDir, "test-mission");
+  const first = await commitWorkpieceIfDirty(workpieceDir, "test-mission");
   expect(first.committed).toBe(true);
   expect(first.commitSha).not.toBeNull();
 
-  const second = commitWorkpieceIfDirty(workpieceDir, "test-mission");
+  const second = await commitWorkpieceIfDirty(workpieceDir, "test-mission");
   expect(second.committed).toBe(false);
   expect(second.commitSha).toBeNull();
 

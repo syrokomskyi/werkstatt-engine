@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0796: initial tests for stale entry warnings in mission.validate.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -47,7 +48,7 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
     mkdirSync(targetDir, { recursive: true });
     symlinkSync(targetDir, join(missionsDir, "test-system-m000001"));
 
-    const warnings = validateNoStaleMissionEntries(tmpDir);
+    const warnings = await validateNoStaleMissionEntries(tmpDir);
 
     expect(warnings.length).toBe(1);
     expect(warnings[0].kind).toBe("symlink");
@@ -60,7 +61,7 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
     );
     writeMissionManifest(tmpDir, "test-system-m000001", "closed");
 
-    const warnings = validateNoStaleMissionEntries(tmpDir);
+    const warnings = await validateNoStaleMissionEntries(tmpDir);
 
     expect(warnings.length).toBe(1);
     expect(warnings[0].kind).toBe("terminal-state-in-root");
@@ -73,7 +74,7 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
     );
     writeMissionManifest(tmpDir, "test-system-m000001", "open");
 
-    const warnings = validateNoStaleMissionEntries(tmpDir);
+    const warnings = await validateNoStaleMissionEntries(tmpDir);
 
     expect(warnings.length).toBe(0);
   });
@@ -86,7 +87,7 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
     mkdirSync(archiveDir, { recursive: true });
     mkdirSync(join(archiveDir, "closed"), { recursive: true });
 
-    const warnings = validateNoStaleMissionEntries(tmpDir);
+    const warnings = await validateNoStaleMissionEntries(tmpDir);
 
     expect(warnings.length).toBe(0);
   });
@@ -96,7 +97,7 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
       "../mission/mission-materialization-commands.ts"
     );
 
-    const warnings = validateNoStaleMissionEntries(tmpDir);
+    const warnings = await validateNoStaleMissionEntries(tmpDir);
 
     expect(warnings.length).toBe(0);
   });

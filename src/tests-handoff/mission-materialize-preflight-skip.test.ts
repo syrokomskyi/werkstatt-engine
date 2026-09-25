@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0597: initial tests for state-file-based preflight skip and --skip-preflight flag precedence.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -150,13 +151,13 @@ afterEach(() => {
   rmSync(testRoot, { recursive: true, force: true });
 });
 
-function setupWorkspace(): string {
+async function setupWorkspace(): Promise<string> {
   return createMaterializeWorkspace(testRoot);
 }
 
 test("preflight is skipped when state file HEAD matches cache clone HEAD", async () => {
-  const systemDir = setupWorkspace();
-  const head = gitHead(systemDir);
+  const systemDir = await setupWorkspace();
+  const head = await gitHead(systemDir);
 
   // Write state file with matching HEAD
   writeFileSync(
@@ -193,7 +194,7 @@ test("preflight is skipped when state file HEAD matches cache clone HEAD", async
 });
 
 test("preflight runs normally when state file is missing", async () => {
-  setupWorkspace();
+  await setupWorkspace();
 
   const { runMissionMaterialize } = await import("../mission/mission-materialize.ts");
 
@@ -213,7 +214,7 @@ test("preflight runs normally when state file is missing", async () => {
 });
 
 test("preflight runs normally when state file HEAD does not match", async () => {
-  const systemDir = setupWorkspace();
+  const systemDir = await setupWorkspace();
 
   // Write state file with non-matching HEAD
   writeFileSync(
@@ -248,7 +249,7 @@ test("preflight runs normally when state file HEAD does not match", async () => 
 });
 
 test("preflight runs normally when state file is corrupt", async () => {
-  const systemDir = setupWorkspace();
+  const systemDir = await setupWorkspace();
 
   // Write corrupt state file
   writeFileSync(join(systemDir, ".materialization-state.json"), "{ invalid json }}}");
@@ -271,8 +272,8 @@ test("preflight runs normally when state file is corrupt", async () => {
 });
 
 test("--skip-preflight flag takes precedence over state file and does not consult it", async () => {
-  const systemDir = setupWorkspace();
-  const head = gitHead(systemDir);
+  const systemDir = await setupWorkspace();
+  const head = await gitHead(systemDir);
 
   // Write state file with matching HEAD
   writeFileSync(

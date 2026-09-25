@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0845: add Playwright Chromium pre-flight check before build.prepare (after distribution-reuse check) — fail fast with actionable error when Chromium is not installed.</item>
   <item>RFC-0931: add runReleaseSign command handler for Ed25519 signing of build-identity.json and signed-manifest.json production.</item>
   <item>RFC-0948: add entitlement diff logging — compares workpiece entitlements against previous release and logs added/removed features.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
@@ -309,7 +309,7 @@ export async function runReleasePrepare(
   }
 
   // Check validation has passed
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const validationPath = path.join(missionDir, "evidence", "validation-report.json");
   if (!(await context.io.exists(validationPath))) {
     throw new Error(`[release.prepare] mission '${missionId}' has not passed validation`);
@@ -549,16 +549,18 @@ export async function runReleasePrepare(
         const bootSmokeDistDir =
           wranglerConfigPath === astroWranglerPath ? path.join(distDest, "server") : distDest;
         // Derive languages from actual dist/client subdirectories (RFC-0978)
-        const bootSmokeLanguages = await detectBootSmokeLanguages(distDest);
-        const bootSmokeRequests = planBootSmokeRequests({
+        const bootSmokeLanguages = await detectBootSmokeLanguages(distDest, context.io);
+        const bootSmokeRequests = await planBootSmokeRequests({
           distDir: distDest,
           languages: bootSmokeLanguages,
+          io: context.io,
         });
         logger.info(`  Running boot-smoke (${bootSmokeRequests.length} representative requests)…`);
         const bootSmokeResult = await runBootSmoke({
           distDir: bootSmokeDistDir,
           wranglerConfigPath,
           requests: bootSmokeRequests,
+          io: context.io,
         });
         const bootSmokeFailed =
           !bootSmokeResult.booted ||
@@ -1316,7 +1318,7 @@ async function validateReleaseState(
   // Check 2: close-report-release-id-consistent
   if (missionId) {
     const closeReportPath = path.join(
-      resolveMissionDir(workspaceRoot, missionId),
+      await resolveMissionDir(workspaceRoot, missionId, io),
       "evidence",
       "close-report.json",
     );
@@ -1504,7 +1506,7 @@ export async function runDistDeterminismValidate(
   if (releaseId) {
     distPath = path.join(workspaceRoot, "releases", releaseId, "dist");
   } else {
-    const missionDir = resolveMissionDir(workspaceRoot, missionId!);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId!, context.io);
     const workpieceDist = path.join(missionDir, "workpiece", "dist");
     const distributionDist = path.join(missionDir, "distribution", "dist");
     if (await context.io.exists(workpieceDist)) {

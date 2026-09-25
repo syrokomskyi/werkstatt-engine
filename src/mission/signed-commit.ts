@@ -8,11 +8,11 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0560: initial signed commit helper using Ed25519 via @warpgogol/werkstatt-shared/passport.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import { signBytes } from "@warpgogol/werkstatt-shared/passport";
 
@@ -23,13 +23,17 @@ export interface SignedCommitResult {
   signature: string | null;
 }
 
-function git(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
+async function git(cwd: string, args: string[], io: WorkspaceIO): Promise<string> {
+  const result = await io.exec("git", args, {
     cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-  }).trim();
+    env: { MISSION_GIT_COMMIT: "1" },
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `git ${args[0] ?? ""} failed (exit ${result.exitCode}): ${result.stderr.trim()}`,
+    );
+  }
+  return result.stdout.trim();
 }
 
 export async function createSignedCommit(
@@ -37,18 +41,19 @@ export async function createSignedCommit(
   message: string,
   actorId: string,
   privateKeyHex: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SignedCommitResult> {
-  if (!existsSync(path.join(workpieceDir, ".git"))) {
+  if (!(await io.exists(path.join(workpieceDir, ".git")))) {
     throw new Error(
       `[createSignedCommit] workpiece is not a git repository — run mission.materialize first`,
     );
   }
 
-  git(workpieceDir, "add -A");
+  await git(workpieceDir, ["add", "-A"], io);
 
   let hasChanges: boolean;
   try {
-    git(workpieceDir, "diff --cached --quiet");
+    await git(workpieceDir, ["diff", "--cached", "--quiet"], io);
     hasChanges = false;
   } catch {
     hasChanges = true;
@@ -56,22 +61,22 @@ export async function createSignedCommit(
 
   if (!hasChanges) {
     return {
-      commitSha: git(workpieceDir, "rev-parse HEAD"),
+      commitSha: await git(workpieceDir, ["rev-parse", "HEAD"], io),
       signed: false,
       actorId: null,
       signature: null,
     };
   }
 
-  git(workpieceDir, `commit -m ${JSON.stringify(message)}`);
-  const preAmendSha = git(workpieceDir, "rev-parse HEAD");
+  await git(workpieceDir, ["commit", "-m", message], io);
+  const preAmendSha = await git(workpieceDir, ["rev-parse", "HEAD"], io);
 
   const signature = await signBytes(privateKeyHex, new TextEncoder().encode(preAmendSha));
 
   const amendedMessage = `${message}\n\nWerkstatt-Actor: ${actorId}\nWerkstatt-Signature: ${signature}`;
-  git(workpieceDir, `commit --amend -m ${JSON.stringify(amendedMessage)}`);
+  await git(workpieceDir, ["commit", "--amend", "-m", amendedMessage], io);
 
-  const postAmendSha = git(workpieceDir, "rev-parse HEAD");
+  const postAmendSha = await git(workpieceDir, ["rev-parse", "HEAD"], io);
 
   return {
     commitSha: postAmendSha,

@@ -68,7 +68,7 @@ describe("cache-clone commit guard (RFC-0821)", () => {
         // execSync(`git commit ...`), gitExec(dir, `commit ...`), git(dir, `commit ...`)
         // Also match execSync("git commit ...") with double quotes
         const hasExecGitCommit =
-          (line.includes("execSync(") || line.includes("gitExec(") || /\bgit\(/.test(line)) &&
+          (line.includes("execSync(") || line.includes("await gitExec(") || /\bgit\(/.test(line)) &&
           (line.includes("commit -m") ||
             line.includes("commit -m") ||
             line.includes("`commit ") ||

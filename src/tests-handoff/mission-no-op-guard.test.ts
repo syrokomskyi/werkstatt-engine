@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0820: initial tests for three-level no-op guard (git.commit warning, close zero-commit block, reconcile zero-transfer warning).</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -383,7 +384,7 @@ test("Level 3: countOperatorCommits returns zero when only materialize commit ex
   const { countOperatorCommits } = await import("../mission/mission-git-commit.ts");
 
   const workpieceDir = join(tmpWorkspace, "missions", "test-system-m000001", "workpiece");
-  const result = countOperatorCommits(workpieceDir, null);
+  const result = await countOperatorCommits(workpieceDir, null);
 
   expect(result.hasOperatorCommits).toBe(false);
   expect(result.commitCount).toBe(0);
@@ -395,7 +396,7 @@ test("Level 3: countOperatorCommits detects operator commits", async () => {
   const { countOperatorCommits } = await import("../mission/mission-git-commit.ts");
 
   const workpieceDir = join(tmpWorkspace, "missions", "test-system-m000001", "workpiece");
-  const result = countOperatorCommits(workpieceDir, null);
+  const result = await countOperatorCommits(workpieceDir, null);
 
   expect(result.hasOperatorCommits).toBe(true);
   expect(result.commitCount).toBeGreaterThanOrEqual(1);

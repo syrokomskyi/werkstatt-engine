@@ -10,11 +10,11 @@
   <item>RFC-0480: initial mission.cleanup command handler.</item>
   <item>RFC-0652: replace unconditional evidence preservation with age-based Axiom evidence cleanup; add --evidence-retention-days flag.</item>
   <item>RFC-0985: add --stale-dirs mode to archive aborted missions and remove stub directories.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
-import { lstatSync } from "node:fs";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -105,7 +105,7 @@ export async function runMissionCleanup(
     for (const entry of entries) {
       if (entry.name === "archive") continue;
       const missionDir = path.join(missionsDir, entry.name);
-      if (lstatSync(missionDir).isSymbolicLink()) continue;
+      if ((await context.io.exec("test", ["-L", missionDir])).exitCode === 0) continue;
       if (!entry.isDirectory) continue;
 
       const missionFile = path.join(missionDir, "mission.yaml");
@@ -165,7 +165,7 @@ export async function runMissionCleanup(
       throw new Error(`[mission.cleanup] mission '${missionId}' is open — abort or close it first`);
     }
 
-    const missionDir = resolveMissionDir(workspaceRoot, missionId);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
     const workpieceDir = path.join(missionDir, "workpiece");
     const distributionDir = path.join(missionDir, "distribution");
 
@@ -262,7 +262,7 @@ export async function runMissionCleanup(
     for (const entry of entries) {
       if (entry.name === "archive") continue;
       const missionDir = path.join(missionsDir, entry.name);
-      if (lstatSync(missionDir).isSymbolicLink()) continue;
+      if ((await context.io.exec("test", ["-L", missionDir])).exitCode === 0) continue;
       if (!entry.isDirectory) continue;
 
       try {

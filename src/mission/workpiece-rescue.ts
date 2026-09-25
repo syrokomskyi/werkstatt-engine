@@ -11,12 +11,12 @@
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import { existsSync, renameSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import type { BordbuchEntryKind } from "@warpgogol/werkstatt-engine/schemas";
 
@@ -44,13 +44,17 @@ function noop(reason: string): WorkpieceRescueResult {
   };
 }
 
-function git(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
+async function git(cwd: string, args: string, io: WorkspaceIO): Promise<string> {
+  // Shell-string args preserved verbatim via sh -c — interpolated JSON.stringify
+  // quoting keeps identical semantics without re-tokenizing.
+  const result = await io.exec("sh", ["-c", `git ${args}`], {
     cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-  }).trim();
+    env: { MISSION_GIT_COMMIT: "1" },
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(`git failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
+  }
+  return result.stdout.trim();
 }
 
 export async function rescueWorkpieceEdits(
@@ -60,14 +64,15 @@ export async function rescueWorkpieceEdits(
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
   workspaceRoot?: string,
   systemId?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WorkpieceRescueResult> {
-  if (!existsSync(workpieceDir) || !existsSync(path.join(workpieceDir, ".git"))) {
+  if (!(await io.exists(workpieceDir)) || !(await io.exists(path.join(workpieceDir, ".git")))) {
     return noop("workpiece not found or not a git repo");
   }
-  if (existsSync(path.join(workpieceDir, ".closed"))) {
+  if (await io.exists(path.join(workpieceDir, ".closed"))) {
     return noop("workpiece is closed");
   }
-  if (!existsSync(path.join(cacheCloneDir, ".git"))) {
+  if (!(await io.exists(path.join(cacheCloneDir, ".git")))) {
     return noop("cache clone is not a git repo");
   }
 
@@ -75,12 +80,13 @@ export async function rescueWorkpieceEdits(
 
   // Step 1: Commit uncommitted changes in workpiece
   try {
-    const status = git(workpieceDir, "status --porcelain");
+    const status = await git(workpieceDir, "status --porcelain", io);
     if (status) {
-      git(workpieceDir, "add -A");
-      git(
+      await git(workpieceDir, "add -A", io);
+      await git(
         workpieceDir,
         `commit --no-verify -m "rescue: auto-commit uncommitted workpiece edits before re-materialization ${missionId}"`,
+        io,
       );
       committedChanges = true;
       logger.info(`  [rescue] Committed uncommitted changes in workpiece`);
@@ -94,7 +100,7 @@ export async function rescueWorkpieceEdits(
   // Get workpiece HEAD after potential commit
   let workpieceHead: string;
   try {
-    workpieceHead = git(workpieceDir, "rev-parse HEAD");
+    workpieceHead = await git(workpieceDir, "rev-parse HEAD", io);
   } catch {
     return noop("no commits in workpiece");
   }
@@ -102,23 +108,19 @@ export async function rescueWorkpieceEdits(
   // Step 2: Get cache clone HEAD
   let cacheCloneHead: string;
   try {
-    cacheCloneHead = git(cacheCloneDir, "rev-parse HEAD");
+    cacheCloneHead = await git(cacheCloneDir, "rev-parse HEAD", io);
   } catch {
     return noop("cache clone has no HEAD");
   }
 
   // Step 3: Check if workpiece HEAD is already an ancestor of cache clone HEAD
   let isAncestor = false;
-  try {
-    execSync(`git merge-base --is-ancestor ${workpieceHead} ${cacheCloneHead}`, {
-      cwd: cacheCloneDir,
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    });
-    isAncestor = true;
-  } catch {
-    isAncestor = false;
-  }
+  const ancestorResult = await io.exec(
+    "git",
+    ["merge-base", "--is-ancestor", workpieceHead, cacheCloneHead],
+    { cwd: cacheCloneDir },
+  );
+  isAncestor = ancestorResult.exitCode === 0;
 
   if (isAncestor) {
     return {
@@ -138,27 +140,22 @@ export async function rescueWorkpieceEdits(
   // Step 4: Fetch workpiece branch into cache clone and merge --no-ff
   let workpieceBranch = "HEAD";
   try {
-    workpieceBranch = git(workpieceDir, "rev-parse --abbrev-ref HEAD");
+    workpieceBranch = await git(workpieceDir, "rev-parse --abbrev-ref HEAD", io);
   } catch {
     // fall back to HEAD
   }
 
   try {
-    execSync(`git fetch ${JSON.stringify(workpieceDir)} ${JSON.stringify(workpieceBranch)}`, {
-      cwd: cacheCloneDir,
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-      timeout: 30_000,
-    });
+    await git(
+      cacheCloneDir,
+      `fetch ${JSON.stringify(workpieceDir)} ${JSON.stringify(workpieceBranch)}`,
+      io,
+    );
 
-    execSync(
-      `git merge --no-ff FETCH_HEAD -m "rescue: preserve workpiece edits before re-materialization ${missionId}"`,
-      {
-        cwd: cacheCloneDir,
-        stdio: ["pipe", "pipe", "pipe"],
-        encoding: "utf-8",
-        timeout: 30_000,
-      },
+    await git(
+      cacheCloneDir,
+      `merge --no-ff FETCH_HEAD -m "rescue: preserve workpiece edits before re-materialization ${missionId}"`,
+      io,
     );
 
     // Push merged commits to bare repo so they survive syncCacheClone's
@@ -166,13 +163,8 @@ export async function rescueWorkpieceEdits(
     let pushedToBareRepo = false;
     let bordbuchEvidence = false;
     try {
-      const branch = git(cacheCloneDir, "rev-parse --abbrev-ref HEAD");
-      execSync(`git push origin ${JSON.stringify(branch)}`, {
-        cwd: cacheCloneDir,
-        stdio: ["pipe", "pipe", "pipe"],
-        encoding: "utf-8",
-        timeout: 30_000,
-      });
+      const branch = await git(cacheCloneDir, "rev-parse --abbrev-ref HEAD", io);
+      await git(cacheCloneDir, `push origin ${JSON.stringify(branch)}`, io);
       pushedToBareRepo = true;
       logger.info(`  [rescue] Pushed rescued commits to bare repo`);
     } catch (pushErr) {
@@ -229,16 +221,12 @@ export async function rescueWorkpieceEdits(
     };
   } catch (err) {
     // Merge failed — abort merge in cache clone
-    try {
-      execSync("git merge --abort", { cwd: cacheCloneDir, stdio: "pipe" });
-    } catch {
-      // merge --abort also failed — continue
-    }
+    await io.exec("git", ["merge", "--abort"], { cwd: cacheCloneDir }).catch(() => {});
 
     // Backup old workpiece so edits can be recovered manually
     const backupDir = `${workpieceDir}.rescue-${process.pid}-${Date.now()}`;
     try {
-      renameSync(workpieceDir, backupDir);
+      await io.rename(workpieceDir, backupDir);
       logger.warn(
         `  [rescue] Merge failed — backed up old workpiece to ${path.basename(backupDir)}`,
       );

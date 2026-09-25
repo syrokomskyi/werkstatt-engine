@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0659: initial tests — cache hit skips build.prepare.dev, --force bypasses cache read, cache write on miss, stale state file fallback.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -166,8 +167,8 @@ afterEach(() => {
   rmSync(testRoot, { recursive: true, force: true });
 });
 
-function setupWorkspace(): string {
-  const systemDir = createMaterializeWorkspace(testRoot);
+async function setupWorkspace(): Promise<string> {
+  const systemDir = await createMaterializeWorkspace(testRoot);
   return systemDir;
 }
 
@@ -182,10 +183,10 @@ function setupWorkspace(): string {
  * git commit (data-only staging) has something new to commit beyond the cloned
  * history.
  */
-function setupWorkspaceWithGitCacheClone(): string {
-  const systemDir = setupWorkspace();
-  gitInit(systemDir);
-  gitCommit(systemDir, "cache clone init");
+async function setupWorkspaceWithGitCacheClone(): Promise<string> {
+  const systemDir = await setupWorkspace();
+  await gitInit(systemDir);
+  await gitCommit(systemDir, "cache clone init");
   // Add an uncommitted file to src/content/ so workpiece git commit has new content
   writeFileSync(
     join(systemDir, "src", "content", "extra.md"),
@@ -213,7 +214,7 @@ async function runMaterialize(
 }
 
 test("RFC-0659: cache miss — build.prepare.dev runs, cache entry written, artifactCacheHit=false", async () => {
-  setupWorkspaceWithGitCacheClone();
+  await setupWorkspaceWithGitCacheClone();
 
   const result = await runMaterialize();
 
@@ -226,7 +227,7 @@ test("RFC-0659: cache miss — build.prepare.dev runs, cache entry written, arti
 });
 
 test("RFC-0659: cache hit — build.prepare.dev skipped, workpiece restored from cache", async () => {
-  const systemDir = setupWorkspaceWithGitCacheClone();
+  const systemDir = await setupWorkspaceWithGitCacheClone();
 
   // First materialization — populates cache
   await runMaterialize();
@@ -249,7 +250,7 @@ test("RFC-0659: cache hit — build.prepare.dev skipped, workpiece restored from
 });
 
 test("RFC-0659: --force flag bypasses cache read, build.prepare.dev runs, cache refreshed", async () => {
-  const systemDir = setupWorkspaceWithGitCacheClone();
+  const systemDir = await setupWorkspaceWithGitCacheClone();
 
   // First materialization — populates cache
   await runMaterialize();
@@ -270,7 +271,7 @@ test("RFC-0659: --force flag bypasses cache read, build.prepare.dev runs, cache 
 });
 
 test("RFC-0659: stale state file (cache dir missing) — falls through to full materialization", async () => {
-  const systemDir = setupWorkspaceWithGitCacheClone();
+  const systemDir = await setupWorkspaceWithGitCacheClone();
 
   // First materialization — populates cache
   await runMaterialize();
@@ -295,7 +296,7 @@ test("RFC-0659: stale state file (cache dir missing) — falls through to full m
 });
 
 test("RFC-0659: .cache/ added to cache clone .gitignore after materialization", async () => {
-  const systemDir = setupWorkspaceWithGitCacheClone();
+  const systemDir = await setupWorkspaceWithGitCacheClone();
 
   await runMaterialize();
 
@@ -306,7 +307,7 @@ test("RFC-0659: .cache/ added to cache clone .gitignore after materialization", 
 });
 
 test("RFC-0659: previous cache entry deleted when new entry is written", async () => {
-  const systemDir = setupWorkspaceWithGitCacheClone();
+  const systemDir = await setupWorkspaceWithGitCacheClone();
 
   // First materialization
   await runMaterialize();
@@ -326,7 +327,7 @@ test("RFC-0659: previous cache entry deleted when new entry is written", async (
 });
 
 test("RFC-0659: report-only mode does not touch artifact cache", async () => {
-  setupWorkspaceWithGitCacheClone();
+  await setupWorkspaceWithGitCacheClone();
 
   const result = await runMaterialize({ "report-only": true });
 

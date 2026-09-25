@@ -8,11 +8,11 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0913: initial module — CACHE_CLONE_GITIGNORE_SENTINEL, CACHE_CLONE_GENERATED_PATTERNS, CACHE_CLONE_ONLY_PATTERNS, restoreCacheCloneGitignore, untrackForbiddenGeneratedFiles.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
 import { FORBIDDEN_PATTERNS } from "../sternsystem/sternsystem-validate.ts";
@@ -39,17 +39,20 @@ export const CACHE_CLONE_ONLY_PATTERNS: readonly string[] = [
   ...CACHE_CLONE_GENERATED_PATTERNS,
 ];
 
-export async function restoreCacheCloneGitignore(systemDir: string): Promise<boolean> {
+export async function restoreCacheCloneGitignore(
+  systemDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   const gitignorePath = path.join(systemDir, ".gitignore");
 
-  if (!existsSync(gitignorePath)) {
+  if (!(await io.exists(gitignorePath))) {
     const newContent =
       CACHE_CLONE_GITIGNORE_SENTINEL + "\n" + CACHE_CLONE_ONLY_PATTERNS.join("\n") + "\n";
     await writeFileIfChanged(gitignorePath, newContent);
     return true;
   }
 
-  const content = readFileSync(gitignorePath, "utf8");
+  const content = await io.readFile(gitignorePath);
 
   if (content.includes(CACHE_CLONE_GITIGNORE_SENTINEL)) {
     return false;
@@ -66,28 +69,23 @@ export async function restoreCacheCloneGitignore(systemDir: string): Promise<boo
   return true;
 }
 
-export function untrackForbiddenGeneratedFiles(systemDir: string): string[] {
+export async function untrackForbiddenGeneratedFiles(
+  systemDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const untracked: string[] = [];
   const args = CACHE_CLONE_ONLY_PATTERNS.map((p) => JSON.stringify(p)).join(" ");
-  try {
-    execSync(`git rm --cached --quiet ${args}`, {
-      cwd: systemDir,
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    });
+  const bulk = await io.exec("sh", ["-c", `git rm --cached --quiet ${args}`], { cwd: systemDir });
+  if (bulk.exitCode === 0) {
     untracked.push(...CACHE_CLONE_ONLY_PATTERNS);
-  } catch {
+  } else {
     for (const pattern of CACHE_CLONE_ONLY_PATTERNS) {
-      try {
-        execSync(`git rm --cached --quiet ${JSON.stringify(pattern)}`, {
-          cwd: systemDir,
-          stdio: ["pipe", "pipe", "pipe"],
-          encoding: "utf-8",
-        });
-        untracked.push(pattern);
-      } catch {
-        // File not tracked — skip
-      }
+      const single = await io.exec(
+        "sh",
+        ["-c", `git rm --cached --quiet ${JSON.stringify(pattern)}`],
+        { cwd: systemDir },
+      );
+      if (single.exitCode === 0) untracked.push(pattern);
     }
   }
   return untracked;

@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0568: initial integration tests for investigateUntrackedFiles and merge-based reconcile flow.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -156,7 +157,7 @@ test("investigateUntrackedFiles returns unknown for boilerplate files outside mi
 test("isWorkpieceDirty detects untracked files in cache clone", async () => {
   // Add an untracked file to the cache clone
   await fs.writeFile(path.join(cacheCloneDir, "untracked.txt"), "untracked");
-  const result = isWorkpieceDirty(cacheCloneDir);
+  const result = await isWorkpieceDirty(cacheCloneDir);
   expect(result.dirty).toBe(true);
   expect(result.fileCount).toBe(1);
   expect(result.files).toContain("untracked.txt");

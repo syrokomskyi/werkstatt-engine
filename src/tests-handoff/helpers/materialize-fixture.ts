@@ -14,40 +14,61 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export function gitInit(dir: string): void {
-  execSync("git init -b main", { cwd: dir, stdio: "pipe" });
-  execSync("git config user.email test@test.com", { cwd: dir, stdio: "pipe" });
-  execSync("git config user.name Test", { cwd: dir, stdio: "pipe" });
+async function gitExec(dir: string, args: string[], io: WorkspaceIO): Promise<string> {
+  const result = await io.exec("git", args, { cwd: dir });
+  if (result.exitCode !== 0) {
+    throw new Error(`git ${args[0] ?? ""} failed: ${result.stderr.trim()}`);
+  }
+  return result.stdout.trim();
 }
 
-export function gitCommit(dir: string, msg: string): void {
-  execSync("git add -A", { cwd: dir, stdio: "pipe" });
-  execSync(`git commit -m ${JSON.stringify(msg)}`, { cwd: dir, stdio: "pipe" });
+export async function gitInit(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+  await gitExec(dir, ["init", "-b", "main"], io);
+  await gitExec(dir, ["config", "user.email", "test@test.com"], io);
+  await gitExec(dir, ["config", "user.name", "Test"], io);
 }
 
-export function gitHead(dir: string): string {
-  return execSync("git rev-parse HEAD", { cwd: dir, stdio: "pipe", encoding: "utf-8" }).trim();
+export async function gitCommit(
+  dir: string,
+  msg: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  await gitExec(dir, ["add", "-A"], io);
+  await gitExec(dir, ["commit", "-m", msg], io);
 }
 
-export function createMaterializeWorkspace(testRoot: string): string {
+export async function gitHead(
+  dir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  return gitExec(dir, ["rev-parse", "HEAD"], io);
+}
+
+export async function createMaterializeWorkspace(
+  testRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
   const tmpWorkspace = join(testRoot, "workspace");
-  mkdirSync(tmpWorkspace, { recursive: true });
+  await io.mkdir(tmpWorkspace);
 
-  gitInit(testRoot);
-  writeFileSync(join(tmpWorkspace, "README.md"), "# test\n");
-  writeFileSync(join(tmpWorkspace, "package.json"), JSON.stringify({ version: "1.0.0" }) + "\n");
-  writeFileSync(join(tmpWorkspace, "pnpm-workspace.yaml"), "packages: []\n");
-  gitCommit(testRoot, "initial");
+  await gitInit(testRoot, io);
+  await io.writeFile(join(tmpWorkspace, "README.md"), "# test\n");
+  await io.writeFile(
+    join(tmpWorkspace, "package.json"),
+    JSON.stringify({ version: "1.0.0" }) + "\n",
+  );
+  await io.writeFile(join(tmpWorkspace, "pnpm-workspace.yaml"), "packages: []\n");
+  await gitCommit(testRoot, "initial", io);
 
   const cacheDir = join(testRoot, "systems-cache", "test-system");
-  mkdirSync(cacheDir, { recursive: true });
+  await io.mkdir(cacheDir);
   const configContent = `schemaVersion: system-config/v1
 id: test-system
 cosmicStar: Vega
@@ -59,26 +80,26 @@ status: active
 registeredAt: "2026-01-01T00:00:00Z"
 notes: ""
 `;
-  writeFileSync(join(cacheDir, "system-config.yaml"), configContent);
-  gitCommit(testRoot, "add system config");
+  await io.writeFile(join(cacheDir, "system-config.yaml"), configContent);
+  await gitCommit(testRoot, "add system config", io);
 
-  writeFileSync(
+  await io.writeFile(
     join(cacheDir, "system.pin.json"),
     JSON.stringify({ platform: { version: "1.0.0" } }, null, 2) + "\n",
   );
-  mkdirSync(join(cacheDir, "bordbuch"), { recursive: true });
-  writeFileSync(join(cacheDir, "bordbuch", "events.ndjson"), "");
-  mkdirSync(join(cacheDir, "src", "content"), { recursive: true });
-  writeFileSync(
+  await io.mkdir(join(cacheDir, "bordbuch"));
+  await io.writeFile(join(cacheDir, "bordbuch", "events.ndjson"), "");
+  await io.mkdir(join(cacheDir, "src", "content"));
+  await io.writeFile(
     join(cacheDir, "src", "content", "system.md"),
     "---\n  domain: test\n  i18n:\n    default: de\n    languages:\n      - de\n---\n",
   );
-  gitCommit(testRoot, "add system");
+  await gitCommit(testRoot, "add system", io);
 
   const missionDir = join(tmpWorkspace, "missions", "test-system-m000001");
-  mkdirSync(missionDir, { recursive: true });
-  mkdirSync(join(missionDir, "workpiece"), { recursive: true });
-  mkdirSync(join(missionDir, "evidence"), { recursive: true });
+  await io.mkdir(missionDir);
+  await io.mkdir(join(missionDir, "workpiece"));
+  await io.mkdir(join(missionDir, "evidence"));
 
   const manifest = {
     schemaVersion: "1.0.0",
@@ -98,8 +119,8 @@ notes: ""
     rfcId: null,
     operationId: "op-001",
   };
-  writeFileSync(join(missionDir, "mission.yaml"), JSON.stringify(manifest, null, 2) + "\n");
+  await io.writeFile(join(missionDir, "mission.yaml"), JSON.stringify(manifest, null, 2) + "\n");
 
-  gitCommit(testRoot, "add mission");
+  await gitCommit(testRoot, "add mission", io);
   return cacheDir;
 }

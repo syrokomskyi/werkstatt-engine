@@ -8,18 +8,17 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1125: initial werkstatt.platform.update — pure platformUpdate() + thin kernel handler, idempotent, drift report.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { discoverSystems } from "../sternsystem/registry-io.ts";
 
 export interface PlatformUpdateData {
@@ -38,8 +37,8 @@ export interface PlatformUpdateData {
 
 /** Injectable dependencies for testing. */
 export interface PlatformUpdateDeps {
-  /** Run the pnpm command (defaults to execSync). */
-  exec?: (cmd: string, cwd: string) => void;
+  /** Run the pnpm command (defaults to io.exec sh -c, throws on non-zero). */
+  exec?: (cmd: string, cwd: string) => void | Promise<void>;
   /** Read the installed engine version (defaults to node_modules read). */
   installedVersion?: (root: string) => Promise<string | null>;
   /** List registered systems (defaults to discoverSystems). */
@@ -57,17 +56,24 @@ async function defaultInstalledVersion(workspaceRoot: string): Promise<string | 
     "werkstatt-engine",
     "package.json",
   );
-  if (!existsSync(pkgPath)) return null;
+  const io = createDefaultIO().io;
+  if (!(await io.exists(pkgPath))) return null;
   try {
-    const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as { version?: string };
+    const pkg = JSON.parse(await io.readFile(pkgPath)) as { version?: string };
     return pkg.version ?? null;
   } catch {
     return null;
   }
 }
 
-function defaultExec(cmd: string, cwd: string): void {
-  execSync(cmd, { cwd, stdio: "pipe", timeout: 300_000 });
+async function defaultExec(cmd: string, cwd: string): Promise<void> {
+  const result = await createDefaultIO().io.exec("sh", ["-c", cmd], {
+    cwd,
+    timeoutMs: 300_000,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(`pnpm exec failed (${result.exitCode}): ${result.stderr.slice(-500)}`);
+  }
 }
 
 async function defaultListSystems(
@@ -95,7 +101,7 @@ export async function platformUpdate(
 
   const pnpmCommand =
     to === "latest" ? `pnpm up -rL "${UPDATE_SCOPE}"` : `pnpm up -r "${UPDATE_SCOPE}@${to}"`;
-  exec(pnpmCommand, workspaceRoot);
+  await exec(pnpmCommand, workspaceRoot);
 
   const after = await installedVersion(workspaceRoot);
 

@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0913: initial tests for restoreCacheCloneGitignore and untrackForbiddenGeneratedFiles.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -72,13 +73,13 @@ test("restoreCacheCloneGitignore: creates .gitignore when it does not exist", as
   expect(content).toContain("package.json");
 });
 
-test("untrackForbiddenGeneratedFiles: untracks tracked forbidden files", () => {
+test("untrackForbiddenGeneratedFiles: untracks tracked forbidden files", async () => {
   writeFileSync(join(testDir, "package.json"), "{}\n");
   writeFileSync(join(testDir, "tsconfig.json"), "{}\n");
   execSync("git add -A", { cwd: testDir, stdio: "pipe" });
   execSync("git commit -m initial", { cwd: testDir, stdio: "pipe" });
 
-  const untracked = untrackForbiddenGeneratedFiles(testDir);
+  const untracked = await untrackForbiddenGeneratedFiles(testDir);
 
   expect(untracked.length).toBeGreaterThan(0);
   expect(untracked).toContain("package.json");
@@ -92,12 +93,12 @@ test("untrackForbiddenGeneratedFiles: untracks tracked forbidden files", () => {
   expect(status).toContain("D  tsconfig.json");
 });
 
-test("untrackForbiddenGeneratedFiles: skips untracked files silently", () => {
+test("untrackForbiddenGeneratedFiles: skips untracked files silently", async () => {
   writeFileSync(join(testDir, "README.md"), "# test\n");
   execSync("git add -A", { cwd: testDir, stdio: "pipe" });
   execSync("git commit -m initial", { cwd: testDir, stdio: "pipe" });
 
-  const untracked = untrackForbiddenGeneratedFiles(testDir);
+  const untracked = await untrackForbiddenGeneratedFiles(testDir);
 
   expect(untracked.length).toBe(0);
 });

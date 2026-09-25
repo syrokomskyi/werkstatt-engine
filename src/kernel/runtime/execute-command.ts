@@ -14,9 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -27,7 +24,8 @@ Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (
 
 fo-review REVIEW-CODE-2026-09-22-01 (needs-revision): input.argv now carries the aliased argv so commands inspecting raw argv see canonical flags; config.regenerate reports identical files as unchanged[] instead of dropping them from both generated and skipped.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
-  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -159,8 +157,8 @@ export async function executeRegisteredCommand(
   if (
     command.mutatesState !== false &&
     context.site &&
-    isClosedWorkpiece(context.site.directory) &&
-    !mutatingCommandRunsOnClosedWorkpiece(command, context.site)
+    (await isClosedWorkpiece(context.site.directory, context.io)) &&
+    !(await mutatingCommandRunsOnClosedWorkpiece(command, context.site, context.io))
   ) {
     logger.info(`Skipped: closed-mission — ${command.name} (workpiece is closed)`);
     return skippedExecutionReport(command, context, "closed-mission");
@@ -527,7 +525,8 @@ const EXECUTE_KERNEL_COMMAND_OPTION_KEYS = [
 ];
 
 export async function executeKernelCommand(
-  options: ExecuteKernelCommandOptions, io: WorkspaceIO = createDefaultIO().io,
+  options: ExecuteKernelCommandOptions,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<KernelExecutionReport | KernelExecutionReport[]> {
   assertKnownOptionKeys(
     options,

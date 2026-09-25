@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0619: initial regression test — asserts force: true is passed to executeKernelPipeline.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -149,12 +150,12 @@ afterEach(() => {
   rmSync(testRoot, { recursive: true, force: true });
 });
 
-function setupWorkspace(): void {
-  createMaterializeWorkspace(testRoot);
+async function setupWorkspace(): Promise<void> {
+  await createMaterializeWorkspace(testRoot);
 }
 
 test("RFC-0619: force: true is passed to executeKernelPipeline during materialization", async () => {
-  setupWorkspace();
+  await setupWorkspace();
 
   const { runMissionMaterialize } = await import("../mission/mission-materialize.ts");
 

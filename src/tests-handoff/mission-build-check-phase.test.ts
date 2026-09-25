@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0635: initial tests for build.check phase addition to mission.build.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -56,20 +57,6 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
       return [{ ok: true, steps: [] }] as never;
     }),
     executeKernelCommand: vi.fn(async () => [{ ok: true, exitCode: 0, summary: "" }] as never),
-  };
-});
-
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
-  return {
-    ...actual,
-    execSync: vi.fn((cmd: string, opts?: Record<string, unknown>) => {
-      if (cmd === "pnpm exec astro build") {
-        mock.execSyncCalled = true;
-        return "10 page(s)";
-      }
-      return actual.execSync(cmd, opts as never);
-    }),
   };
 });
 
@@ -209,8 +196,24 @@ function makeInput(): KernelCommandInput {
 }
 
 function makeContext(): KernelRuntimeContext {
+  const baseIo = createDefaultIO().io;
   return {
-    io: createDefaultIO().io,
+    io: {
+      ...baseIo,
+      exec: vi.fn(
+        async (
+          command: string,
+          args: string[],
+          opts?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+        ) => {
+          if (command === "pnpm" && args.join(" ") === "exec astro build") {
+            mock.execSyncCalled = true;
+            return { exitCode: 0, stdout: "10 page(s)", stderr: "" };
+          }
+          return baseIo.exec(command, args, opts);
+        },
+      ),
+    },
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

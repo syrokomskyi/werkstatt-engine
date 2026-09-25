@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0954: fail-closed guard blocks re-materialization when workpiece has uncommitted changes — operator must commit or reconcile first. --force bypasses with rescue.</item>
   <item>RFC-0958: rewire runMissionMaterializeInternal onto runOperation with granular journaled steps for crash-safe resumable materialization.</item>
   <item>RFC-1093 (fo-fix): replace inline WG_ADAPTER_BLOCK IIFE with resolveAdapterBlock(stagingDir) from adapter-config.ts.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,15 +14,12 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954</history>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, readFileSync, readlinkSync } from "node:fs";
-import { glob as fsGlob } from "node:fs/promises";
 import path from "node:path";
-import { execSync } from "node:child_process";
 import { parse as yamlParse } from "yaml";
 import type {
   DiscoveredSiteWorkspace,
@@ -58,6 +54,7 @@ import { rescueWorkpieceEdits } from "./workpiece-rescue.ts";
 import { resolveCurrentEcosystem, resolvePlatformSemanticHash } from "../handoff/bundle-io.ts";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { compareSemver } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { KernelPipelineStep } from "@warpgogol/werkstatt-engine/kernel";
 import { runOperation, checkDifferentKindOperation, type OperationStep } from "../journal/index.ts";
 
@@ -93,13 +90,14 @@ export interface MissionMaterializeData {
 // to prevent cryptic resolution failures.
 export async function checkWorkspaceGlobsForStalePackages(
   workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ stalePackages: string[]; ok: boolean }> {
   const workspaceYamlPath = path.join(workspaceRoot, "pnpm-workspace.yaml");
-  if (!existsSync(workspaceYamlPath)) {
+  if (!(await io.exists(workspaceYamlPath))) {
     return { stalePackages: [], ok: true };
   }
 
-  const content = readFileSync(workspaceYamlPath, "utf8");
+  const content = await io.readFile(workspaceYamlPath);
   const workspace = yamlParse(content);
   const patterns: string[] = workspace.packages ?? [];
 
@@ -110,9 +108,7 @@ export async function checkWorkspaceGlobsForStalePackages(
     if (pattern.startsWith("!")) continue;
     const globPattern = path.join(workspaceRoot, pattern, "package.json");
     try {
-      for await (const match of fsGlob(globPattern)) {
-        packageJsonPaths.push(match);
-      }
+      packageJsonPaths.push(...(await io.glob(globPattern)));
     } catch {
       // Glob pattern may not match — skip
     }
@@ -122,7 +118,7 @@ export async function checkWorkspaceGlobsForStalePackages(
   const workspacePackageNames = new Set<string>();
   for (const pkgJsonPath of packageJsonPaths) {
     try {
-      const pkgContent = readFileSync(pkgJsonPath, "utf8");
+      const pkgContent = await io.readFile(pkgJsonPath);
       const pkg = JSON.parse(pkgContent);
       if (pkg.name) {
         workspacePackageNames.add(pkg.name);
@@ -136,7 +132,7 @@ export async function checkWorkspaceGlobsForStalePackages(
   const stalePackages: string[] = [];
   for (const pkgJsonPath of packageJsonPaths) {
     try {
-      const pkgContent = readFileSync(pkgJsonPath, "utf8");
+      const pkgContent = await io.readFile(pkgJsonPath);
       const pkg = JSON.parse(pkgContent);
       const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
       for (const [depName, depSpec] of Object.entries(deps)) {
@@ -217,24 +213,25 @@ async function getWorkspaceAbsoluteGeneratedPaths(
 async function copyDir(
   src: string,
   dest: string,
+  io: WorkspaceIO,
   skipPaths?: Set<string>,
   rootSrc?: string,
 ): Promise<void> {
-  if (!existsSync(src)) return;
-  await fs.mkdir(dest, { recursive: true });
+  if (!(await io.exists(src))) return;
+  await io.mkdir(dest);
   const root = rootSrc ?? src;
-  const entries = await fs.readdir(src, { withFileTypes: true });
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      await copyDir(srcPath, destPath, skipPaths, root);
+    if (entry.isDirectory) {
+      await copyDir(srcPath, destPath, io, skipPaths, root);
     } else {
       if (skipPaths && skipPaths.size > 0) {
         const relPath = path.relative(root, srcPath);
         if (skipPaths.has(relPath)) continue;
       }
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -288,7 +285,7 @@ async function generateFullBoilerplate(
   let domain = "";
   if (await context.io.exists(systemMdPath)) {
     try {
-      const raw = readFileSync(systemMdPath, "utf8");
+      const raw = await context.io.readFile(systemMdPath);
       const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
       if (fmMatch) {
         const domainMatch = fmMatch[1].match(/^  domain:\s*"?([^"\s]+)"?/m);
@@ -352,7 +349,7 @@ async function generateFullBoilerplate(
 
   for (const { dest, content } of templateFiles) {
     const fullPath = path.join(stagingDir, dest);
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await context.io.mkdir(path.dirname(fullPath));
     await atomicWriteFile(fullPath, content);
     regeneratedFiles.push(dest);
   }
@@ -443,7 +440,7 @@ async function generateFullBoilerplate(
   // .env is the single template for the operator to fill in.
   const envExamplePath = path.join(stagingDir, ".env.example");
   if (await context.io.exists(envExamplePath)) {
-    const envExampleContent = await fs.readFile(envExamplePath, "utf8");
+    const envExampleContent = await context.io.readFile(envExamplePath);
     await atomicWriteFile(path.join(stagingDir, ".env"), envExampleContent);
     regeneratedFiles.push(".env.example");
     logger.info(`  .env.example, .env written`);
@@ -461,6 +458,7 @@ async function syncCacheClone(
   workspaceRoot: string,
   systemId: string,
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   let config: Awaited<ReturnType<typeof readSystemConfig>> | null = null;
   try {
@@ -483,7 +481,7 @@ async function syncCacheClone(
 
   const bareRepoPath = resolveMirrorPath(workspaceRoot, gitMirrors[0].path);
 
-  if (existsSync(gitDir)) {
+  if (await io.exists(gitDir)) {
     // Cache clone exists — fetch and reset to origin/main
     logger.info(`  Fetching latest from ${bareRepoPath}…`);
     try {
@@ -493,57 +491,55 @@ async function syncCacheClone(
       // unstaged changes" or "It seems that there is already a rebase-merge directory".
       const rebaseMerge = path.join(gitDir, "rebase-merge");
       const rebaseApply = path.join(gitDir, "rebase-apply");
-      if (existsSync(rebaseMerge) || existsSync(rebaseApply)) {
+      if ((await io.exists(rebaseMerge)) || (await io.exists(rebaseApply))) {
         logger.warn(`  ⚠ Cache clone has an in-progress rebase — aborting it before sync.`);
-        try {
-          execSync("git rebase --abort", { cwd: cachePath, stdio: "pipe", timeout: 10_000 });
-        } catch {
+        const rebaseAbort = await io.exec("git", ["rebase", "--abort"], {
+          cwd: cachePath,
+          timeoutMs: 10_000,
+        });
+        if (rebaseAbort.exitCode !== 0) {
           // If git rebase --abort fails, manually remove the rebase state directories
-          await fs.rm(rebaseMerge, { recursive: true, force: true }).catch(() => {});
-          await fs.rm(rebaseApply, { recursive: true, force: true }).catch(() => {});
+          await io.rm(rebaseMerge, { recursive: true }).catch(() => {});
+          await io.rm(rebaseApply, { recursive: true }).catch(() => {});
         }
       }
       // ADR-0031: warn on uncommitted changes before hard reset
-      const status = execSync("git status --porcelain", {
+      const statusResult = await io.exec("git", ["status", "--porcelain"], {
         cwd: cachePath,
-        encoding: "utf-8",
-        timeout: 10_000,
-      }).trim();
+        timeoutMs: 10_000,
+      });
+      const status = statusResult.exitCode === 0 ? statusResult.stdout.trim() : "";
       if (status) {
         logger.warn(
           `  ⚠ Cache clone has uncommitted changes — they will be lost on reset. Push to bare repo before materializing.`,
         );
       }
-      execSync("git fetch origin", { cwd: cachePath, stdio: "pipe", timeout: 30_000 });
+      await io.exec("git", ["fetch", "origin"], { cwd: cachePath, timeoutMs: 30_000 });
       // RFC-0987 Fix 4: resolve branch via symbolic-ref instead of rev-parse --abbrev-ref.
       // In detached HEAD, rev-parse returns "HEAD" which produces invalid refspec for reset.
       // Try symbolic-ref --short HEAD first (current branch when not detached),
       // then refs/remotes/origin/HEAD (remote default for detached HEAD), then main.
       let branch = "main";
-      try {
-        const ref = execSync("git symbolic-ref --short HEAD", {
-          cwd: cachePath,
-          encoding: "utf-8",
-          timeout: 10_000,
-        }).trim();
-        branch = ref || "main";
-      } catch {
+      const headRef = await io.exec("git", ["symbolic-ref", "--short", "HEAD"], {
+        cwd: cachePath,
+        timeoutMs: 10_000,
+      });
+      if (headRef.exitCode === 0 && headRef.stdout.trim()) {
+        branch = headRef.stdout.trim();
+      } else {
         // Detached HEAD — try remote default
-        try {
-          const ref = execSync("git symbolic-ref --short refs/remotes/origin/HEAD", {
-            cwd: cachePath,
-            encoding: "utf-8",
-            timeout: 10_000,
-          }).trim();
-          branch = ref.replace("origin/", "") || "main";
-        } catch {
-          // No remote HEAD set — default to main
+        const originRef = await io.exec(
+          "git",
+          ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+          { cwd: cachePath, timeoutMs: 10_000 },
+        );
+        if (originRef.exitCode === 0) {
+          branch = originRef.stdout.trim().replace("origin/", "") || "main";
         }
       }
-      execSync(`git reset --hard origin/${branch}`, {
+      await io.exec("git", ["reset", "--hard", `origin/${branch}`], {
         cwd: cachePath,
-        stdio: "pipe",
-        timeout: 30_000,
+        timeoutMs: 30_000,
       });
       logger.info(`  Cache clone synced to origin/${branch}`);
     } catch (err) {
@@ -551,36 +547,38 @@ async function syncCacheClone(
         `[mission.materialize] failed to sync cache clone for system '${systemId}': ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-  } else if (existsSync(cachePath)) {
+  } else if (await io.exists(cachePath)) {
     // Directory exists but is not a git clone — clone into a temp dir and replace
     logger.info(`  Cloning ${bareRepoPath} into cache clone…`);
     const tmpDir = `${cachePath}.clone-${process.pid}-${Date.now()}`;
     try {
-      execSync(`git clone "${bareRepoPath}" "${tmpDir}"`, {
-        stdio: "pipe",
-        timeout: 60_000,
+      const cloneResult = await io.exec("git", ["clone", bareRepoPath, tmpDir], {
+        timeoutMs: 60_000,
       });
+      if (cloneResult.exitCode !== 0) {
+        throw new Error(`git clone failed: ${cloneResult.stderr.trim()}`);
+      }
       // Preserve .env and other untracked files from the old directory
-      const oldEntries = await fs.readdir(cachePath, { withFileTypes: true });
+      const oldEntries = await io.readdir(cachePath);
       for (const e of oldEntries) {
         if (e.name === ".git") continue;
         const src = path.join(cachePath, e.name);
         const dest = path.join(tmpDir, e.name);
-        if (!existsSync(dest)) {
-          if (e.isDirectory()) {
-            await copyDir(src, dest);
+        if (!(await io.exists(dest))) {
+          if (e.isDirectory) {
+            await copyDir(src, dest, io);
           } else {
-            await fs.copyFile(src, dest);
+            await io.copyFile(src, dest);
           }
         }
       }
       // Replace old directory with the clone
-      await fs.rm(cachePath, { recursive: true, force: true });
-      await fs.rename(tmpDir, cachePath);
+      await io.rm(cachePath, { recursive: true });
+      await io.rename(tmpDir, cachePath);
       logger.info(`  Cache clone populated from ${bareRepoPath}`);
     } catch (err) {
-      if (existsSync(tmpDir)) {
-        await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      if (await io.exists(tmpDir)) {
+        await io.rm(tmpDir, { recursive: true }).catch(() => {});
       }
       throw new Error(
         `[mission.materialize] failed to clone cache clone for system '${systemId}': ${err instanceof Error ? err.message : String(err)}`,
@@ -589,12 +587,14 @@ async function syncCacheClone(
   } else {
     // Directory doesn't exist — clone directly
     logger.info(`  Cloning ${bareRepoPath} into cache clone…`);
-    await fs.mkdir(path.dirname(cachePath), { recursive: true });
+    await io.mkdir(path.dirname(cachePath));
+    const cloneResult = await io.exec("git", ["clone", bareRepoPath, cachePath], {
+      timeoutMs: 60_000,
+    });
     try {
-      execSync(`git clone "${bareRepoPath}" "${cachePath}"`, {
-        stdio: "pipe",
-        timeout: 60_000,
-      });
+      if (cloneResult.exitCode !== 0) {
+        throw new Error(`git clone failed: ${cloneResult.stderr.trim()}`);
+      }
       logger.info(`  Cache clone populated from ${bareRepoPath}`);
     } catch (err) {
       throw new Error(
@@ -629,10 +629,11 @@ async function runPreflightGate(
   missionId: string,
   skipPreflight: boolean,
   logger: { info: (msg: string) => void },
+  io: WorkspaceIO,
 ): Promise<PreflightReport> {
   const ranAt = new Date().toISOString();
-  const evidenceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "evidence");
-  await fs.mkdir(evidenceDir, { recursive: true });
+  const evidenceDir = path.join(await resolveMissionDir(workspaceRoot, missionId, io), "evidence");
+  await io.mkdir(evidenceDir);
   const reportPath = path.join(evidenceDir, "preflight-report.json");
 
   if (skipPreflight) {
@@ -757,16 +758,9 @@ async function computeArtifactCacheKey(
  * RFC-0659: Resolve the current cache clone HEAD. Returns null if HEAD cannot
  * be resolved (non-git cache clone, empty repo).
  */
-function resolveCacheCloneHead(systemDir: string): string | null {
-  try {
-    return execSync("git rev-parse HEAD", {
-      cwd: systemDir,
-      stdio: "pipe",
-      encoding: "utf-8",
-    }).trim();
-  } catch {
-    return null;
-  }
+async function resolveCacheCloneHead(systemDir: string, io: WorkspaceIO): Promise<string | null> {
+  const result = await io.exec("git", ["rev-parse", "HEAD"], { cwd: systemDir });
+  return result.exitCode === 0 ? result.stdout.trim() : null;
 }
 
 /**
@@ -775,11 +769,12 @@ function resolveCacheCloneHead(systemDir: string): string | null {
  */
 async function readArtifactCacheState(
   systemDir: string,
+  io: WorkspaceIO,
 ): Promise<MaterializationCacheState | null> {
   const statePath = path.join(systemDir, ARTIFACT_CACHE_STATE_FILE);
-  if (!existsSync(statePath)) return null;
+  if (!(await io.exists(statePath))) return null;
   try {
-    const raw = await fs.readFile(statePath, "utf8");
+    const raw = await io.readFile(statePath);
     return JSON.parse(raw) as MaterializationCacheState;
   } catch {
     return null;
@@ -794,18 +789,19 @@ async function copyDirExcluding(
   src: string,
   dest: string,
   excludeTopLevel: Set<string>,
+  io: WorkspaceIO,
 ): Promise<void> {
-  if (!existsSync(src)) return;
-  await fs.mkdir(dest, { recursive: true });
-  const entries = await fs.readdir(src, { withFileTypes: true });
+  if (!(await io.exists(src))) return;
+  await io.mkdir(dest);
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     if (excludeTopLevel.has(entry.name)) continue;
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      await copyDir(srcPath, destPath);
+    if (entry.isDirectory) {
+      await copyDir(srcPath, destPath, io);
     } else {
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -820,9 +816,10 @@ async function writeArtifactCacheState(
   systemDir: string,
   state: MaterializationCacheState,
   _logger: { info: (msg: string) => void; warn: (msg: string) => void },
+  io: WorkspaceIO,
 ): Promise<void> {
   const statePath = path.join(systemDir, ARTIFACT_CACHE_STATE_FILE);
-  await fs.mkdir(path.dirname(statePath), { recursive: true });
+  await io.mkdir(path.dirname(statePath));
   await atomicWriteFile(statePath, JSON.stringify(state, null, 2) + "\n");
 
   // RFC-0659: Ensure .cache/ is in the cache clone's .gitignore.
@@ -830,8 +827,8 @@ async function writeArtifactCacheState(
   // and invalidate the cache key on the next materialization.
   const gitignorePath = path.join(systemDir, ".gitignore");
   let gitignoreContent = "";
-  if (existsSync(gitignorePath)) {
-    gitignoreContent = await fs.readFile(gitignorePath, "utf8");
+  if (await io.exists(gitignorePath)) {
+    gitignoreContent = await io.readFile(gitignorePath);
   }
   if (!gitignoreContent.includes(".cache/")) {
     const newContent =
@@ -904,7 +901,7 @@ export async function runMissionMaterializeInternal(
   // Primary materialization (materializedAt === null) skips the guard — rescue
   // handles any stale workpiece from a failed previous attempt.
   // --force bypasses the guard (rescue still runs as safety net).
-  const missionDirForRescue = resolveMissionDir(workspaceRoot, missionId);
+  const missionDirForRescue = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDirForRescue = path.join(missionDirForRescue, "workpiece");
 
   if (
@@ -916,12 +913,11 @@ export async function runMissionMaterializeInternal(
   ) {
     let dirty = false;
     try {
-      const status = execSync("git status --porcelain", {
+      const statusResult = await context.io.exec("git", ["status", "--porcelain"], {
         cwd: workpieceDirForRescue,
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
-      dirty = status.length > 0;
+      });
+      dirty = statusResult.exitCode === 0 && statusResult.stdout.trim().length > 0;
+      if (statusResult.exitCode !== 0) dirty = false;
     } catch {
       // git status failed — not a valid git repo, skip guard
     }
@@ -987,13 +983,13 @@ export async function runMissionMaterializeInternal(
     throw new Error(`[mission.materialize] system '${manifest.systemId}' has no system.pin.json`);
   }
 
-  const pinRaw = await fs.readFile(pinPath, "utf8");
+  const pinRaw = await context.io.readFile(pinPath);
   const pin = JSON.parse(pinRaw);
   const pinVersion = pin.platform?.version ?? "unknown";
 
   // Read current platform version from workspace root package.json
   const workspacePkgPath = path.join(workspaceRoot, "package.json");
-  const workspacePkg = JSON.parse(await fs.readFile(workspacePkgPath, "utf8"));
+  const workspacePkg = JSON.parse(await context.io.readFile(workspacePkgPath));
   const platformVersion = workspacePkg.version ?? "unknown";
 
   // Version comparison (simplified — full implementation would use compareEcosystem)
@@ -1058,7 +1054,7 @@ export async function runMissionMaterializeInternal(
   // version comparison, report-only early return) run outside the journal. The main sequence
   // (preflight skip → artifact cache → staging → data copy → move → restore → build → git → cache →
   // report → manifest → commit) runs as journaled steps.
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDir = path.join(missionDir, "workpiece");
   const stagingDir = resolveStagingDir(missionDir, workpieceDir, operationId);
 
@@ -1231,20 +1227,15 @@ export async function buildMaterializeSteps(
         const cc = c as MaterializeStepCtx;
         if (!cc.skipPreflight) {
           const stateFilePath = path.join(cc.systemDir, ".materialization-state.json");
-          if (existsSync(stateFilePath)) {
+          if (await cc.context.io.exists(stateFilePath)) {
             try {
-              const stateRaw = await fs.readFile(stateFilePath, "utf8");
+              const stateRaw = await cc.context.io.readFile(stateFilePath);
               const state = JSON.parse(stateRaw) as MaterializationState;
               let currentHead: string | null = null;
-              try {
-                currentHead = execSync("git rev-parse HEAD", {
-                  cwd: cc.systemDir,
-                  stdio: "pipe",
-                  encoding: "utf-8",
-                }).trim();
-              } catch {
-                // HEAD cannot be resolved — fail safe, run preflight
-              }
+              const headResult = await cc.context.io.exec("git", ["rev-parse", "HEAD"], {
+                cwd: cc.systemDir,
+              });
+              if (headResult.exitCode === 0) currentHead = headResult.stdout.trim();
               if (currentHead && state.cacheCloneHead === currentHead) {
                 cc.preflightSkipped = true;
                 cc.preflightSkipReason = "cache-clone-head-unchanged";
@@ -1264,7 +1255,7 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         if (!cc.reportOnly) {
-          cc.cacheCloneHead = resolveCacheCloneHead(cc.systemDir);
+          cc.cacheCloneHead = await resolveCacheCloneHead(cc.systemDir, cc.context.io);
           if (cc.cacheCloneHead) {
             try {
               const keyResult = await computeArtifactCacheKey(cc.workspaceRoot, cc.cacheCloneHead);
@@ -1275,10 +1266,10 @@ export async function buildMaterializeSteps(
               };
 
               if (!cc.force) {
-                const cacheState = await readArtifactCacheState(cc.systemDir);
+                const cacheState = await readArtifactCacheState(cc.systemDir, cc.context.io);
                 if (cacheState && cacheState.cacheKey === cc.artifactCacheKey) {
                   const cacheDir = path.join(cc.systemDir, ARTIFACT_CACHE_DIR, cc.artifactCacheKey);
-                  if (existsSync(cacheDir)) {
+                  if (await cc.context.io.exists(cacheDir)) {
                     cc.artifactCacheHit = true;
                     cc.logger.info(
                       `  Artifact cache hit (key: ${cc.artifactCacheKey.slice(0, 12)})`,
@@ -1288,7 +1279,7 @@ export async function buildMaterializeSteps(
                       `  Artifact cache: state file exists but cache directory missing — falling through to full materialization`,
                     );
                     try {
-                      await fs.unlink(path.join(cc.systemDir, ARTIFACT_CACHE_STATE_FILE));
+                      await cc.context.io.rm(path.join(cc.systemDir, ARTIFACT_CACHE_STATE_FILE));
                     } catch {
                       // ignore
                     }
@@ -1311,23 +1302,21 @@ export async function buildMaterializeSteps(
       name: "setup-staging",
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
-        if (existsSync(cc.stagingDir)) {
-          await fs.rm(cc.stagingDir, { recursive: true, force: true });
+        if (await cc.context.io.exists(cc.stagingDir)) {
+          await cc.context.io.rm(cc.stagingDir, { recursive: true });
         }
-        await fs.mkdir(cc.stagingDir, { recursive: true });
+        await cc.context.io.mkdir(cc.stagingDir);
 
-        const hasGitCacheClone = existsSync(path.join(cc.systemDir, ".git"));
+        const hasGitCacheClone = await cc.context.io.exists(path.join(cc.systemDir, ".git"));
         if (hasGitCacheClone) {
           const tempCloneDir = path.join(cc.missionDir, `.clone-${cc.operationId}`);
-          if (existsSync(tempCloneDir)) {
-            await fs.rm(tempCloneDir, { recursive: true, force: true });
+          if (await cc.context.io.exists(tempCloneDir)) {
+            await cc.context.io.rm(tempCloneDir, { recursive: true });
           }
-          execSync(`git clone ${JSON.stringify(cc.systemDir)} ${JSON.stringify(tempCloneDir)}`, {
-            stdio: ["pipe", "pipe", "pipe"],
-          });
+          await cc.context.io.exec("git", ["clone", cc.systemDir, tempCloneDir]);
           cc.clonedGitDir = path.join(cc.stagingDir, ".git");
-          await fs.rename(path.join(tempCloneDir, ".git"), cc.clonedGitDir);
-          await fs.rm(tempCloneDir, { recursive: true, force: true });
+          await cc.context.io.rename(path.join(tempCloneDir, ".git"), cc.clonedGitDir);
+          await cc.context.io.rm(tempCloneDir, { recursive: true });
           cc.logger.info(`  Cloned cache clone git history into staging`);
         }
       },
@@ -1338,7 +1327,7 @@ export async function buildMaterializeSteps(
         const cc = c as MaterializeStepCtx;
         if (cc.artifactCacheHit && cc.artifactCacheKey) {
           const cacheDir = path.join(cc.systemDir, ARTIFACT_CACHE_DIR, cc.artifactCacheKey);
-          await copyDirExcluding(cacheDir, cc.stagingDir, new Set([".git"]));
+          await copyDirExcluding(cacheDir, cc.stagingDir, new Set([".git"]), cc.context.io);
           cc.logger.info(`  Restored workpiece from artifact cache`);
         } else {
           const skipPathsGlobal = await getWorkspaceAbsoluteGeneratedPaths(cc.context.ownershipMap);
@@ -1359,7 +1348,7 @@ export async function buildMaterializeSteps(
             ".env.local",
             ".materialization-state.json",
           ]);
-          await copyDirExcluding(cc.systemDir, cc.stagingDir, cacheCloneExclude);
+          await copyDirExcluding(cc.systemDir, cc.stagingDir, cacheCloneExclude, cc.context.io);
           cc.logger.info(`  Copied cache clone working tree (excluding .git, .cache, env files)`);
 
           // Remove generated files that were copied from the cache clone —
@@ -1368,26 +1357,26 @@ export async function buildMaterializeSteps(
           // and must be removed before generateFullBoilerplate regenerates them.
           for (const skipPath of skipPathsGlobal) {
             const stagingPath = path.join(cc.stagingDir, skipPath);
-            if (existsSync(stagingPath)) {
-              await fs.rm(stagingPath, { force: true });
+            if (await cc.context.io.exists(stagingPath)) {
+              await cc.context.io.rm(stagingPath);
             }
           }
 
           const pinFileSrc = path.join(cc.systemDir, "system.pin.json");
-          if (existsSync(pinFileSrc)) {
-            await fs.copyFile(pinFileSrc, path.join(cc.stagingDir, "system.pin.json"));
+          if (await cc.context.io.exists(pinFileSrc)) {
+            await cc.context.io.copyFile(pinFileSrc, path.join(cc.stagingDir, "system.pin.json"));
             cc.logger.info(`  Copied system.pin.json`);
           }
 
           for (const cacheDir of MEDIA_CACHE_DIRS) {
             const srcCache = path.join(cc.systemDir, cacheDir);
-            if (existsSync(srcCache)) {
+            if (await cc.context.io.exists(srcCache)) {
               const destCache = path.join(cc.stagingDir, cacheDir);
               try {
-                if (existsSync(destCache)) {
-                  await fs.rm(destCache, { recursive: true, force: true });
+                if (await cc.context.io.exists(destCache)) {
+                  await cc.context.io.rm(destCache, { recursive: true });
                 }
-                await copyDir(srcCache, destCache);
+                await copyDir(srcCache, destCache, cc.context.io);
                 cc.mediaCacheWarmed = true;
                 cc.mediaCacheSources++;
                 cc.logger.info(`  Warmed ${cacheDir} from cache clone`);
@@ -1460,16 +1449,12 @@ export async function buildMaterializeSteps(
           );
           let restoredCount = 0;
           for (const entry of registryOnlyNonConditional) {
-            try {
-              execSync(`git checkout HEAD -- ${entry.path}`, {
-                cwd: cc.workpieceDir,
-                stdio: ["pipe", "pipe", "pipe"],
-                encoding: "utf-8",
-              });
-              restoredCount++;
-            } catch {
-              // File not tracked in git or does not exist in HEAD — skip
-            }
+            const checkout = await cc.context.io.exec(
+              "git",
+              ["checkout", "HEAD", "--", entry.path],
+              { cwd: cc.workpieceDir },
+            );
+            if (checkout.exitCode === 0) restoredCount++;
           }
           if (restoredCount > 0) {
             cc.logger.info(`  Restored ${restoredCount} registry-only generated file(s) from git`);
@@ -1531,24 +1516,25 @@ export async function buildMaterializeSteps(
         const cc = c as MaterializeStepCtx;
         cc.logger.info(`  Stopping stale astro dev servers from previous missions…`);
         try {
-          const output = execSync("pgrep -af 'astro.*dev'", {
-            encoding: "utf-8",
-            timeout: 10_000,
+          const pgrepResult = await cc.context.io.exec("pgrep", ["-af", "astro.*dev"], {
+            timeoutMs: 10_000,
           });
-          const lines = output.trim().split("\n").filter(Boolean);
-          for (const line of lines) {
-            const pidStr = line.split("\s+")[0];
-            if (!pidStr) continue;
-            const pid = parseInt(pidStr, 10);
-            if (Number.isNaN(pid) || pid === process.pid) continue;
-            try {
-              const cwd = readlinkSync(`/proc/${pid}/cwd`).trim();
-              if (cwd.includes("/missions/")) {
-                process.kill(pid, "SIGTERM");
-                cc.logger.info(`  Stopped stale dev server (pid=${pid}, cwd=${cwd})`);
+          if (pgrepResult.exitCode === 0) {
+            const lines = pgrepResult.stdout.trim().split("\n").filter(Boolean);
+            for (const line of lines) {
+              const pidStr = line.split("\s+")[0];
+              if (!pidStr) continue;
+              const pid = parseInt(pidStr, 10);
+              if (Number.isNaN(pid) || pid === process.pid) continue;
+              try {
+                const cwd = (await cc.context.io.realpath(`/proc/${pid}/cwd`)).trim();
+                if (cwd.includes("/missions/")) {
+                  process.kill(pid, "SIGTERM");
+                  cc.logger.info(`  Stopped stale dev server (pid=${pid}, cwd=${cwd})`);
+                }
+              } catch {
+                // Process may have exited or cwd unreadable — skip silently
               }
-            } catch {
-              // Process may have exited or cwd unreadable — skip silently
             }
           }
         } catch {
@@ -1561,15 +1547,14 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         cc.logger.info(`  Linking workpiece workspace dependencies…`);
-        try {
-          execSync("pnpm install", {
-            cwd: cc.workspaceRoot,
-            stdio: ["pipe", "pipe", "pipe"],
-            timeout: 300_000,
-          });
+        const installResult = await cc.context.io.exec("pnpm", ["install"], {
+          cwd: cc.workspaceRoot,
+          timeoutMs: 300_000,
+        });
+        if (installResult.exitCode === 0) {
           cc.logger.info(`  Workpiece workspace dependencies linked`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
+        } else {
+          const msg = installResult.stderr.trim() || `exit ${installResult.exitCode}`;
           throw new Error(
             `[mission.materialize] pnpm install failed — workpiece cannot be linked into workspace.\n` +
               `  Error: ${msg}\n` +
@@ -1583,17 +1568,17 @@ export async function buildMaterializeSteps(
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
         const pkgJsonPath = path.join(cc.workpieceDir, "package.json");
-        if (!existsSync(pkgJsonPath)) return;
-        const pkgRaw = readFileSync(pkgJsonPath, "utf8");
+        if (!(await cc.context.io.exists(pkgJsonPath))) return;
+        const pkgRaw = await cc.context.io.readFile(pkgJsonPath);
         const pkg = JSON.parse(pkgRaw);
         const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
         for (const [depName, depSpec] of Object.entries(deps)) {
           if (typeof depSpec !== "string") continue;
           if (!depSpec.startsWith("~") && !depSpec.startsWith("^")) continue;
           const installedPath = path.join(cc.workpieceDir, "node_modules", depName, "package.json");
-          if (!existsSync(installedPath)) continue;
+          if (!(await cc.context.io.exists(installedPath))) continue;
           try {
-            const installedPkg = JSON.parse(readFileSync(installedPath, "utf8"));
+            const installedPkg = JSON.parse(await cc.context.io.readFile(installedPath));
             const installedVersion = installedPkg.version;
             if (!installedVersion) continue;
             const specBody = depSpec.replace(/^[~^]/, "");
@@ -1681,6 +1666,7 @@ export async function buildMaterializeSteps(
           cc.missionId,
           effectiveSkipPreflight,
           cc.logger,
+          cc.context.io,
         );
 
         if (cc.skipPreflight) {
@@ -1722,34 +1708,28 @@ export async function buildMaterializeSteps(
       name: "git-init-commit",
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
-        if (existsSync(path.join(cc.workpieceDir, ".git"))) {
+        if (await cc.context.io.exists(path.join(cc.workpieceDir, ".git"))) {
           // Stage all files — data, generated, and custom composition files.
           // git add -A ensures custom files (src/pages/portal/[token].astro,
           // src/components/*, etc.) are included in the materialize commit.
-          execSync("git add -A", {
-            cwd: cc.workpieceDir,
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execSync(`git commit -m "materialize from pin ${cc.pinVersion}"`, {
-            cwd: cc.workpieceDir,
-            stdio: ["pipe", "pipe", "pipe"],
-            env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-          });
+          await cc.context.io.exec("git", ["add", "-A"], { cwd: cc.workpieceDir });
+          await cc.context.io.exec(
+            "git",
+            ["commit", "-m", `materialize from pin ${cc.pinVersion}`],
+            { cwd: cc.workpieceDir, env: { MISSION_GIT_COMMIT: "1" } },
+          );
           await installWorkpieceCommitHook(cc.workpieceDir);
           cc.logger.info(
             `  Git commit created in workpiece (full working tree, on top of cloned history)`,
           );
         } else {
-          execSync("git init -b main", { cwd: cc.workpieceDir, stdio: ["pipe", "pipe", "pipe"] });
-          execSync("git add -A", {
-            cwd: cc.workpieceDir,
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execSync(`git commit -m "materialize from pin ${cc.pinVersion}"`, {
-            cwd: cc.workpieceDir,
-            stdio: ["pipe", "pipe", "pipe"],
-            env: { ...process.env, MISSION_GIT_COMMIT: "1" },
-          });
+          await cc.context.io.exec("git", ["init", "-b", "main"], { cwd: cc.workpieceDir });
+          await cc.context.io.exec("git", ["add", "-A"], { cwd: cc.workpieceDir });
+          await cc.context.io.exec(
+            "git",
+            ["commit", "-m", `materialize from pin ${cc.pinVersion}`],
+            { cwd: cc.workpieceDir, env: { MISSION_GIT_COMMIT: "1" } },
+          );
           await installWorkpieceCommitHook(cc.workpieceDir);
           cc.logger.info(
             `  Git initialized in workpiece with initial commit (non-git cache clone fallback)`,
@@ -1769,13 +1749,12 @@ export async function buildMaterializeSteps(
         ) {
           try {
             const cacheBaseDir = path.join(cc.systemDir, ARTIFACT_CACHE_DIR);
-            if (existsSync(cacheBaseDir)) {
-              const entries = await fs.readdir(cacheBaseDir, { withFileTypes: true });
+            if (await cc.context.io.exists(cacheBaseDir)) {
+              const entries = await cc.context.io.readdir(cacheBaseDir);
               for (const entry of entries) {
                 if (entry.name !== cc.artifactCacheKey) {
-                  await fs.rm(path.join(cacheBaseDir, entry.name), {
+                  await cc.context.io.rm(path.join(cacheBaseDir, entry.name), {
                     recursive: true,
-                    force: true,
                   });
                 }
               }
@@ -1785,6 +1764,7 @@ export async function buildMaterializeSteps(
               cc.workpieceDir,
               newCacheDir,
               new Set([".git", "node_modules", "dist"]),
+              cc.context.io,
             );
             cc.logger.info(`  Artifact cache: wrote entry (${cc.artifactCacheKey.slice(0, 12)})`);
 
@@ -1799,6 +1779,7 @@ export async function buildMaterializeSteps(
                 writtenAt: new Date().toISOString(),
               },
               cc.logger,
+              cc.context.io,
             );
           } catch (err) {
             cc.logger.warn(
@@ -1833,7 +1814,7 @@ export async function buildMaterializeSteps(
         const cc = c as MaterializeStepCtx;
         cc.now = new Date().toISOString();
         const evidenceDir = path.join(cc.missionDir, "evidence");
-        await fs.mkdir(evidenceDir, { recursive: true });
+        await cc.context.io.mkdir(evidenceDir);
         const report = {
           schemaVersion: "1.0.0",
           missionId: cc.missionId,
@@ -1909,9 +1890,8 @@ export async function runMissionMaterialize(
 
   // RFC-0952 Guard 1: actionable error for missing manifest
   const manifestPath = path.join(workspaceRoot, "missions", missionId, "mission.yaml");
-  try {
-    await fs.access(manifestPath);
-  } catch {
+  const manifestExists = await context.io.exists(manifestPath);
+  if (!manifestExists) {
     const mIdx = missionId.lastIndexOf("-m");
     const systemId = mIdx > 0 ? missionId.slice(0, mIdx) : null;
     const openHint = systemId

@@ -6,13 +6,13 @@
 <CHANGE_SUMMARY>
   <item>RFC-0962: initial test suite for ship composite command.</item>
   <item>RFC-0962 fo-fix: added --until alt, --until main, invalid --until, releaseId restoration on resume tests; fixed resume test for stepResults including skipped steps.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
 import { test, expect, vi, beforeEach, afterEach } from "vitest";
 import { runLeitstandShip } from "../leitstand/ship.ts";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
-import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -32,14 +32,6 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   };
 });
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
-  return {
-    ...actual,
-    execSync: vi.fn(),
-  };
-});
-
 vi.mock("../kernel/runtime/registry-cache.ts", () => ({
   getOrBuildWorkspaceRegistry: vi.fn().mockResolvedValue(undefined),
 }));
@@ -54,7 +46,13 @@ vi.mock("../sternsystem/registry-io.ts", () => ({
   ),
 }));
 
-const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
+const mockIoExec = vi.fn();
+function ioExecOk(stdout: string): void {
+  mockIoExec.mockResolvedValue({ exitCode: 0, stdout, stderr: "" });
+}
+function ioExecOkOnce(stdout: string): void {
+  mockIoExec.mockResolvedValueOnce({ exitCode: 0, stdout, stderr: "" });
+}
 const mockExecuteKernelCommand = executeKernelCommand as unknown as ReturnType<typeof vi.fn>;
 
 const PHASE_FLAGS: Record<string, string[]> = {
@@ -133,7 +131,7 @@ function assertAllPhaseCallsValid(): void {
 }
 
 const context = {
-  io: createDefaultIO().io,
+  io: { ...createDefaultIO().io, exec: mockIoExec },
   workspaceRoot: "/tmp/test-ship",
   logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 } as unknown as KernelRuntimeContext;
@@ -159,8 +157,8 @@ let operationsDir: string;
 
 beforeEach(async () => {
   mockExecuteKernelCommand.mockReset();
-  mockExecSync.mockReset();
-  mockExecSync.mockReturnValue("");
+  mockIoExec.mockReset();
+  ioExecOk("");
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "ship-test-"));
   operationsDir = path.join(tmpDir, "systems-cache", "test-sys", "operations");
@@ -333,7 +331,7 @@ test("self-healing: dirty workpiece after validate triggers auto-commit + re-val
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
-  mockExecSync.mockReturnValueOnce("M generated.ts\n");
+  ioExecOkOnce("M generated.ts\n");
   mockPhaseResult("mission.git.commit", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -377,7 +375,7 @@ test("resume after failure skips completed steps", async () => {
   expect(journalContent).toContain("step-failed");
 
   vi.clearAllMocks();
-  mockExecSync.mockReturnValue("");
+  ioExecOk("");
 
   mockPhaseResult("mission.reconcile", 0);
   mockPhaseResult("mission.close", 0);
@@ -544,7 +542,7 @@ test("resume restores releaseId from journal after release-prepare completed", a
   expect(journalContent).toContain("releaseId");
 
   vi.clearAllMocks();
-  mockExecSync.mockReturnValue("");
+  ioExecOk("");
 
   // Resume: release-ready + certify-dev + dev-deploy
   mockPhaseResult("release.ready", 0);

@@ -8,20 +8,17 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0480: remove pull/both directions — push-only (edits-only-through-missions invariant).</item>
   <item>RFC-0818: reorder external push + bundle creation to after bordbuch commit so bordbuch entry reaches external mirrors.</item>
   <item>ADR-0073: Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
   <item>ADR-0086: commit all dirty operational files (operations journals, status files) via commitCacheCloneIfDirty before pushing — closed missions never reconcile again, so sync is the last chance for their operational state to reach mirrors.</item>
   <item>RFC-1139: CLI hint accuracy and agent-safety hygiene — rfc.create hint, EC-14-PARTIAL, amend delegation, ledger scope, sync footer, mission.open remnants</item>
-  <history>RFC-0472, RFC-0477</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0472, RFC-0477, RFC-0480</history>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-
 import path from "node:path";
 import { tmpdir } from "node:os";
-import * as fs from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -35,6 +32,7 @@ import {
 } from "./registry-io.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { commitCacheCloneIfDirty } from "../mission/mission-git-commit.ts";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface SternsystemSyncData {
   systemId: string;
@@ -55,13 +53,12 @@ function flagBoolean(input: KernelCommandInput, key: string): boolean {
   return v === true || v === "true";
 }
 
-function git(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
-    cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    timeout: 300_000,
-  }).trim();
+async function git(cwd: string, args: string[], io: WorkspaceIO): Promise<string> {
+  const result = await io.exec("git", args, { cwd });
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.trim() || `git ${args[0] ?? ""} exited ${result.exitCode}`);
+  }
+  return result.stdout.trim();
 }
 
 export async function runSternsystemSync(
@@ -82,7 +79,7 @@ export async function runSternsystemSync(
 
   const syncAll = flagBoolean(input, "all");
 
-  const config = await readSystemConfig(workspaceRoot, id);
+  const config = await readSystemConfig(workspaceRoot, id, context.io);
 
   if (config.mirrors.length < 2) {
     throw new Error(`[sternsystem.sync] system '${id}' has no bare mirror configured`);
@@ -90,14 +87,14 @@ export async function runSternsystemSync(
 
   const { gitMirrors, cachePath } = resolveMirrors(workspaceRoot, config);
   const bareRepoPath = resolveMirrorPath(workspaceRoot, gitMirrors[0].path);
-  if (!await context.io.exists(bareRepoPath)) {
+  if (!(await context.io.exists(bareRepoPath))) {
     throw new Error(`[sternsystem.sync] bare repo not found at ${bareRepoPath}`);
   }
 
   // RFC-0574: star topology — first push cache clone to bare repo (mirrors[1])
   let branch: string;
   try {
-    branch = git(bareRepoPath, "symbolic-ref HEAD");
+    branch = await git(bareRepoPath, ["symbolic-ref", "HEAD"], context.io);
   } catch {
     throw new Error(`[sternsystem.sync] bare repo has no commits — nothing to push`);
   }
@@ -111,7 +108,7 @@ export async function runSternsystemSync(
     // to reach the bare repo and external mirrors. Non-fatal: a failed sweep
     // must not block propagation of already-committed state.
     try {
-      const sweep = commitCacheCloneIfDirty(cachePath, id);
+      const sweep = await commitCacheCloneIfDirty(cachePath, id);
       if (sweep.committed) {
         logger.info(
           `[sternsystem.sync] auto-committed dirty operational files (${sweep.commitSha?.slice(0, 8)})`,
@@ -128,7 +125,7 @@ export async function runSternsystemSync(
       // If the bare repo received unexpected commits after the last fetch,
       // --force-with-lease rejects the push (safe). This fixes non-fast-forward
       // errors caused by divergent histories between cache and bare.
-      git(cachePath, `push --force-with-lease origin ${branchName}`);
+      await git(cachePath, ["push", "--force-with-lease", "origin", branchName], context.io);
     } catch (err) {
       logger.warn(
         `[sternsystem.sync] cache-to-bare push failed (non-fatal): ${(err as Error).message}`,
@@ -145,7 +142,7 @@ export async function runSternsystemSync(
   }
 
   const refSpec = syncAll ? "--all" : branchName;
-  const tagSpec = syncAll ? " --tags" : "";
+  const pushRefs = syncAll ? ["--all", "--tags"] : [branchName];
 
   const warnings: string[] = [];
 
@@ -153,7 +150,7 @@ export async function runSternsystemSync(
   // what content was synced, not the bordbuch commit itself.
   let commitSha: string;
   try {
-    commitSha = git(bareRepoPath, "rev-parse HEAD");
+    commitSha = await git(bareRepoPath, ["rev-parse", "HEAD"], context.io);
   } catch {
     commitSha = "";
   }
@@ -191,22 +188,20 @@ export async function runSternsystemSync(
   for (let i = 0; i < mirrorUrls.length; i++) {
     const mirrorUrl = mirrorUrls[i];
     const remoteName = `mirror-${i}`;
-    const currentRemoteUrl = (() => {
-      try {
-        return git(bareRepoPath, `remote get-url ${remoteName}`);
-      } catch {
-        return null;
-      }
-    })();
+    const currentRemoteUrl = await git(
+      bareRepoPath,
+      ["remote", "get-url", remoteName],
+      context.io,
+    ).catch(() => null);
 
     if (currentRemoteUrl === null) {
       logger.info(`[sternsystem.sync] adding remote '${remoteName}' → ${mirrorUrl}`);
-      git(bareRepoPath, `remote add ${remoteName} ${mirrorUrl}`);
+      await git(bareRepoPath, ["remote", "add", remoteName, mirrorUrl], context.io);
     } else if (currentRemoteUrl !== mirrorUrl) {
       logger.info(
         `[sternsystem.sync] updating remote '${remoteName}' URL: ${currentRemoteUrl} → ${mirrorUrl}`,
       );
-      git(bareRepoPath, `remote set-url ${remoteName} ${mirrorUrl}`);
+      await git(bareRepoPath, ["remote", "set-url", remoteName, mirrorUrl], context.io);
     }
 
     if (direction === "push") {
@@ -218,15 +213,19 @@ export async function runSternsystemSync(
         // (edits-only-through-missions invariant) while protecting against
         // true concurrent pushes between fetch and push.
         try {
-          git(bareRepoPath, `fetch ${remoteName}`);
+          await git(bareRepoPath, ["fetch", remoteName], context.io);
         } catch {
           // First push or network issue — no tracking ref, proceed below
         }
         try {
-          git(bareRepoPath, `push --force-with-lease ${remoteName} ${refSpec}${tagSpec}`);
+          await git(
+            bareRepoPath,
+            ["push", "--force-with-lease", remoteName, ...pushRefs],
+            context.io,
+          );
         } catch {
           // Fallback: plain push (first push, no remote ref to lease against)
-          git(bareRepoPath, `push ${remoteName} ${refSpec}${tagSpec}`);
+          await git(bareRepoPath, ["push", remoteName, ...pushRefs], context.io);
         }
       } catch (err) {
         const stderr = (err as Error).message;
@@ -243,7 +242,7 @@ export async function runSternsystemSync(
   for (const bundleMirror of bundleMirrors) {
     const bundlePath = path.join(tmpdir(), `${id}-${Date.now()}.bundle`);
     try {
-      git(bareRepoPath, `bundle create "${bundlePath}" --all`);
+      await git(bareRepoPath, ["bundle", "create", bundlePath, "--all"], context.io);
       logger.info(`[sternsystem.sync] created bundle for ${bundleMirror.path}`);
       // Copy bundle to backup endpoint (non-git protocols: ftp, s3, rsync)
       // For file-based bundle mirrors, copy directly
@@ -253,8 +252,8 @@ export async function runSternsystemSync(
         bundleMirror.path.startsWith("/")
       ) {
         const destPath = resolveMirrorPath(workspaceRoot, bundleMirror.path);
-        await fs.mkdir(path.dirname(destPath), { recursive: true });
-        await fs.copyFile(bundlePath, destPath);
+        await context.io.mkdir(path.dirname(destPath));
+        await context.io.copyFile(bundlePath, destPath);
         logger.info(`[sternsystem.sync] copied bundle to ${destPath}`);
       } else {
         // Non-file protocols (ftp, s3, rsync) — log as warning (external tool required)
@@ -271,7 +270,7 @@ export async function runSternsystemSync(
       logger.warn(`[sternsystem.sync] ${msg}`);
     } finally {
       // Cleanup temp bundle
-      await fs.rm(bundlePath, { force: true }).catch(() => {});
+      await context.io.rm(bundlePath).catch(() => {});
     }
   }
 
@@ -283,8 +282,8 @@ export async function runSternsystemSync(
   // external mirrors are in sync.
   if (externalMirrors.length > 0 && !syncAll) {
     try {
-      const headSha = git(bareRepoPath, `rev-parse ${branchName}`);
-      git(bareRepoPath, `update-ref refs/mirror/${branchName} ${headSha}`);
+      const headSha = await git(bareRepoPath, ["rev-parse", branchName], context.io);
+      await git(bareRepoPath, ["update-ref", `refs/mirror/${branchName}`, headSha], context.io);
       logger.info(`[sternsystem.sync] updated refs/mirror/${branchName} → ${headSha.slice(0, 12)}`);
     } catch (err) {
       warnings.push(`Failed to update refs/mirror/${branchName}: ${(err as Error).message}`);

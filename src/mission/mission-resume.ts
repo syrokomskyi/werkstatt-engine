@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial mission.resume command handler.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -70,7 +71,7 @@ export async function runMissionResume(
     };
   }
 
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const journalPath = path.join(missionDir, "journal.jsonl");
 
   const manifest = await readMissionManifest(workspaceRoot, missionId);

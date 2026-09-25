@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0715: add nachweis-signed and nachweis-timestamped to nachweis writer-role for N3 crypto verification.</item>
   <item>RFC-0724: add DEPRECATED_KIND_MIGRATIONS for forward-only kind renames (release-published -> release-ready).</item>
   <item>RFC-0994: add redactForBordbuch to strip git remote URLs before sensitive payload check.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0355, RFC-0473, RFC-0477, RFC-0574, RFC-0580, RFC-0583, RFC-0706</history>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <history>RFC-0355, RFC-0473, RFC-0477, RFC-0574, RFC-0580, RFC-0583, RFC-0706, RFC-0715</history>
 </CHANGE_SUMMARY>
 */
 
@@ -457,11 +457,11 @@ export async function commitAndPushBordbuch(
   const statusPath = path.join("bordbuch", "status.generated.yaml");
 
   try {
-    gitExec(systemDir, `add ${bordbuchPath}`);
+    await gitExec(systemDir, `add ${bordbuchPath}`);
     // Also commit bordbuch/status.generated.yaml if it exists (RFC-0597 fix: prevent dirty cache clone)
     if (await io.exists(path.join(systemDir, statusPath))) {
       try {
-        gitExec(systemDir, `add ${statusPath}`);
+        await gitExec(systemDir, `add ${statusPath}`);
       } catch {
         // status.generated.yaml may not exist or may be gitignored — non-fatal
       }
@@ -472,8 +472,8 @@ export async function commitAndPushBordbuch(
 
   let commitSha: string | null = null;
   try {
-    cacheCloneCommit(systemDir, message);
-    commitSha = gitExec(systemDir, "rev-parse HEAD");
+    await cacheCloneCommit(systemDir, message);
+    commitSha = await gitExec(systemDir, "rev-parse HEAD");
   } catch {
     return { commitSha: null, pushed: false, error: null };
   }
@@ -484,12 +484,12 @@ export async function commitAndPushBordbuch(
   // then refs/remotes/origin/HEAD (remote default for detached HEAD), then main.
   let branch = "main";
   try {
-    const ref = gitExec(systemDir, "symbolic-ref --short HEAD", { allowNonZero: true });
+    const ref = await gitExec(systemDir, "symbolic-ref --short HEAD", { allowNonZero: true });
     branch = ref.trim() || "main";
   } catch {
     // Detached HEAD — try remote default
     try {
-      const ref = gitExec(systemDir, "symbolic-ref --short refs/remotes/origin/HEAD", {
+      const ref = await gitExec(systemDir, "symbolic-ref --short refs/remotes/origin/HEAD", {
         allowNonZero: true,
       });
       branch = ref.replace("origin/", "").trim() || "main";
@@ -501,22 +501,22 @@ export async function commitAndPushBordbuch(
   let stashed = false;
   try {
     try {
-      gitExec(systemDir, "stash push -m bordbuch-pull-rebase");
+      await gitExec(systemDir, "stash push -m bordbuch-pull-rebase");
       stashed = true;
     } catch {
       // No changes to stash — proceed with pull
     }
-    gitExec(systemDir, `pull --rebase origin ${branch}`);
+    await gitExec(systemDir, `pull --rebase origin ${branch}`);
     if (stashed) {
       try {
-        gitExec(systemDir, "stash pop");
+        await gitExec(systemDir, "stash pop");
         stashed = false;
       } catch {
         // Stash pop failed — drop the stash to prevent accumulation.
         // The stashed changes are lost, but they were auto-generated
         // (bordbuch/status files) and will be recreated on next commit.
         try {
-          gitExec(systemDir, "stash drop");
+          await gitExec(systemDir, "stash drop");
           stashed = false;
         } catch {
           // Stash may have been already popped — ignore
@@ -526,13 +526,13 @@ export async function commitAndPushBordbuch(
     // RFC-0987 Fix 5: use --force-with-lease to safely overwrite diverged bare repo
     // history. The cache clone is the source of truth (RFC-0480); --force-with-lease
     // rejects the push if the remote HEAD changed unexpectedly.
-    gitExec(systemDir, `push --force-with-lease origin ${branch}`);
+    await gitExec(systemDir, `push --force-with-lease origin ${branch}`);
     return { commitSha, pushed: true, error: null };
   } catch (err) {
     // RFC-0987 Fix 1: abort any in-progress rebase to prevent stale rebase-merge
     // state from blocking subsequent git operations (e.g. mission.open bordbuch.repair).
     try {
-      gitExec(systemDir, "rebase --abort");
+      await gitExec(systemDir, "rebase --abort");
     } catch {
       // If git rebase --abort fails, manually remove the rebase state directories
       try {
@@ -545,7 +545,7 @@ export async function commitAndPushBordbuch(
     // Clean up stash on push failure too
     if (stashed) {
       try {
-        gitExec(systemDir, "stash drop");
+        await gitExec(systemDir, "stash drop");
       } catch {
         // Ignore — stash may not exist
       }

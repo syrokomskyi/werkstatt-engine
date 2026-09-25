@@ -14,6 +14,7 @@ pass/fail status with restore commands for missing files.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0844: initial workpiece.config.presence.check command handler.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -66,7 +67,7 @@ export async function runWorkpieceConfigPresenceCheck(
   const missionId = flagString(input, "mission");
   if (!missionId) throw new Error("[workpiece.config.presence.check] --mission is required");
 
-  const missionDir = resolveMissionDir(workspaceRoot, missionId);
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDir = path.join(missionDir, "workpiece");
 
   if (!await context.io.exists(workpieceDir)) {

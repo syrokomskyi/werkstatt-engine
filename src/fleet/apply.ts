@@ -15,11 +15,10 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0964: initial fleet.apply implementation — wave orchestration, concurrency, stop-threshold, journal, report.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync, statSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type {
@@ -37,7 +36,7 @@ import {
 } from "../sternsystem/registry-io.ts";
 import { appendRecord, readJournal } from "../journal/jsonl.ts";
 import type { FleetSiteRecord } from "./fleet-sites-generate.ts";
-import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FLEET_SITES_FILE = "fleet/fleet.sites.yaml";
 const FLEET_OPERATIONS_DIR = "fleet/operations";
@@ -91,10 +90,10 @@ function flagInt(input: KernelCommandInput, key: string, def: number): number {
   return def;
 }
 
-async function loadFleetSites(workspaceRoot: string): Promise<FleetSiteRecord[]> {
+async function loadFleetSites(workspaceRoot: string, io: WorkspaceIO): Promise<FleetSiteRecord[]> {
   const filePath = join(workspaceRoot, FLEET_SITES_FILE);
-  if (!existsSync(filePath)) return [];
-  const raw = await readFile(filePath, "utf8");
+  if (!(await io.exists(filePath))) return [];
+  const raw = await io.readFile(filePath);
   // Strip GENERATED header
   const markerIdx = raw.indexOf("\n---\n");
   const body = markerIdx >= 0 ? raw.slice(markerIdx + 5) : raw;
@@ -103,16 +102,20 @@ async function loadFleetSites(workspaceRoot: string): Promise<FleetSiteRecord[]>
   return yamlParsed.sites ?? [];
 }
 
-function isRegistryStale(workspaceRoot: string, systems: { id: string }[]): boolean {
+async function isRegistryStale(
+  workspaceRoot: string,
+  systems: { id: string }[],
+  io: WorkspaceIO,
+): Promise<boolean> {
   const fleetPath = join(workspaceRoot, FLEET_SITES_FILE);
-  if (!existsSync(fleetPath)) return true;
-  const fleetMtime = statSync(fleetPath).mtimeMs;
+  if (!(await io.exists(fleetPath))) return true;
+  const fleetMtime = (await io.stat(fleetPath)).mtimeMs;
   const now = Date.now();
   if (now - fleetMtime > STALENESS_THRESHOLD_MS) return true;
   for (const sys of systems) {
     const configPath = join(resolveCacheClonePath(workspaceRoot, sys.id), "system-config.yaml");
-    if (existsSync(configPath)) {
-      const configMtime = statSync(configPath).mtimeMs;
+    if (await io.exists(configPath)) {
+      const configMtime = (await io.stat(configPath)).mtimeMs;
       if (configMtime > fleetMtime) return true;
     }
   }
@@ -362,10 +365,10 @@ export async function runFleetApply(
   let sites: FleetSiteRecord[];
   const { systems } = await discoverSystems(workspaceRoot);
 
-  if (isRegistryStale(workspaceRoot, systems)) {
+  if (await isRegistryStale(workspaceRoot, systems, context.io)) {
     sites = await regenerateRegistry(workspaceRoot, logger);
   } else {
-    sites = await loadFleetSites(workspaceRoot);
+    sites = await loadFleetSites(workspaceRoot, context.io);
     if (sites.length === 0 && systems.length > 0) {
       sites = await regenerateRegistry(workspaceRoot, logger);
     }
@@ -444,11 +447,11 @@ export async function runFleetApply(
   // Journal setup
   const opId = resumeOpId ?? randomUUID();
   const journalPath = join(workspaceRoot, FLEET_OPERATIONS_DIR, `${opId}.jsonl`);
-  await mkdir(dirname(journalPath), { recursive: true });
+  await context.io.mkdir(dirname(journalPath));
 
   // Resume: load completed sites from journal
   const completedSites = new Set<string>();
-  if (resumeOpId && existsSync(journalPath)) {
+  if (resumeOpId && (await context.io.exists(journalPath))) {
     const records = await readJournal(journalPath);
     for (const rec of records) {
       if (rec.kind === "step-done") {
@@ -474,9 +477,9 @@ export async function runFleetApply(
   // Preflight: Cloudflare worker count
   try {
     const servicesPath = join(workspaceRoot, "services", "registry.yaml");
-    if (existsSync(servicesPath)) {
+    if (await context.io.exists(servicesPath)) {
       const { parse: parseYaml } = await import("yaml");
-      const raw = await readFile(servicesPath, "utf8");
+      const raw = await context.io.readFile(servicesPath);
       const parsed = parseYaml(raw) as { services?: unknown[] };
       const workerCount = parsed.services?.length ?? 0;
       const totalWorkers = workerCount + sites.length;
@@ -570,8 +573,8 @@ export async function runFleetApply(
 
   // Persist report
   const reportPath = join(workspaceRoot, FLEET_REPORTS_DIR, `${opId}.json`);
-  await mkdir(dirname(reportPath), { recursive: true });
-  await writeFile(reportPath, JSON.stringify(result, null, 2), "utf8");
+  await context.io.mkdir(dirname(reportPath));
+  await context.io.writeFile(reportPath, JSON.stringify(result, null, 2));
 
   return {
     exitCode: result.exitCode,

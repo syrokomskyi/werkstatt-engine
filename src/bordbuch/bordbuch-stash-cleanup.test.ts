@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>Initial: regression test for stash drop after failed pop and on push failure.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -90,7 +91,7 @@ const gitCallsNoStash = vi.hoisted(() => ({
 
 test("no stash drop when nothing was stashed", async () => {
   vi.mocked(await import("../werkstatt/git-exec.ts")).gitExec.mockImplementationOnce(
-    (cwd: string, args: string) => {
+    async (cwd: string, args: string) => {
       gitCallsNoStash.calls.push(args);
       if (args === "stash push -m bordbuch-pull-rebase") {
         throw new Error("no changes to stash");

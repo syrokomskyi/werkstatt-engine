@@ -15,21 +15,26 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import path from "node:path";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const MISSIONS_DIR = "missions";
 
-export function resolveMissionDir(workspaceRoot: string, missionId: string): string {
+export async function resolveMissionDir(
+  workspaceRoot: string,
+  missionId: string,
+  io: WorkspaceIO,
+): Promise<string> {
   const primary = path.join(workspaceRoot, MISSIONS_DIR, missionId);
-  if (existsSync(primary)) return primary;
+  if (await io.exists(primary)) return primary;
 
   for (const state of ["closed", "aborted"]) {
     const archived = path.join(workspaceRoot, MISSIONS_DIR, "archive", state, missionId);
-    if (existsSync(archived)) return archived;
+    if (await io.exists(archived)) return archived;
   }
 
   return primary;

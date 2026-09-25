@@ -10,30 +10,36 @@
   <item>RFC-0580: extract gitExec from bordbuch-io.ts into shared utility with allowNonZero option.</item>
   <item>RFC-0646: add gitExecWithRetry companion with RetryOptions for transient-failure resilience.</item>
   <item>RFC-0794: add optional env parameter to gitExec and gitExecWithRetry for passing environment variables (e.g. ECOSYSTEM_COMMIT=1) to git commands.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export function gitExec(
+export async function gitExec(
   cwd: string,
   args: string,
   options?: { allowNonZero?: boolean; env?: NodeJS.ProcessEnv },
-): string {
-  try {
-    return execSync(`git ${args}`, {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 30_000,
-      ...(options?.env ? { env: options.env } : {}),
-    }).trim();
-  } catch (err) {
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  const env = options?.env
+    ? (Object.fromEntries(Object.entries(options.env).filter(([, v]) => v !== undefined)) as Record<
+        string,
+        string
+      >)
+    : undefined;
+  const result = await io.exec("sh", ["-c", `git ${args}`], {
+    cwd,
+    timeoutMs: 30_000,
+    env,
+  });
+  if (result.exitCode !== 0) {
     if (options?.allowNonZero) {
       return "";
     }
-    throw err;
+    throw new Error(`git ${args} failed (${result.exitCode}): ${result.stderr}`);
   }
+  return result.stdout.trim();
 }
 
 export interface RetryOptions {
@@ -65,11 +71,12 @@ export async function gitExecWithRetry(
   args: string,
   retryOptions: RetryOptions,
   options?: { allowNonZero?: boolean; env?: NodeJS.ProcessEnv },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= retryOptions.backoffMs.length; attempt++) {
     try {
-      return gitExec(cwd, args, options);
+      return await gitExec(cwd, args, options, io);
     } catch (err) {
       lastError = err;
       if (!isTransientError(err)) throw err;

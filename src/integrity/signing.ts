@@ -15,6 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 
 /**
@@ -38,6 +39,7 @@ import {
 } from "@warpgogol/werkstatt-engine/signing";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { ensureDir, pathExists, readBuffer, readText, writeText } from "./fs.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { readJsonFile, stableStringify } from "./json.ts";
 import {
   buildLatestDir,
@@ -207,7 +209,9 @@ export async function signLatestBuildArtifacts(args: {
   cwd: string;
   privateKeyPem: string;
   publicKeyUrl?: string;
+  io?: WorkspaceIO;
 }): Promise<ReleaseSignatureArtifacts> {
+  const io = args.io ?? createDefaultIO().io;
   const { outputs, outputsRaw, provenance, provenanceRaw } = await loadBuildArtifactsForSigning(
     args.cwd,
   );
@@ -223,7 +227,7 @@ export async function signLatestBuildArtifacts(args: {
   });
 
   const existingManifestPath = signedManifestPath(args.cwd);
-  if (await pathExists(existingManifestPath)) {
+  if (await pathExists(existingManifestPath, io)) {
     const existingManifest = await readJsonFile<SignedManifest>(existingManifestPath);
     const digestsMatch =
       existingManifest.buildId === nextPayload.buildId &&
@@ -265,14 +269,12 @@ export async function signLatestBuildArtifacts(args: {
     publicKeyUrl: args.publicKeyUrl,
   };
 
-  await ensureDir(buildLatestDir(args.cwd));
+  await ensureDir(buildLatestDir(args.cwd), io);
   await Promise.all([
-    writeText(signatureHexPath(args.cwd), `${signed.signatureHex}\n`),
-    writeText(signedManifestPath(args.cwd), stableStringify(signedManifest)),
+    writeText(signatureHexPath(args.cwd), `${signed.signatureHex}\n`, io),
+    writeText(signedManifestPath(args.cwd), stableStringify(signedManifest), io),
+    io.writeFile(signatureBinaryPath(args.cwd), signed.signatureBuffer),
   ]);
-  await import("node:fs/promises").then(({ writeFile }) =>
-    writeFile(signatureBinaryPath(args.cwd), signed.signatureBuffer),
-  );
 
   return {
     outputs,

@@ -53,7 +53,7 @@ describe("runBootSmoke integration (ADR-0067)", () => {
     try {
       createMinimalWorkerFixture(distDir);
       const wranglerConfigPath = join(distDir, "server", "wrangler.json");
-      const requests = planBootSmokeRequests({ distDir, languages: ["de"] });
+      const requests = await planBootSmokeRequests({ distDir, languages: ["de"] });
 
       const result = await runBootSmoke({
         distDir: join(distDir, "server"),
@@ -140,7 +140,7 @@ describe("runBootSmoke integration (ADR-0067)", () => {
     try {
       createMinimalWorkerFixture(distDir);
       const wranglerConfigPath = join(distDir, "server", "wrangler.json");
-      const requests = planBootSmokeRequests({ distDir, languages: ["de"] });
+      const requests = await planBootSmokeRequests({ distDir, languages: ["de"] });
 
       await runBootSmoke({
         distDir: join(distDir, "server"),

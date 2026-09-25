@@ -11,6 +11,7 @@
   <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -82,8 +83,8 @@ export async function runValidatePostbuild(
   let siteName: string;
 
   if (missionId) {
-    const manifest = await readMissionManifest(workspaceRoot, missionId);
-    const missionDir = resolveMissionDir(workspaceRoot, missionId);
+    const manifest = await readMissionManifest(workspaceRoot, missionId, context.io);
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
     const workpieceDir = path.join(missionDir, "workpiece");
     siteName = manifest.systemId;
     siteWorkspace = {

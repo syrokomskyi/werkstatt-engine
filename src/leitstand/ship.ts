@@ -14,12 +14,10 @@
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import type {
@@ -60,6 +58,7 @@ export interface ShipContext {
   cacheCloneDir: string;
   releaseId: string | null;
   logger: KernelRuntimeContext["logger"];
+  io: KernelRuntimeContext["io"];
 }
 
 export interface ShipResult {
@@ -158,7 +157,7 @@ function buildPreflightStep(): OperationStep<ShipContext> {
 
       // 4. Env vars presence check
       const envPath = path.join(ctx.workpieceDir, ".env");
-      if (!existsSync(envPath)) {
+      if (!(await ctx.io.exists(envPath))) {
         throw new Error(`preflight: .env file not found in workpiece ${ctx.workpieceDir}`);
       }
       ctx.logger.info("  [ship] preflight: env vars presence check ok");
@@ -167,38 +166,29 @@ function buildPreflightStep(): OperationStep<ShipContext> {
       // Warns if cache clone HEAD and bare repo HEAD have diverged —
       // mirror sync will fail with non-fast-forward in this case.
       const cacheDir = ctx.cacheCloneDir;
-      if (existsSync(path.join(cacheDir, ".git"))) {
-        try {
-          const cacheHead = execSync("git rev-parse HEAD", {
-            cwd: cacheDir,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          }).trim();
-          const bareDir = path.resolve(ctx.workspaceRoot, "..", "systems-git", ctx.systemId);
-          if (existsSync(bareDir)) {
-            try {
-              const bareHead = execSync("git rev-parse master", {
-                cwd: bareDir,
-                encoding: "utf-8",
-                stdio: ["pipe", "pipe", "pipe"],
-              }).trim();
-              if (cacheHead !== bareHead) {
-                ctx.logger.info(
-                  `  [ship] preflight: WARN cache clone and bare repo have diverged (cache=${cacheHead.slice(0, 8)}, bare=${bareHead.slice(0, 8)}) — mirror sync may fail with non-fast-forward`,
-                );
-              } else {
-                ctx.logger.info("  [ship] preflight: cache-clone git divergence check ok");
-              }
-            } catch {
-              ctx.logger.info(
-                "  [ship] preflight: cache-clone git divergence check skipped (bare repo unreadable)",
-              );
-            }
-          }
-        } catch {
+      if (await ctx.io.exists(path.join(cacheDir, ".git"))) {
+        const cacheHeadResult = await ctx.io.exec("git", ["rev-parse", "HEAD"], { cwd: cacheDir });
+        const cacheHead = cacheHeadResult.exitCode === 0 ? cacheHeadResult.stdout.trim() : "";
+        const bareDir = path.resolve(ctx.workspaceRoot, "..", "systems-git", ctx.systemId);
+        if (!cacheHead) {
           ctx.logger.info(
             "  [ship] preflight: cache-clone git divergence check skipped (cache clone unreadable)",
           );
+        } else if (await ctx.io.exists(bareDir)) {
+          const bareHeadResult = await ctx.io.exec("git", ["rev-parse", "master"], {
+            cwd: bareDir,
+          });
+          if (bareHeadResult.exitCode !== 0) {
+            ctx.logger.info(
+              "  [ship] preflight: cache-clone git divergence check skipped (bare repo unreadable)",
+            );
+          } else if (cacheHead !== bareHeadResult.stdout.trim()) {
+            ctx.logger.info(
+              `  [ship] preflight: WARN cache clone and bare repo have diverged (cache=${cacheHead.slice(0, 8)}, bare=${bareHeadResult.stdout.trim().slice(0, 8)}) — mirror sync may fail with non-fast-forward`,
+            );
+          } else {
+            ctx.logger.info("  [ship] preflight: cache-clone git divergence check ok");
+          }
         }
       }
     },
@@ -217,10 +207,10 @@ function buildMissionValidateStep(): OperationStep<ShipContext> {
       }
 
       // Self-healing: check for uncommitted generated files after validate
-      const gitStatus = execSync("git status --porcelain", {
+      const statusResult = await ctx.io.exec("git", ["status", "--porcelain"], {
         cwd: ctx.workpieceDir,
-        encoding: "utf-8",
-      }).trim();
+      });
+      const gitStatus = statusResult.exitCode === 0 ? statusResult.stdout.trim() : "";
 
       if (gitStatus !== "") {
         ctx.logger.info(
@@ -426,11 +416,15 @@ export function buildShipPlan(input: {
 
 // ─── Command handler ─────────────────────────────────────────────────────────
 
-function checkMissionClosed(workspaceRoot: string, missionId: string): boolean {
+async function checkMissionClosed(
+  workspaceRoot: string,
+  missionId: string,
+  io: KernelRuntimeContext["io"],
+): Promise<boolean> {
   const missionYamlPath = path.join(workspaceRoot, "missions", missionId, "mission.yaml");
-  if (!existsSync(missionYamlPath)) return false;
+  if (!(await io.exists(missionYamlPath))) return false;
   try {
-    const raw = readFileSync(missionYamlPath, "utf-8");
+    const raw = await io.readFile(missionYamlPath);
     const parsed = parseYaml(raw) as { state?: string };
     return parsed.state === "closed";
   } catch {
@@ -501,11 +495,11 @@ export async function runLeitstandShip(
   const journalPath = path.join(operationsDir, `ship-${missionId}.jsonl`);
 
   // Lazily create operations directory
-  await fs.mkdir(operationsDir, { recursive: true });
+  await context.io.mkdir(operationsDir);
 
   // --force: delete stale ship journal to start fresh
-  if (isForce && await context.io.exists(journalPath)) {
-    await fs.unlink(journalPath);
+  if (isForce && (await context.io.exists(journalPath))) {
+    await context.io.rm(journalPath);
     logger.info(`  [ship] --force: deleted stale journal ${journalPath}`);
   }
 
@@ -517,10 +511,11 @@ export async function runLeitstandShip(
     cacheCloneDir,
     releaseId: null,
     logger,
+    io: context.io,
   };
 
   // Detect mission state — if already closed, skip lifecycle phases
-  const missionClosed = checkMissionClosed(workspaceRoot, missionId);
+  const missionClosed = await checkMissionClosed(workspaceRoot, missionId, context.io);
   if (missionClosed) {
     logger.info(
       `  [ship] mission ${missionId} is closed — skipping lifecycle phases (validate, reconcile, close)`,

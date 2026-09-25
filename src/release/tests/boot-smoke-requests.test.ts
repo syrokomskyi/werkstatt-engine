@@ -6,18 +6,18 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 describe("planBootSmokeRequests", () => {
-  it("always includes root route", () => {
+  it("always includes root route", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-root-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     const root = requests.find((r) => r.path === "/");
     expect(root).toBeDefined();
     expect(root!.kind).toBe("page");
     expect(root!.expectStatus).toEqual([200]);
   });
 
-  it("includes one route per language", () => {
+  it("includes one route per language", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-perlang-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "uk"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "uk"] });
     const deRoute = requests.find((r) => r.path === "/de/");
     const ukRoute = requests.find((r) => r.path === "/uk/");
     expect(deRoute).toBeDefined();
@@ -27,105 +27,105 @@ describe("planBootSmokeRequests", () => {
     expect(ukRoute!.kind).toBe("page");
   });
 
-  it("includes no language routes when languages is empty", () => {
+  it("includes no language routes when languages is empty", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-nolang-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     expect(requests.filter((r) => r.kind === "page" && r.path !== "/")).toHaveLength(0);
   });
 
-  it("includes API route when dist/client/api/ exists", () => {
+  it("includes API route when dist/client/api/ exists", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-api-"));
     mkdirSync(join(tmpDist, "client", "api"), { recursive: true });
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
     const apiRoute = requests.find((r) => r.kind === "api");
     expect(apiRoute).toBeDefined();
     expect(apiRoute!.path).toBe("/api/");
     expect(apiRoute!.expectStatus).toEqual([200, 404]);
   });
 
-  it("omits API route when dist/client/api/ does not exist", () => {
+  it("omits API route when dist/client/api/ does not exist", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-noapi-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
     expect(requests.find((r) => r.kind === "api")).toBeUndefined();
   });
 
-  it("includes favicon asset route when dist/client/ exists", () => {
+  it("includes favicon asset route when dist/client/ exists", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-fav-"));
     mkdirSync(join(tmpDist, "client"), { recursive: true });
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     const assetRoute = requests.find((r) => r.kind === "asset");
     expect(assetRoute).toBeDefined();
     expect(assetRoute!.path).toBe("/favicon.ico");
     expect(assetRoute!.expectStatus).toEqual([200, 404]);
   });
 
-  it("omits favicon route when dist/client/ does not exist", () => {
+  it("omits favicon route when dist/client/ does not exist", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-noclient-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     expect(requests.find((r) => r.kind === "asset")).toBeUndefined();
   });
 
-  it("always includes 404 probe", () => {
+  it("always includes 404 probe", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-404-"));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     const notFound = requests.find((r) => r.kind === "not-found");
     expect(notFound).toBeDefined();
     expect(notFound!.path).toBe("/__boot-smoke-404-probe__");
     expect(notFound!.expectStatus).toEqual([404]);
   });
 
-  it("includes page route from surface.generated.json when it exists", () => {
+  it("includes page route from surface.generated.json when it exists", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-surf-"));
     const surface = [{ path: "/about", kind: "page" }];
     writeFileSync(join(tmpDist, "surface.generated.json"), JSON.stringify(surface));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     const aboutRoute = requests.find((r) => r.path === "/about");
     expect(aboutRoute).toBeDefined();
     expect(aboutRoute!.kind).toBe("page");
     expect(aboutRoute!.expectStatus).toEqual([200]);
   });
 
-  it("does not duplicate root route from surface.generated.json", () => {
+  it("does not duplicate root route from surface.generated.json", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-surfroot-"));
     const surface = [{ path: "/", kind: "page" }];
     writeFileSync(join(tmpDist, "surface.generated.json"), JSON.stringify(surface));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: [] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: [] });
     const rootRoutes = requests.filter((r) => r.path === "/");
     expect(rootRoutes).toHaveLength(1);
   });
 
-  it("does not duplicate routes already present from language planning", () => {
+  it("does not duplicate routes already present from language planning", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-nodup-"));
     const surface = [{ path: "/de/", kind: "page" }];
     writeFileSync(join(tmpDist, "surface.generated.json"), JSON.stringify(surface));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
     const deRoutes = requests.filter((r) => r.path === "/de/");
     expect(deRoutes).toHaveLength(1);
   });
 
-  it("handles unparseable surface.generated.json gracefully", () => {
+  it("handles unparseable surface.generated.json gracefully", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-badsurf-"));
     writeFileSync(join(tmpDist, "surface.generated.json"), "{invalid json");
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de"] });
     expect(requests.find((r) => r.path === "/")).toBeDefined();
     expect(requests.find((r) => r.path === "/de/")).toBeDefined();
   });
 
-  it("produces no duplicate paths across all request sources", () => {
+  it("produces no duplicate paths across all request sources", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-nodups-"));
     mkdirSync(join(tmpDist, "client", "api"), { recursive: true });
     const surface = [{ path: "/about", kind: "page" }];
     writeFileSync(join(tmpDist, "surface.generated.json"), JSON.stringify(surface));
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "uk"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "uk"] });
     const paths = requests.map((r) => r.path);
     const uniquePaths = new Set(paths);
     expect(paths.length).toBe(uniquePaths.size);
   });
 
-  it("includes at least root, 404 probe, and language routes for a typical site", () => {
+  it("includes at least root, 404 probe, and language routes for a typical site", async () => {
     const tmpDist = mkdtempSync(join(tmpdir(), "boot-smoke-req-typical-"));
     mkdirSync(join(tmpDist, "client"), { recursive: true });
-    const requests = planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "uk"] });
+    const requests = await planBootSmokeRequests({ distDir: tmpDist, languages: ["de", "uk"] });
     const paths = requests.map((r) => r.path);
     expect(paths).toContain("/");
     expect(paths).toContain("/de/");

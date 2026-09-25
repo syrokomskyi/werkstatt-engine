@@ -22,6 +22,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -70,7 +71,7 @@ export async function runGitMeshStatus(
     };
   }
 
-  const localSha = await gitRevParseHead(workspaceRoot).catch(() => "");
+  const localSha = await gitRevParseHead(workspaceRoot, context.io).catch(() => "");
 
   // Find the latest remote-tracking branch by committer timestamp
   let remoteSha = "";
@@ -78,8 +79,8 @@ export async function runGitMeshStatus(
 
   for (const remote of config.remotes) {
     try {
-      const sha = await gitRevParseRemote(remote.name, config.trackedBranch, workspaceRoot);
-      const timestamp = await gitCommitTimestamp(sha, workspaceRoot);
+      const sha = await gitRevParseRemote(remote.name, config.trackedBranch, workspaceRoot, context.io);
+      const timestamp = await gitCommitTimestamp(sha, workspaceRoot, context.io);
       if (timestamp > latestTimestamp) {
         latestTimestamp = timestamp;
         remoteSha = sha;
@@ -93,8 +94,8 @@ export async function runGitMeshStatus(
   let ahead = 0;
 
   if (remoteSha && localSha) {
-    behind = await gitRevListCount(localSha, remoteSha, workspaceRoot).catch(() => 0);
-    ahead = await gitRevListCount(remoteSha, localSha, workspaceRoot).catch(() => 0);
+    behind = await gitRevListCount(localSha, remoteSha, workspaceRoot, context.io).catch(() => 0);
+    ahead = await gitRevListCount(remoteSha, localSha, workspaceRoot, context.io).catch(() => 0);
   }
 
   // Read last sync time

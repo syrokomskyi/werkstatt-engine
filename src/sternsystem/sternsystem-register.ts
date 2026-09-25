@@ -13,6 +13,7 @@ With --amend: update pin and open amend mission without creating a new registry 
   <item>RFC-0532: extend with pin creation, content stubs, mission.open, mission.materialize, --amend/--amend-id flags, and atomic rollback.</item>
   <item>RFC-0561: add --owner flag for VC subject id (did:web) on new registration and amend backfill.</item>
   <item>RFC-0902: reject TLD-suffixed IDs before writing any files.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -248,7 +249,7 @@ export async function runSternsystemRegister(
     throw new Error(`[sternsystem.register] cosmicStar '${cosmicStar}' is not in StarCatalog`);
   }
 
-  if (hasAppsCollision(workspaceRoot, id)) {
+  if (await hasAppsCollision(workspaceRoot, id, context.io)) {
     throw new Error(
       `[sternsystem.register] id '${id}' matches existing apps/${id}/ — extract first`,
     );
@@ -324,7 +325,7 @@ export async function runSternsystemRegister(
             `git add -A exited ${addResult.exitCode}: ${addResult.stderr.slice(0, 200)}`,
           );
         }
-        cacheCloneCommit(systemDir, `sternsystem.register: scaffold ${id}`);
+        await cacheCloneCommit(systemDir, `sternsystem.register: scaffold ${id}`);
         // Push to bare repo so syncCacheClone can fetch
         try {
           const pushResult = await context.io.exec("sh", ["-c", "git push origin main"], {

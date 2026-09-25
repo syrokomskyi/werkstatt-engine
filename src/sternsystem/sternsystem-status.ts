@@ -11,11 +11,11 @@
 <CHANGE_SUMMARY>
   <item>RFC-0477: initial sternsystem.status command handler.</item>
   <item>RFC-1063: add currentMission from system-state.yaml to status output.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { gitExec } from "../werkstatt/git-exec.ts";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -79,15 +79,6 @@ function flagBoolean(input: KernelCommandInput, key: string): boolean {
   return v === true || v === "true";
 }
 
-function gitExec(cwd: string, args: string): string {
-  return execSync(`git ${args}`, {
-    cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    timeout: 30_000,
-  }).trim();
-}
-
 function compareSha(
   a: string | null,
   b: string | null,
@@ -100,6 +91,7 @@ function compareSha(
 async function statusForSystem(
   workspaceRoot: string,
   systemId: string,
+  io: import("@warpgogol/werkstatt-shared/kernel/workspace-io").WorkspaceIO,
 ): Promise<SternsystemStatusData> {
   let config: Awaited<ReturnType<typeof readSystemConfig>> | null = null;
   try {
@@ -117,14 +109,14 @@ async function statusForSystem(
   let mirrorSha: string | null = null;
   let dirtyFiles: string[] = [];
 
-  if (existsSync(systemDir)) {
+  if (await io.exists(systemDir)) {
     try {
-      headSha = gitExec(systemDir, "rev-parse HEAD");
+      headSha = await gitExec(systemDir, "rev-parse HEAD", undefined, io);
     } catch {
       headSha = null;
     }
     try {
-      dirtyFiles = gitExec(systemDir, "status --porcelain")
+      dirtyFiles = (await gitExec(systemDir, "status --porcelain", undefined, io))
         .split("\n")
         .filter((l) => l.trim().length > 0)
         .map((l) => l.slice(3));
@@ -136,21 +128,24 @@ async function statusForSystem(
   if (config && config.mirrors.length > 1) {
     const bareMirror = config.mirrors[1];
     const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
-    if (existsSync(bareRepoPath)) {
+    if (await io.exists(bareRepoPath)) {
       let branch: string;
       try {
-        branch = gitExec(bareRepoPath, "symbolic-ref HEAD").replace("refs/heads/", "");
+        branch = (await gitExec(bareRepoPath, "symbolic-ref HEAD", undefined, io)).replace(
+          "refs/heads/",
+          "",
+        );
       } catch {
         branch = "main";
       }
       try {
-        originSha = gitExec(bareRepoPath, `rev-parse ${branch}`);
+        originSha = await gitExec(bareRepoPath, `rev-parse ${branch}`, undefined, io);
       } catch {
         originSha = null;
       }
       if (config.mirrors.length > 2) {
         try {
-          mirrorSha = gitExec(bareRepoPath, `rev-parse refs/mirror/${branch}`);
+          mirrorSha = await gitExec(bareRepoPath, `rev-parse refs/mirror/${branch}`, undefined, io);
         } catch {
           mirrorSha = null;
         }
@@ -258,7 +253,7 @@ export async function runSternsystemStatus(
     const results: SternsystemStatusData[] = [];
     for (const config of configs) {
       try {
-        const status = await statusForSystem(workspaceRoot, config.id);
+        const status = await statusForSystem(workspaceRoot, config.id, context.io);
         results.push(status);
       } catch {
         results.push({
@@ -289,7 +284,7 @@ export async function runSternsystemStatus(
     };
   }
 
-  const status = await statusForSystem(workspaceRoot, id!);
+  const status = await statusForSystem(workspaceRoot, id!, context.io);
   const mirrorInfo =
     status.git.originVsMirror === "sync"
       ? "mirror in sync"

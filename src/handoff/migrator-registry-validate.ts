@@ -8,10 +8,10 @@ registry for id uniqueness, RFC-id ordering, and test coverage.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0479: initial migrator.registry.validate command.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -25,10 +25,10 @@ export interface MigratorRegistryValidateData {
   violations: string[];
 }
 
-export function runMigratorRegistryValidate(
+export async function runMigratorRegistryValidate(
   _input: KernelCommandInput,
   context: KernelRuntimeContext,
-): KernelCommandResult<MigratorRegistryValidateData> {
+): Promise<KernelCommandResult<MigratorRegistryValidateData>> {
   const { workspaceRoot, logger } = context;
   const violations: string[] = [];
 
@@ -58,10 +58,10 @@ export function runMigratorRegistryValidate(
     const pbtTestPath = path.join(migratorDir, `${migrator.id}.pbt.test.ts`);
     const snapshotTestPath = path.join(migratorDir, `${migrator.id}.snapshot.test.ts`);
 
-    if (!existsSync(pbtTestPath)) {
+    if (!(await context.io.exists(pbtTestPath))) {
       violations.push(`missing PBT test: ${migrator.id}.pbt.test.ts`);
     }
-    if (!existsSync(snapshotTestPath)) {
+    if (!(await context.io.exists(snapshotTestPath))) {
       violations.push(`missing snapshot test: ${migrator.id}.snapshot.test.ts`);
     }
   }

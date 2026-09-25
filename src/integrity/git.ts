@@ -13,6 +13,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
 
@@ -21,11 +22,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
  * Provides file history, change detection, and repository metadata queries.
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import type { ChangedPaths, GitFileHistory } from "./types.ts";
-
-const execFileAsync = promisify(execFile);
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const DEFAULT_GIT_TIMEOUT_MS = 15_000;
 
@@ -33,30 +31,44 @@ interface RunGitOptions {
   timeoutMs?: number;
 }
 
-async function runGit(cwd: string, args: string[], options: RunGitOptions = {}): Promise<string> {
+async function runGit(
+  cwd: string,
+  args: string[],
+  io: WorkspaceIO,
+  options: RunGitOptions = {},
+): Promise<string> {
   const { timeoutMs = DEFAULT_GIT_TIMEOUT_MS } = options;
-  const { stdout } = await execFileAsync("git", args, {
-    cwd,
-    maxBuffer: 20 * 1024 * 1024,
-    timeout: timeoutMs,
-  });
-  return stdout.trimEnd();
+  const result = await io.exec("git", args, { cwd, timeoutMs });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `git ${args[0] ?? ""} failed (exit ${result.exitCode}): ${result.stderr.trim()}`,
+    );
+  }
+  return result.stdout.trimEnd();
 }
 
 function uniqueSorted(values: Iterable<string>): string[] {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
 }
 
-export async function getTrackedFiles(cwd: string): Promise<string[]> {
-  const output = await runGit(cwd, ["ls-files"]);
+export async function getTrackedFiles(
+  cwd: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
+  const output = await runGit(cwd, ["ls-files"], io);
   return output ? output.split("\n").filter(Boolean) : [];
 }
 
-export async function getFileHistory(cwd: string, repoPath: string): Promise<GitFileHistory> {
+export async function getFileHistory(
+  cwd: string,
+  repoPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<GitFileHistory> {
   try {
     const latestOutput = await runGit(
       cwd,
       ["log", "--follow", "-1", "--format=%aI%x09%H", "--", repoPath],
+      io,
       { timeoutMs: 10_000 },
     ).catch(() => "");
 
@@ -65,6 +77,7 @@ export async function getFileHistory(cwd: string, repoPath: string): Promise<Git
     const createdOutput = await runGit(
       cwd,
       ["log", "--follow", "--diff-filter=A", "--format=%aI", "--", repoPath],
+      io,
       { timeoutMs: 5_000 },
     ).catch(() => "");
 
@@ -79,11 +92,16 @@ export async function getFileHistory(cwd: string, repoPath: string): Promise<Git
   }
 }
 
-export async function getFileRevisionFromHistory(cwd: string, repoPath: string): Promise<number> {
+export async function getFileRevisionFromHistory(
+  cwd: string,
+  repoPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<number> {
   try {
     const output = await runGit(
       cwd,
       ["log", "--follow", "--diff-filter=AMT", "--format=%H", "--", repoPath],
+      io,
       { timeoutMs: 15_000 },
     ).catch(() => "");
 
@@ -177,18 +195,23 @@ function hasAnyChanges(changes: ChangedPaths): boolean {
   );
 }
 
-export async function getChangedPaths(cwd: string, baseRef?: string): Promise<ChangedPaths> {
+export async function getChangedPaths(
+  cwd: string,
+  baseRef?: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<ChangedPaths> {
   try {
     if (baseRef) {
       const output = await runGit(
         cwd,
         ["diff", "--name-status", "--find-renames", `${baseRef}...HEAD`],
+        io,
         { timeoutMs: 10_000 },
       );
       return parseNameStatus(output);
     }
 
-    const output = await runGit(cwd, ["status", "--porcelain=1", "--untracked-files=normal"], {
+    const output = await runGit(cwd, ["status", "--porcelain=1", "--untracked-files=normal"], io, {
       timeoutMs: 10_000,
     });
     const workingTreeChanges = parsePorcelainStatus(output);
@@ -199,6 +222,7 @@ export async function getChangedPaths(cwd: string, baseRef?: string): Promise<Ch
     const headDiff = await runGit(
       cwd,
       ["diff-tree", "--no-commit-id", "--name-status", "--find-renames", "-r", "HEAD"],
+      io,
       { timeoutMs: 10_000 },
     ).catch(() => "");
 
@@ -212,9 +236,12 @@ export async function getChangedPaths(cwd: string, baseRef?: string): Promise<Ch
   }
 }
 
-export async function getRepoUrl(cwd: string): Promise<string | null> {
+export async function getRepoUrl(
+  cwd: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | null> {
   try {
-    const output = await runGit(cwd, ["config", "--get", "remote.origin.url"], {
+    const output = await runGit(cwd, ["config", "--get", "remote.origin.url"], io, {
       timeoutMs: 5_000,
     });
     return output || null;
@@ -223,9 +250,12 @@ export async function getRepoUrl(cwd: string): Promise<string | null> {
   }
 }
 
-export async function getHeadSha(cwd: string): Promise<string | null> {
+export async function getHeadSha(
+  cwd: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | null> {
   try {
-    const output = await runGit(cwd, ["rev-parse", "HEAD"], { timeoutMs: 5_000 });
+    const output = await runGit(cwd, ["rev-parse", "HEAD"], io, { timeoutMs: 5_000 });
     return output || null;
   } catch {
     return null;
