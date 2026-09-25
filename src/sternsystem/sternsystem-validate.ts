@@ -44,6 +44,10 @@ import { collectEnvFiles } from "../mission/env-persist.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 import { readPassport } from "./registry-io.ts";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
+import {
+  isBordbuchDriftBookkeepingOnly,
+  dropTrailingBookkeepingEntries,
+} from "./passport-staleness.ts";
 import { readAuthorization, isAuthorizationExpired } from "./handover.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import { readJournal } from "../journal/jsonl.ts";
@@ -687,32 +691,55 @@ export async function runSternsystemValidate(
           freshPayload.provenance.generatedAt = passportDoc.payload.provenance.generatedAt;
           const freshHash = computePassportHash(freshPayload);
           if (freshHash !== passportDoc.passportHash) {
-            // Tolerate stale bordbuchHead right after a handover — the passport is
-            // generated before the handover bordbuch entry is appended, so the head
-            // legitimately doesn't include it. Check if the only difference is the
-            // bordbuch head pointing to the entry before the latest handover event.
-            let isPostHandoverDrift = false;
+            let isToleratedDrift = false;
             try {
               const entries = await readBordbuch(workspaceRoot, entry.id);
-              const handoverEntries = entries.filter((e) => e.kind === "handover");
+              const recordedHead = passportDoc.payload.provenance.bordbuchHead;
+
+              // ADR-0092: a head drift caused only by bookkeeping entries
+              // (mirror-sync — propagation of already-committed state) does not
+              // stale the passport. Reproducing the signed hash with the recorded
+              // head pinned proves nothing else drifted alongside.
               if (
-                handoverEntries.length > 0 &&
-                entries.length > 0 &&
-                entries[entries.length - 1].kind === "handover"
+                freshPayload.provenance.bordbuchHead !== recordedHead &&
+                isBordbuchDriftBookkeepingOnly(entries, recordedHead)
               ) {
-                // The latest bordbuch entry is a handover event — check if the
-                // passport's bordbuchHead matches the entry just before it
-                const prevEntry = entries[entries.length - 2];
-                const expectedHead = prevEntry ? prevEntry.hash : "";
-                if (passportDoc.payload.provenance.bordbuchHead === expectedHead) {
-                  isPostHandoverDrift = true;
+                const tolerated = {
+                  ...freshPayload,
+                  provenance: {
+                    ...freshPayload.provenance,
+                    bordbuchHead: recordedHead,
+                  },
+                };
+                isToleratedDrift = computePassportHash(tolerated) === passportDoc.passportHash;
+              }
+
+              if (!isToleratedDrift) {
+                // Tolerate stale bordbuchHead right after a handover — the passport is
+                // generated before the handover bordbuch entry is appended, so the head
+                // legitimately doesn't include it. Check if the only difference is the
+                // bordbuch head pointing to the entry before the latest handover event.
+                // ADR-0092: trailing bookkeeping entries (mirror-sync) are stripped
+                // before locating the handover, so a sync after handover still counts.
+                const significant = dropTrailingBookkeepingEntries(entries);
+                if (
+                  significant.length > 0 &&
+                  significant[significant.length - 1].kind === "handover"
+                ) {
+                  // The latest state-significant bordbuch entry is a handover event —
+                  // check if the passport's bordbuchHead matches the entry just before it
+                  const prevEntry = significant[significant.length - 2];
+                  const expectedHead = prevEntry ? prevEntry.hash : "";
+                  if (recordedHead === expectedHead) {
+                    isToleratedDrift = true;
+                  }
                 }
               }
             } catch {
               // Bordbuch read failed — can't determine, treat as real drift
             }
 
-            if (!isPostHandoverDrift) {
+            if (!isToleratedDrift) {
               warnings.push({
                 systemId: entry.id,
                 field: "PASSPORT-03",

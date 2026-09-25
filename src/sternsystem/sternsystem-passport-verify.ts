@@ -20,7 +20,9 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
+import { isBordbuchDriftBookkeepingOnly } from "./passport-staleness.ts";
 import { readPassport, resolveCacheClonePath } from "./registry-io.ts";
+import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 
 export interface SternsystemPassportVerifyData {
   command: "sternsystem.passport.verify";
@@ -97,7 +99,18 @@ export async function runSternsystemPassportVerify(
 
     if (freshHash !== doc.passportHash) {
       if (freshPayload.provenance.bordbuchHead !== doc.payload.provenance.bordbuchHead) {
-        bordbuchHeadMatches = false;
+        // ADR-0092: a head drift caused only by bookkeeping entries
+        // (mirror-sync — propagation of already-committed state) does not
+        // stale the passport; any other new entry does.
+        try {
+          const entries = await readBordbuch(workspaceRoot, systemId);
+          if (!isBordbuchDriftBookkeepingOnly(entries, doc.payload.provenance.bordbuchHead)) {
+            bordbuchHeadMatches = false;
+          }
+        } catch {
+          // Bordbuch unreadable — fail safe: treat the drift as real
+          bordbuchHeadMatches = false;
+        }
       }
       const freshResources = JSON.stringify(freshPayload.resources);
       const docResources = JSON.stringify(doc.payload.resources);
