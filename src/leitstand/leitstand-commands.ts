@@ -464,7 +464,7 @@ async function _runPreflight(
       wranglerBinPath = workpieceBin;
     }
   }
-  const wranglerCheck = await checkWranglerAvailable(workspaceRoot, wranglerBinPath);
+  const wranglerCheck = await checkWranglerAvailable(workspaceRoot, wranglerBinPath, io);
   checks.push({
     name: "wrangler-available",
     passed: wranglerCheck.available,
@@ -523,29 +523,17 @@ async function _runPreflight(
 async function checkWranglerAvailable(
   workspaceRoot: string,
   nodeModulesBinPath?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ available: boolean; detail: string }> {
   try {
-    const { execFile } = await import("node:child_process");
     const env: Record<string, string> = { ...process.env } as Record<string, string>;
     if (nodeModulesBinPath) {
       env.PATH = `${nodeModulesBinPath}:${process.env.PATH ?? ""}`;
     }
-    const result = await new Promise<{ exitCode: number; stdout: string; stderr: string }>(
-      (resolve) => {
-        execFile(
-          "npx",
-          ["--yes", "wrangler", "--version"],
-          { cwd: workspaceRoot, env },
-          (err, stdout, stderr) => {
-            resolve({
-              exitCode: err ? 1 : 0,
-              stdout: stdout ?? "",
-              stderr: stderr ?? "",
-            });
-          },
-        );
-      },
-    );
+    const result = await io.exec("npx", ["--yes", "wrangler", "--version"], {
+      cwd: workspaceRoot,
+      env,
+    });
     if (result.exitCode === 0) {
       return { available: true, detail: `wrangler resolved: ${result.stdout.trim()}` };
     }

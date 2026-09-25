@@ -20,6 +20,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { join } from "node:path";
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
 import { resolveActor } from "../mission/actor-identity.ts";
 import { readPassport, writePassport } from "./registry-io.ts";
@@ -312,6 +313,7 @@ export async function runSternsystemHandoverComplete(
         systemId,
         werkstattRoot: workspaceRoot,
         authorizationPath: authPath,
+        io: context.io,
       });
       ownershipRegistryUpdated = true;
       logger.info(`[sternsystem.handover.complete] ${systemId} ownership registry updated`);
@@ -322,16 +324,14 @@ export async function runSternsystemHandoverComplete(
       try {
         const { appendRecord } = await import("../journal/jsonl.ts");
         const { resolveCacheClonePath } = await import("./registry-io.ts");
-        const { mkdir } = await import("node:fs/promises");
-        const path = await import("node:path");
-        const journalDir = path.join(
+        const journalDir = join(
           resolveCacheClonePath(workspaceRoot, systemId),
           "operations",
           "journal",
         );
-        await mkdir(journalDir, { recursive: true });
+        await context.io.mkdir(journalDir);
         const opId = `ownership-transfer-retry-${systemId}-${Date.now()}`;
-        const journalPath = path.join(journalDir, `${opId}.jsonl`);
+        const journalPath = join(journalDir, `${opId}.jsonl`);
         const at = new Date().toISOString();
         await appendRecord(journalPath, {
           kind: "op-started",

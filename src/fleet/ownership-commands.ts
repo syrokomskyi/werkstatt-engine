@@ -177,6 +177,7 @@ export async function runFleetOwnershipTransfer(
       systemId,
       werkstattRoot: context.workspaceRoot,
       authorizationPath: authorization,
+      io: context.io,
     });
 
     return {

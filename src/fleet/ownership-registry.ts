@@ -15,6 +15,7 @@ Reads passport from cache clone and sends it to the registry.</purpose>
 */
 
 import { createHash } from "node:crypto";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { readPassport } from "../sternsystem/registry-io.ts";
 import type { SignedSitePassport } from "../sternsystem/passport.ts";
 
@@ -198,10 +199,7 @@ export async function verifyOwnership(input: {
   }
 
   if (!response.ok) {
-    throw new OwnershipError(
-      "OWNERSHIP-02",
-      `Registry error (${response.status})`,
-    );
+    throw new OwnershipError("OWNERSHIP-02", `Registry error (${response.status})`);
   }
 
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
@@ -218,9 +216,10 @@ export async function verifyOwnership(input: {
   return {
     registered: true,
     claim,
-    conflictsWith: claim.instanceId !== deriveInstanceId(passport.payload.creator.publicKey)
-      ? claim.instanceId
-      : null,
+    conflictsWith:
+      claim.instanceId !== deriveInstanceId(passport.payload.creator.publicKey)
+        ? claim.instanceId
+        : null,
   };
 }
 
@@ -229,22 +228,20 @@ export async function transferOwnership(input: {
   werkstattRoot: string;
   registryUrl?: string;
   authorizationPath: string;
+  io?: WorkspaceIO;
 }): Promise<TransferResult> {
   const { systemId, werkstattRoot, authorizationPath } = input;
+  const io = input.io ?? createDefaultIO().io;
   const baseUrl = getRegistryUrl(input.registryUrl);
 
   const passport = await readPassport(werkstattRoot, systemId);
   if (!passport) {
-    throw new OwnershipError(
-      "OWNERSHIP-01",
-      `passport.json not found for ${systemId}`,
-    );
+    throw new OwnershipError("OWNERSHIP-01", `passport.json not found for ${systemId}`);
   }
 
-  const { readFile } = await import("node:fs/promises");
   let authorization: unknown;
   try {
-    const authRaw = await readFile(authorizationPath, "utf8");
+    const authRaw = await io.readFile(authorizationPath);
     authorization = JSON.parse(authRaw);
   } catch (err) {
     throw new OwnershipError(
