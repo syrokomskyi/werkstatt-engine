@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   validateResult: {
@@ -211,6 +212,7 @@ test("RFC-0801: mission.close does NOT call mission.archive after close", async 
     flags: { mission: "test-system-m000001", actor: "test-agent", "allow-no-op": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

@@ -14,8 +14,6 @@ health check, and dev state recording.</purpose>
 */
 
 import path from "node:path";
-import { existsSync } from "node:fs";
-import { copyFileSync } from "node:fs";
 import type { KernelCommandInput, KernelCommandResult } from "@warpgogol/werkstatt-engine/kernel";
 import { readServicesRegistry, findServiceEntry } from "../sternsystem/registry-io.ts";
 import {
@@ -37,6 +35,7 @@ import {
   type ServiceDevDeployData,
   type KernelRuntimeContext,
 } from "./service-deploy-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export async function runLeitstandServiceDevDeploy(
   input: KernelCommandInput,
@@ -62,12 +61,12 @@ export async function runLeitstandServiceDevDeploy(
   }
 
   const serviceDir = path.join(workspaceRoot, "services", serviceId);
-  if (!existsSync(serviceDir)) {
+  if (!await context.io.exists(serviceDir)) {
     throw new Error(`[leitstand.service.dev-deploy] services/${serviceId}/ does not exist`);
   }
 
   const devConfigPath = path.join(serviceDir, "wrangler.dev.jsonc");
-  if (!existsSync(devConfigPath)) {
+  if (!await context.io.exists(devConfigPath)) {
     throw new Error(
       `[leitstand.service.dev-deploy] services/${serviceId}/wrangler.dev.jsonc not found — cannot dev-deploy without dev config`,
     );
@@ -79,9 +78,9 @@ export async function runLeitstandServiceDevDeploy(
   const envDevPath = path.join(serviceDir, ".env.dev");
   const envPath = path.join(serviceDir, ".env");
   const envDevExamplePath = path.join(serviceDir, ".env.dev.example");
-  if (!existsSync(envDevPath) && existsSync(envPath) && existsSync(envDevExamplePath)) {
+  if (!await context.io.exists(envDevPath) && await context.io.exists(envPath) && await context.io.exists(envDevExamplePath)) {
     try {
-      copyFileSync(envPath, envDevPath);
+      await context.io.copyFile(envPath, envDevPath);
       logger.info(`[leitstand.service.dev-deploy] auto-created .env.dev from .env`);
     } catch {
       // best-effort — deploy.preflight will report the error

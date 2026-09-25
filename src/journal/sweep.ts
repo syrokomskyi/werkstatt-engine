@@ -11,12 +11,11 @@
 </CHANGE_SUMMARY>
 */
 
-import { readdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { readJournal } from "./jsonl.ts";
 import { abandonOperation } from "./runner.ts";
 import type { JournalRecord } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface IncompleteOperationRef {
   opId: string;
@@ -53,25 +52,25 @@ export function referencesMissionId(text: string, missionId: string): boolean {
  */
 export async function findIncompleteOperationsForMission(
   operationsDir: string,
-  missionId: string,
+  missionId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<OperationSweepResult> {
   const result: OperationSweepResult = { incomplete: [], unreadableFiles: [] };
-  if (!existsSync(operationsDir)) {
+  if (!await io.exists(operationsDir)) {
     return result;
   }
 
-  const files = (await readdir(operationsDir)).filter((f) => f.endsWith(".jsonl"));
+  const files = (await io.readdir(operationsDir)).filter((f) => f.name.endsWith(".jsonl"));
   for (const file of files) {
-    const journalPath = path.join(operationsDir, file);
+    const journalPath = path.join(operationsDir, file.name);
     let records: JournalRecord[];
     try {
       records = await readJournal(journalPath);
     } catch {
-      result.unreadableFiles.push(file);
+      result.unreadableFiles.push(file.name);
       continue;
     }
 
-    const fileReferencesMission = referencesMissionId(file, missionId);
+    const fileReferencesMission = referencesMissionId(file.name, missionId);
     const terminalOpIds = new Set(
       records.filter((r) => r.kind === "op-done" || r.kind === "op-abandoned").map((r) => r.opId),
     );

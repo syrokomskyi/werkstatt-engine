@@ -26,7 +26,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { fileExists } from "@warpgogol/werkstatt-shared/node/fs";
 import {
@@ -35,6 +34,7 @@ import {
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
 import type { DiscoveredSiteWorkspace } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 // @ai-invariant: The resolver must refuse dual representation — a site existing as both apps/<id> and a mission workpiece is an error, not a fallback.
 
 export type SiteWorkspaceSource = "apps" | "mission" | "cache-clone";
@@ -55,9 +55,9 @@ function shouldIgnoreName(name: string): boolean {
   return name.startsWith("-") || name.startsWith("old-");
 }
 
-async function readPackageName(packageJsonPath: string): Promise<string | undefined> {
+async function readPackageName(packageJsonPath: string, io: WorkspaceIO = createDefaultIO().io): Promise<string | undefined> {
   try {
-    const raw = await fs.readFile(packageJsonPath, "utf8");
+    const raw = await io.readFile(packageJsonPath);
     const data = JSON.parse(raw) as { name?: unknown };
     return typeof data.name === "string" ? data.name : undefined;
   } catch {
@@ -181,7 +181,7 @@ export async function resolveSiteWorkspace(
   throw new Error(`Unknown site id "${siteId}". Resolvable sites: ${known || "(none)"}`);
 }
 
-export async function discoverSiteWorkspaces(workspaceRoot: string): Promise<SiteWorkspace[]> {
+export async function discoverSiteWorkspaces(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SiteWorkspace[]> {
   const infos = await discoverSystemInfos(workspaceRoot);
   const results: SiteWorkspace[] = [];
   const seen = new Set<string>();
@@ -207,15 +207,15 @@ export async function discoverSiteWorkspaces(workspaceRoot: string): Promise<Sit
 
   // Transitional apps/ discovery
   const appsRoot = path.join(workspaceRoot, "apps");
-  let entries: import("node:fs").Dirent[];
+  let entries: DirEntry[];
   try {
-    entries = await fs.readdir(appsRoot, { withFileTypes: true, encoding: "utf8" });
+    entries = await io.readdir(appsRoot);
   } catch {
     entries = [];
   }
 
   for (const entry of entries) {
-    if (!entry.isDirectory() || shouldIgnoreName(entry.name)) continue;
+    if (!entry.isDirectory || shouldIgnoreName(entry.name)) continue;
     if (seen.has(entry.name)) {
       // Dual representation: both mission workpiece and apps/<id> exist.
       // When the registry entry has currentMission set, the mission workpiece

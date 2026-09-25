@@ -13,7 +13,6 @@ zone ID resolution, environment variable resolution, and record identity.
 </CHANGE_SUMMARY>
 */
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dnsRecordFileSchema } from "@warpgogol/werkstatt-shared/ontology/schemas";
 import type {
@@ -23,6 +22,7 @@ import type {
 import { filterEnv, sourceDotenv } from "../leitstand/adapters/cloudflare-workers.ts";
 import { resolveZoneId } from "../subdomain/subdomain-helpers.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export { resolveZoneId as resolveDnsZoneId };
 
@@ -45,12 +45,13 @@ export function flagBoolean(
 export async function loadDnsRecordFile(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DnsRecordFile | null> {
   const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
   const filePath = join(cacheDir, "dns-records.yaml");
   let raw: string;
   try {
-    raw = await readFile(filePath, "utf-8");
+    raw = await io.readFile(filePath);
   } catch {
     return null;
   }

@@ -20,9 +20,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import type { Diagnostic, KernelCommandResult, KernelNextStep } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface CommandsValidateResult {
   command: string;
@@ -232,8 +232,8 @@ function inferCommandName(filePath: string, workspaceRoot: string): string {
   return fileName.replace(/-/g, ".");
 }
 
-async function scanFile(filePath: string, workspaceRoot: string): Promise<Diagnostic[]> {
-  const content = await readFile(filePath, "utf8").catch(() => "");
+async function scanFile(filePath: string, workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<Diagnostic[]> {
+  const content = await io.readFile(filePath).catch(() => "");
   if (!content || !isHandlerFile(content)) return [];
 
   const diagnostics: Diagnostic[] = [];
@@ -297,16 +297,16 @@ async function scanFile(filePath: string, workspaceRoot: string): Promise<Diagno
 
 async function scanDirectory(
   dir: string,
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ diagnostics: Diagnostic[]; scannedFiles: number }> {
   let scannedFiles = 0;
   const allDiagnostics: Diagnostic[] = [];
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const entries = await io.readdir(dir).catch(() => []);
 
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
 
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       if (EXCLUDE_DIRS.has(entry.name)) continue;
       const subResult = await scanDirectory(fullPath, workspaceRoot);
       scannedFiles += subResult.scannedFiles;

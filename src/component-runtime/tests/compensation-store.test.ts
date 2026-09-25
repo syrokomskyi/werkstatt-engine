@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { CompensationStore, resolveCompensationStorePath } from "../compensation-store.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { CompensationResult } from "@warpgogol/werkstatt-shared/component";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
@@ -12,10 +13,10 @@ describe("CompensationStore", () => {
   let dbPath: string;
   let store: CompensationStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = mkdtempSync(join(process.cwd(), "tmp-comp-store-"));
     dbPath = join(tmpDir, "compensation-evidence.db");
-    store = new CompensationStore(dbPath);
+    store = await CompensationStore.create(dbPath, createDefaultIO().io);
   });
 
   afterEach(() => {

@@ -16,9 +16,6 @@
 </CHANGE_SUMMARY>
 */
 
-import { execFileSync } from "node:child_process";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type {
@@ -28,6 +25,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +140,25 @@ async function runSubCommand(
   return { exitCode, summary: result.summary };
 }
 
+/**
+ * io.exec resolves on non-zero exit — cold e2e steps must throw so runStep
+ * marks the step failed (same contract execSync gave the original code).
+ */
+async function execChecked(
+  io: WorkspaceIO,
+  cmd: string,
+  args: string[],
+  opts?: Parameters<WorkspaceIO["exec"]>[2],
+): Promise<Awaited<ReturnType<WorkspaceIO["exec"]>>> {
+  const result = await io.exec(cmd, args, opts);
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `${cmd} ${args[0] ?? ""} exited ${result.exitCode}: ${result.stderr.slice(0, 300) || result.stdout.slice(0, 300)}`,
+    );
+  }
+  return result;
+}
+
 // ─── Main command handler ──────────────────────────────────────────────────
 
 export async function runColdE2e(
@@ -159,12 +176,11 @@ export async function runColdE2e(
 
   // Preflight: check working tree is clean
   try {
-    const statusOutput = execFileSync("git", ["status", "--porcelain"], {
+    const statusOutput = await execChecked(context.io, "git", ["status", "--porcelain"], {
       cwd: workspaceRoot,
-      encoding: "utf-8",
-      timeout: 10_000,
+      timeoutMs: 10000,
     });
-    if (statusOutput.trim().length > 0) {
+    if (statusOutput.stdout.trim().length > 0) {
       return {
         exitCode: 1,
         data: {
@@ -201,14 +217,15 @@ export async function runColdE2e(
   }
 
   // Get current commit
-  const platformCommit = execFileSync("git", ["rev-parse", "HEAD"], {
-    cwd: workspaceRoot,
-    encoding: "utf-8",
-    timeout: 10_000,
-  }).trim();
+  const platformCommit = (
+    await execChecked(context.io, "git", ["rev-parse", "HEAD"], {
+      cwd: workspaceRoot,
+      timeoutMs: 10000,
+    })
+  ).stdout.trim();
 
   // Create cold root
-  const coldRoot = await fs.mkdtemp(path.join(os.tmpdir(), "werkstatt-e2e-cold-"));
+  const coldRoot = await context.io.mkdtemp(path.join(os.tmpdir(), "werkstatt-e2e-cold-"));
   logger.info(`[werkstatt.e2e.cold] cold root: ${coldRoot}`);
 
   const steps: ColdRunStep[] = [];
@@ -234,13 +251,15 @@ export async function runColdE2e(
         "prepare-cold-root",
         async () => {
           // Clone the current checkout
-          execFileSync("git", ["clone", workspaceRoot, path.join(coldRoot, "werkstatt")], {
-            encoding: "utf-8",
-            timeout: 60_000,
-          });
+          await execChecked(
+            context.io,
+            "git",
+            ["clone", workspaceRoot, path.join(coldRoot, "werkstatt")],
+            { timeoutMs: 60000 },
+          );
           // Create systems-cache directory (sibling of werkstatt clone)
-          await fs.mkdir(path.join(coldRoot, "systems-cache"), { recursive: true });
-          await fs.mkdir(path.join(coldRoot, "systems-git"), { recursive: true });
+          await context.io.mkdir(path.join(coldRoot, "systems-cache"));
+          await context.io.mkdir(path.join(coldRoot, "systems-git"));
         },
         logger,
         perStepTimeout,
@@ -252,15 +271,11 @@ export async function runColdE2e(
       await runStep(
         "install",
         async () => {
-          execFileSync("pnpm", ["install", "--frozen-lockfile"], {
+          await execChecked(context.io, "pnpm", ["install", "--frozen-lockfile"], {
             cwd: stepCtx.workspaceRoot,
-            encoding: "utf-8",
-            timeout: perStepTimeout,
           });
-          execFileSync("pnpm", ["exec", "playwright", "install", "chromium"], {
+          await execChecked(context.io, "pnpm", ["exec", "playwright", "install", "chromium"], {
             cwd: stepCtx.workspaceRoot,
-            encoding: "utf-8",
-            timeout: perStepTimeout,
           });
         },
         logger,
@@ -281,79 +296,56 @@ export async function runColdE2e(
           // Must run after install step so deps are available. sternsystem.register
           // auto-generates a passport if SIGNING_PRIVATE_KEY is set.
           const keyDir = path.join(coldRoot, "signing-key");
-          await fs.mkdir(keyDir, { recursive: true });
+          await context.io.mkdir(keyDir);
           await runSubCommand(
             stepCtx.workspaceRoot,
             "signing.key.generate",
             [`--output-dir=${keyDir}`, "--encoding=pem", "--force"],
             logger,
           );
-          const privateKeyPem = await fs.readFile(path.join(keyDir, "signing.key.pem"), "utf8");
+          const privateKeyPem = await context.io.readFile(path.join(keyDir, "signing.key.pem"));
           process.env.SIGNING_PRIVATE_KEY = privateKeyPem.trim();
           logger.info(`  [e2e.cold] temporary signing key generated for passport signing`);
 
           // Initialize bare repo
-          await fs.mkdir(barePath, { recursive: true });
-          execFileSync("git", ["init", "--bare", "-b", "main", barePath], {
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
+          await context.io.mkdir(barePath);
+          await execChecked(context.io, "git", ["init", "--bare", "-b", "main", barePath]);
 
           // Initialize cache clone as a git repo
-          await fs.mkdir(cachePath, { recursive: true });
-          execFileSync("git", ["init", "-b", "main", cachePath], {
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execFileSync("git", ["config", "user.email", "e2e-cold@warpgogol.local"], {
+          await context.io.mkdir(cachePath);
+          await execChecked(context.io, "git", ["init", "-b", "main", cachePath]);
+          await execChecked(
+            context.io,
+            "git",
+            ["config", "user.email", "e2e-cold@warpgogol.local"],
+            { cwd: cachePath },
+          );
+          await execChecked(context.io, "git", ["config", "user.name", "e2e-cold"], {
             cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execFileSync("git", ["config", "user.name", "e2e-cold"], {
-            cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
           });
           // Add bare repo as origin
-          execFileSync("git", ["remote", "add", "origin", barePath], {
+          await execChecked(context.io, "git", ["remote", "add", "origin", barePath], {
             cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
           });
 
           // Initial commit + push to create main branch in bare repo
-          await fs.writeFile(path.join(cachePath, "README.md"), "# e2e-cold\n", "utf-8");
-          execFileSync("git", ["add", "-A"], {
-            cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execFileSync("git", ["commit", "-m", "initial"], {
-            cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execFileSync("git", ["push", "origin", "main"], {
-            cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
+          await context.io.writeFile(path.join(cachePath, "README.md"), "# e2e-cold\n");
+          await execChecked(context.io, "git", ["add", "-A"], { cwd: cachePath });
+          await execChecked(context.io, "git", ["commit", "-m", "initial"], { cwd: cachePath });
+          await execChecked(context.io, "git", ["push", "origin", "main"], { cwd: cachePath });
 
           // RFC-0840: Write operator config files to cache clone (untracked,
           // not git-committed) so restoreOperatorConfigFiles finds them during
           // mission.materialize. A fresh Sternsystem has no previous mission to
           // persist these from — the cold run must seed them.
-          await fs.writeFile(
+          await context.io.writeFile(
             path.join(cachePath, ".lighthouse-budget-ignore"),
             "# e2e-cold: lighthouse budget ignore\n",
-            "utf-8",
           );
-          await fs.mkdir(path.join(cachePath, "src"), { recursive: true });
-          await fs.writeFile(
+          await context.io.mkdir(path.join(cachePath, "src"));
+          await context.io.writeFile(
             path.join(cachePath, "src", "image-delivery.config.yaml"),
             "# e2e-cold: image delivery config\nprovider: build-portable\n",
-            "utf-8",
           );
 
           // RFC-0073: pbp.content.validate requires src/content/business-profile/de/
@@ -363,68 +355,52 @@ export async function runColdE2e(
           // mission.open inside sternsystem.register) validates before the
           // content-edit step, so they must be present at materialization time.
           const pbpDeDir = path.join(cachePath, "src", "content", "business-profile", "de");
-          await fs.mkdir(pbpDeDir, { recursive: true });
-          await fs.writeFile(
+          await context.io.mkdir(pbpDeDir);
+          await context.io.writeFile(
             path.join(pbpDeDir, "business.md"),
             "---\nschema: pbp/business@1\nid: https://e2e-cold.test/business\ntype: business\nstatus: published\nname: E2E Cold Test Business\nsummary: Synthetic business profile for cold E2E validation\ndescription: Synthetic business profile for cold E2E validation\n---\n",
-            "utf-8",
           );
           for (const sub of ["web", "contact", "places"]) {
-            await fs.mkdir(path.join(pbpDeDir, sub), { recursive: true });
-            await fs.writeFile(path.join(pbpDeDir, sub, ".gitkeep"), "", "utf-8");
+            await context.io.mkdir(path.join(pbpDeDir, sub));
+            await context.io.writeFile(path.join(pbpDeDir, sub, ".gitkeep"), "");
           }
           // RFC-0468: pbp.migration.validate requires owner-decision-register.yaml
           // and migration-coverage-report.yaml in src/content/business-profile/.
           const pbpRoot = path.join(cachePath, "src", "content", "business-profile");
-          await fs.writeFile(
+          await context.io.writeFile(
             path.join(pbpRoot, "owner-decision-register.yaml"),
             "schemaVersion: '1.0.0'\nitems:\n  - id: 1\n    topic: setup\n    question: Initial setup\n    status: open\n    blocks: []\n",
-            "utf-8",
           );
-          await fs.writeFile(
+          await context.io.writeFile(
             path.join(pbpRoot, "migration-coverage-report.yaml"),
             "schemaVersion: '1.0.0'\ncoveragePercentage: 100\nmappedEntities: 1\ntotalLegacyEntities: 1\nverifiedEntities: 1\nunmappedEntities: []\nlegacySourceMappings:\n  - legacyFile: legacy/business.md\n    targetEntities: [business]\n    category: business\nvalidation:\n  errors: []\n",
-            "utf-8",
           );
           // RFC-0095: footer.legal.validate requires site/de/labels.md with
           // footer.legalIds for DE-locale apps.
           const siteLabelsDir = path.join(cachePath, "src", "content", "site", "de");
-          await fs.mkdir(siteLabelsDir, { recursive: true });
-          await fs.writeFile(
+          await context.io.mkdir(siteLabelsDir);
+          await context.io.writeFile(
             path.join(siteLabelsDir, "labels.md"),
             "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\ncopyright:\n  symbol: ©\n  yearFirst: 2024\nbrandTagline: E2E Cold Test\nskipLinkLabel: Skip to main content\nbreadcrumbs:\n  homeLabel: Startseite\n  navAriaLabel: Brotkrümelnavigation\nlangSwitcher:\n  switchAriaLabel: Sprache wechseln\nmaterialCredits:\n  summaryLabel: Credits\n  pageTitle: Material Credits\n  pageDescription: Credits for materials used on this site\n  emptyMessage: No credits available\n  detailsLabel: Details\n  createdBy: Created by\n  createdWith: Created with\n  promptBy: Prompt by\n  reviewedBy: Reviewed by\n  license: License\n  copyrightLabel: Copyright\n  rightsHolder: Rights holder\n  sourceType: Source type\n  sourceTypeLabels:\n    human-made: Human-made\n    ai-assisted: AI-assisted\n    ai-generated: AI-generated\n    composite: Composite\n    third-party: Third-party\n    commissioned: Commissioned\n    licensed-third-party: Licensed third-party\n    customer-supplied: Customer-supplied\n    public-domain: Public domain\n    screenshot: Screenshot\n  statusLabels:\n    active: Active\n    orphaned: Orphaned\n    needs-review: Needs review\n    blocked: Blocked\n    expired: Expired\n  usageBasisLabels:\n    internal-commissioned: Internal commissioned\n    express-permission: Express permission\n    license: License\n    customer-supplied: Customer-supplied\n    public-domain: Public domain\n    statutory-exception: Statutory exception\n    quotation-right: Quotation right\n    unverified: Unverified\n  aiUsageLabels:\n    aiGenerated: AI generated\n    aiAssisted: AI assisted\n    humanContribution: Human contribution\n    copyrightClaimed: Copyright claimed\n    copyrightNotClaimed: Copyright not claimed\n  usedOnLabel: Used on\n  verifiedAtLabel: Verified at\n  noPreviewLabel: No preview available\n  copyrightExplanation: Copyright explanation\n---\n",
-            "utf-8",
           );
           // RFC-0074: infra.brief.validate checks for wrangler.jsonc existence.
           // RFC-0908: host.canonical.config.validate requires a www→apex redirect route.
-          await fs.writeFile(
+          await context.io.writeFile(
             path.join(cachePath, "wrangler.jsonc"),
             '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01",\n  "routes": ["www.e2e-cold.test/*"]\n}\n',
-            "utf-8",
           );
-          execFileSync("git", ["add", "-A"], {
-            cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          execFileSync(
+          await execChecked(context.io, "git", ["add", "-A"], { cwd: cachePath });
+          await execChecked(
+            context.io,
             "git",
             ["commit", "-m", "add business-profile/de for pbp.content.validate"],
-            {
-              cwd: cachePath,
-              encoding: "utf-8",
-              stdio: ["pipe", "pipe", "pipe"],
-            },
+            { cwd: cachePath },
           );
-          execFileSync("git", ["push", "origin", "main"], {
-            cwd: cachePath,
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
+          await execChecked(context.io, "git", ["push", "origin", "main"], { cwd: cachePath });
 
           // Copy fixture brief into cold root
           const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
-          await fs.mkdir(briefDir, { recursive: true });
+          await context.io.mkdir(briefDir);
           const fixtureBrief = `---
 client:
   id: e2e-cold
@@ -436,7 +412,7 @@ i18n:
 legalJurisdiction: DE
 ---
 `;
-          await fs.writeFile(path.join(briefDir, "00-brief.md"), fixtureBrief, "utf-8");
+          await context.io.writeFile(path.join(briefDir, "00-brief.md"), fixtureBrief);
 
           const result = (await executeKernelCommand({
             workspaceRoot: stepCtx.workspaceRoot,
@@ -639,7 +615,10 @@ legalJurisdiction: DE
             // The workpiece is materialized by sternsystem.register's mission.open
             // Find the workpiece directory
             const missionsDir = path.join(stepCtx.workspaceRoot, "missions");
-            const missionDirs = await fs.readdir(missionsDir).catch(() => []);
+            const missionDirs = await context.io
+              .readdir(missionsDir)
+              .then((e) => e.map((x) => x.name))
+              .catch(() => []);
             const missionDir = missionDirs.find((d) => d.includes(missionId!));
             if (!missionDir) {
               throw new Error(`content-edit: mission directory not found for ${missionId}`);
@@ -648,8 +627,8 @@ legalJurisdiction: DE
             const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
 
             const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
-            if (existsSync(systemMdPath)) {
-              const content = await fs.readFile(systemMdPath, "utf-8");
+            if (await context.io.exists(systemMdPath)) {
+              const content = await context.io.readFile(systemMdPath);
               // Inject verification.google block and pages[] array into
               // frontmatter for search.verification.validate (SEARCH-VERIFY-01)
               // and semantic.targets.validate (SEM-TARGET-04).
@@ -679,14 +658,14 @@ legalJurisdiction: DE
               );
               // Append a deterministic cold-run marker
               const marker = `\n\n<!-- e2e-cold: ${platformCommit} -->\n`;
-              await fs.writeFile(systemMdPath, updatedContent + marker);
+              await context.io.writeFile(systemMdPath, updatedContent + marker);
 
               // Create minimal content page files for the pageIds declared in
               // system.md pages[] so that generated.stale.validate can resolve
               // preview images back to content pages. Pages must be frontmatter-only
               // (no markdown body) with title, description, and lang fields.
               const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
-              await fs.mkdir(pagesDir, { recursive: true });
+              await context.io.mkdir(pagesDir);
               const pageStubs: Record<string, { title: string; description: string }> = {
                 home: {
                   title: "Startseite",
@@ -717,8 +696,8 @@ legalJurisdiction: DE
               for (const [slug, meta] of Object.entries(pageStubs)) {
                 const pageId = slug === "digitales-fundament" ? "digitalesFundament" : slug;
                 const pageFile = path.join(pagesDir, `${slug}.md`);
-                if (!existsSync(pageFile)) {
-                  await fs.writeFile(
+                if (!(await context.io.exists(pageFile))) {
+                  await context.io.writeFile(
                     pageFile,
                     `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${meta.title}\ndescription: ${meta.description}\nlang: de\nblocks:\n  - id: ${slug}-main\n    type: markdown\n    props:\n      hideSectionNumber: true\n---\n`,
                   );
@@ -729,21 +708,19 @@ legalJurisdiction: DE
             // RFC-0908: host.canonical.config.validate scans middleware source
             // for host redirect patterns. Add a stub that satisfies the scan.
             const middlewareDir = path.join(workpieceDir, "src", "middleware");
-            await fs.mkdir(middlewareDir, { recursive: true });
-            await fs.writeFile(
+            await context.io.mkdir(middlewareDir);
+            await context.io.writeFile(
               path.join(middlewareDir, "host-canonical-redirect.ts"),
               '// RFC-0908: www → apex canonical redirect stub\n/*\n<MODULE_CONTRACT>\n<purpose>Stub file for host canonical redirect validation pattern detection in cold E2E pipeline.</purpose>\n<non-goals>\n  <item>Does not perform actual redirects — exists for validator scan satisfaction only.</item>\n</non-goals>\n</MODULE_CONTRACT>\n<CHANGE_SUMMARY>\n  <item>RFC-0965: cold E2E host canonical redirect stub.</item>\n</CHANGE_SUMMARY>\n*/\n// @ai-invariant: Stub file for validator pattern detection only.\nexport function redirectWwwToApex(host: string): Response | null {\n  if (host === "www.e2e-cold.test") {\n    return Response.redirect("https://e2e-cold.test", 301);\n  }\n  return null;\n}\n',
-              "utf-8",
             );
 
             // RFC-0721: behavior.snapshot.validate requires a committed
             // behavior.snapshot.generated.yaml with the GENERATED_MARKER.
             // The validator auto-recovers (regenerates) on SNAP-01 drift,
             // so a minimal placeholder is sufficient.
-            await fs.writeFile(
+            await context.io.writeFile(
               path.join(workpieceDir, "behavior.snapshot.generated.yaml"),
               "# GENERATED. Do not change this line unless the file contains project specific changes.\n# DO NOT EDIT THIS FILE. Changes are overwritten on the next build.\n# Owner command: behavior.snapshot.generate\n# Edit instead: the behavior.snapshot.generate generator source (not this file).\n# Regenerate:   pnpm exec werkstatt run behavior.snapshot.generate\nmeta:\n  schemaVersion: 1\n  deterministic: true\n  generatedAt: null\n  contentHash: ''\nsite: e2e-cold\nroutes: []\nheaders: []\nredirects: []\n",
-              "utf-8",
             );
 
             // Commit the edit
@@ -842,7 +819,7 @@ legalJurisdiction: DE
 
     // Clean up temp dir on success unless --keep
     if (!keep) {
-      await fs.rm(coldRoot, { recursive: true, force: true }).catch(() => {
+      await context.io.rm(coldRoot, { recursive: true }).catch(() => {
         logger.info(`[werkstatt.e2e.cold] warning: could not remove cold root ${coldRoot}`);
       });
     }

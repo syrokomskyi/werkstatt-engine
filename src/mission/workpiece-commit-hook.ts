@@ -19,10 +19,9 @@
 </CHANGE_SUMMARY> 
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkpieceHookResult {
   installed: boolean;
@@ -55,20 +54,26 @@ fi
 
 export async function installWorkpieceCommitHook(
   workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WorkpieceHookResult> {
   const hooksDir = path.join(workpieceDir, ".git", "hooks");
   const hookPath = path.join(hooksDir, "pre-commit");
 
-  if (!existsSync(path.join(workpieceDir, ".git"))) {
+  if (!(await io.exists(path.join(workpieceDir, ".git")))) {
     return { installed: false, hookPath };
   }
 
-  if (!existsSync(hooksDir)) {
-    await fs.mkdir(hooksDir, { recursive: true });
+  if (!(await io.exists(hooksDir))) {
+    await io.mkdir(hooksDir);
   }
 
   await writeFileIfChanged(hookPath, HOOK_SCRIPT);
-  await fs.chmod(hookPath, 0o755);
+  const chmodResult = await io.exec("chmod", ["755", hookPath]);
+  if (chmodResult.exitCode !== 0) {
+    throw new Error(
+      `chmod ${hookPath} exited ${chmodResult.exitCode}: ${chmodResult.stderr.slice(0, 200)}`,
+    );
+  }
 
   return { installed: true, hookPath };
 }

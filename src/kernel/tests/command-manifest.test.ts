@@ -16,6 +16,7 @@ import type {
   KernelRuntimeContext,
   ModuleExport,
 } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /*
 <MODULE_CONTRACT>
@@ -43,6 +44,7 @@ const input = { argv: [], flags: {} } as unknown as KernelCommandInput;
 
 function ctx(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     siteExplicit: false,
     logger,

@@ -28,12 +28,12 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { GitMeshVerifyResult } from "./types.ts";
 import { loadGitMeshConfig } from "./config.ts";
 import { gitLogSignatureStatus, gitRevParseHead } from "./git-ops.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const LAST_VERIFIED_FILE = ".git/gitmesh.last-verified";
 const IDENTITY_FILENAME = "werkstatt.identity.json";
@@ -43,13 +43,13 @@ interface IdentityFile {
   publicKeys?: string[];
 }
 
-async function loadIdentityPublicKeys(workspaceRoot: string): Promise<string[]> {
+async function loadIdentityPublicKeys(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
   // RFC-0560 dependency: git's %G? signature status checks git's keyring, not the
   // operator's specific public key. The publicKeys loaded here will be used to
   // compare against signing keys once RFC-0560's trailer format is implemented.
   // Until then, gitmesh.verify relies on git's GPG/SSH signature verification.
   const identityPath = join(workspaceRoot, IDENTITY_FILENAME);
-  const raw = await readFile(identityPath, "utf8");
+  const raw = await io.readFile(identityPath);
   const identity: IdentityFile = JSON.parse(raw);
 
   const keys: string[] = [];
@@ -167,7 +167,7 @@ export async function runGitMeshVerify(
   let range: string;
   let lastVerifiedSha = "";
   try {
-    lastVerifiedSha = (await readFile(join(workspaceRoot, LAST_VERIFIED_FILE), "utf8")).trim();
+    lastVerifiedSha = (await context.io.readFile(join(workspaceRoot, LAST_VERIFIED_FILE))).trim();
     range = `${lastVerifiedSha}..${headSha}`;
   } catch {
     // Full verification — all commits
@@ -196,7 +196,7 @@ export async function runGitMeshVerify(
   const verified = unsignedCommits === 0 && invalidSignatures === 0;
 
   // Write last-verified SHA
-  await writeFile(join(workspaceRoot, LAST_VERIFIED_FILE), headSha, "utf8");
+  await context.io.writeFile(join(workspaceRoot, LAST_VERIFIED_FILE), headSha);
 
   const diagnostics: string[] = [];
   if (unsignedCommits > 0) {

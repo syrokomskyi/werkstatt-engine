@@ -14,10 +14,10 @@ Advances the migratorCursor for RFC-0502 (authors, sources, claims, review metad
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0502_MIGRATOR_ID = "rfc-0502";
 
@@ -50,15 +50,15 @@ export const rfc0502Migrator: Migrator = {
   toVersion: "4.14.0",
   description:
     "Create initial author record file surface/authors/{lang}/andrii-syrokomskyi.md if it does not exist. Advances migratorCursor for RFC-0502 (ratgeber editorial provenance — authors, sources, claims, and review metadata).",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const authorsBaseDir = path.join(data.rootPath, "src", "content", "surface", "authors");
 
     let langDirs: string[];
     try {
-      langDirs = await fs.readdir(authorsBaseDir);
+      langDirs = (await io.readdir(authorsBaseDir)).map(e => e.name);
     } catch {
       ctx.logger.info(`[rfc-0502] no authors directory at ${authorsBaseDir} — creating`);
-      await fs.mkdir(authorsBaseDir, { recursive: true });
+      await io.mkdir(authorsBaseDir);
       langDirs = [];
     }
 
@@ -66,14 +66,13 @@ export const rfc0502Migrator: Migrator = {
 
     for (const lang of langsToProcess) {
       const langPath = path.join(authorsBaseDir, lang);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat?.isDirectory()) {
-        await fs.mkdir(langPath, { recursive: true });
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat?.isDirectory) {
+        await io.mkdir(langPath);
       }
 
       const authorFile = path.join(langPath, "andrii-syrokomskyi.md");
-      const exists = await fs
-        .stat(authorFile)
+      const exists = await io.stat(authorFile)
         .then(() => true)
         .catch(() => false);
 
@@ -84,7 +83,7 @@ export const rfc0502Migrator: Migrator = {
 
       const content = AUTHOR_RECORDS[lang] ?? AUTHOR_RECORD_DE!;
       try {
-        await fs.writeFile(authorFile, content, "utf-8");
+        await io.writeFile(authorFile, content);
         ctx.logger.info(`[rfc-0502] created author record: ${lang}/andrii-syrokomskyi.md`);
       } catch (err) {
         throw new MigrationError(

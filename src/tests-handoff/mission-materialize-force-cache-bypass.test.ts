@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createMaterializeWorkspace } from "./helpers/materialize-fixture.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockPipeline = vi.hoisted(() => ({
   forceUsed: undefined as boolean | undefined,
@@ -161,6 +162,7 @@ test("RFC-0619: force: true is passed to executeKernelPipeline during materializ
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;

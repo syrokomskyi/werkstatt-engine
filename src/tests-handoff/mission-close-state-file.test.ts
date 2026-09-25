@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   validateResult: {
@@ -201,6 +202,7 @@ test("mission.close writes .materialization-state.json with current cache clone 
     flags: { mission: "test-system-m000001", actor: "test-agent", "allow-no-op": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: {
       info: () => {},
@@ -251,6 +253,7 @@ test("mission.close copies .cache/video/ from workpiece to cache clone", async (
     flags: { mission: "test-system-m000001", actor: "test-agent", "allow-no-op": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: {
       info: () => {},
@@ -291,6 +294,7 @@ test("mission.close copies .cache/video-live/ from workpiece to cache clone", as
     flags: { mission: "test-system-m000001", actor: "test-agent", "allow-no-op": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: {
       info: () => {},
@@ -318,6 +322,7 @@ test("mission.close succeeds when workpiece has no .cache/ directory", async () 
     flags: { mission: "test-system-m000001", actor: "test-agent", "allow-no-op": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: {
       info: () => {},

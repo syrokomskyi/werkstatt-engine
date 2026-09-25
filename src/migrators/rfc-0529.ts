@@ -15,10 +15,10 @@ src/content/. Idempotent: running twice produces the same result.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0529_MIGRATOR_ID = "rfc-0529";
 
@@ -121,21 +121,21 @@ function migrateYamlFile(content: string): string {
 async function scanDir(
   dir: string,
   ctx: MigrationContext,
-  isGenerated: (name: string) => boolean,
+  isGenerated: (name: string) => boolean, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
-  let entries: import("node:fs").Dirent[];
+  let entries: DirEntry[];
   try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
+    entries = await io.readdir(dir);
   } catch {
     return;
   }
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       if (entry.name.startsWith("-") || entry.name.startsWith("old-")) continue;
       await scanDir(fullPath, ctx, isGenerated);
-    } else if (entry.isFile()) {
+    } else if (entry.isFile) {
       if (isGenerated(entry.name)) continue;
       if (entry.name.endsWith(".md")) {
         await migrateMarkdownFileOnDisk(fullPath, ctx);
@@ -155,10 +155,10 @@ function isGeneratedFile(name: string): boolean {
   );
 }
 
-async function migrateMarkdownFileOnDisk(filePath: string, ctx: MigrationContext): Promise<void> {
+async function migrateMarkdownFileOnDisk(filePath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   let content: string;
   try {
-    content = await fs.readFile(filePath, "utf-8");
+    content = await io.readFile(filePath);
   } catch {
     return;
   }
@@ -168,7 +168,7 @@ async function migrateMarkdownFileOnDisk(filePath: string, ctx: MigrationContext
   const migrated = migrateMarkdownFile(content);
   if (migrated !== content) {
     try {
-      await fs.writeFile(filePath, migrated, "utf-8");
+      await io.writeFile(filePath, migrated);
       ctx.logger.info(`[rfc-0529] migrated content references in ${filePath}`);
     } catch (err) {
       throw new MigrationError(
@@ -181,10 +181,10 @@ async function migrateMarkdownFileOnDisk(filePath: string, ctx: MigrationContext
   }
 }
 
-async function migrateYamlFileOnDisk(filePath: string, ctx: MigrationContext): Promise<void> {
+async function migrateYamlFileOnDisk(filePath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   let content: string;
   try {
-    content = await fs.readFile(filePath, "utf-8");
+    content = await io.readFile(filePath);
   } catch {
     return;
   }
@@ -194,7 +194,7 @@ async function migrateYamlFileOnDisk(filePath: string, ctx: MigrationContext): P
   const migrated = migrateYamlFile(content);
   if (migrated !== content) {
     try {
-      await fs.writeFile(filePath, migrated, "utf-8");
+      await io.writeFile(filePath, migrated);
       ctx.logger.info(`[rfc-0529] migrated content references in ${filePath}`);
     } catch (err) {
       throw new MigrationError(
@@ -213,11 +213,11 @@ export const rfc0529Migrator: Migrator = {
   toVersion: "4.20.0",
   description:
     "Convert brace-delimited {collection.file.field} content references to braceless collection.file.field syntax in all .md and .yaml files under src/content/. Idempotent. Advances migratorCursor for RFC-0529 (braceless content reference migration).",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const contentDir = path.join(data.rootPath, "src", "content");
 
     try {
-      await fs.stat(contentDir);
+      await io.stat(contentDir);
     } catch {
       ctx.logger.info(`[rfc-0529] no content directory at ${contentDir} — skipping`);
       return data;

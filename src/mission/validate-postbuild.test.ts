@@ -37,6 +37,7 @@ import {
   resolveSiteWorkspace,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockExecuteKernelPipeline = vi.mocked(executeKernelPipeline);
 const mockExecuteKernelCommand = vi.mocked(executeKernelCommand);
@@ -69,7 +70,8 @@ function makeContext(workspaceRoot: string) {
     section: vi.fn(),
     getEvents: vi.fn(() => []),
   };
-  return { workspaceRoot, logger } as never;
+  return {
+  io: createDefaultIO().io, workspaceRoot, logger } as never;
 }
 
 function makePipelineReport(
@@ -257,6 +259,7 @@ test("stale dist/ warning is always printed", async () => {
 
   const warnSpy = vi.fn();
   const ctx = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: vi.fn(),

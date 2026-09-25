@@ -17,6 +17,7 @@ import { computeEntryHash } from "../bordbuch/bordbuch-io.ts";
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // RFC-0951: mock runMissionMaterializeInternal so mission.open doesn't require a real system
 vi.mock("../mission/mission-materialize.ts", () => ({
@@ -149,7 +150,7 @@ test("mission.open refuses when bordbuch has orphan-mission-close violation", as
   const input = {
     flags: { system: "test-system", brief: "Test mission", actor: "test-agent" },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   await expect(runMissionOpen(input, context)).rejects.toThrow(
     /bordbuch for system 'test-system' has 1.*violation/,
@@ -186,7 +187,7 @@ test("mission.open proceeds when bordbuch is clean (0 violations)", async () => 
   const input = {
     flags: { system: "test-system", brief: "Test mission 2", actor: "test-agent" },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   const result = await runMissionOpen(input, context);
   expect(result.data?.state).toBe("open");

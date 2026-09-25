@@ -16,8 +16,6 @@ returns the file content.
 </CHANGE_SUMMARY>
 */
 
-import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -26,6 +24,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "../mission/mission-io.ts";
 import { isClientEditable } from "./dna-22-checker.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkpieceReadResult {
   path: string;
@@ -54,7 +53,7 @@ export async function runWorkpieceRead(
   const { workspaceRoot, logger } = context;
 
   const manifestPath = path.join(resolveMissionDir(workspaceRoot, missionId), "mission.yaml");
-  if (!existsSync(manifestPath)) {
+  if (!await context.io.exists(manifestPath)) {
     throw new Error(`[workpiece.read] Mission '${missionId}' is not open or does not exist`);
   }
 
@@ -66,7 +65,7 @@ export async function runWorkpieceRead(
   }
 
   const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
-  if (!existsSync(workpieceDir)) {
+  if (!await context.io.exists(workpieceDir)) {
     throw new Error(
       `[workpiece.read] Workpiece for mission '${missionId}' not found. Run mission.materialize first.`,
     );
@@ -83,11 +82,11 @@ export async function runWorkpieceRead(
     throw new Error(`Path '${normalizedPath}' is outside client-editable surface (DNA-22)`);
   }
 
-  if (!existsSync(resolvedPath)) {
+  if (!await context.io.exists(resolvedPath)) {
     throw new Error(`[workpiece.read] File not found: ${normalizedPath}`);
   }
 
-  const content = await readFile(resolvedPath, "utf8");
+  const content = await context.io.readFile(resolvedPath);
   logger.info(`[workpiece.read] ${missionId}: read ${normalizedPath}`);
 
   return {

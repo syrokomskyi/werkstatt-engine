@@ -21,8 +21,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -33,6 +31,7 @@ import { resolveMissionDir } from "@warpgogol/werkstatt-engine/kernel";
 import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import { discoverSystems, readSystemState } from "../sternsystem/registry-io.ts";
 import { createR2Client, resolveR2ConfigFromEnv, MissingEnvError } from "./r2-client.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface EvidenceSyncResult {
   missionId: string;
@@ -64,16 +63,17 @@ function flagBool(input: KernelCommandInput, key: string): boolean {
 async function readEvidenceMetadata(
   evidenceDir: string,
   missionId: string,
+  io: WorkspaceIO,
 ): Promise<EvidenceMetadata> {
   const metaPath = path.join(evidenceDir, "evidence-metadata.json");
-  if (!existsSync(metaPath)) {
+  if (!(await io.exists(metaPath))) {
     throw new Error(
       `[evidence.sync] INVALID_EVIDENCE: evidence-metadata.json not found for mission '${missionId}' — run mission.check first`,
     );
   }
   let raw: string;
   try {
-    raw = await fs.readFile(metaPath, "utf8");
+    raw = await io.readFile(metaPath);
   } catch (err) {
     throw new Error(
       `[evidence.sync] INVALID_EVIDENCE: cannot read evidence-metadata.json for mission '${missionId}': ${err}`,
@@ -129,13 +129,13 @@ export async function runEvidenceSync(
   const missionDir = resolveMissionDir(workspaceRoot, missionId);
   const evidenceDir = path.join(missionDir, "evidence", "axiom");
 
-  if (!existsSync(evidenceDir)) {
+  if (!await context.io.exists(evidenceDir)) {
     throw new Error(
       `[evidence.sync] NOT_FOUND: evidence/axiom/ directory not found for mission '${missionId}'`,
     );
   }
 
-  const metadata = await readEvidenceMetadata(evidenceDir, missionId);
+  const metadata = await readEvidenceMetadata(evidenceDir, missionId, context.io);
   const runTimestamp = explicitRunTimestamp ?? metadata.runTimestamp!;
   const systemId = await resolveSystemId(workspaceRoot, missionId);
   const r2KeyPrefix = `${systemId}/${missionId}/${runTimestamp}/`;
@@ -197,7 +197,7 @@ export async function runEvidenceSync(
         const results = await Promise.allSettled(
           batch.map(async (relPath) => {
             const fullPath = path.join(evidenceDir, relPath);
-            const body = await fs.readFile(fullPath);
+            const body = await context.io.readFileBytes(fullPath);
             totalBytes += body.byteLength;
             await client.putObject({
               key: r2KeyPrefix + relPath,
@@ -246,7 +246,7 @@ export async function runEvidenceSync(
   } else {
     for (const relPath of relativeFiles) {
       const fullPath = path.join(evidenceDir, relPath);
-      const stat = await fs.stat(fullPath);
+      const stat = await context.io.stat(fullPath);
       totalBytes += stat.size;
       uploadedFiles.push(relPath);
     }

@@ -36,6 +36,7 @@ import { readMissionManifest } from "../mission-io.ts";
 import { resolveOperationSteps } from "../steps/index.ts";
 import { appendRecord } from "../../journal/index.ts";
 import type { OperationStep } from "../../journal/index.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 let missionDir: string;
@@ -79,7 +80,7 @@ test("mission.resume with no incomplete operation returns nothing to resume", as
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -149,7 +150,7 @@ test("mission.resume with incomplete operation calls resolveOperationSteps and r
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -176,7 +177,7 @@ test("mission.resume --abandon without --force returns error", async () => {
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -211,7 +212,7 @@ test("mission.resume --abandon --force appends op-abandoned", async () => {
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -237,7 +238,7 @@ test("mission.resume without --mission returns error", async () => {
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -279,7 +280,7 @@ test("mission.journal.show returns records and incomplete operation info", async
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -327,7 +328,7 @@ test("mission.journal.show with --op filter returns only matching records", asyn
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );
@@ -353,7 +354,7 @@ test("mission.journal.show with no journal returns empty records", async () => {
       dryRun: false,
       siteExplicit: false,
       outputFormat: "pretty",
-      io: {} as any,
+      io: createDefaultIO().io,
       actualState: undefined as never,
     },
   );

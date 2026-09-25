@@ -32,7 +32,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { createHash } from "node:crypto";
-import { readFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
@@ -48,6 +47,7 @@ import type {
   KernelRuntimeContext,
   ModuleExport,
 } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface CommandManifestEntry {
   name: string;
@@ -342,7 +342,7 @@ export async function runCommandManifestGenerate(
 
   if (!dryRun) {
     const outputPath = manifestFilePath(context.workspaceRoot);
-    await mkdir(dirname(outputPath), { recursive: true });
+    await context.io.mkdir(dirname(outputPath));
     await writeFileAtomic(
       outputPath,
       `${buildGeneratedHeader({ filePath: MANIFEST_RELATIVE_PATH, ownerCommand: "command.manifest.generate" })}${yamlStringify(manifest)}\n`,
@@ -378,7 +378,7 @@ export async function runCommandManifestValidate(
 
   let committedRaw: string | undefined;
   try {
-    committedRaw = await readFile(manifestFilePath(context.workspaceRoot), "utf8");
+    committedRaw = await context.io.readFile(manifestFilePath(context.workspaceRoot));
   } catch {
     committedRaw = undefined;
   }

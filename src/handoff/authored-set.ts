@@ -14,7 +14,6 @@ classifies non-code data (content, public, config) by marker + path rules.</purp
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import {
   createCompassInventoryEntries,
@@ -22,6 +21,7 @@ import {
   isGeneratedMarkerTextCandidate,
   type KernelCommandInput,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /** Code extensions Compass itself scans — for these we defer to the Compass inventory. */
 const CODE_EXT = new Set([".ts", ".tsx", ".astro", ".js", ".jsx", ".mjs", ".mts", ".css"]);
@@ -94,15 +94,15 @@ export interface AuthoredPartition {
 
 async function walkAppFiles(appDir: string): Promise<string[]> {
   const out: string[] = [];
-  async function rec(dir: string): Promise<void> {
+  async function rec(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      entries = await io.readdir(dir);
     } catch {
       return;
     }
     for (const e of entries) {
-      if (e.isDirectory()) {
+      if (e.isDirectory) {
         if (IGNORED_DIRS.has(e.name)) continue;
         await rec(path.join(dir, e.name));
       } else {
@@ -125,7 +125,7 @@ async function walkAppFiles(appDir: string): Promise<string[]> {
 export async function resolveAuthoredFiles(
   workspaceRoot: string,
   siteId: string,
-  input: KernelCommandInput,
+  input: KernelCommandInput, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<AuthoredPartition> {
   const appDir = path.resolve(workspaceRoot, "apps", siteId);
   const appPrefix = `apps/${siteId}/`;
@@ -186,7 +186,7 @@ export async function resolveAuthoredFiles(
     // Non-code data: the generated marker is authoritative for text candidates.
     if (isGeneratedMarkerTextCandidate(appRel)) {
       try {
-        const content = await fs.readFile(abs, "utf8");
+        const content = await io.readFile(abs);
         if (hasGeneratedMarker(content)) {
           excluded.push({ path: appRel, reason: "generated-marker" });
           continue;

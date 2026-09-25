@@ -16,15 +16,19 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { writeFile, rename, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // START_BLOCK_ATOMIC
 /** [CL-ATOMIC][atomicWrite][WRITTEN] path={targetPath} */
-export async function atomicWrite(targetPath: string, content: string): Promise<void> {
-  await mkdir(dirname(targetPath), { recursive: true });
+export async function atomicWrite(
+  targetPath: string,
+  content: string,
+  io: WorkspaceIO,
+): Promise<void> {
+  await io.mkdir(dirname(targetPath));
   const tmp = `${targetPath}.tmp`;
-  await writeFile(tmp, content, "utf-8");
-  await rename(tmp, targetPath);
+  await io.writeFile(tmp, content);
+  await io.rename(tmp, targetPath);
 }
 // END_BLOCK_ATOMIC

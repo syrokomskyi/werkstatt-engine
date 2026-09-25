@@ -17,6 +17,7 @@ import { runLeitstandCertify } from "../leitstand/certify.ts";
 import { evidenceEnvelopeV1Schema } from "../certification/contracts/evidence.ts";
 import type { KernelRuntimeContext, KernelCommandInput } from "@warpgogol/werkstatt-engine/kernel";
 import { vi } from "vitest";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("../mission/mission-git-commit.ts", () => ({
   cacheCloneCommit: () => {},
@@ -40,6 +41,7 @@ let cacheCloneDir: string;
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

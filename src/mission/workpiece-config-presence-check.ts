@@ -17,7 +17,6 @@ pass/fail status with restore commands for missing files.
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -26,6 +25,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { OPERATOR_CONFIG_FILES } from "./operator-config-files.ts";
 import { resolveMissionDir } from "./mission-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkpieceConfigPresenceResult {
   command: "workpiece.config.presence.check";
@@ -69,7 +69,7 @@ export async function runWorkpieceConfigPresenceCheck(
   const missionDir = resolveMissionDir(workspaceRoot, missionId);
   const workpieceDir = path.join(missionDir, "workpiece");
 
-  if (!existsSync(workpieceDir)) {
+  if (!await context.io.exists(workpieceDir)) {
     return {
       data: {
         command: "workpiece.config.presence.check",
@@ -89,7 +89,7 @@ export async function runWorkpieceConfigPresenceCheck(
 
   for (const entry of OPERATOR_CONFIG_FILES) {
     const fullPath = path.join(workpieceDir, entry);
-    if (existsSync(fullPath)) {
+    if (await context.io.exists(fullPath)) {
       present.push(entry);
     } else {
       missing.push({

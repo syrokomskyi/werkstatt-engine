@@ -12,7 +12,6 @@
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -20,6 +19,7 @@ import {
   type WerkstattIdentityConfig,
   type WerkstattCredential,
 } from "@warpgogol/werkstatt-shared/passport";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const IDENTITY_CONFIG_FILENAME = "werkstatt.identity.json";
 
@@ -27,18 +27,18 @@ export function identityConfigPath(workspaceRoot: string): string {
   return join(workspaceRoot, IDENTITY_CONFIG_FILENAME);
 }
 
-export async function readIdentityConfig(workspaceRoot: string): Promise<WerkstattIdentityConfig> {
-  const raw = await readFile(identityConfigPath(workspaceRoot), "utf-8");
+export async function readIdentityConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<WerkstattIdentityConfig> {
+  const raw = await io.readFile(identityConfigPath(workspaceRoot));
   const parsed = JSON.parse(raw);
   return WerkstattIdentityConfigSchema.parse(parsed);
 }
 
 export async function writeIdentityConfig(
   workspaceRoot: string,
-  config: WerkstattIdentityConfig,
+  config: WerkstattIdentityConfig, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const path = identityConfigPath(workspaceRoot);
-  await writeFile(path, JSON.stringify(config, null, 2) + "\n", "utf-8");
+  await io.writeFile(path, JSON.stringify(config, null, 2) + "\n");
 }
 
 export function generateCredentialId(): string {

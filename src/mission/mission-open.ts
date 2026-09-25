@@ -178,7 +178,7 @@ export async function runMissionOpen(
   // git pull --rebase to fail with "It seems that there is already a rebase-merge directory".
   // Auto-recover: abort the stale rebase and log a warning. Detached HEAD remains fail-fast.
   const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
-  if (existsSync(path.join(cacheDir, ".git"))) {
+  if (await context.io.exists(path.join(cacheDir, ".git"))) {
     // Check detached HEAD — fail-fast (requires operator decision)
     try {
       execSync("git symbolic-ref HEAD", {
@@ -193,7 +193,7 @@ export async function runMissionOpen(
       );
     }
     // Check stale rebase-merge — auto-recover + warn
-    if (existsSync(path.join(cacheDir, ".git", "rebase-merge"))) {
+    if (await context.io.exists(path.join(cacheDir, ".git", "rebase-merge"))) {
       logger.warn(
         `[mission.open] cache clone for '${systemId}' has stale rebase-merge — auto-aborting before bordbuch validation.`,
       );
@@ -294,7 +294,7 @@ export async function runMissionOpen(
     // Check pin file exists
     const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
     const pinPath = path.join(cacheDir, "system.pin.json");
-    if (!existsSync(pinPath)) {
+    if (!await context.io.exists(pinPath)) {
       throw new Error(
         `[mission.open] system '${systemId}' has no system.pin.json — run sternsystem.pin first`,
       );
@@ -438,10 +438,10 @@ export async function runMissionOpen(
 
         // RFC-1033: Preserve workpiece for post-failure debugging before cleanup.
         // Rename workpiece/ to workpiece-failed/ and write failure-report.json.
-        if (existsSync(workpieceDir)) {
+        if (await context.io.exists(workpieceDir)) {
           try {
             // If a previous workpiece-failed/ exists, remove it first
-            if (existsSync(workpieceFailedDir)) {
+            if (await context.io.exists(workpieceFailedDir)) {
               await fs.rm(workpieceFailedDir, { recursive: true, force: true });
             }
             await fs.rename(workpieceDir, workpieceFailedDir);
@@ -458,7 +458,7 @@ export async function runMissionOpen(
             failedStep,
             error: detail,
             rolledBackAt: new Date().toISOString(),
-            preservedAt: existsSync(workpieceFailedDir)
+            preservedAt: await context.io.exists(workpieceFailedDir)
               ? "missions/" + missionId + "/workpiece-failed"
               : null,
           };
@@ -496,7 +496,7 @@ export async function runMissionOpen(
         );
         // RFC-0985 Measure 3: Commit system-state.yaml to cache clone git
         const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
-        if (existsSync(path.join(cacheCloneDir, ".git"))) {
+        if (await context.io.exists(path.join(cacheCloneDir, ".git"))) {
           try {
             execSync(
               'git add system-state.yaml && git commit -m "mission.open rollback: clear currentMission"',
@@ -609,7 +609,7 @@ export async function buildOpenSteps(
         if (!existsSync(missionsDir)) return;
         const entries = readdirSync(missionsDir, { withFileTypes: true });
         for (const entry of entries) {
-          if (!entry.isDirectory() || entry.name === "archive") continue;
+          if (!entry.isDirectory || entry.name === "archive") continue;
           const marker = path.join(missionsDir, entry.name, ".rollback-pending");
           if (existsSync(marker)) {
             // Complete the rollback: remove mission dir, clear system-state

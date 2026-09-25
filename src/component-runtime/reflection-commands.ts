@@ -13,7 +13,6 @@
 </CHANGE_SUMMARY>
 */
 
-import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -36,7 +35,10 @@ export interface ReflectionCommandContext {
 }
 
 function parseContext(context: KernelRuntimeContext): ReflectionCommandContext {
-  const ctx = context as unknown as { reflectionInput?: ReflectionInput; lawKernelSummary?: LawKernelSummary };
+  const ctx = context as unknown as {
+    reflectionInput?: ReflectionInput;
+    lawKernelSummary?: LawKernelSummary;
+  };
   if (!ctx.reflectionInput) {
     throw new Error("REFLECTION-CMD-01: reflectionInput not provided in kernel context");
   }
@@ -53,7 +55,11 @@ export function runReflectGraph(
   const { reflectionInput, lawKernelSummary } = parseContext(context);
   const reflection = reflectRuntime(reflectionInput, lawKernelSummary);
   assertNoForbiddenFieldsReflection(reflection);
-  return { data: reflection, exitCode: 0, summary: `Reflected ${reflection.components.length} components` };
+  return {
+    data: reflection,
+    exitCode: 0,
+    summary: `Reflected ${reflection.components.length} components`,
+  };
 }
 
 export function runReflectCapabilities(
@@ -76,7 +82,11 @@ export function runReflectHealth(
     componentId: c.componentId,
     health: c.health ?? { status: "unknown" as const },
   }));
-  return { data: { ...reflection, components: healthResults as never }, exitCode: 0, summary: `Health checked ${healthResults.length} components` };
+  return {
+    data: { ...reflection, components: healthResults as never },
+    exitCode: 0,
+    summary: `Health checked ${healthResults.length} components`,
+  };
 }
 
 export function runReflectFibers(
@@ -92,24 +102,39 @@ export function runReflectFibers(
   return { data: fibers, exitCode: 0, summary: `${fibers.length} fiber states` };
 }
 
-export function runReflectCatalogGenerate(
+export async function runReflectCatalogGenerate(
   _input: KernelCommandInput,
   context: KernelRuntimeContext,
-): KernelCommandResult<{ path: string }> {
+): Promise<KernelCommandResult<{ path: string }>> {
   const { reflectionInput } = parseContext(context);
   const catalog = createCapabilityCatalog(reflectionInput);
   assertNoForbiddenFields(catalog);
 
   const outputPath = join(context.workspaceRoot, "docs", "runtime-catalog.generated.yaml");
   const yaml = catalogToYaml(catalog);
-  writeFileSync(outputPath, yaml, "utf-8");
+  await context.io.writeFile(outputPath, yaml);
 
-  return { data: { path: "docs/runtime-catalog.generated.yaml" }, exitCode: 0, summary: `Catalog written to docs/runtime-catalog.generated.yaml (${catalog.entries.length} entries)` };
+  return {
+    data: { path: "docs/runtime-catalog.generated.yaml" },
+    exitCode: 0,
+    summary: `Catalog written to docs/runtime-catalog.generated.yaml (${catalog.entries.length} entries)`,
+  };
 }
 
 function assertNoForbiddenFieldsReflection(reflection: RuntimeReflectionV1): void {
   const json = JSON.stringify(reflection);
-  const forbidden = ["secrets", "credentials", "privateState", "rawGrants", "prompts", "executableBytes", "leaseTokens", "authorityMaterial", "artifactBytes", "sourceCode"];
+  const forbidden = [
+    "secrets",
+    "credentials",
+    "privateState",
+    "rawGrants",
+    "prompts",
+    "executableBytes",
+    "leaseTokens",
+    "authorityMaterial",
+    "artifactBytes",
+    "sourceCode",
+  ];
   for (const field of forbidden) {
     if (json.includes(field)) {
       throw new Error(`REFLECTION-02: reflection contains forbidden field name: ${field}`);

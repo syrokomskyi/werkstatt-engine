@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { runSternsystemSync } from "./sternsystem-sync.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function git(cwd: string, args: string): string {
   return execSync(`git ${args}`, {
@@ -41,6 +42,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 function makeContext(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       section: () => {},

@@ -25,7 +25,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { GitMeshStatus } from "./types.ts";
@@ -36,6 +35,7 @@ import {
   gitRevParseHead,
   gitRevParseRemote,
 } from "./git-ops.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const LAST_SYNC_FILE = ".git/gitmesh.last-sync";
 
@@ -100,7 +100,7 @@ export async function runGitMeshStatus(
   // Read last sync time
   let lastSync = "";
   try {
-    lastSync = await readFile(join(workspaceRoot, LAST_SYNC_FILE), "utf8");
+    lastSync = await context.io.readFile(join(workspaceRoot, LAST_SYNC_FILE));
     lastSync = lastSync.trim();
   } catch {
     // No last sync file — never synced

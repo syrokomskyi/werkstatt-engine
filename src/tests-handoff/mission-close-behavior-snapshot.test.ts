@@ -13,6 +13,7 @@ import { test, expect, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   executeKernelCommandCalls: [] as Array<Record<string, unknown>>,
@@ -45,6 +46,7 @@ vi.mock("../mission/mission-git-commit.ts", () => ({
 function makeCtx(overrides: Record<string, unknown> = {}) {
   const workpieceDir = mkdtempSync(join(tmpdir(), "mission-close-snapshot-test-"));
   return {
+    io: createDefaultIO().io,
     workspaceRoot: "/tmp/workspace",
     missionId: "test-mission",
     missionDir: "/tmp/workspace/missions/test-mission",

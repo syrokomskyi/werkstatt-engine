@@ -12,10 +12,6 @@
 </CHANGE_SUMMARY>
 */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-import fs from "node:fs/promises";
 import path from "node:path";
 
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
@@ -28,6 +24,7 @@ import type {
 import { resolvePlatformSemanticHash } from "./bundle-io.ts";
 import { hasPlatformScopeFiles, hasTrailer } from "./platform-scope.ts";
 import { compareSemver } from "./semver.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface PlatformConsistencyData {
   currentHash: string;
@@ -65,14 +62,15 @@ async function findRfcsWithVersionBump(
   rfcDir: string,
   since: string,
   predicate: (vb: string) => boolean,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<RfcVersionBumpMatch[]> {
   const results: RfcVersionBumpMatch[] = [];
   try {
-    const rfcFiles = await fs.readdir(rfcDir);
+    const rfcFiles = await io.readdir(rfcDir);
     for (const file of rfcFiles) {
-      if (!file.endsWith(".md") || file.startsWith("rfc-0000")) continue;
-      const filePath = path.join(rfcDir, file);
-      const content = await fs.readFile(filePath, "utf-8");
+      if (!file.name.endsWith(".md") || file.name.startsWith("rfc-0000")) continue;
+      const filePath = path.join(rfcDir, file.name);
+      const content = await io.readFile(filePath);
       const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
       if (!fmMatch) continue;
       const fm = yamlParse(fmMatch[1]) as Record<string, unknown>;
@@ -88,8 +86,6 @@ async function findRfcsWithVersionBump(
   return results;
 }
 
-const execFileAsync = promisify(execFile);
-
 /**
  * RFC-0533 PC-04: the commit SHA that introduced the PC-04 rule.
  * Commits before this SHA are exempt — the rule is not retroactive.
@@ -104,43 +100,54 @@ interface GitLogCommit {
   files: string[];
 }
 
-async function getGitLogSince(workspaceRoot: string, sinceSha: string): Promise<GitLogCommit[]> {
+async function getGitLogSince(
+  workspaceRoot: string,
+  sinceSha: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<GitLogCommit[]> {
   try {
     // If cutoff is not a real SHA or doesn't exist in this repo, use the root commit
     let effectiveSince = sinceSha;
     if (sinceSha === "0000000" || sinceSha.length < 7) {
       try {
-        const { stdout: rootSha } = await execFileAsync(
-          "git",
-          ["rev-list", "--max-parents=0", "HEAD"],
-          { cwd: workspaceRoot },
-        );
-        effectiveSince = rootSha.trim();
+        const rootResult = await io.exec("git", ["rev-list", "--max-parents=0", "HEAD"], {
+          cwd: workspaceRoot,
+        });
+        if (rootResult.exitCode !== 0) {
+          throw new Error(`git rev-list exited ${rootResult.exitCode}`);
+        }
+        effectiveSince = rootResult.stdout.trim();
       } catch {
         return [];
       }
     } else {
       // Verify the SHA exists in this repo
       try {
-        await execFileAsync("git", ["cat-file", "-e", sinceSha], { cwd: workspaceRoot });
+        const catResult = await io.exec("git", ["cat-file", "-e", sinceSha], {
+          cwd: workspaceRoot,
+        });
+        if (catResult.exitCode !== 0) {
+          throw new Error(`git cat-file exited ${catResult.exitCode}`);
+        }
       } catch {
         // SHA doesn't exist — fall back to root commit
         try {
-          const { stdout: rootSha } = await execFileAsync(
-            "git",
-            ["rev-list", "--max-parents=0", "HEAD"],
-            { cwd: workspaceRoot },
-          );
-          effectiveSince = rootSha.trim();
+          const rootResult = await io.exec("git", ["rev-list", "--max-parents=0", "HEAD"], {
+            cwd: workspaceRoot,
+          });
+          if (rootResult.exitCode !== 0) {
+            throw new Error(`git rev-list exited ${rootResult.exitCode}`);
+          }
+          effectiveSince = rootResult.stdout.trim();
         } catch {
           return [];
         }
       }
     }
-    const { stdout } = await execFileAsync(
+    const { stdout } = await io.exec(
       "git",
       ["log", `${effectiveSince}..HEAD`, "--format=__COMMIT__%H%n%P%n%B%n__FILES__", "--name-only"],
-      { cwd: workspaceRoot, maxBuffer: 10 * 1024 * 1024 },
+      { cwd: workspaceRoot },
     );
     const commits: GitLogCommit[] = [];
     const blocks = stdout.split("__COMMIT__");
@@ -199,7 +206,7 @@ export async function runPlatformConsistencyValidate(
 
   let packageJson: { version?: string };
   try {
-    packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf-8")) as { version?: string };
+    packageJson = JSON.parse(await context.io.readFile(packageJsonPath)) as { version?: string };
   } catch {
     throw new Error("[platform.consistency.validate] Could not read root package.json");
   }
@@ -207,7 +214,7 @@ export async function runPlatformConsistencyValidate(
 
   let lastLog: PlatformVersionLogEntry | null = null;
   try {
-    const logContent = await fs.readFile(logPath, "utf-8");
+    const logContent = await context.io.readFile(logPath);
     lastLog = yamlParse(logContent) as PlatformVersionLogEntry;
   } catch {
     // first run — no log file
@@ -283,8 +290,8 @@ export async function runPlatformConsistencyValidate(
       validatedAt,
     };
     const logYaml = yamlStringify(logEntry);
-    await fs.mkdir(path.dirname(logPath), { recursive: true });
-    await fs.writeFile(logPath, logYaml, "utf-8");
+    await context.io.mkdir(path.dirname(logPath));
+    await context.io.writeFile(logPath, logYaml);
   }
 
   const data: PlatformConsistencyData = {

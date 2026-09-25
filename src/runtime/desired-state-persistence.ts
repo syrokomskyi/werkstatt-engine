@@ -15,11 +15,11 @@ last persisted desired state, compare it with actual state, and correct drift.
 </CHANGE_SUMMARY>
 */
 
-import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { DesiredState, ComponentDeclaration } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /**
  * On-disk schema for persisted desired state.
@@ -40,7 +40,7 @@ interface PersistedDesiredState {
  */
 export async function persistDesiredState(
   desired: DesiredState,
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const dir = join(workspaceRoot, ".werkstatt");
   const filePath = join(dir, "desired-state.json");
@@ -54,7 +54,7 @@ export async function persistDesiredState(
     profileId: desired.profileId,
   };
 
-  await mkdir(dir, { recursive: true });
+  await io.mkdir(dir);
   await writeFileAtomic(filePath, JSON.stringify(persisted, null, 2) + "\n");
 }
 
@@ -63,13 +63,13 @@ export async function persistDesiredState(
  * Returns null if the file does not exist or is corrupt (logs warning).
  */
 export async function loadPersistedDesiredState(
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DesiredState | null> {
   const filePath = join(workspaceRoot, ".werkstatt", "desired-state.json");
 
   let raw: string;
   try {
-    raw = await readFile(filePath, "utf8");
+    raw = await io.readFile(filePath);
   } catch {
     return null;
   }

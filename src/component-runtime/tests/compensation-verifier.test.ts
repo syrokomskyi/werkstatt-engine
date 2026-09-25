@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { CompensationStore } from "../compensation-store.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { CompensationVerifier } from "../compensation-verifier.ts";
 import type { CompensationAction } from "@warpgogol/werkstatt-shared/component";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
@@ -12,7 +13,7 @@ const COMP_HASH = `sha256:${"b".repeat(64)}` as Sha256Digest;
 
 function makeContext(): KernelRuntimeContext {
   return {
-    io: {} as never,
+    io: createDefaultIO().io,
     registry: {} as never,
   } as unknown as KernelRuntimeContext;
 }
@@ -34,9 +35,9 @@ describe("CompensationVerifier", () => {
   let store: CompensationStore;
   let verifier: CompensationVerifier;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = mkdtempSync(join(process.cwd(), "tmp-comp-verifier-"));
-    store = new CompensationStore(join(tmpDir, "evidence.db"));
+    store = await CompensationStore.create(join(tmpDir, "evidence.db"), createDefaultIO().io);
     verifier = new CompensationVerifier(store, makeContext());
   });
 

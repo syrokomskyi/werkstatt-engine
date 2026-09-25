@@ -19,6 +19,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@warpgogol/werkstatt-engine/kernel")>();
@@ -153,6 +154,7 @@ test("reconcile sets divergenceWarning with diverged=false when cache clone HEAD
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -240,6 +242,7 @@ test("reconcile sets divergenceWarning with diverged=true when cache clone HEAD 
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -286,6 +289,7 @@ test("reconcile sets divergenceWarning to null when git rev-parse origin/main fa
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;

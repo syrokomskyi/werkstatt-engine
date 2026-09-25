@@ -47,6 +47,7 @@ import type {
   AuthorityEvidenceV1,
   ArtifactEvidenceV1,
 } from "../evolution/contracts.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const D =
   "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
@@ -1059,6 +1060,7 @@ describe("bordbuch integration (AC-11)", () => {
 
   it("records candidate event in bordbuch with candidateId, state, and artifactHash", async () => {
     const context = {
+      io: createDefaultIO().io,
       workspaceRoot: tmpDir,
       site: { name: "test-system" },
       logger: { warn: () => {}, info: () => {}, success: () => {}, error: () => {} },

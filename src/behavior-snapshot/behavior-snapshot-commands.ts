@@ -19,8 +19,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import type {
@@ -37,6 +35,7 @@ import {
 import { isHtmlRedirectPage } from "@warpgogol/werkstatt-shared/semantic";
 import { hashHtml } from "@warpgogol/werkstatt-engine/fingerprint";
 import type { RouteFact } from "@warpgogol/werkstatt-engine/schemas";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -80,16 +79,17 @@ export function isRouteRedirected(routePath: string, rules: RedirectRule[]): boo
 export async function collectRoutes(
   distDir: string,
   redirectRules: RedirectRule[] = [],
+  io: WorkspaceIO,
 ): Promise<RouteFact[]> {
   const routes: RouteFact[] = [];
-  if (!existsSync(distDir)) return routes;
+  if (!(await io.exists(distDir))) return routes;
 
   for (const fullPath of await collectFiles(distDir, { extensions: [".html"] })) {
     if (path.basename(fullPath) !== "index.html") continue;
     const relPath = path.relative(distDir, fullPath).replace(/\\/g, "/");
     const routePath = "/" + relPath.replace(/index\.html$/, "").replace(/\/$/, "");
     if (isRouteRedirected(routePath || "/", redirectRules)) continue;
-    const html = await fs.readFile(fullPath, "utf8");
+    const html = await io.readFile(fullPath);
     if (isHtmlRedirectPage(html)) {
       const redirectTarget = extractRedirectTarget(html) ?? "unknown";
       routes.push({ path: routePath || "/", contentHash: null, redirectTarget });
@@ -103,9 +103,9 @@ export async function collectRoutes(
   return routes;
 }
 
-async function hashFileIfExists(filePath: string): Promise<string> {
-  if (!existsSync(filePath)) return "sha256:absent";
-  const content = await fs.readFile(filePath);
+async function hashFileIfExists(filePath: string, io: WorkspaceIO): Promise<string> {
+  if (!(await io.exists(filePath))) return "sha256:absent";
+  const content = await io.readFile(filePath);
   return `sha256:${crypto.createHash("sha256").update(content).digest("hex")}`;
 }
 
@@ -141,21 +141,23 @@ export async function runBehaviorSnapshotCapture(
   }
 
   const distDir = path.resolve(workspaceRoot, distPath);
-  if (!existsSync(distDir)) {
+  if (!(await context.io.exists(distDir))) {
     throw new Error(`[behavior.snapshot.capture] dist directory not found: ${distDir}`);
   }
 
   const redirectsPath = path.join(distDir, "_redirects");
-  const redirectsContent = existsSync(redirectsPath)
-    ? await fs.readFile(redirectsPath, "utf8")
+  const redirectsContent = (await context.io.exists(redirectsPath))
+    ? await context.io.readFile(redirectsPath)
     : "";
   const redirectRules = redirectsContent ? parseRedirectRules(redirectsContent) : [];
 
-  const routes = await collectRoutes(distDir, redirectRules);
+  const routes = await collectRoutes(distDir, redirectRules, context.io);
   const sitemapPath = path.join(distDir, "sitemap.xml");
-  const sitemapHash = await hashFileIfExists(sitemapPath);
+  const sitemapHash = await hashFileIfExists(sitemapPath, context.io);
   const robotsPath = path.join(distDir, "robots.txt");
-  const robotsContent = existsSync(robotsPath) ? await fs.readFile(robotsPath, "utf8") : "";
+  const robotsContent = (await context.io.exists(robotsPath))
+    ? await context.io.readFile(robotsPath)
+    : "";
   const headersPath = path.join(distDir, "_headers");
 
   const snapshot: BehaviorSnapshot = {
@@ -164,7 +166,7 @@ export async function runBehaviorSnapshotCapture(
     sitemapHash,
     llmsHashes: {},
     robotsDirectives: robotsContent,
-    headersHash: await hashFileIfExists(headersPath),
+    headersHash: await hashFileIfExists(headersPath, context.io),
     redirectsHash: redirectsContent ? await hashContent(redirectsContent) : "sha256:absent",
   };
 
@@ -224,15 +226,15 @@ export async function runBehaviorSnapshotDiff(
   const baselineFile = path.resolve(workspaceRoot, baselinePath);
   const candidateFile = path.resolve(workspaceRoot, candidatePath);
 
-  if (!existsSync(baselineFile)) {
+  if (!(await context.io.exists(baselineFile))) {
     throw new Error(`[behavior.snapshot.diff] baseline not found: ${baselineFile}`);
   }
-  if (!existsSync(candidateFile)) {
+  if (!(await context.io.exists(candidateFile))) {
     throw new Error(`[behavior.snapshot.diff] candidate not found: ${candidateFile}`);
   }
 
-  const baselineRaw = JSON.parse(await fs.readFile(baselineFile, "utf8"));
-  const candidateRaw = JSON.parse(await fs.readFile(candidateFile, "utf8"));
+  const baselineRaw = JSON.parse(await context.io.readFile(baselineFile));
+  const candidateRaw = JSON.parse(await context.io.readFile(candidateFile));
 
   const baseline = baselineRaw.behaviorSnapshot ?? baselineRaw;
   const candidate = candidateRaw.behaviorSnapshot ?? candidateRaw;

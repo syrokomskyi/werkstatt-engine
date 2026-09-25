@@ -15,7 +15,6 @@ to build.prepare/build.check. Red-tier requires --force; --report-only stops bef
 */
 
 import path from "node:path";
-import fs from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -35,6 +34,7 @@ import { injectAuthoredSet, loadAuthoredSet, runRegeneration } from "./materiali
 import { buildValidationPack, diffValidationPacks } from "./validation-pack.ts";
 import { reportDerivedEdits } from "./derived-edits.ts";
 import type { CatchupReport } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface HandoffAbsorbData {
   bundleDir: string;
@@ -46,9 +46,9 @@ export interface HandoffAbsorbData {
   validationClean?: boolean;
 }
 
-async function pathExists(p: string): Promise<boolean> {
+async function pathExists(p: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   try {
-    await fs.stat(p);
+    await io.stat(p);
     return true;
   } catch {
     return false;
@@ -170,7 +170,7 @@ export async function runHandoffAbsorb(
 
   const loaded = await loadAuthoredSet(bundleDir, manifest);
 
-  await fs.mkdir(targetDir, { recursive: true });
+  await context.io.mkdir(targetDir);
   const filesInjected = await injectAuthoredSet(targetDir, loaded);
 
   logger.section(`[handoff.absorb] materialize → apps/${targetApp}${isNewApp ? " (new app)" : ""}`);

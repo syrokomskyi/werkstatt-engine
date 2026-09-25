@@ -14,7 +14,6 @@ and an authored/derived manifest. No packages/, node_modules/, dist/, or *.gener
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import {
   handoffLockSchema,
@@ -36,17 +35,18 @@ import {
 import { allMigratorIds } from "../migrators/registry.ts";
 import { resolveAuthoredFiles } from "./authored-set.ts";
 import { buildValidationPack } from "./validation-pack.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const LOCK_SCHEMA_VERSION = "1.0.0";
 const ZERO_HASH = `sha256:${"0".repeat(64)}`;
 
 async function walkFiles(root: string): Promise<string[]> {
   const out: string[] = [];
-  async function rec(dir: string): Promise<void> {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+  async function rec(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+    const entries = await io.readdir(dir);
     for (const e of entries) {
       const abs = path.join(dir, e.name);
-      if (e.isDirectory()) await rec(abs);
+      if (e.isDirectory) await rec(abs);
       else out.push(abs);
     }
   }
@@ -54,12 +54,12 @@ async function walkFiles(root: string): Promise<string[]> {
   return out;
 }
 
-async function highestRfcId(workspaceRoot: string): Promise<string> {
+async function highestRfcId(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<string> {
   try {
-    const files = await fs.readdir(path.join(workspaceRoot, "docs", "rfcs"));
+    const files = await io.readdir(path.join(workspaceRoot, "docs", "rfcs"));
     let max = 0;
     for (const f of files) {
-      const m = /^RFC-(\d{4})/.exec(f);
+      const m = /^RFC-(\d{4})/.exec(f.name);
       if (m) max = Math.max(max, Number(m[1]));
     }
     return `RFC-${String(max).padStart(4, "0")}`;
@@ -73,9 +73,9 @@ async function highestRfcId(workspaceRoot: string): Promise<string> {
  * uni.registry component surface (over-inclusion is safe for the diff — unused entries
  * stay green). Narrowing to the app's resolved component graph is a follow-up.
  */
-async function snapshotCapabilities(workspaceRoot: string): Promise<HandoffCapability[]> {
+async function snapshotCapabilities(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<HandoffCapability[]> {
   try {
-    const raw = await fs.readFile(path.join(workspaceRoot, "uni.registry.yaml"), "utf8");
+    const raw = await io.readFile(path.join(workspaceRoot, "uni.registry.yaml"));
     const parsed = JSON.parse(raw) as {
       entries?: { id: string; semanticId?: string; version: string; intent?: string[] }[];
     };
@@ -116,7 +116,7 @@ export async function runHandoffPack(
 
   const sourceSiteDir = path.resolve(workspaceRoot, "apps", siteName);
   try {
-    await fs.stat(sourceSiteDir);
+    await context.io.stat(sourceSiteDir);
   } catch {
     throw new Error(`[handoff.pack] no site at apps/${siteName}`);
   }
@@ -136,10 +136,7 @@ export async function runHandoffPack(
   let systemHash = ZERO_HASH;
   let buildCommit = commit === "unknown" ? "0000000" : commit;
   try {
-    const passportRaw = await fs.readFile(
-      path.join(sourceSiteDir, "dist", ".well-known", "cosmic-passport.json"),
-      "utf8",
-    );
+    const passportRaw = await context.io.readFile(path.join(sourceSiteDir, "dist", ".well-known", "cosmic-passport.json"));
     const passport = JSON.parse(passportRaw) as {
       composition?: { systemHash?: string };
       provenance?: { commitSha?: string };
@@ -186,26 +183,26 @@ export async function runHandoffPack(
 
   // Clear and rebuild the bundle (preserve .git so a per-client repo survives).
   try {
-    for (const entry of await fs.readdir(bundleDir)) {
-      if (entry === ".git") continue;
-      await fs.rm(path.join(bundleDir, entry), { recursive: true, force: true });
+    for (const entry of await context.io.readdir(bundleDir)) {
+      if (entry.name === ".git") continue;
+      await context.io.rm(path.join(bundleDir, entry.name), { recursive: true });
     }
   } catch {
-    await fs.mkdir(bundleDir, { recursive: true });
+    await context.io.mkdir(bundleDir);
   }
-  await fs.mkdir(siteDir, { recursive: true });
+  await context.io.mkdir(siteDir);
 
   // Copy the Compass-complete authored partition (one file at a time).
   for (const rel of partition.authored) {
     const src = path.join(sourceSiteDir, rel);
     const dest = path.join(siteDir, rel);
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.copyFile(src, dest);
+    await context.io.mkdir(path.dirname(dest));
+    await context.io.copyFile(src, dest);
   }
 
   // Snapshot provenance.
   const provDir = path.join(bundleDir, "provenance");
-  await fs.mkdir(provDir, { recursive: true });
+  await context.io.mkdir(provDir);
   for (const [from, to] of [
     [
       path.join(sourceSiteDir, "dist", ".well-known", "cosmic-passport.json"),
@@ -214,7 +211,7 @@ export async function runHandoffPack(
     [path.join(sourceSiteDir, "provenance", "coverage-ledger.yaml"), "coverage-ledger.yaml"],
   ] as const) {
     try {
-      await fs.copyFile(from, path.join(provDir, to));
+      await context.io.copyFile(from, path.join(provDir, to));
     } catch {
       /* absent — skip */
     }
@@ -222,22 +219,14 @@ export async function runHandoffPack(
 
   // Golden validation pack — significant properties of the last build (for absorb to diff against).
   const validationDir = path.join(bundleDir, "validation");
-  await fs.mkdir(validationDir, { recursive: true });
+  await context.io.mkdir(validationDir);
   const golden = await buildValidationPack(sourceSiteDir);
-  await fs.writeFile(
-    path.join(validationDir, "pack.json"),
-    `${JSON.stringify(golden, null, 2)}\n`,
-    "utf8",
-  );
+  await context.io.writeFile(path.join(validationDir, "pack.json"), `${JSON.stringify(golden, null, 2)}\n`);
   try {
-    const outDir = await fs
-      .stat(path.join(sourceSiteDir, "dist", "client"))
+    const outDir = await context.io.stat(path.join(sourceSiteDir, "dist", "client"))
       .then(() => "dist/client")
       .catch(() => "dist");
-    await fs.copyFile(
-      path.join(sourceSiteDir, outDir, "sitemap.xml"),
-      path.join(validationDir, "sitemap.snapshot.xml"),
-    );
+    await context.io.copyFile(path.join(sourceSiteDir, outDir, "sitemap.xml"), path.join(validationDir, "sitemap.snapshot.xml"));
   } catch {
     /* no sitemap — skip snapshot */
   }
@@ -262,16 +251,8 @@ export async function runHandoffPack(
     entries,
   });
 
-  await fs.writeFile(
-    path.join(bundleDir, "handoff-lock.json"),
-    `${JSON.stringify(lock, null, 2)}\n`,
-    "utf8",
-  );
-  await fs.writeFile(
-    path.join(bundleDir, "handoff-manifest.json"),
-    `${JSON.stringify(manifest, null, 2)}\n`,
-    "utf8",
-  );
+  await context.io.writeFile(path.join(bundleDir, "handoff-lock.json"), `${JSON.stringify(lock, null, 2)}\n`);
+  await context.io.writeFile(path.join(bundleDir, "handoff-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   logger.success(`[handoff.pack] packed ${entries.length} authored file(s) → ${bundleDir}`);
   return {

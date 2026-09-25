@@ -14,11 +14,11 @@ frontmatter. This completes the RFC-0471 content migration that was left incompl
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
 import { parseFrontmatter, serializeFrontmatter } from "./yaml-utils.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0481_MIGRATOR_ID = "rfc-0481";
 
@@ -90,9 +90,9 @@ function mapCompanyToBusiness(
   return business;
 }
 
-async function isPbpBusinessFile(filePath: string): Promise<boolean> {
+async function isPbpBusinessFile(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   try {
-    const raw = await fs.readFile(filePath, "utf8");
+    const raw = await io.readFile(filePath);
     return raw.includes("schema: pbp/business@1") || raw.includes('schema: "pbp/business@1"');
   } catch {
     return false;
@@ -101,7 +101,7 @@ async function isPbpBusinessFile(filePath: string): Promise<boolean> {
 
 async function transformBusinessSingleton(
   data: SternsystemData,
-  ctx: MigrationContext,
+  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const locales = await readLocalesSafe(data.rootPath, ctx);
 
@@ -126,7 +126,7 @@ async function transformBusinessSingleton(
 
     let sourceRaw: string;
     try {
-      sourceRaw = await fs.readFile(sourcePath, "utf8");
+      sourceRaw = await io.readFile(sourcePath);
     } catch {
       throw new MigrationError(
         RFC_0481_MIGRATOR_ID,
@@ -140,18 +140,18 @@ async function transformBusinessSingleton(
     const business = mapCompanyToBusiness(frontmatter, lang);
     const output = serializeFrontmatter(business);
 
-    await fs.mkdir(path.dirname(targetPath), { recursive: true });
-    await fs.writeFile(targetPath, output, "utf8");
+    await io.mkdir(path.dirname(targetPath));
+    await io.writeFile(targetPath, output);
     ctx.logger.info(`[migrator rfc-0481] created business-profile/${lang}/business.md`);
   }
 
   return data;
 }
 
-export async function readLocalesSafe(rootPath: string, ctx: MigrationContext): Promise<string[]> {
+export async function readLocalesSafe(rootPath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
   const systemMdPath = path.join(rootPath, "src", "content", "system.md");
   try {
-    const raw = await fs.readFile(systemMdPath, "utf8");
+    const raw = await io.readFile(systemMdPath);
     const { frontmatter } = parseFrontmatter(raw);
     const i18n = frontmatter.i18n as
       { supported?: Record<string, unknown>; default?: string } | undefined;

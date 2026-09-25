@@ -18,7 +18,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -58,8 +57,8 @@ export async function runDeployArtifactGc(
   const dryRun = flagBool(input, "dry-run");
   const retention = flagNumber(input, "retain", DEFAULT_RETENTION);
 
-  const currentHash = readSymlinkBasename(currentSymlinkPath(workspaceRoot));
-  const previousHash = readSymlinkBasename(previousSymlinkPath(workspaceRoot));
+  const currentHash = await readSymlinkBasename(currentSymlinkPath(workspaceRoot), context.io);
+  const previousHash = await readSymlinkBasename(previousSymlinkPath(workspaceRoot), context.io);
 
   const referenced = new Set<string>();
   if (currentHash) referenced.add(currentHash);
@@ -77,7 +76,7 @@ export async function runDeployArtifactGc(
   for (const hash of allHashes) {
     const dir = artifactDir(workspaceRoot, hash);
     try {
-      const stat = await fs.stat(dir);
+      const stat = await context.io.stat(dir);
       sortedByTime.push({ hash, mtime: stat.mtimeMs });
     } catch {
       // skip
@@ -109,7 +108,7 @@ export async function runDeployArtifactGc(
     for (const candidate of candidates) {
       const dir = artifactDir(workspaceRoot, candidate.hash);
       try {
-        await fs.rm(dir, { recursive: true, force: true });
+        await context.io.rm(dir, { recursive: true });
         deleted++;
       } catch (err) {
         logger.error(

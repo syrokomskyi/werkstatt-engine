@@ -18,11 +18,11 @@ Idempotent: running twice produces no changes on already-migrated files.</purpos
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type FileStat, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0500_MIGRATOR_ID = "rfc-0500";
 
@@ -74,22 +74,22 @@ function sectionsToProse(sections: Section[]): string {
 async function findMarkdownFiles(dir: string): Promise<string[]> {
   const results: string[] = [];
 
-  async function walk(d: string): Promise<void> {
+  async function walk(d: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {
-      entries = await fs.readdir(d);
+      entries = (await io.readdir(d)).map(e => e.name);
     } catch {
       return;
     }
     for (const entry of entries) {
       const fullPath = path.join(d, entry);
-      let stat: Awaited<ReturnType<typeof fs.stat>>;
+      let stat: FileStat;
       try {
-        stat = await fs.stat(fullPath);
+        stat = await io.stat(fullPath);
       } catch {
         continue;
       }
-      if (stat.isDirectory()) {
+      if (stat.isDirectory) {
         await walk(fullPath);
       } else if (entry.endsWith(".md")) {
         results.push(fullPath);
@@ -101,19 +101,19 @@ async function findMarkdownFiles(dir: string): Promise<string[]> {
   return results;
 }
 
-async function dirExists(dir: string): Promise<boolean> {
+async function dirExists(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   try {
-    const stat = await fs.stat(dir);
-    return stat.isDirectory();
+    const stat = await io.stat(dir);
+    return stat.isDirectory;
   } catch {
     return false;
   }
 }
 
-async function fileExists(file: string): Promise<boolean> {
+async function fileExists(file: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   try {
-    const stat = await fs.stat(file);
-    return stat.isFile();
+    const stat = await io.stat(file);
+    return stat.isFile;
   } catch {
     return false;
   }
@@ -145,7 +145,7 @@ Artikel rund um lokale Online-Sichtbarkeit, Google Business Profile und Auffindb
 
 async function transformTopicsToArticles(
   data: SternsystemData,
-  ctx: MigrationContext,
+  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const topicsDir = path.join(data.rootPath, "src", "content", "surface", "topics");
   const articlesDir = path.join(data.rootPath, "src", "content", "surface", "articles");
@@ -162,20 +162,20 @@ async function transformTopicsToArticles(
   }
 
   if (topicsExists && !articlesExists) {
-    await fs.mkdir(articlesDir, { recursive: true });
-    const langDirs = await fs.readdir(topicsDir);
+    await io.mkdir(articlesDir);
+    const langDirs = await io.readdir(topicsDir);
     for (const langDir of langDirs) {
-      const srcLangPath = path.join(topicsDir, langDir);
-      const stat = await fs.stat(srcLangPath).catch(() => null);
-      if (!stat || !stat.isDirectory()) continue;
-      const destLangPath = path.join(articlesDir, langDir);
-      await fs.mkdir(destLangPath, { recursive: true });
+      const srcLangPath = path.join(topicsDir, langDir.name);
+      const stat = await io.stat(srcLangPath).catch(() => null);
+      if (!stat || !stat.isDirectory) continue;
+      const destLangPath = path.join(articlesDir, langDir.name);
+      await io.mkdir(destLangPath);
       const files = await findMarkdownFiles(srcLangPath);
       for (const file of files) {
         const relName = path.relative(srcLangPath, file);
         const destFile = path.join(destLangPath, relName);
-        await fs.mkdir(path.dirname(destFile), { recursive: true });
-        await fs.copyFile(file, destFile);
+        await io.mkdir(path.dirname(destFile));
+        await io.copyFile(file, destFile);
       }
     }
     ctx.logger.info("[migrator rfc-0500] copied topics/ → articles/");
@@ -185,7 +185,7 @@ async function transformTopicsToArticles(
   for (const filePath of articleFiles) {
     let raw: string;
     try {
-      raw = await fs.readFile(filePath, "utf8");
+      raw = await io.readFile(filePath);
     } catch {
       ctx.logger.info(`[migrator rfc-0500] skip unreadable file: ${filePath}`);
       continue;
@@ -223,7 +223,7 @@ async function transformTopicsToArticles(
       ctx.logger.info(
         `[migrator rfc-0500] removing FAQ-only article: ${path.relative(data.rootPath, filePath)}`,
       );
-      await fs.unlink(filePath);
+      await io.rm(filePath);
       continue;
     }
 
@@ -239,9 +239,9 @@ async function transformTopicsToArticles(
       const proseFileName = `ratgeber-${lang}-${slug}.md`;
       const proseFilePath = path.join(proseDir, proseFileName);
 
-      await fs.mkdir(proseDir, { recursive: true });
+      await io.mkdir(proseDir);
       const proseContent = sectionsToProse(sections as Section[]);
-      await fs.writeFile(proseFilePath, proseContent, "utf8");
+      await io.writeFile(proseFilePath, proseContent);
       ctx.logger.info(
         `[migrator rfc-0500] wrote prose: ${path.relative(data.rootPath, proseFilePath)}`,
       );
@@ -251,13 +251,13 @@ async function transformTopicsToArticles(
 
     if (before !== after || transformed.sections === undefined) {
       const output = "---\n" + stringifyYaml(transformed) + "---\n" + body;
-      await fs.writeFile(filePath, output, "utf8");
+      await io.writeFile(filePath, output);
       ctx.logger.info(`[migrator rfc-0500] transformed: ${path.relative(data.rootPath, filePath)}`);
     }
   }
 
   if (topicsExists) {
-    await fs.rm(topicsDir, { recursive: true }).catch(() => {
+    await io.rm(topicsDir, { recursive: true }).catch(() => {
       ctx.logger.info("[migrator rfc-0500] could not remove old topics/ directory");
     });
   }
@@ -266,18 +266,18 @@ async function transformTopicsToArticles(
   const categoriesDir = path.join(data.rootPath, "src", "content", "surface", "article-categories");
   const categoriesExist = await dirExists(categoriesDir);
   if (!categoriesExist) {
-    await fs.mkdir(categoriesDir, { recursive: true });
-    const langDirs = await fs.readdir(articlesDir).catch(() => []);
+    await io.mkdir(categoriesDir);
+    const langDirs = await io.readdir(articlesDir).catch(() => []);
     for (const langDir of langDirs) {
-      const langPath = path.join(articlesDir, langDir);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat || !stat.isDirectory()) continue;
-      const destLangPath = path.join(categoriesDir, langDir);
-      await fs.mkdir(destLangPath, { recursive: true });
+      const langPath = path.join(articlesDir, langDir.name);
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat || !stat.isDirectory) continue;
+      const destLangPath = path.join(categoriesDir, langDir.name);
+      await io.mkdir(destLangPath);
 
       const kostenPath = path.join(destLangPath, "kosten.md");
       if (!(await fileExists(kostenPath))) {
-        await fs.writeFile(kostenPath, CATEGORY_KOSTEN, "utf8");
+        await io.writeFile(kostenPath, CATEGORY_KOSTEN);
         ctx.logger.info(
           `[migrator rfc-0500] created category: ${path.relative(data.rootPath, kostenPath)}`,
         );
@@ -285,7 +285,7 @@ async function transformTopicsToArticles(
 
       const sichtbarkeitPath = path.join(destLangPath, "sichtbarkeit.md");
       if (!(await fileExists(sichtbarkeitPath))) {
-        await fs.writeFile(sichtbarkeitPath, CATEGORY_SICHTBARKEIT, "utf8");
+        await io.writeFile(sichtbarkeitPath, CATEGORY_SICHTBARKEIT);
         ctx.logger.info(
           `[migrator rfc-0500] created category: ${path.relative(data.rootPath, sichtbarkeitPath)}`,
         );

@@ -18,11 +18,11 @@ Does NOT set notdienst (operator-authored content).</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type FileStat, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0492_MIGRATOR_ID = "rfc-0492";
 
@@ -44,22 +44,22 @@ function transformFrontmatter(data: Record<string, unknown>): Record<string, unk
 async function findIndustryFiles(rootPath: string): Promise<string[]> {
   const results: string[] = [];
 
-  async function walk(dir: string): Promise<void> {
+  async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {
-      entries = await fs.readdir(dir);
+      entries = (await io.readdir(dir)).map(e => e.name);
     } catch {
       return;
     }
     for (const entry of entries) {
       const fullPath = path.join(dir, entry);
-      let stat: Awaited<ReturnType<typeof fs.stat>>;
+      let stat: FileStat;
       try {
-        stat = await fs.stat(fullPath);
+        stat = await io.stat(fullPath);
       } catch {
         continue;
       }
-      if (stat.isDirectory()) {
+      if (stat.isDirectory) {
         await walk(fullPath);
       } else if (entry.endsWith(".md")) {
         results.push(fullPath);
@@ -74,14 +74,14 @@ async function findIndustryFiles(rootPath: string): Promise<string[]> {
 
 async function transformIndustryFiles(
   data: SternsystemData,
-  ctx: MigrationContext,
+  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const files = await findIndustryFiles(data.rootPath);
 
   for (const filePath of files) {
     let raw: string;
     try {
-      raw = await fs.readFile(filePath, "utf8");
+      raw = await io.readFile(filePath);
     } catch {
       ctx.logger.info(`[migrator rfc-0492] skip unreadable file: ${filePath}`);
       continue;
@@ -115,7 +115,7 @@ async function transformIndustryFiles(
 
     if (before !== after) {
       const output = "---\n" + stringifyYaml(frontmatter) + "---\n" + body;
-      await fs.writeFile(filePath, output, "utf8");
+      await io.writeFile(filePath, output);
       ctx.logger.info(`[migrator rfc-0492] transformed: ${path.relative(data.rootPath, filePath)}`);
     }
   }

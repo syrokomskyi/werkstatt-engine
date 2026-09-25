@@ -250,7 +250,7 @@ async function validateYamlFiles(
 
   const entries = await fs.readdir(cacheDir, { withFileTypes: true });
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
+    if (!entry.isFile) continue;
     if (!entry.name.endsWith(".yaml") && !entry.name.endsWith(".yml")) continue;
 
     const filePath = path.join(cacheDir, entry.name);
@@ -388,7 +388,7 @@ export async function runSternsystemValidate(
 
     // Pin file validation (if cache clone exists)
     const pinPath = path.join(cacheDir, "system.pin.json");
-    if (existsSync(pinPath)) {
+    if (await context.io.exists(pinPath)) {
       try {
         const raw = await fs.readFile(pinPath, "utf8");
         const parsed = JSON.parse(raw);
@@ -468,7 +468,7 @@ export async function runSternsystemValidate(
       const bareMirror = entry.mirrors[1];
       const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
 
-      if (existsSync(bareRepoPath)) {
+      if (await context.io.exists(bareRepoPath)) {
         try {
           const remoteUrl = execSync("git remote get-url mirror", {
             cwd: bareRepoPath,
@@ -505,7 +505,7 @@ export async function runSternsystemValidate(
 
     // RFC-0648: branch-convention rule — cache clone and bare repo must use 'main' branch
     const cacheGitDir = path.join(cacheDir, ".git");
-    if (existsSync(cacheGitDir)) {
+    if (await context.io.exists(cacheGitDir)) {
       try {
         const cacheBranch = execSync("git symbolic-ref HEAD", {
           cwd: cacheDir,
@@ -533,7 +533,7 @@ export async function runSternsystemValidate(
     if (entry.mirrors.length > 1) {
       const bareMirror = entry.mirrors[1];
       const bareRepoPath = resolveMirrorPath(workspaceRoot, bareMirror.path);
-      if (existsSync(bareRepoPath)) {
+      if (await context.io.exists(bareRepoPath)) {
         try {
           const bareBranch = execSync("git symbolic-ref HEAD", {
             cwd: bareRepoPath,
@@ -600,7 +600,7 @@ export async function runSternsystemValidate(
     // all DRIFT-02 generators are migrated to context.io. DRIFT-01 (content
     // drift) stays a warning: pre-existing drift needs a one-time cleanup pass
     // before it can go blocking (see ADR consequences).
-    if (existsSync(cacheDir)) {
+    if (await context.io.exists(cacheDir)) {
       try {
         const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
         const driftReport = (await executeKernelCommand({
@@ -631,7 +631,7 @@ export async function runSternsystemValidate(
         const state = await readSystemState(workspaceRoot, entry.id);
         if (state.currentMission) {
           const workpieceDir = resolveWorkpiecePath(workspaceRoot, state.currentMission);
-          if (existsSync(workpieceDir)) {
+          if (await context.io.exists(workpieceDir)) {
             const workpieceEnvFiles = await collectEnvFiles(workpieceDir);
             if (workpieceEnvFiles.length > 0) {
               warnings.push({
@@ -877,7 +877,7 @@ export async function runSternsystemValidate(
       const cachePath = resolveMirrors(workspaceRoot, entry).cachePath;
       if (cachePath) {
         const configPath = path.join(cachePath, "tools", "kernel.config.ts");
-        if (existsSync(configPath)) {
+        if (await context.io.exists(configPath)) {
           try {
             const { loadAppRuntime } = await import("../kernel/runtime/registry.ts");
             await loadAppRuntime(workspaceRoot, {

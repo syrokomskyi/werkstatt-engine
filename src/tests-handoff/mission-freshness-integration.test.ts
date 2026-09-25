@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   validateResult: {
@@ -241,6 +242,7 @@ test("integration: reconcile→close succeeds when no post-reconcile commits", a
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -274,6 +276,7 @@ test("integration: post-reconcile commit blocks close, re-reconcile unblocks", a
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -314,6 +317,7 @@ test("integration: close report includes freshness fields after successful close
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

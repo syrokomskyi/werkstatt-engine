@@ -14,8 +14,8 @@
 import { loadEntitiesById, loadPathsCurrent } from "./registry.ts";
 import { getFileRevisionFromHistory } from "./git.ts";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface RevisionByPathResult {
   revision: number;
@@ -25,7 +25,7 @@ export interface RevisionByPathResult {
 
 export async function getRevisionByPath(
   cwd: string,
-  repoPath: string,
+  repoPath: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<RevisionByPathResult> {
   const paths = await loadPathsCurrent(cwd);
   const entityId = paths[repoPath];
@@ -38,7 +38,7 @@ export async function getRevisionByPath(
       // Compute live hash if the file exists
       try {
         const abs = resolve(cwd, repoPath);
-        const content = await readFile(abs, "utf8");
+        const content = await io.readFile(abs);
         contentHash = "sha256-" + createHash("sha256").update(content).digest("hex");
       } catch {
         // keep registry hash
@@ -56,7 +56,7 @@ export async function getRevisionByPath(
   let contentHash = "";
   try {
     const abs = resolve(cwd, repoPath);
-    const content = await readFile(abs, "utf8");
+    const content = await io.readFile(abs);
     contentHash = "sha256-" + createHash("sha256").update(content).digest("hex");
   } catch {
     // file may not exist

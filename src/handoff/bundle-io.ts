@@ -12,10 +12,7 @@ hash files, and resolve the recipient's current ecosystem facts.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import { execFile } from "node:child_process";
-import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import {
   handoffLockSchema,
   handoffManifestSchema,
@@ -26,34 +23,45 @@ import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { resolvePlatformSemanticHash } from "@warpgogol/werkstatt-engine/kernel";
 import type { RegistryView } from "./types.ts";
 import type { ValidationPack } from "./validation-pack.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export { resolvePlatformSemanticHash };
-
-const execFileAsync = promisify(execFile);
 
 export function sha256OfBytes(bytes: Buffer | string): string {
   return byteHash(bytes);
 }
 
-export async function hashFile(filePath: string): Promise<string> {
-  const bytes = await fs.readFile(filePath);
+export async function hashFile(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
+  const bytes = await io.readFile(filePath);
   return sha256OfBytes(bytes);
 }
 
-export async function readLock(bundleDir: string): Promise<HandoffLock> {
-  const raw = await fs.readFile(path.join(bundleDir, "handoff-lock.json"), "utf8");
+export async function readLock(
+  bundleDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<HandoffLock> {
+  const raw = await io.readFile(path.join(bundleDir, "handoff-lock.json"));
   return handoffLockSchema.parse(JSON.parse(raw));
 }
 
-export async function readManifest(bundleDir: string): Promise<HandoffManifest> {
-  const raw = await fs.readFile(path.join(bundleDir, "handoff-manifest.json"), "utf8");
+export async function readManifest(
+  bundleDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<HandoffManifest> {
+  const raw = await io.readFile(path.join(bundleDir, "handoff-manifest.json"));
   return handoffManifestSchema.parse(JSON.parse(raw));
 }
 
 /** Read the bundle's golden validation pack (validation/pack.json), or null if absent. */
-export async function readGoldenPack(bundleDir: string): Promise<ValidationPack | null> {
+export async function readGoldenPack(
+  bundleDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<ValidationPack | null> {
   try {
-    const raw = await fs.readFile(path.join(bundleDir, "validation", "pack.json"), "utf8");
+    const raw = await io.readFile(path.join(bundleDir, "validation", "pack.json"));
     return JSON.parse(raw) as ValidationPack;
   } catch {
     return null;
@@ -66,15 +74,21 @@ export interface CurrentEcosystem {
 }
 
 /** Resolve the recipient's current ecosystem version (root package.json) and git SHA. */
-export async function resolveCurrentEcosystem(workspaceRoot: string): Promise<CurrentEcosystem> {
-  const pkgRaw = await fs.readFile(path.join(workspaceRoot, "package.json"), "utf8");
+export async function resolveCurrentEcosystem(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<CurrentEcosystem> {
+  const pkgRaw = await io.readFile(path.join(workspaceRoot, "package.json"));
   const version = String((JSON.parse(pkgRaw) as { version?: string }).version ?? "0.0.0");
   let commit = "unknown";
   try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+    const revResult = await io.exec("git", ["rev-parse", "HEAD"], {
       cwd: workspaceRoot,
     });
-    commit = stdout.trim();
+    if (revResult.exitCode !== 0) {
+      throw new Error(`git rev-parse exited ${revResult.exitCode}`);
+    }
+    commit = revResult.stdout.trim();
   } catch {
     // not a git checkout — leave "unknown"
   }
@@ -92,12 +106,18 @@ export async function resolveCurrentEcosystem(workspaceRoot: string): Promise<Cu
  * RFC-0364: superseded by resolvePlatformSemanticHash for new writers.
  * Retained for dual-read during migration.
  */
-export async function resolvePackagesHash(workspaceRoot: string): Promise<string> {
+export async function resolvePackagesHash(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD:packages"], {
+    const revResult = await io.exec("git", ["rev-parse", "HEAD:packages"], {
       cwd: workspaceRoot,
     });
-    return sha256OfBytes(stdout.trim());
+    if (revResult.exitCode !== 0) {
+      throw new Error(`git rev-parse exited ${revResult.exitCode}`);
+    }
+    return sha256OfBytes(revResult.stdout.trim());
   } catch {
     return `sha256:${"0".repeat(64)}`;
   }
@@ -111,8 +131,11 @@ interface UniRegistryEntry {
 }
 
 /** Build a RegistryView keyed by the unique entry id (semanticId is not unique across layers). */
-export async function readRegistryView(workspaceRoot: string): Promise<RegistryView> {
-  const raw = await fs.readFile(path.join(workspaceRoot, "uni.registry.yaml"), "utf8");
+export async function readRegistryView(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<RegistryView> {
+  const raw = await io.readFile(path.join(workspaceRoot, "uni.registry.yaml"));
   const parsed = JSON.parse(raw) as { entries?: UniRegistryEntry[] };
   const byId = new Map<string, { version: string; semanticId: string; intent: string[] }>();
   for (const entry of parsed.entries ?? []) {

@@ -15,12 +15,16 @@ collection from content.config.ts, and deletes the legacy business/ directory.</
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
 import { parseFrontmatter, serializeFrontmatter } from "./yaml-utils.ts";
 import { readLocalesSafe } from "./rfc-0481.ts";
+import {
+  createDefaultIO,
+  type DirEntry,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0483_MIGRATOR_ID = "rfc-0483";
 
@@ -142,17 +146,21 @@ const REFERENCE_MAPPINGS: Record<string, string> = {
 
 const BUSINESS_REF_PATTERN = /\{business\.[^}]+\}/g;
 
-async function readMarkdownFiles(dir: string, baseDir: string): Promise<string[]> {
+async function readMarkdownFiles(
+  dir: string,
+  baseDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const results: string[] = [];
-  let entries: import("node:fs").Dirent[];
+  let entries: DirEntry[];
   try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
+    entries = await io.readdir(dir);
   } catch {
     return results;
   }
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       const nested = await readMarkdownFiles(fullPath, baseDir);
       results.push(...nested);
     } else if (entry.name.endsWith(".md")) {
@@ -178,14 +186,18 @@ function replaceReferencesInFile(raw: string, ctx: MigrationContext): string {
   return replaceReferencesInText(raw, ctx);
 }
 
-async function migrateReferences(rootPath: string, ctx: MigrationContext): Promise<void> {
+async function migrateReferences(
+  rootPath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const contentDir = path.join(rootPath, "src", "content");
   const mdFiles = await readMarkdownFiles(contentDir, contentDir);
   for (const filePath of mdFiles) {
-    const raw = await fs.readFile(filePath, "utf8");
+    const raw = await io.readFile(filePath);
     const updated = replaceReferencesInFile(raw, ctx);
     if (updated !== raw) {
-      await fs.writeFile(filePath, updated, "utf8");
+      await io.writeFile(filePath, updated);
       ctx.logger.info(
         `[migrator rfc-0483] migrated references in ${path.relative(rootPath, filePath)}`,
       );
@@ -193,7 +205,11 @@ async function migrateReferences(rootPath: string, ctx: MigrationContext): Promi
   }
 }
 
-async function copyPbpEntitiesFromUk(rootPath: string, ctx: MigrationContext): Promise<void> {
+async function copyPbpEntitiesFromUk(
+  rootPath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const bpDir = path.join(rootPath, "src", "content", "business-profile");
   const ukDir = path.join(bpDir, "uk");
   const deDir = path.join(bpDir, "de");
@@ -202,18 +218,20 @@ async function copyPbpEntitiesFromUk(rootPath: string, ctx: MigrationContext): P
   for (const ukFile of ukEntries) {
     const relPath = path.relative(ukDir, ukFile);
     const deFile = path.join(deDir, relPath);
-    try {
-      await fs.access(deFile);
-    } catch {
-      const content = await fs.readFile(ukFile, "utf8");
-      await fs.mkdir(path.dirname(deFile), { recursive: true });
-      await fs.writeFile(deFile, content, "utf8");
+    if (!(await io.exists(deFile))) {
+      const content = await io.readFile(ukFile);
+      await io.mkdir(path.dirname(deFile));
+      await io.writeFile(deFile, content);
       ctx.logger.info(`[migrator rfc-0483] created de/${relPath} from uk/ template`);
     }
   }
 }
 
-async function populatePresentationFields(rootPath: string, ctx: MigrationContext): Promise<void> {
+async function populatePresentationFields(
+  rootPath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const businessDir = path.join(rootPath, "src", "content", "business");
   const bpDir = path.join(rootPath, "src", "content", "business-profile");
 
@@ -229,7 +247,7 @@ async function populatePresentationFields(rootPath: string, ctx: MigrationContex
 
     for (const legacyFile of legacyFiles) {
       const fileName = path.basename(legacyFile, ".md");
-      const legacyRaw = await fs.readFile(legacyFile, "utf8");
+      const legacyRaw = await io.readFile(legacyFile);
       const { frontmatter } = parseFrontmatter(legacyRaw);
 
       const presentation = extractPresentation(fileName, frontmatter);
@@ -239,13 +257,13 @@ async function populatePresentationFields(rootPath: string, ctx: MigrationContex
       if (!targetPath) continue;
 
       try {
-        const targetRaw = await fs.readFile(targetPath, "utf8");
+        const targetRaw = await io.readFile(targetPath);
         const { frontmatter: targetFm, body } = parseFrontmatter(targetRaw);
         const existingPresentation = (targetFm.presentation as Record<string, unknown>) ?? {};
         const merged = mergePresentation(existingPresentation, presentation);
         targetFm.presentation = merged;
         const updated = serializeFrontmatter(targetFm) + body;
-        await fs.writeFile(targetPath, updated, "utf8");
+        await io.writeFile(targetPath, updated);
         ctx.logger.info(
           `[migrator rfc-0483] populated presentation.* on ${path.relative(rootPath, targetPath)}`,
         );
@@ -353,11 +371,12 @@ function mergePresentation(
 async function removeBusinessCollectionFromConfig(
   rootPath: string,
   ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const configPath = path.join(rootPath, "src", "content.config.ts");
   let raw: string;
   try {
-    raw = await fs.readFile(configPath, "utf8");
+    raw = await io.readFile(configPath);
   } catch {
     return;
   }
@@ -373,18 +392,22 @@ async function removeBusinessCollectionFromConfig(
   );
 
   if (updated !== raw) {
-    await fs.writeFile(configPath, updated, "utf8");
+    await io.writeFile(configPath, updated);
     ctx.logger.info(`[migrator rfc-0483] removed business collection from content.config.ts`);
   }
 }
 
-async function deleteBusinessDirectory(rootPath: string, ctx: MigrationContext): Promise<void> {
+async function deleteBusinessDirectory(
+  rootPath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const businessDir = path.join(rootPath, "src", "content", "business");
   const contentDir = path.join(rootPath, "src", "content");
   const mdFiles = await readMarkdownFiles(contentDir, contentDir);
 
   for (const filePath of mdFiles) {
-    const raw = await fs.readFile(filePath, "utf8");
+    const raw = await io.readFile(filePath);
     const matches = raw.match(BUSINESS_REF_PATTERN);
     if (matches) {
       const realRefs = matches.filter((m) => m !== "{business.offer.*}");
@@ -400,7 +423,7 @@ async function deleteBusinessDirectory(rootPath: string, ctx: MigrationContext):
   }
 
   try {
-    await fs.rm(businessDir, { recursive: true, force: true });
+    await io.rm(businessDir, { recursive: true });
     ctx.logger.info(`[migrator rfc-0483] deleted src/content/business/ directory`);
   } catch {
     ctx.logger.info(`[migrator rfc-0483] business/ directory already absent`);
@@ -409,15 +432,19 @@ async function deleteBusinessDirectory(rootPath: string, ctx: MigrationContext):
 
 const OLD_FORMAT_FILES = ["company.md", "contact.md", "location.md", "web.md"];
 
-async function deleteOldFormatFiles(rootPath: string, ctx: MigrationContext): Promise<void> {
+async function deleteOldFormatFiles(
+  rootPath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const bpDir = path.join(rootPath, "src", "content", "business-profile");
   for (const lang of await readLocalesSafe(rootPath, ctx)) {
     for (const fileName of OLD_FORMAT_FILES) {
       const filePath = path.join(bpDir, lang, fileName);
       try {
-        const raw = await fs.readFile(filePath, "utf8");
+        const raw = await io.readFile(filePath);
         if (!raw.includes("schema:")) {
-          await fs.unlink(filePath);
+          await io.rm(filePath);
           ctx.logger.info(
             `[migrator rfc-0483] deleted old-format ${path.relative(rootPath, filePath)}`,
           );

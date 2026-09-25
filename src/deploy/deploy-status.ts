@@ -18,7 +18,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
+
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -31,7 +31,6 @@ import {
   previousSymlinkPath,
   readSymlinkBasename,
 } from "./deploy-utils.ts";
-import fs from "node:fs/promises";
 
 export async function runDeployStatus(
   _input: KernelCommandInput,
@@ -39,17 +38,17 @@ export async function runDeployStatus(
 ): Promise<KernelCommandResult<DeployStatus>> {
   const { workspaceRoot, logger } = context;
 
-  const currentHash = readSymlinkBasename(currentSymlinkPath(workspaceRoot));
-  const previousHash = readSymlinkBasename(previousSymlinkPath(workspaceRoot));
+  const currentHash = await readSymlinkBasename(currentSymlinkPath(workspaceRoot), context.io);
+  const previousHash = await readSymlinkBasename(previousSymlinkPath(workspaceRoot), context.io);
 
   let currentGitSha: string | null = null;
   let deployedAt: string | null = null;
 
   if (currentHash) {
     const mp = manifestPath(workspaceRoot, currentHash);
-    if (existsSync(mp)) {
+    if (await context.io.exists(mp)) {
       try {
-        const manifest = JSON.parse(await fs.readFile(mp, "utf8"));
+        const manifest = JSON.parse(await context.io.readFile(mp));
         currentGitSha = manifest.gitSha ?? null;
         deployedAt = manifest.builtAt ?? null;
       } catch {

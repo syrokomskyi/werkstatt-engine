@@ -17,6 +17,7 @@ import {
   verifyBuildIdentitySignature,
 } from "../../integrity/signing.ts";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("../../sternsystem/registry-io.ts", () => ({
   readSystemConfigSmart: vi.fn(),
@@ -33,7 +34,7 @@ function makeInput(flags: Record<string, unknown>) {
 }
 
 function makeContext(workspaceRoot: string) {
-  return { workspaceRoot, dryRun: false, site: undefined } as unknown as Parameters<
+  return { io: createDefaultIO().io, workspaceRoot, dryRun: false, site: undefined } as unknown as Parameters<
     typeof runLeitstandVerify
   >[1];
 }

@@ -16,6 +16,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockPipeline = vi.hoisted(() => ({
   prepareResult: { ok: true, steps: [{ ok: true, commandName: "config.regenerate", exitCode: 0 }] },
@@ -224,6 +225,7 @@ function makeInput(flags: Record<string, unknown> = {}): KernelCommandInput {
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -364,6 +366,7 @@ test("reuse path logs bordbuch cleanup when commitBordbuchProjections commits fi
 
   const infoCalls: unknown[] = [];
   const ctx = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: {
       info: (...args: unknown[]) => infoCalls.push(args.join(" ")),

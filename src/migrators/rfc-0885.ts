@@ -13,7 +13,6 @@ twice produces the same result.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import {
   parseMarkdownFrontmatter,
@@ -21,6 +20,7 @@ import {
 } from "@warpgogol/werkstatt-shared/content";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0885_MIGRATOR_ID = "rfc-0885";
 
@@ -75,13 +75,13 @@ function mapConsentStatus(
 
 async function migrateConsentFiles(
   rootPath: string,
-  ctx: MigrationContext,
+  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const bpBaseDir = path.join(rootPath, "src", "content", "business-profile");
 
   let langDirs: string[];
   try {
-    langDirs = await fs.readdir(bpBaseDir);
+    langDirs = (await io.readdir(bpBaseDir)).map(e => e.name);
   } catch {
     ctx.logger.info(`[rfc-0885] no business-profile directory at ${bpBaseDir} — skipping consent migration`);
     return;
@@ -89,15 +89,15 @@ async function migrateConsentFiles(
 
   for (const lang of langDirs) {
     const consentDir = path.join(bpBaseDir, lang, "consent");
-    const stat = await fs.stat(consentDir).catch(() => null);
-    if (!stat?.isDirectory()) continue;
+    const stat = await io.stat(consentDir).catch(() => null);
+    if (!stat?.isDirectory) continue;
 
-    const files = (await fs.readdir(consentDir)).filter((f) => f.endsWith(".md"));
+    const files = (await io.readdir(consentDir)).filter((f) => f.name.endsWith(".md"));
     for (const file of files) {
-      const filePath = path.join(consentDir, file);
+      const filePath = path.join(consentDir, file.name);
       let content: string;
       try {
-        content = await fs.readFile(filePath, "utf-8");
+        content = await io.readFile(filePath);
       } catch {
         continue;
       }
@@ -121,7 +121,7 @@ async function migrateConsentFiles(
 
       const updated = stringifyMarkdownFrontmatter(body, data);
       try {
-        await fs.writeFile(filePath, updated, "utf-8");
+        await io.writeFile(filePath, updated);
         ctx.logger.info(`[rfc-0885] migrated consent: ${lang}/${file}`);
       } catch (err) {
         throw new MigrationError(
@@ -137,28 +137,28 @@ async function migrateConsentFiles(
 
 async function migrateEvidenceSourceFiles(
   rootPath: string,
-  ctx: MigrationContext,
+  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const bpBaseDir = path.join(rootPath, "src", "content", "business-profile");
 
   let langDirs: string[];
   try {
-    langDirs = await fs.readdir(bpBaseDir);
+    langDirs = (await io.readdir(bpBaseDir)).map(e => e.name);
   } catch {
     return;
   }
 
   for (const lang of langDirs) {
     const esDir = path.join(bpBaseDir, lang, "evidence-source");
-    const stat = await fs.stat(esDir).catch(() => null);
-    if (!stat?.isDirectory()) continue;
+    const stat = await io.stat(esDir).catch(() => null);
+    if (!stat?.isDirectory) continue;
 
-    const files = (await fs.readdir(esDir)).filter((f) => f.endsWith(".md"));
+    const files = (await io.readdir(esDir)).filter((f) => f.name.endsWith(".md"));
     for (const file of files) {
-      const filePath = path.join(esDir, file);
+      const filePath = path.join(esDir, file.name);
       let content: string;
       try {
-        content = await fs.readFile(filePath, "utf-8");
+        content = await io.readFile(filePath);
       } catch {
         continue;
       }
@@ -181,7 +181,7 @@ async function migrateEvidenceSourceFiles(
 
       const updated = stringifyMarkdownFrontmatter(body, data);
       try {
-        await fs.writeFile(filePath, updated, "utf-8");
+        await io.writeFile(filePath, updated);
         ctx.logger.info(`[rfc-0885] migrated evidence-source: ${lang}/${file}`);
       } catch (err) {
         throw new MigrationError(

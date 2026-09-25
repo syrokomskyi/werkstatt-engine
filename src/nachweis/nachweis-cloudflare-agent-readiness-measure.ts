@@ -23,9 +23,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
-import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import type {
   KernelCommandInput,
@@ -41,6 +39,7 @@ import {
   type AssessmentIngestResult,
 } from "./nachweis-io.ts";
 import { runNachweisAssessmentIngest } from "./nachweis-assessment-ingest.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -611,7 +610,7 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
     );
   }
 
-  const workDir = await mkdtemp(path.join(tmpdir(), "cloudflare-ar-measure-"));
+  const workDir = await context.io.mkdtemp(path.join(tmpdir(), "cloudflare-ar-measure-"));
 
   try {
     let scanId: string;
@@ -634,7 +633,7 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
       );
     }
 
-    await fs.writeFile(path.join(workDir, "cloudflare-submission.json"), submissionRaw, "utf8");
+    await context.io.writeFile(path.join(workDir, "cloudflare-submission.json"), submissionRaw);
 
     let pollResult: PollResult;
     try {
@@ -668,11 +667,7 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
       );
     }
 
-    await fs.writeFile(
-      path.join(workDir, "cloudflare-result.json"),
-      pollResult.rawResponse,
-      "utf8",
-    );
+    await context.io.writeFile(path.join(workDir, "cloudflare-result.json"), pollResult.rawResponse);
 
     let parsedDimensions: ReturnType<typeof parseAgentReadiness>;
     try {
@@ -700,11 +695,7 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
       },
       parsedAt: new Date().toISOString(),
     };
-    await fs.writeFile(
-      path.join(workDir, "provider-parser-metadata.json"),
-      JSON.stringify(parserMetadata, null, 2),
-      "utf8",
-    );
+    await context.io.writeFile(path.join(workDir, "provider-parser-metadata.json"), JSON.stringify(parserMetadata, null, 2));
 
     const bundle = buildAssessmentBundle(options, scanId, pollResult.parsed, parsedDimensions);
 
@@ -719,7 +710,7 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
     }
 
     const bundlePath = path.join(workDir, "assessment-bundle.json");
-    await fs.writeFile(bundlePath, JSON.stringify(bundle, null, 2), "utf8");
+    await context.io.writeFile(bundlePath, JSON.stringify(bundle, null, 2));
 
     logger.info(
       `[nachweis.measure.cloudflare-agent-readiness] scan ${scanId} complete, delegating to nachweis.assessment.ingest`,
@@ -764,6 +755,6 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
       summary,
     };
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true });
+    await context.io.rm(workDir, { recursive: true });
   }
 }

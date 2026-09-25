@@ -208,7 +208,12 @@ test("RFC-0623: propagate retries on transient 504 Gateway Timeout then succeeds
   ]);
   const adapter = createCloudflareWorkersAdapter(runner);
   const promise = adapter.propagate(basePropagateInput);
+  // propagate does real-fs awaits (io.exists) before the retry delay is
+  // queued — the first advance lets it reach the setTimeout (queued near the
+  // window edge); runAllTimers then fires every retry delay including ones
+  // scheduled mid-flight.
   await vi.advanceTimersByTimeAsync(30_000);
+  await vi.runAllTimersAsync();
   const result = await promise;
   expect(result.state).toBe("succeeded");
   expect((runner as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2);
@@ -233,7 +238,12 @@ test("RFC-0623: propagate succeeds after retry on 522 error", async () => {
   ]);
   const adapter = createCloudflareWorkersAdapter(runner);
   const promise = adapter.propagate(basePropagateInput);
+  // propagate does real-fs awaits (io.exists) before the retry delay is
+  // queued — the first advance lets it reach the setTimeout (queued near the
+  // window edge); runAllTimers then fires every retry delay including ones
+  // scheduled mid-flight.
   await vi.advanceTimersByTimeAsync(30_000);
+  await vi.runAllTimersAsync();
   const result = await promise;
   expect(result.state).toBe("succeeded");
   expect((runner as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2);
@@ -249,7 +259,12 @@ test("RFC-0623: propagate exhausts all retries on persistent 503 then fails", as
   ]);
   const adapter = createCloudflareWorkersAdapter(runner);
   const promise = adapter.propagate(basePropagateInput);
+  // propagate does real-fs awaits (io.exists) before the retry delay is
+  // queued — the first advance lets it reach the setTimeout (queued near the
+  // window edge); runAllTimers then fires every retry delay including ones
+  // scheduled mid-flight.
   await vi.advanceTimersByTimeAsync(30_000);
+  await vi.runAllTimersAsync();
   await vi.advanceTimersByTimeAsync(60_000);
   const result = await promise;
   expect(result.state).toBe("failed");

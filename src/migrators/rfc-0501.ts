@@ -14,11 +14,11 @@ Idempotent: running twice produces no changes on already-migrated files.</purpos
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0501_MIGRATOR_ID = "rfc-0501";
 
@@ -28,12 +28,12 @@ export const rfc0501Migrator: Migrator = {
   toVersion: "4.13.0",
   description:
     "Set existing published ratgeber articles to review-required — their prose bodies don't have the 10-section structure yet. Advances migratorCursor for RFC-0501 (ratgeber article types, mandatory structure, and publication gate).",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const articlesBaseDir = path.join(data.rootPath, "src", "content", "surface", "articles");
 
     let langDirs: string[];
     try {
-      langDirs = await fs.readdir(articlesBaseDir);
+      langDirs = (await io.readdir(articlesBaseDir)).map(e => e.name);
     } catch {
       ctx.logger.info(`[rfc-0501] no articles directory at ${articlesBaseDir} — skipping`);
       return data;
@@ -41,12 +41,12 @@ export const rfc0501Migrator: Migrator = {
 
     for (const langDir of langDirs) {
       const langPath = path.join(articlesBaseDir, langDir);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat?.isDirectory()) continue;
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat?.isDirectory) continue;
 
       let files: string[];
       try {
-        files = await fs.readdir(langPath);
+        files = (await io.readdir(langPath)).map(e => e.name);
       } catch {
         continue;
       }
@@ -54,7 +54,7 @@ export const rfc0501Migrator: Migrator = {
       for (const file of files) {
         if (!file.endsWith(".md")) continue;
         const filePath = path.join(langPath, file);
-        const raw = await fs.readFile(filePath, "utf-8");
+        const raw = await io.readFile(filePath);
 
         const frontmatterMatch = /^---\n([\s\S]*?)\n---/.exec(raw);
         if (!frontmatterMatch) continue;
@@ -70,7 +70,7 @@ export const rfc0501Migrator: Migrator = {
         const updatedRaw = `---\n${updatedFmYaml}\n---${raw.slice(frontmatterMatch[0].length)}`;
 
         try {
-          await fs.writeFile(filePath, updatedRaw, "utf-8");
+          await io.writeFile(filePath, updatedRaw);
           ctx.logger.info(`[rfc-0501] set ${file} to review-required`);
         } catch (err) {
           throw new MigrationError(

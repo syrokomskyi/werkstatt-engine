@@ -55,6 +55,7 @@ import {
 import { resolveNachweisCachePath } from "../nachweis/nachweis-io.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockReadBordbuch = vi.mocked(readBordbuch);
 const mockAppendAndCommit = vi.mocked(appendAndCommitBordbuch);
@@ -74,6 +75,7 @@ const workspaceRoot = "/fake/workspace";
 
 function makeContext() {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: vi.fn(),

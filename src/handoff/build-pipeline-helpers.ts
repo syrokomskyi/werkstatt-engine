@@ -17,15 +17,16 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 import path from "node:path";
-import { existsSync } from "node:fs";
-import { execSync } from "node:child_process";
-import * as fs from "node:fs/promises";
-import type { DiscoveredSiteWorkspace, KernelPipelineReport } from "@warpgogol/werkstatt-engine/kernel";
+import type {
+  DiscoveredSiteWorkspace,
+  KernelPipelineReport,
+} from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelPipeline } from "@warpgogol/werkstatt-engine/kernel";
 import { fingerprintTree } from "@warpgogol/werkstatt-engine/fingerprint/semantic";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { resolveCurrentEcosystem, resolvePlatformSemanticHash } from "./bundle-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /**
  * Runs a kernel pipeline phase and throws a descriptive error if it fails.
@@ -74,12 +75,13 @@ export interface BuildInputHashResult {
 export async function computeBuildInputHash(
   workspaceRoot: string,
   workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<BuildInputHashResult> {
   const { version: platformVersion } = await resolveCurrentEcosystem(workspaceRoot);
   const platformSemanticHash = await resolvePlatformSemanticHash(workspaceRoot);
   const contentDir = path.join(workpieceDir, "src", "content");
   let workpieceTreeHash = "sha256:absent";
-  if (existsSync(contentDir)) {
+  if (await io.exists(contentDir)) {
     const contentResult = await fingerprintTree(contentDir, { mode: "semantic" });
     workpieceTreeHash = contentResult.value;
   }
@@ -109,20 +111,23 @@ export async function writePreliminaryBuildIdentity(
   workpieceDir: string,
   fields: PreliminaryBuildIdentityFields,
   logger: { info: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   let commitSha = "0000000";
   try {
-    commitSha = execSync("git rev-parse HEAD", {
+    const revResult = await io.exec("sh", ["-c", "git rev-parse HEAD"], {
       cwd: workpieceDir,
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
+    });
+    if (revResult.exitCode !== 0) {
+      throw new Error(`git rev-parse exited ${revResult.exitCode}`);
+    }
+    commitSha = revResult.stdout.trim();
   } catch {
     // Workpiece may not be a git repo — use placeholder
   }
 
   const publicWellKnownDir = path.join(workpieceDir, "public", ".well-known");
-  await fs.mkdir(publicWellKnownDir, { recursive: true });
+  await io.mkdir(publicWellKnownDir);
   const preliminary = {
     releaseId: fields.releaseId,
     systemId: fields.systemId,
@@ -148,6 +153,9 @@ export async function writePreliminaryBuildIdentity(
  * after build.post completes. The copy in dist/client/.well-known/ is left intact —
  * release.prepare overwrites it with the final build-identity.json.
  */
-export async function cleanupPreliminaryBuildIdentity(filePath: string): Promise<void> {
-  await fs.rm(filePath, { force: true });
+export async function cleanupPreliminaryBuildIdentity(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  await io.rm(filePath, { recursive: true });
 }

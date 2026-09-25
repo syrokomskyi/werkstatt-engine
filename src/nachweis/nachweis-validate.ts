@@ -22,8 +22,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -49,6 +47,7 @@ import {
   type NachweisValidateResult,
   type NachweisViolation,
 } from "./nachweis-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const NACHWEIS_EVIDENCE_KINDS = new Set([
   "client-statement",
@@ -75,17 +74,17 @@ interface PbpEntityRecord {
 async function readPbpEntitiesByType(
   cachePath: string,
   entityType: string,
-  lang: string,
+  lang: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<PbpEntityRecord[]> {
   const dir = resolvePbpEntityDir(cachePath, lang, entityType);
-  if (!existsSync(dir)) return [];
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+  if (!await io.exists(dir)) return [];
+  const entries = await io.readdir(dir);
   const records: PbpEntityRecord[] = [];
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
+    if (!entry.isFile) continue;
     if (!entry.name.endsWith(".md") && !entry.name.endsWith(".yaml")) continue;
     const filePath = path.join(dir, entry.name);
-    const raw = await fs.readFile(filePath, "utf8");
+    const raw = await io.readFile(filePath);
     if (entry.name.endsWith(".md")) {
       const { data } = parseMarkdownFrontmatter(raw);
       records.push({ id: entry.name.replace(/\.(md|yaml)$/, ""), type: entityType, data });

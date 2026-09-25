@@ -18,9 +18,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import crypto from "node:crypto";
-import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { ChangelogCtx } from "../context.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // START_BLOCK_KEY
 /** [CL-CACHE][buildCacheKey][KEY_COMPUTED] */
@@ -49,7 +49,7 @@ export function buildCacheKey(params: {
 // START_BLOCK_FILE_CACHE
 export async function cacheGet(key: string, ctx: ChangelogCtx): Promise<unknown | null> {
   try {
-    const data = await readFile(join(ctx.cacheDir, `${key}.json`), "utf-8");
+    const data = await ctx.io.readFile(join(ctx.cacheDir, `${key}.json`));
     console.log(`[CL-CACHE][get][HIT] key=${key.slice(0, 12)}...`);
     return JSON.parse(data) as unknown;
   } catch {
@@ -60,11 +60,11 @@ export async function cacheGet(key: string, ctx: ChangelogCtx): Promise<unknown 
 
 export async function cacheSet(key: string, value: unknown, ctx: ChangelogCtx): Promise<void> {
   try {
-    await mkdir(ctx.cacheDir, { recursive: true });
+    await ctx.io.mkdir(ctx.cacheDir);
     const tmp = join(ctx.cacheDir, `${key}.tmp`);
     const target = join(ctx.cacheDir, `${key}.json`);
-    await writeFile(tmp, JSON.stringify(value, null, 2), "utf-8");
-    await rename(tmp, target);
+    await ctx.io.writeFile(tmp, JSON.stringify(value, null, 2));
+    await ctx.io.rename(tmp, target);
   } catch {
     /* silent — cache is best-effort */
   }
@@ -72,11 +72,14 @@ export async function cacheSet(key: string, value: unknown, ctx: ChangelogCtx): 
 // END_BLOCK_FILE_CACHE
 
 // START_BLOCK_HASH
-export async function hashPromptFile(promptPath: string): Promise<string> {
+export async function hashPromptFile(
+  promptPath: string,
+  io: import("@warpgogol/werkstatt-shared/kernel/workspace-io").WorkspaceIO,
+): Promise<string> {
   try {
     return crypto
       .createHash("sha256")
-      .update(await readFile(promptPath, "utf-8"))
+      .update(await io.readFile(promptPath))
       .digest("hex");
   } catch {
     return "no-prompt";

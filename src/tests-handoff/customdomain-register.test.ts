@@ -16,6 +16,7 @@ import type { KernelRuntimeContext, KernelCommandInput } from "@warpgogol/werkst
 import { setupCloudflareApiMock, cfSuccessResponse } from "./helpers/cloudflare-api-mock.ts";
 import { buildSystemConfig } from "./helpers/registry-builder.ts";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 let parentDir: string;
@@ -40,6 +41,7 @@ afterEach(() => {
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

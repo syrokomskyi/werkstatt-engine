@@ -12,6 +12,7 @@ import {
   type CommitRecord,
 } from "../commit-message-lint.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /*
 <MODULE_CONTRACT>
@@ -153,6 +154,7 @@ const logger = {
 
 function ctx(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     siteExplicit: false,
     logger,

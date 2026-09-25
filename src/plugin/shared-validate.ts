@@ -26,9 +26,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { scanDirectoryForImports, type ImportViolation } from "./import-scan-util.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const SHARED_PKG = "@warpgogol/werkstatt-shared";
 const SITE_PREFIX = "@warpgogol/werkstatt-site";
@@ -46,10 +46,10 @@ export interface SharedValidateResult {
   checks: SharedCheckResult[];
 }
 
-async function checkSharedDependency(workspaceRoot: string): Promise<SharedCheckResult> {
+async function checkSharedDependency(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SharedCheckResult> {
   const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt-engine", "package.json");
   try {
-    const content = await readFile(pkgJsonPath, "utf8");
+    const content = await io.readFile(pkgJsonPath);
     const pkg = JSON.parse(content);
     const deps = pkg.dependencies ?? {};
     const hasShared = SHARED_PKG in deps;
@@ -69,7 +69,7 @@ async function checkSharedDependency(workspaceRoot: string): Promise<SharedCheck
   }
 }
 
-async function checkExemptionHygiene(workspaceRoot: string): Promise<SharedCheckResult> {
+async function checkExemptionHygiene(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SharedCheckResult> {
   const autonomyPath = join(
     workspaceRoot,
     "packages",
@@ -79,7 +79,7 @@ async function checkExemptionHygiene(workspaceRoot: string): Promise<SharedCheck
     "autonomy-validate.ts",
   );
   try {
-    const content = await readFile(autonomyPath, "utf8");
+    const content = await io.readFile(autonomyPath);
     const hasSiteExemption = content.includes(`"@warpgogol/werkstatt-site"`);
     return {
       id: "SHARED-02",
@@ -146,11 +146,11 @@ async function checkNoEngineImportsInShared(workspaceRoot: string): Promise<{
 }
 
 async function checkSharedPackageDeclaresNoEngineDep(
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SharedCheckResult> {
   const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt-shared", "package.json");
   try {
-    const content = await readFile(pkgJsonPath, "utf8");
+    const content = await io.readFile(pkgJsonPath);
     const pkg = JSON.parse(content);
     const depFields = [
       "dependencies",

@@ -11,8 +11,6 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -32,6 +30,7 @@ import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { resolveCurrentEcosystem, resolvePlatformSemanticHash } from "../handoff/bundle-io.ts";
 import { allMigratorIds } from "../migrators/registry.ts";
 import { highestRfcId, snapshotCapabilities } from "./pin-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface SternsystemExtractData {
   appId: string;
@@ -48,17 +47,17 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
 
 const EXTRACTION_DATA_PATHS = ["src/content", "public", "provenance"];
 
-async function copyDir(src: string, dest: string): Promise<void> {
-  if (!existsSync(src)) return;
-  await fs.mkdir(dest, { recursive: true });
-  const entries = await fs.readdir(src, { withFileTypes: true });
+async function copyDir(src: string, dest: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+  if (!await io.exists(src)) return;
+  await io.mkdir(dest);
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       await copyDir(srcPath, destPath);
     } else {
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -74,7 +73,7 @@ export async function runSternsystemExtract(
   if (!siteId) throw new Error("[sternsystem.extract] --site is required");
 
   const appDir = path.join(workspaceRoot, "apps", siteId);
-  if (!existsSync(appDir)) {
+  if (!await context.io.exists(appDir)) {
     throw new Error(`[sternsystem.extract] apps/${siteId}/ does not exist`);
   }
 
@@ -101,13 +100,13 @@ export async function runSternsystemExtract(
     const systemDir = config
       ? resolveMirrors(workspaceRoot, config).cachePath
       : resolveCacheClonePath(workspaceRoot, siteId);
-    await fs.mkdir(systemDir, { recursive: true });
+    await context.io.mkdir(systemDir);
 
     // Copy data paths
     for (const dataPath of EXTRACTION_DATA_PATHS) {
       const src = path.join(appDir, dataPath);
       const dest = path.join(systemDir, dataPath);
-      if (existsSync(src)) {
+      if (await context.io.exists(src)) {
         await copyDir(src, dest);
         logger.info(`  Copied ${dataPath}`);
       }

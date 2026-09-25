@@ -15,6 +15,7 @@ import {
   type PipelineBudgetsFile,
 } from "../pipeline-budgets.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /*
 <MODULE_CONTRACT>
@@ -138,6 +139,7 @@ const logger = {
 
 function ctx(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     siteExplicit: false,
     logger,

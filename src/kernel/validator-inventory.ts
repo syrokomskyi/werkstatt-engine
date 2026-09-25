@@ -28,7 +28,6 @@ Scheduler: collectErrors option on executeScheduledSteps — read-only steps (Sc
 </CHANGE_SUMMARY>
 */
 
-import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
@@ -41,6 +40,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const INVENTORY_RELATIVE_PATH = join("docs", "validator-inventory.generated.yaml");
 
@@ -215,7 +215,7 @@ export async function runValidatorInventoryGenerate(
 
   if (!dryRun) {
     const outputPath = inventoryFilePath(context.workspaceRoot);
-    await mkdir(dirname(outputPath), { recursive: true });
+    await context.io.mkdir(dirname(outputPath));
     await writeFileAtomic(outputPath, content);
   }
 

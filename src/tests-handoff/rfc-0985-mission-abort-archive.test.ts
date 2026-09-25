@@ -13,6 +13,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildAbortSteps, type AbortStepCtx } from "../mission/mission-abort.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { OperationStep } from "../journal/index.ts";
 
 let tmpDir: string;
@@ -59,6 +60,7 @@ function makeAbortCtx(overrides?: Partial<AbortStepCtx>): AbortStepCtx {
     actor: { handle: "test-agent", role: "operator" } as any,
     reason: "test abort",
     now: "2026-08-29T00:00:00.000Z",
+    io: createDefaultIO().io,
     ...overrides,
   };
 }

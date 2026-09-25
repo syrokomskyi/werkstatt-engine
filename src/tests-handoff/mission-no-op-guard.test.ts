@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ---------------------------------------------------------------------------
 // Mocks — same pattern as rfc-0658-mission-close-bordbuch-validate.test.ts
@@ -247,6 +248,7 @@ test("Level 1: mission.git.commit returns noChanges=true when workpiece is clean
     flags: { mission: "test-system-m000001", message: "test commit" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -270,6 +272,7 @@ test("Level 1: mission.git.commit returns noChanges undefined when there are cha
     flags: { mission: "test-system-m000001", message: "real changes" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -294,6 +297,7 @@ test("Level 2: mission.close blocks when zero operator commits since materializa
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -319,6 +323,7 @@ test("Level 2: mission.close blocks with brief in error message", async () => {
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -338,6 +343,7 @@ test("Level 2: mission.close allows close with --allow-no-op when zero commits",
     flags: { mission: "test-system-m000001", actor: "test-agent", "allow-no-op": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -357,6 +363,7 @@ test("Level 2: mission.close proceeds normally when operator commits exist", asy
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

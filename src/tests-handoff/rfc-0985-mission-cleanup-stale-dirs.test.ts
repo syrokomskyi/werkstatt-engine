@@ -13,6 +13,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 
@@ -30,6 +31,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},

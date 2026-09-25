@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { commitAndPushBordbuch } from "../bordbuch/bordbuch-io.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockCachePath = vi.hoisted(() => ({ value: "" as string }));
 
@@ -146,6 +147,7 @@ test("Fix 3: mission.open auto-recovers stale rebase-merge before bordbuch valid
 
   const logs: string[] = [];
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: testRoot,
     logger: {
       info: (msg: string) => logs.push(msg),

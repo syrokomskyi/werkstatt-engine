@@ -16,6 +16,7 @@ import { promisify } from "node:util";
 
 import { runPlatformConsistencyValidate } from "../handoff/platform-consistency.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +29,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 function makeContext(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       section: () => {},

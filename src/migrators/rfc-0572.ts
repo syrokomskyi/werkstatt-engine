@@ -14,35 +14,35 @@ produces the same result. No-op on blocks that never had structured fields.</pur
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0572_MIGRATOR_ID = "rfc-0572";
 
-async function scanDir(dir: string, lang: string, ctx: MigrationContext): Promise<void> {
-  let entries: import("node:fs").Dirent[];
+async function scanDir(dir: string, lang: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+  let entries: DirEntry[];
   try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
+    entries = await io.readdir(dir);
   } catch {
     return;
   }
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       await scanDir(fullPath, lang, ctx);
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+    } else if (entry.isFile && entry.name.endsWith(".md")) {
       await migrateFile(fullPath, lang, ctx);
     }
   }
 }
 
-async function migrateFile(filePath: string, lang: string, ctx: MigrationContext): Promise<void> {
+async function migrateFile(filePath: string, lang: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   let content: string;
   try {
-    content = await fs.readFile(filePath, "utf-8");
+    content = await io.readFile(filePath);
   } catch {
     return;
   }
@@ -95,7 +95,7 @@ async function migrateFile(filePath: string, lang: string, ctx: MigrationContext
 
   if (modified) {
     try {
-      await fs.writeFile(filePath, updated, "utf-8");
+      await io.writeFile(filePath, updated);
       ctx.logger.info(`[rfc-0572] migrated send-message block in ${filePath}`);
     } catch (err) {
       throw new MigrationError(
@@ -114,12 +114,12 @@ export const rfc0572Migrator: Migrator = {
   toVersion: "4.20.0",
   description:
     "Remove emailField/phoneField from send-message page blocks and re-add contactRequirementMessage. Advances migratorCursor for RFC-0572 (revert to single-textarea contact form).",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const pagesBaseDir = path.join(data.rootPath, "src", "content", "pages");
 
     let langDirs: string[];
     try {
-      langDirs = await fs.readdir(pagesBaseDir);
+      langDirs = (await io.readdir(pagesBaseDir)).map(e => e.name);
     } catch {
       ctx.logger.info(`[rfc-0572] no pages directory at ${pagesBaseDir} — skipping`);
       langDirs = [];
@@ -127,8 +127,8 @@ export const rfc0572Migrator: Migrator = {
 
     for (const lang of langDirs) {
       const langPath = path.join(pagesBaseDir, lang);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat?.isDirectory()) continue;
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat?.isDirectory) continue;
       await scanDir(langPath, lang, ctx);
     }
 

@@ -18,6 +18,7 @@ import type {
   KernelRuntimeContext,
   KernelFlagValue,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 let workpieceDir: string;
@@ -72,7 +73,7 @@ function makeContext(): KernelRuntimeContext {
     },
     dryRun: false,
     outputFormat: "json",
-    io: {} as never,
+    io: createDefaultIO().io,
     actualState: undefined as never,
   };
 }

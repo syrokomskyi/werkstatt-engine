@@ -25,9 +25,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dhtCacheEntrySchema, type DHTCacheEntry, type DHTSiteEntry } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CACHE_FILENAME = "werkstatt.dht.cache.json";
 
@@ -35,10 +35,10 @@ interface CacheFile {
   entries: Record<string, DHTCacheEntry>;
 }
 
-export async function loadCache(workspaceRoot: string): Promise<CacheFile> {
+export async function loadCache(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<CacheFile> {
   const cachePath = join(workspaceRoot, CACHE_FILENAME);
   try {
-    const raw = await readFile(cachePath, "utf8");
+    const raw = await io.readFile(cachePath);
     const parsed = JSON.parse(raw) as CacheFile;
     if (!parsed.entries || typeof parsed.entries !== "object") {
       return { entries: {} };
@@ -49,9 +49,9 @@ export async function loadCache(workspaceRoot: string): Promise<CacheFile> {
   }
 }
 
-export async function saveCache(workspaceRoot: string, cache: CacheFile): Promise<void> {
+export async function saveCache(workspaceRoot: string, cache: CacheFile, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   const cachePath = join(workspaceRoot, CACHE_FILENAME);
-  await writeFile(cachePath, JSON.stringify(cache, null, 2) + "\n", "utf8");
+  await io.writeFile(cachePath, JSON.stringify(cache, null, 2) + "\n");
 }
 
 export function getCachedEntry(

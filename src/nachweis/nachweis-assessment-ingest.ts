@@ -20,9 +20,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, lstatSync } from "node:fs";
 import path from "node:path";
+import { lstatSync } from "node:fs";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -32,6 +31,7 @@ import {
   parseMarkdownFrontmatter,
   stringifyMarkdownFrontmatter,
 } from "@warpgogol/werkstatt-shared/content";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import {
@@ -138,13 +138,13 @@ export async function runNachweisAssessmentIngest(
     ) as unknown as KernelCommandResult<AssessmentIngestResult>;
   }
 
-  if (!existsSync(bundlePath)) {
+  if (!(await context.io.exists(bundlePath))) {
     throw new Error(
       `[nachweis.assessment.ingest] NOT_FOUND: bundle '${bundlePath}' does not exist`,
     );
   }
 
-  const rawBundleJson = await fs.readFile(bundlePath, "utf8");
+  const rawBundleJson = await context.io.readFile(bundlePath);
 
   if (scanForCredentials(rawBundleJson)) {
     return makeErrorResult(
@@ -210,7 +210,7 @@ export async function runNachweisAssessmentIngest(
         `[nachweis.assessment.ingest] ASSESSMENT_ARTIFACT_PATH_ESCAPE: artifact '${artifact.key}' path '${artifact.file}' escapes bundle directory`,
       );
     }
-    if (!existsSync(artifactPath)) {
+    if (!(await context.io.exists(artifactPath))) {
       return makeErrorResult(
         systemId,
         bundle,
@@ -219,8 +219,7 @@ export async function runNachweisAssessmentIngest(
       );
     }
     try {
-      const stat = lstatSync(artifactPath);
-      if (stat.isSymbolicLink()) {
+      if (lstatSync(artifactPath).isSymbolicLink()) {
         return makeErrorResult(
           systemId,
           bundle,
@@ -259,11 +258,11 @@ export async function runNachweisAssessmentIngest(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${bundle.slug}.md`);
 
-  const existingEvidence = existsSync(evidenceFile);
+  const existingEvidence = await context.io.exists(evidenceFile);
   let existingData: Record<string, unknown> | undefined;
   let existingContent = "";
   if (existingEvidence) {
-    const raw = await fs.readFile(evidenceFile, "utf8");
+    const raw = await context.io.readFile(evidenceFile);
     const parsed2 = parseMarkdownFrontmatter(raw);
     existingData = parsed2.data;
     existingContent = parsed2.content;
@@ -355,9 +354,9 @@ export async function runNachweisAssessmentIngest(
       artifact.key,
       ext,
     );
-    const fileBuffer = await fs.readFile(artifactPath);
+    const fileBuffer = await context.io.readFileBytes(artifactPath);
     try {
-      await uploadToR2(new Uint8Array(fileBuffer), r2Path, artifact.mediaType);
+      await uploadToR2(fileBuffer, r2Path, artifact.mediaType);
     } catch (err) {
       if (isMissingEnvError(err)) {
         return {
@@ -440,9 +439,9 @@ export async function runNachweisAssessmentIngest(
     ...(bundle.providerReportUrl ? { providerReportUrl: bundle.providerReportUrl } : {}),
   };
 
-  await fs.mkdir(evidenceDir, { recursive: true });
+  await context.io.mkdir(evidenceDir);
   const updatedContent = stringifyMarkdownFrontmatter(existingContent, evidenceData);
-  await fs.writeFile(evidenceFile, updatedContent, "utf8");
+  await context.io.writeFile(evidenceFile, updatedContent);
 
   const operationId = generateOperationId();
   await acquireLock(

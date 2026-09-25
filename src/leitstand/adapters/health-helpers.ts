@@ -11,12 +11,10 @@
 </CHANGE_SUMMARY>
 */
 
-import { spawn } from "node:child_process";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type { RouteFact } from "@warpgogol/werkstatt-engine/schemas";
 import type { CommandRunner } from "../adapter.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export function filterEnv(env: Record<string, string | undefined>): Record<string, string> {
   const result: Record<string, string> = {};
@@ -28,33 +26,17 @@ export function filterEnv(env: Record<string, string | undefined>): Record<strin
   return result;
 }
 
-export function createDefaultCommandRunner(): CommandRunner {
-  return (cmd, args, opts) =>
-    new Promise((resolve, reject) => {
-      const child = spawn(cmd, args, {
-        cwd: opts?.cwd,
-        env: { ...process.env, ...opts?.env },
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      let stdout = "";
-      let stderr = "";
-      child.stdout.on("data", (d) => {
-        stdout += d.toString();
-      });
-      child.stderr.on("data", (d) => {
-        stderr += d.toString();
-      });
-      child.on("error", reject);
-      child.on("exit", (code) => {
-        resolve({ exitCode: code ?? 1, stdout, stderr });
-      });
-    });
+export function createDefaultCommandRunner(io: WorkspaceIO = createDefaultIO().io): CommandRunner {
+  return async (cmd, args, opts) => {
+    const result = await io.exec(cmd, args, { cwd: opts?.cwd, env: opts?.env });
+    return { exitCode: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
+  };
 }
 
-export async function sourceDotenv(filePath: string): Promise<Record<string, string>> {
+export async function sourceDotenv(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
-  if (!existsSync(filePath)) return env;
-  const content = await fs.readFile(filePath, "utf8");
+  if (!await io.exists(filePath)) return env;
+  const content = await io.readFile(filePath);
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
@@ -77,11 +59,11 @@ export interface BehaviorSnapshot {
 
 export async function readBehaviorSnapshot(
   workspaceRoot: string,
-  releaseId: string,
+  releaseId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<BehaviorSnapshot | null> {
   const snapshotPath = path.join(workspaceRoot, "releases", releaseId, "behavior-snapshot.json");
-  if (!existsSync(snapshotPath)) return null;
-  const content = await fs.readFile(snapshotPath, "utf8");
+  if (!await io.exists(snapshotPath)) return null;
+  const content = await io.readFile(snapshotPath);
   const parsed = JSON.parse(content) as { behaviorSnapshot?: BehaviorSnapshot } & BehaviorSnapshot;
   return parsed.behaviorSnapshot ?? parsed;
 }

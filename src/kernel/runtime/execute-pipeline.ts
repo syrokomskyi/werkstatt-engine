@@ -32,7 +32,6 @@ import { performance } from "node:perf_hooks";
 import process from "node:process";
 import os from "node:os";
 import { join } from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createKernelLogger } from "../logger.ts";
 import type { ActualState, PipelineDeclaration } from "@warpgogol/werkstatt-shared/kernel";
 import {
@@ -45,6 +44,7 @@ import {
   createDefaultIO,
   EMPTY_WORKPIECE_ENV,
   loadWorkpieceEnv,
+  type WorkspaceIO,
 } from "@warpgogol/werkstatt-shared/kernel";
 import { createCacheLayer } from "../cache/cache-layer.ts";
 import { buildWorkspaceTreeIndex } from "../cache/workspace-tree-index.ts";
@@ -344,11 +344,12 @@ interface PipelineCacheHitsFile {
 export async function loadImportedCacheHits(
   workspaceRoot: string,
   currentPipelineName: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<Set<string>> {
   const filePath = join(workspaceRoot, PIPELINE_CACHE_HITS_DIR, PIPELINE_CACHE_HITS_FILENAME);
   let raw: string;
   try {
-    raw = await readFile(filePath, "utf8");
+    raw = await io.readFile(filePath);
   } catch {
     return new Set();
   }
@@ -384,13 +385,14 @@ export async function persistCacheHits(
   workspaceRoot: string,
   pipelineName: string,
   cacheHitCommands: Set<string>,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const dir = join(workspaceRoot, PIPELINE_CACHE_HITS_DIR);
   const filePath = join(dir, PIPELINE_CACHE_HITS_FILENAME);
 
   let existing: PipelineCacheHitsFile = { pipelines: {} };
   try {
-    const raw = await readFile(filePath, "utf8");
+    const raw = await io.readFile(filePath);
     existing = JSON.parse(raw) as PipelineCacheHitsFile;
     if (!existing.pipelines || typeof existing.pipelines !== "object") {
       existing = { pipelines: {} };
@@ -405,8 +407,8 @@ export async function persistCacheHits(
   };
 
   try {
-    await mkdir(dir, { recursive: true });
-    await writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf8");
+    await io.mkdir(dir);
+    await io.writeFile(filePath, JSON.stringify(existing, null, 2) + "\n");
   } catch {
     // Non-fatal — persistence is best-effort.
   }
@@ -415,12 +417,15 @@ export async function persistCacheHits(
 /**
  * RFC-0687: Clear the pipeline cache-hits file. Called when `--force` is set.
  */
-export async function clearPipelineCacheHits(workspaceRoot: string): Promise<void> {
+export async function clearPipelineCacheHits(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const dir = join(workspaceRoot, PIPELINE_CACHE_HITS_DIR);
   const filePath = join(dir, PIPELINE_CACHE_HITS_FILENAME);
   try {
-    await mkdir(dir, { recursive: true });
-    await writeFile(filePath, JSON.stringify({ pipelines: {} }, null, 2) + "\n", "utf8");
+    await io.mkdir(dir);
+    await io.writeFile(filePath, JSON.stringify({ pipelines: {} }, null, 2) + "\n");
   } catch {
     // Non-fatal — clear is best-effort.
   }

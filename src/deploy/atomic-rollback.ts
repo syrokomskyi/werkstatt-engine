@@ -18,7 +18,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -41,7 +40,7 @@ export async function runDeployAtomicRollback(
   const { workspaceRoot, logger } = context;
 
   const previousPath = previousSymlinkPath(workspaceRoot);
-  const previousHash = readSymlinkBasename(previousPath);
+  const previousHash = await readSymlinkBasename(previousPath, context.io);
 
   if (!previousHash) {
     logger.error("[deploy.atomic.rollback] no previous artifact to roll back to");
@@ -58,7 +57,7 @@ export async function runDeployAtomicRollback(
   }
 
   const dir = artifactDir(workspaceRoot, previousHash);
-  if (!existsSync(dir)) {
+  if (!(await context.io.exists(dir))) {
     logger.error(`[deploy.atomic.rollback] previous artifact ${previousHash} directory missing`);
     return {
       data: {
@@ -84,7 +83,7 @@ export async function runDeployAtomicRollback(
   }
 
   const currentPath = currentSymlinkPath(workspaceRoot);
-  const currentHash = readSymlinkBasename(currentPath);
+  const currentHash = await readSymlinkBasename(currentPath, context.io);
 
   const startTime = Date.now();
   await atomicSymlinkSwap(currentPath, dir);

@@ -77,6 +77,7 @@ import {
   resolveCacheClonePath,
   discoverSystems,
 } from "../sternsystem/registry-io.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockMaterializeInternal = vi.mocked(runMissionMaterializeInternal);
 const mockReadSystemConfig = vi.mocked(readSystemConfig);
@@ -90,6 +91,7 @@ let cacheCloneDir: string;
 
 function makeContext() {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       section() {},

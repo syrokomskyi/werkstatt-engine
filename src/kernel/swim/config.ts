@@ -25,10 +25,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { v7 as uuidv7 } from "uuid";
 import type { SwimConfig } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CONFIG_FILENAME = "werkstatt.swim.json";
 
@@ -72,15 +72,15 @@ export function validateConfig(config: unknown): asserts config is SwimConfig {
   }
 }
 
-export async function loadSwimConfig(workspaceRoot: string): Promise<SwimConfig> {
+export async function loadSwimConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SwimConfig> {
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
-  const raw = await readFile(configPath, "utf8");
+  const raw = await io.readFile(configPath);
   const parsed: unknown = JSON.parse(raw);
   validateConfig(parsed);
   return parsed;
 }
 
-export async function createSwimConfig(workspaceRoot: string, seed: string): Promise<SwimConfig> {
+export async function createSwimConfig(workspaceRoot: string, seed: string, io: WorkspaceIO = createDefaultIO().io): Promise<SwimConfig> {
   const config: SwimConfig = {
     workshopId: uuidv7(),
     bindAddr: DEFAULT_BIND_ADDR,
@@ -92,7 +92,7 @@ export async function createSwimConfig(workspaceRoot: string, seed: string): Pro
   };
 
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
-  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  await io.writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
 
   return config;
 }

@@ -74,6 +74,7 @@ import { readMissionManifest } from "./mission-io.ts";
 import { readSystemState, writeSystemState } from "../sternsystem/registry-io.ts";
 import { acquireLock, commitWerkstattSideEffects } from "../werkstatt/index.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockReadMissionManifest = vi.mocked(readMissionManifest);
 const mockReadSystemState = vi.mocked(readSystemState);
@@ -97,6 +98,7 @@ const validManifest = {
 
 function makeContext(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       info: vi.fn(),

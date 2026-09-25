@@ -15,7 +15,6 @@ lock, wrangler deploy, health check, and prod state recording.</purpose>
 */
 
 import path from "node:path";
-import { existsSync } from "node:fs";
 import type { KernelCommandInput, KernelCommandResult } from "@warpgogol/werkstatt-engine/kernel";
 import { readServicesRegistry, findServiceEntry } from "../sternsystem/registry-io.ts";
 import {
@@ -36,6 +35,7 @@ import {
   type ServicePromoteData,
   type KernelRuntimeContext,
 } from "./service-deploy-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export async function runLeitstandServicePromote(
   input: KernelCommandInput,
@@ -61,12 +61,12 @@ export async function runLeitstandServicePromote(
   }
 
   const serviceDir = path.join(workspaceRoot, "services", serviceId);
-  if (!existsSync(serviceDir)) {
+  if (!await context.io.exists(serviceDir)) {
     throw new Error(`[leitstand.service.promote] services/${serviceId}/ does not exist`);
   }
 
   const wranglerPath = path.join(serviceDir, "wrangler.jsonc");
-  if (!existsSync(wranglerPath)) {
+  if (!await context.io.exists(wranglerPath)) {
     throw new Error(
       `[leitstand.service.promote] services/${serviceId}/wrangler.jsonc not found — not a Cloudflare Worker service`,
     );

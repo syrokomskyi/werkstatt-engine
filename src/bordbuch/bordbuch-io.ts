@@ -19,10 +19,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import {
   bordbuchEntrySchema,
   type BordbuchEntry,
@@ -164,10 +163,11 @@ function nextEventId(entries: BordbuchEntry[]): string {
 export async function readBordbuch(
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<BordbuchEntry[]> {
   const filePath = await resolveBordbuchPath(workspaceRoot, systemId);
-  if (!existsSync(filePath)) return [];
-  const raw = await fs.readFile(filePath, "utf8");
+  if (!(await io.exists(filePath))) return [];
+  const raw = await io.readFile(filePath);
   const lines = raw.split("\n").filter((l) => l.trim().length > 0);
   const entries: BordbuchEntry[] = [];
   for (const line of lines) {
@@ -195,11 +195,12 @@ export async function appendBordbuchEntry(
     status?: BordbuchEntry["status"];
     erratumOf?: string;
   },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<BordbuchEntry> {
   const filePath = await resolveBordbuchPath(workspaceRoot, systemId);
   const dir = path.dirname(filePath);
-  if (!existsSync(dir)) {
-    await fs.mkdir(dir, { recursive: true });
+  if (!(await io.exists(dir))) {
+    await io.mkdir(dir);
   }
 
   const redactedSummary = redactForBordbuch(summary);
@@ -268,7 +269,7 @@ export async function appendBordbuchEntry(
   bordbuchEntrySchema.parse(entry);
 
   const line = JSON.stringify(entry) + "\n";
-  const existingContent = existsSync(filePath) ? await fs.readFile(filePath, "utf8") : "";
+  const existingContent = (await io.exists(filePath)) ? await io.readFile(filePath) : "";
   const separator = existingContent.length > 0 && !existingContent.endsWith("\n") ? "\n" : "";
   await atomicWriteFile(filePath, `${existingContent}${separator}${line}`);
   return entry;
@@ -413,6 +414,7 @@ export async function deriveNextMissionNumberSafe(
   entries: BordbuchEntry[],
   workspaceRoot: string,
   systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<number> {
   let maxNum = 0;
   for (const entry of entries) {
@@ -425,12 +427,11 @@ export async function deriveNextMissionNumberSafe(
   }
   // Also scan existing mission directories on disk
   const missionsPath = path.join(workspaceRoot, "missions");
-  if (existsSync(missionsPath)) {
-    const dirs = await fs.readdir(missionsPath, { withFileTypes: true });
+  if (await io.exists(missionsPath)) {
+    const dirs = await io.readdir(missionsPath);
     for (const d of dirs) {
       if (d.name === "archive") continue;
-      if (d.isSymbolicLink()) continue;
-      if (!d.isDirectory()) continue;
+      if (!d.isDirectory) continue;
       if (!d.name.startsWith(`${systemId}-m`)) continue;
       const m = d.name.match(/-m(\d{6})$/);
       if (m) {
@@ -450,6 +451,7 @@ export interface CommitAndPushResult {
 export async function commitAndPushBordbuch(
   systemDir: string,
   message: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<CommitAndPushResult> {
   const bordbuchPath = path.join("bordbuch", "events.ndjson");
   const statusPath = path.join("bordbuch", "status.generated.yaml");
@@ -457,7 +459,7 @@ export async function commitAndPushBordbuch(
   try {
     gitExec(systemDir, `add ${bordbuchPath}`);
     // Also commit bordbuch/status.generated.yaml if it exists (RFC-0597 fix: prevent dirty cache clone)
-    if (existsSync(path.join(systemDir, statusPath))) {
+    if (await io.exists(path.join(systemDir, statusPath))) {
       try {
         gitExec(systemDir, `add ${statusPath}`);
       } catch {
@@ -534,10 +536,10 @@ export async function commitAndPushBordbuch(
     } catch {
       // If git rebase --abort fails, manually remove the rebase state directories
       try {
-        rmSync(path.join(systemDir, ".git", "rebase-merge"), { recursive: true, force: true });
+        await io.rm(path.join(systemDir, ".git", "rebase-merge"), { recursive: true });
       } catch {}
       try {
-        rmSync(path.join(systemDir, ".git", "rebase-apply"), { recursive: true, force: true });
+        await io.rm(path.join(systemDir, ".git", "rebase-apply"), { recursive: true });
       } catch {}
     }
     // Clean up stash on push failure too

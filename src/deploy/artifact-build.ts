@@ -19,10 +19,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -36,6 +33,7 @@ import {
   platformArtifactsBase,
   writeManifest,
 } from "./deploy-utils.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function _flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -47,35 +45,43 @@ function flagBool(input: KernelCommandInput, key: string): boolean {
   return v === true || v === "true";
 }
 
-async function getGitSha(workspaceRoot: string): Promise<string> {
+async function getGitSha(workspaceRoot: string, io: WorkspaceIO): Promise<string> {
   try {
-    const output = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: workspaceRoot,
-      encoding: "utf8",
-      timeout: 5000,
-    }).trim();
+    const output = (
+      await io.exec("git", ["rev-parse", "HEAD"], {
+        cwd: workspaceRoot,
+        timeoutMs: 5000,
+      })
+    ).stdout.trim();
     return output;
   } catch {
     return "unknown";
   }
 }
 
-async function copyDistTrees(workspaceRoot: string, destDist: string): Promise<void> {
+async function copyDistTrees(
+  workspaceRoot: string,
+  destDist: string,
+  io: WorkspaceIO,
+): Promise<void> {
   const packagesDir = path.join(workspaceRoot, "packages");
-  if (!existsSync(packagesDir)) return;
+  if (!(await io.exists(packagesDir))) return;
 
-  await fs.mkdir(destDist, { recursive: true });
+  await io.mkdir(destDist);
 
-  const entries = await fs.readdir(packagesDir, { withFileTypes: true });
+  const entries = await io.readdir(packagesDir);
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory) continue;
     const pkgDir = path.join(packagesDir, entry.name);
     const distDir = path.join(pkgDir, "dist");
-    if (!existsSync(distDir)) continue;
+    if (!(await io.exists(distDir))) continue;
 
     const destPkgDir = path.join(destDist, entry.name);
-    await fs.mkdir(destPkgDir, { recursive: true });
-    await fs.cp(distDir, destPkgDir, { recursive: true });
+    await io.mkdir(destPkgDir);
+    const cpResult = await io.exec("cp", ["-r", distDir, destPkgDir]);
+    if (cpResult.exitCode !== 0) {
+      throw new Error(`cp failed for '${entry.name}': ${cpResult.stderr.slice(0, 200)}`);
+    }
   }
 }
 
@@ -88,17 +94,20 @@ export async function runDeployArtifactBuild(
   const skipSign = flagBool(input, "skip-sign");
 
   const baseDir = platformArtifactsBase(workspaceRoot);
-  await fs.mkdir(baseDir, { recursive: true });
+  await context.io.mkdir(baseDir);
 
   if (!skipBuild) {
     logger.info("[deploy.artifact.build] running turbo run build...");
     try {
-      execFileSync("pnpm", ["exec", "turbo", "run", "build"], {
+      const buildResult = await context.io.exec("pnpm", ["exec", "turbo", "run", "build"], {
         cwd: workspaceRoot,
-        encoding: "utf8",
-        timeout: 300000,
-        stdio: "pipe",
+        timeoutMs: 300000,
       });
+      if (buildResult.exitCode !== 0) {
+        throw new Error(
+          `turbo run build exited ${buildResult.exitCode}: ${buildResult.stderr.slice(-400)}`,
+        );
+      }
     } catch (err) {
       throw new Error(`[deploy.artifact.build] turbo run build failed: ${(err as Error).message}`);
     }
@@ -106,15 +115,15 @@ export async function runDeployArtifactBuild(
 
   const stagingDir = path.join(baseDir, `.staging-${process.pid}-${Date.now()}`);
   const stagingDist = path.join(stagingDir, "dist");
-  await fs.mkdir(stagingDist, { recursive: true });
+  await context.io.mkdir(stagingDist);
 
   try {
-    await copyDistTrees(workspaceRoot, stagingDist);
+    await copyDistTrees(workspaceRoot, stagingDist, context.io);
 
     const { treeHash, files, totalSize } = await hashArtifactDir(stagingDist);
     const hash = treeHash;
 
-    const gitSha = await getGitSha(workspaceRoot);
+    const gitSha = await getGitSha(workspaceRoot, context.io);
     const builtAt = new Date().toISOString();
     const buildHost = await requireEnv("WORKSHOP_ID", workspaceRoot).catch(
       () => process.env.HOSTNAME ?? "unknown",
@@ -145,7 +154,7 @@ export async function runDeployArtifactBuild(
     }
 
     const finalDir = artifactDir(workspaceRoot, hash);
-    if (existsSync(finalDir)) {
+    if (await context.io.exists(finalDir)) {
       logger.info(`[deploy.artifact.build] artifact ${hash} already exists — reusing`);
       return {
         data: {
@@ -167,7 +176,7 @@ export async function runDeployArtifactBuild(
       };
     }
 
-    await fs.rename(stagingDir, finalDir);
+    await context.io.rename(stagingDir, finalDir);
     await writeManifest(workspaceRoot, hash, manifest);
 
     logger.success(
@@ -193,8 +202,8 @@ export async function runDeployArtifactBuild(
       ],
     };
   } finally {
-    if (existsSync(stagingDir)) {
-      await fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    if (await context.io.exists(stagingDir)) {
+      await context.io.rm(stagingDir, { recursive: true }).catch(() => {});
     }
   }
 }

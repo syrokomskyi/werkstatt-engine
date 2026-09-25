@@ -16,9 +16,8 @@ Provides persistEnvFilesToCacheClone (mission.close) and restoreEnvFilesFromCach
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface EnvPersistResult {
   copied: string[];
@@ -38,12 +37,12 @@ function shouldExclude(filename: string): boolean {
   return false;
 }
 
-export async function collectEnvFiles(dir: string): Promise<string[]> {
-  if (!existsSync(dir)) return [];
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+export async function collectEnvFiles(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+  if (!await io.exists(dir)) return [];
+  const entries = await io.readdir(dir);
   const envFiles: string[] = [];
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
+    if (!entry.isFile) continue;
     if (!entry.name.startsWith(".env")) continue;
     if (shouldExclude(entry.name)) continue;
     envFiles.push(entry.name);
@@ -53,7 +52,7 @@ export async function collectEnvFiles(dir: string): Promise<string[]> {
 
 export async function persistEnvFilesToCacheClone(
   workpieceDir: string,
-  cacheCloneDir: string,
+  cacheCloneDir: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<EnvPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -63,7 +62,7 @@ export async function persistEnvFilesToCacheClone(
     const src = path.join(workpieceDir, filename);
     const dest = path.join(cacheCloneDir, filename);
     try {
-      await fs.copyFile(src, dest);
+      await io.copyFile(src, dest);
       copied.push(filename);
     } catch {
       skipped.push(filename);
@@ -75,7 +74,7 @@ export async function persistEnvFilesToCacheClone(
 
 export async function restoreEnvFilesFromCacheClone(
   cacheCloneDir: string,
-  workpieceDir: string,
+  workpieceDir: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<EnvPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -85,12 +84,12 @@ export async function restoreEnvFilesFromCacheClone(
     const src = path.join(cacheCloneDir, filename);
     const dest = path.join(workpieceDir, filename);
     try {
-      let content = await fs.readFile(src, "utf8");
+      let content = await io.readFile(src);
       content = content.replace(
         /^PUBLIC_IMAGE_PROVIDER=.*$/m,
         "PUBLIC_IMAGE_PROVIDER=build-portable",
       );
-      await fs.writeFile(dest, content, "utf8");
+      await io.writeFile(dest, content);
       copied.push(filename);
     } catch {
       skipped.push(filename);

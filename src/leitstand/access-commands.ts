@@ -21,7 +21,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -36,6 +35,7 @@ import {
 } from "../sternsystem/registry-io.ts";
 import { sourceDotenv, filterEnv } from "./adapters/index.ts";
 import { runWranglerSecretPut, runWranglerSecretDelete } from "./adapters/wrangler-secrets.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 type ChannelName = "dev" | "alt";
 
@@ -87,7 +87,7 @@ export async function runLeitstandAccessProtect(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = existsSync(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
@@ -150,7 +150,7 @@ export async function runLeitstandAccessUnprotect(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = existsSync(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,

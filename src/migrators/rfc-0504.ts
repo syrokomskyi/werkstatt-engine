@@ -16,10 +16,10 @@ Idempotent: running twice produces the same result.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0504_MIGRATOR_ID = "rfc-0504";
 
@@ -102,14 +102,14 @@ export const rfc0504Migrator: Migrator = {
   toVersion: "4.15.0",
   description:
     "Add empty articleSections and changelog frontmatter fields to article records if absent. Strip H1 headings from prose bodies (remove duplicates of article title, convert unique H1 to H2 unless duplicate H2 exists). Advances migratorCursor for RFC-0504 (12-section ratgeber article layout).",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const articlesBaseDir = path.join(data.rootPath, "src", "content", "surface", "articles");
     const proseBaseDir = path.join(data.rootPath, "src", "content", "prose");
 
     // Process article records
     let langDirs: string[];
     try {
-      langDirs = await fs.readdir(articlesBaseDir);
+      langDirs = (await io.readdir(articlesBaseDir)).map(e => e.name);
     } catch {
       ctx.logger.info(`[rfc-0504] no articles directory at ${articlesBaseDir} — skipping`);
       langDirs = [];
@@ -117,15 +117,15 @@ export const rfc0504Migrator: Migrator = {
 
     for (const lang of langDirs) {
       const langPath = path.join(articlesBaseDir, lang);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat?.isDirectory()) continue;
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat?.isDirectory) continue;
 
-      const articleFiles = (await fs.readdir(langPath)).filter((f) => f.endsWith(".md"));
+      const articleFiles = (await io.readdir(langPath)).filter((f) => f.name.endsWith(".md"));
       for (const articleFile of articleFiles) {
-        const articlePath = path.join(langPath, articleFile);
+        const articlePath = path.join(langPath, articleFile.name);
         let content: string;
         try {
-          content = await fs.readFile(articlePath, "utf-8");
+          content = await io.readFile(articlePath);
         } catch {
           continue;
         }
@@ -151,7 +151,7 @@ export const rfc0504Migrator: Migrator = {
 
         if (modified) {
           try {
-            await fs.writeFile(articlePath, updated, "utf-8");
+            await io.writeFile(articlePath, updated);
             ctx.logger.info(`[rfc-0504] updated article frontmatter: ${lang}/${articleFile}`);
           } catch (err) {
             throw new MigrationError(
@@ -164,18 +164,17 @@ export const rfc0504Migrator: Migrator = {
         }
 
         // Strip H1 from prose body
-        const slug = articleFile.replace(/\.md$/, "");
+        const slug = articleFile.name.replace(/\.md$/, "");
         const proseFileName = `ratgeber-${slug}.md`;
         const prosePath = path.join(proseBaseDir, lang, proseFileName);
-        const proseExists = await fs
-          .stat(prosePath)
+        const proseExists = await io.stat(prosePath)
           .then(() => true)
           .catch(() => false);
 
         if (proseExists) {
           let proseContent: string;
           try {
-            proseContent = await fs.readFile(prosePath, "utf-8");
+            proseContent = await io.readFile(prosePath);
           } catch {
             continue;
           }
@@ -183,7 +182,7 @@ export const rfc0504Migrator: Migrator = {
           const stripped = stripH1FromMarkdown(proseContent, articleTitle);
           if (stripped !== proseContent) {
             try {
-              await fs.writeFile(prosePath, stripped, "utf-8");
+              await io.writeFile(prosePath, stripped);
               ctx.logger.info(`[rfc-0504] stripped H1 from prose: ${lang}/${proseFileName}`);
             } catch (err) {
               throw new MigrationError(

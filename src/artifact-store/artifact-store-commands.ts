@@ -12,8 +12,6 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { create as tarCreate, extract as tarExtract } from "tar";
 import { byteHash, byteHashFile } from "@warpgogol/werkstatt-engine/fingerprint";
@@ -25,6 +23,7 @@ import type {
 import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -49,8 +48,9 @@ async function hashFile(filePath: string): Promise<string> {
 
 async function hashDir(
   dir: string,
+  io: WorkspaceIO,
 ): Promise<{ treeHash: string; fileCount: number; byteSize: number }> {
-  if (!existsSync(dir)) return { treeHash: "sha256:empty", fileCount: 0, byteSize: 0 };
+  if (!(await io.exists(dir))) return { treeHash: "sha256:empty", fileCount: 0, byteSize: 0 };
   const hashes: string[] = [];
   let fileCount = 0;
   let byteSize = 0;
@@ -60,7 +60,7 @@ async function hashDir(
     const fileHash = await byteHashFile(fullPath);
     hashes.push(`${relPath}:${fileHash}`);
     fileCount++;
-    const stat = await fs.stat(fullPath);
+    const stat = await io.stat(fullPath);
     byteSize += stat.size;
   }
 
@@ -99,9 +99,10 @@ export async function storeArtifactCore(
   releaseId: string,
   distDir: string,
   systemId: string,
+  io: WorkspaceIO,
   sitePath?: string,
 ): Promise<StoreArtifactCoreResult> {
-  const { treeHash, fileCount, byteSize } = await hashDir(distDir);
+  const { treeHash, fileCount, byteSize } = await hashDir(distDir, io);
 
   // Create tar.gz archive of the dist directory
   const archiveTmpPath = path.join(
@@ -110,7 +111,7 @@ export async function storeArtifactCore(
     "tmp",
     `${releaseId}-${Date.now()}.tar.gz`,
   );
-  await fs.mkdir(path.dirname(archiveTmpPath), { recursive: true });
+  await io.mkdir(path.dirname(archiveTmpPath));
 
   await tarCreate(
     {
@@ -125,31 +126,31 @@ export async function storeArtifactCore(
 
   // Move archive to content-addressed path
   const storeDir = hashPath(workspaceRoot, distArtifactHash);
-  await fs.mkdir(storeDir, { recursive: true });
+  await io.mkdir(storeDir);
   const archivePath = path.join(storeDir, `${distArtifactHash}.tar.gz`);
-  await fs.rename(archiveTmpPath, archivePath);
+  await io.rename(archiveTmpPath, archivePath);
 
   // Also copy artifact.tar.gz to releases/{release}/ for resolveArtifactHash
   const releaseDir = path.join(workspaceRoot, "releases", releaseId);
-  await fs.mkdir(releaseDir, { recursive: true });
+  await io.mkdir(releaseDir);
   const releaseArtifactPath = path.join(releaseDir, "artifact.tar.gz");
-  await fs.copyFile(archivePath, releaseArtifactPath);
+  await io.copyFile(archivePath, releaseArtifactPath);
 
   // Clean up tmp dir if empty
   const tmpDir = path.dirname(archiveTmpPath);
   try {
-    await fs.rmdir(tmpDir);
+    await io.rm(tmpDir, { recursive: true });
   } catch {
     // not empty or already removed — fine
   }
 
   // Idempotent: remove any existing manifest for this releaseId before writing new one
-  const existing = await findArtifactManifest(workspaceRoot, releaseId);
+  const existing = await findArtifactManifest(workspaceRoot, releaseId, io);
   if (
     existing &&
     existing.manifestPath !== path.join(storeDir, `${distArtifactHash}.manifest.json`)
   ) {
-    await fs.unlink(existing.manifestPath).catch(() => {});
+    await io.rm(existing.manifestPath).catch(() => {});
   }
 
   const now = new Date().toISOString();
@@ -193,10 +194,11 @@ export async function storeArtifactCore(
 async function deriveSystemIdFromRelease(
   workspaceRoot: string,
   releaseId: string,
+  io: WorkspaceIO,
 ): Promise<string> {
   const manifestPath = path.join(workspaceRoot, "releases", releaseId, "release.yaml");
-  if (existsSync(manifestPath)) {
-    const content = await fs.readFile(manifestPath, "utf8");
+  if (await io.exists(manifestPath)) {
+    const content = await io.readFile(manifestPath);
     for (const line of content.split("\n")) {
       const match = line.match(/^systemId:\s*(.+)$/);
       if (match) return match[1].trim();
@@ -219,11 +221,11 @@ export async function runArtifactStorePut(
   }
 
   const distDir = path.resolve(workspaceRoot, distPath);
-  if (!existsSync(distDir)) {
+  if (!(await context.io.exists(distDir))) {
     throw new Error(`[artifact.store.put] dist directory not found: ${distDir}`);
   }
 
-  const systemId = await deriveSystemIdFromRelease(workspaceRoot, releaseId);
+  const systemId = await deriveSystemIdFromRelease(workspaceRoot, releaseId, context.io);
 
   const operationId = generateOperationId();
   await acquireLock(
@@ -235,7 +237,7 @@ export async function runArtifactStorePut(
   );
 
   try {
-    const result = await storeArtifactCore(workspaceRoot, releaseId, distDir, systemId, sitePath);
+    const result = await storeArtifactCore(workspaceRoot, releaseId, distDir, systemId, context.io, sitePath);
 
     logger.success(
       `[artifact.store.put] stored artifact for ${releaseId}: ${result.distArtifactHash}`,
@@ -289,20 +291,20 @@ export async function runArtifactStoreGet(
 
   // Find manifest by searching store directories
   const storeBase = path.join(workspaceRoot, ARTIFACTS_DIR, "sha256");
-  if (!existsSync(storeBase)) {
+  if (!(await context.io.exists(storeBase))) {
     throw new Error(`[artifact.store.get] no artifacts found — store does not exist`);
   }
 
   let manifestPath: string | null = null;
   let manifest: Record<string, unknown> | null = null;
 
-  const subdirs = await fs.readdir(storeBase);
+  const subdirs = (await context.io.readdir(storeBase)).map((e) => e.name);
   for (const subdir of subdirs) {
     const dir = path.join(storeBase, subdir);
-    const files = await fs.readdir(dir);
+    const files = (await context.io.readdir(dir)).map((e) => e.name);
     for (const file of files) {
       if (file.endsWith(".manifest.json")) {
-        const candidate = JSON.parse(await fs.readFile(path.join(dir, file), "utf8"));
+        const candidate = JSON.parse(await context.io.readFile(path.join(dir, file)));
         if (candidate.releaseId === releaseId) {
           manifestPath = path.join(dir, file);
           manifest = candidate;
@@ -323,7 +325,7 @@ export async function runArtifactStoreGet(
   // For MVP, we verify the manifest exists and hashes match
   // A full implementation would extract the tarball
   const outputDir = path.resolve(workspaceRoot, outputPath);
-  await fs.mkdir(outputDir, { recursive: true });
+  await context.io.mkdir(outputDir);
 
   logger.success(`[artifact.store.get] rehydrated artifact for ${releaseId}`);
   return {
@@ -359,14 +361,14 @@ export async function runArtifactStoreValidate(
   let hashVerified = false;
   let treeHashVerified = false;
 
-  if (existsSync(storeBase)) {
-    const subdirs = await fs.readdir(storeBase);
+  if (await context.io.exists(storeBase)) {
+    const subdirs = (await context.io.readdir(storeBase)).map((e) => e.name);
     for (const subdir of subdirs) {
       const dir = path.join(storeBase, subdir);
-      const files = await fs.readdir(dir);
+      const files = (await context.io.readdir(dir)).map((e) => e.name);
       for (const file of files) {
         if (file.endsWith(".manifest.json")) {
-          const candidate = JSON.parse(await fs.readFile(path.join(dir, file), "utf8"));
+          const candidate = JSON.parse(await context.io.readFile(path.join(dir, file)));
           if (candidate.releaseId === releaseId) {
             manifestFound = true;
             hashVerified = true; // MVP: manifest presence implies hash verified
@@ -412,18 +414,19 @@ const ARTIFACTS_DIR_NAME = ".werkstatt/artifacts/releases";
 async function findArtifactManifest(
   workspaceRoot: string,
   releaseId: string,
+  io: WorkspaceIO,
 ): Promise<{ manifest: Record<string, unknown>; manifestPath: string } | null> {
   const storeBase = path.join(workspaceRoot, ARTIFACTS_DIR_NAME, "sha256");
-  if (!existsSync(storeBase)) return null;
+  if (!(await io.exists(storeBase))) return null;
 
-  const subdirs = await fs.readdir(storeBase);
+  const subdirs = (await io.readdir(storeBase)).map((e) => e.name);
   for (const subdir of subdirs) {
     const dir = path.join(storeBase, subdir);
-    const entries = await fs.readdir(dir);
+    const entries = (await io.readdir(dir)).map((e) => e.name);
     for (const file of entries) {
       if (!file.endsWith(".manifest.json")) continue;
       try {
-        const candidate = JSON.parse(await fs.readFile(path.join(dir, file), "utf8"));
+        const candidate = JSON.parse(await io.readFile(path.join(dir, file)));
         if (candidate.releaseId === releaseId) {
           return { manifest: candidate, manifestPath: path.join(dir, file) };
         }
@@ -445,19 +448,20 @@ export async function artifactStorePreflight(
   workspaceRoot: string,
   releaseId: string,
   distPath: string,
+  io: WorkspaceIO,
 ): Promise<ArtifactPreflightResult> {
-  const found = await findArtifactManifest(workspaceRoot, releaseId);
+  const found = await findArtifactManifest(workspaceRoot, releaseId, io);
   if (!found) {
     return { manifestFound: false, distTreeHash: null, hashVerified: false };
   }
 
   const expectedTreeHash = found.manifest.distTreeHash as string;
 
-  if (!existsSync(distPath)) {
+  if (!(await io.exists(distPath))) {
     return { manifestFound: true, distTreeHash: expectedTreeHash, hashVerified: false };
   }
 
-  const { treeHash } = await hashDir(distPath);
+  const { treeHash } = await hashDir(distPath, io);
   return {
     manifestFound: true,
     distTreeHash: expectedTreeHash,
@@ -469,8 +473,9 @@ export async function artifactStoreRehydrate(
   workspaceRoot: string,
   releaseId: string,
   outputDir: string,
+  io: WorkspaceIO,
 ): Promise<{ verified: boolean; output: string }> {
-  const found = await findArtifactManifest(workspaceRoot, releaseId);
+  const found = await findArtifactManifest(workspaceRoot, releaseId, io);
   if (!found) {
     throw new Error(`[artifact.store] no artifact found for release ${releaseId}`);
   }
@@ -481,12 +486,12 @@ export async function artifactStoreRehydrate(
   }
 
   const archivePath = path.resolve(workspaceRoot, archiveRel);
-  if (!existsSync(archivePath)) {
+  if (!(await io.exists(archivePath))) {
     throw new Error(`[artifact.store] archive not found for release ${releaseId}: ${archivePath}`);
   }
 
   const resolved = path.resolve(workspaceRoot, outputDir);
-  await fs.mkdir(resolved, { recursive: true });
+  await io.mkdir(resolved);
 
   await tarExtract({
     file: archivePath,
@@ -508,7 +513,7 @@ export async function runArtifactStoreGc(
   const dryRun = flagBool(input, "dry-run");
 
   const storeBase = path.join(workspaceRoot, ARTIFACTS_DIR, "sha256");
-  if (!existsSync(storeBase)) {
+  if (!(await context.io.exists(storeBase))) {
     return {
       data: { dryRun, examined: 0, deleted: 0, retained: 0, candidates: [] },
       summary: `[artifact.store.gc] no artifacts found`,
@@ -519,14 +524,14 @@ export async function runArtifactStoreGc(
   let examined = 0;
   let retained = 0;
 
-  const subdirs = await fs.readdir(storeBase);
+  const subdirs = (await context.io.readdir(storeBase)).map((e) => e.name);
   for (const subdir of subdirs) {
     const dir = path.join(storeBase, subdir);
-    const files = await fs.readdir(dir);
+    const files = (await context.io.readdir(dir)).map((e) => e.name);
     for (const file of files) {
       if (!file.endsWith(".manifest.json")) continue;
       examined++;
-      const manifest = JSON.parse(await fs.readFile(path.join(dir, file), "utf8"));
+      const manifest = JSON.parse(await context.io.readFile(path.join(dir, file)));
 
       if (systemFilter && manifest.systemId !== systemFilter) continue;
 

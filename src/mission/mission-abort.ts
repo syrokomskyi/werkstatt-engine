@@ -19,9 +19,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -46,6 +43,7 @@ import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface MissionAbortData {
   missionId: string;
@@ -99,7 +97,7 @@ export async function runMissionAbort(
     const missionDir = resolveMissionDir(workspaceRoot, missionId);
     const workpieceDir = path.join(missionDir, "workpiece");
     const evidenceDir = path.join(missionDir, "evidence");
-    await fs.mkdir(evidenceDir, { recursive: true });
+    await context.io.mkdir(evidenceDir);
 
     const now = new Date().toISOString();
 
@@ -113,6 +111,7 @@ export async function runMissionAbort(
       actor,
       reason,
       now,
+      io: context.io,
     };
 
     const steps = await buildAbortSteps(workspaceRoot, missionId, abortCtx);
@@ -189,6 +188,7 @@ export interface AbortStepCtx {
   actor: ReturnType<typeof resolveActor>;
   reason: string;
   now: string;
+  io: import("@warpgogol/werkstatt-shared/kernel/workspace-io").WorkspaceIO;
 }
 
 export async function buildAbortSteps(
@@ -226,13 +226,19 @@ export async function buildAbortSteps(
       name: "create-git-bundle",
       run: async (c: unknown) => {
         const cc = c as AbortStepCtx;
-        if (existsSync(path.join(cc.workpieceDir, ".git"))) {
+        if (await cc.io.exists(path.join(cc.workpieceDir, ".git"))) {
           const bundlePath = path.join(cc.evidenceDir, "workpiece.git-bundle");
           try {
-            execSync(`git bundle create ${JSON.stringify(bundlePath)} --all`, {
-              cwd: cc.workpieceDir,
-              stdio: ["pipe", "pipe", "pipe"],
-            });
+            const bundleResult = await cc.io.exec(
+              "git",
+              ["bundle", "create", bundlePath, "--all"],
+              {
+                cwd: cc.workpieceDir,
+              },
+            );
+            if (bundleResult.exitCode !== 0) {
+              throw new Error(`git bundle exited ${bundleResult.exitCode}`);
+            }
           } catch {
             // Bundle creation failed — non-fatal
           }
@@ -302,17 +308,22 @@ export async function buildAbortSteps(
         // RFC-0985 Measure 3: Commit system-state.yaml to cache clone git
         // so that git push does not restore the stale currentMission value.
         const cacheCloneDir = resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
-        if (existsSync(path.join(cacheCloneDir, ".git"))) {
+        if (await cc.io.exists(path.join(cacheCloneDir, ".git"))) {
           try {
-            execSync(
-              'git add system-state.yaml && git commit -m "mission.abort: clear currentMission"',
+            const commitResult = await cc.io.exec(
+              "sh",
+              [
+                "-c",
+                'git add system-state.yaml && git commit -m "mission.abort: clear currentMission"',
+              ],
               {
                 cwd: cacheCloneDir,
-                stdio: ["pipe", "pipe", "pipe"],
-                encoding: "utf-8",
-                env: { ...process.env, MISSION_GIT_COMMIT: "1" },
+                env: { ...process.env, MISSION_GIT_COMMIT: "1" } as Record<string, string>,
               },
             );
+            if (commitResult.exitCode !== 0) {
+              throw new Error(`git commit exited ${commitResult.exitCode}`);
+            }
           } catch {
             // Non-fatal — system-state.yaml may already be committed or unchanged
           }
@@ -329,10 +340,10 @@ export async function buildAbortSteps(
           path.join(cc.workspaceRoot, "missions"),
           cc.missionId,
         );
-        if (!existsSync(storePath)) {
+        if (!(await cc.io.exists(storePath))) {
           return; // No compensation evidence — nothing to verify
         }
-        const store = new CompensationStore(storePath);
+        const store = await CompensationStore.create(storePath, cc.io);
         try {
           // The store may contain unverified compensations from interrupted missions.
           // We log them as warnings but do not block abort — the evidence is preserved
@@ -357,13 +368,18 @@ export async function buildAbortSteps(
           "aborted",
           cc.missionId,
         );
-        await fs.mkdir(path.dirname(archiveDir), { recursive: true });
+        await cc.io.mkdir(path.dirname(archiveDir));
         try {
-          await fs.rename(cc.missionDir, archiveDir);
+          await cc.io.rename(cc.missionDir, archiveDir);
         } catch {
           // Cross-device fallback: copy then remove
-          await fs.cp(cc.missionDir, archiveDir, { recursive: true, force: true });
-          await fs.rm(cc.missionDir, { recursive: true, force: true });
+          const cpResult = await cc.io.exec("cp", ["-r", cc.missionDir, archiveDir]);
+          if (cpResult.exitCode !== 0) {
+            throw new Error(
+              `cp failed archiving '${cc.missionDir}': ${cpResult.stderr.slice(0, 200)}`,
+            );
+          }
+          await cc.io.rm(cc.missionDir, { recursive: true });
         }
       },
     },

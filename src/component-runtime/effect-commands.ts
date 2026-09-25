@@ -52,7 +52,7 @@ export function runEffectClassify(
   };
 }
 
-export function runEffectCompensationVerify(
+export async function runEffectCompensationVerify(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<CompensationResult>> {
@@ -92,7 +92,7 @@ export function runEffectCompensationVerify(
     ? resolveCompensationStorePath(missionsDir, missionId)
     : `${workspaceRoot}/missions/_global/compensation-evidence.db`;
 
-  const store = new CompensationStore(storePath);
+  const store = await CompensationStore.create(storePath, context.io);
   const verifier = new CompensationVerifier(store, context);
 
   return verifier
@@ -113,10 +113,10 @@ export function runEffectCompensationVerify(
     });
 }
 
-export function runEffectCompensationInspect(
+export async function runEffectCompensationInspect(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
-): KernelCommandResult<CompensationResult | null> {
+): Promise<KernelCommandResult<CompensationResult | null>> {
   const operationHash = input.flags["operation-hash"] as string | undefined;
   if (!operationHash || !isSha256Digest(operationHash)) {
     throw new Error("EFFECT-CMD-02: --operation-hash flag (sha256:...) is required");
@@ -131,7 +131,7 @@ export function runEffectCompensationInspect(
     ? resolveCompensationStorePath(missionsDir, missionId)
     : `${workspaceRoot}/missions/_global/compensation-evidence.db`;
 
-  const store = new CompensationStore(storePath);
+  const store = await CompensationStore.create(storePath, context.io);
   const result = store.get(operationHash as Sha256Digest);
   store.close();
 

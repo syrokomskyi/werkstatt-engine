@@ -2,6 +2,7 @@ import { test, expect, describe, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /*
 <MODULE_CONTRACT>
@@ -95,6 +96,7 @@ const { runLeitstandPromote } = await import("../leitstand-commands.ts");
 
 function makeContext(workspaceRoot: string) {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

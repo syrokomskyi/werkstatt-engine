@@ -17,11 +17,11 @@ migrator is a no-op. Advances the migratorCursor for RFC-0505.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0505_MIGRATOR_ID = "rfc-0505";
 
@@ -76,13 +76,13 @@ export const rfc0505Migrator: Migrator = {
   toVersion: "4.16.0",
   description:
     "Transform ratgeber article claim sidecars (surface/articles/{lang}/*.claims.yaml) into structured claim records (surface/claims/{lang}/{claimId}.md) and delete sidecars. Sets reviewStatus to 'unverified' — editorial review required. Advances migratorCursor for RFC-0505.",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const articlesBaseDir = path.join(data.rootPath, "src", "content", "surface", "articles");
     const claimsBaseDir = path.join(data.rootPath, "src", "content", "surface", "claims");
 
     let langDirs: string[];
     try {
-      langDirs = await fs.readdir(articlesBaseDir);
+      langDirs = (await io.readdir(articlesBaseDir)).map(e => e.name);
     } catch {
       ctx.logger.info(`[rfc-0505] no articles directory at ${articlesBaseDir} — skipping`);
       return data;
@@ -90,11 +90,11 @@ export const rfc0505Migrator: Migrator = {
 
     for (const lang of langDirs) {
       const langPath = path.join(articlesBaseDir, lang);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat?.isDirectory()) continue;
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat?.isDirectory) continue;
 
-      const files = await fs.readdir(langPath).catch(() => []);
-      const sidecarFiles = files.filter((f) => f.endsWith(".claims.yaml"));
+      const files = await io.readdir(langPath).catch(() => []);
+      const sidecarFiles = files.filter((f) => f.name.endsWith(".claims.yaml"));
 
       if (sidecarFiles.length === 0) {
         ctx.logger.info(`[rfc-0505] no claim sidecars in ${lang} — skipping`);
@@ -102,15 +102,15 @@ export const rfc0505Migrator: Migrator = {
       }
 
       const claimsLangDir = path.join(claimsBaseDir, lang);
-      await fs.mkdir(claimsLangDir, { recursive: true });
+      await io.mkdir(claimsLangDir);
 
       for (const sidecarFile of sidecarFiles) {
-        const sidecarPath = path.join(langPath, sidecarFile);
-        const articleSlug = sidecarFile.replace(/\.claims\.yaml$/, "");
+        const sidecarPath = path.join(langPath, sidecarFile.name);
+        const articleSlug = sidecarFile.name.replace(/\.claims\.yaml$/, "");
 
         let raw: string;
         try {
-          raw = await fs.readFile(sidecarPath, "utf-8");
+          raw = await io.readFile(sidecarPath);
         } catch (err) {
           throw new MigrationError(
             RFC_0505_MIGRATOR_ID,
@@ -135,8 +135,7 @@ export const rfc0505Migrator: Migrator = {
 
         for (const [claimId, claim] of Object.entries(parsed)) {
           const claimRecordPath = path.join(claimsLangDir, `${claimId}.md`);
-          const exists = await fs
-            .stat(claimRecordPath)
+          const exists = await io.stat(claimRecordPath)
             .then(() => true)
             .catch(() => false);
 
@@ -147,7 +146,7 @@ export const rfc0505Migrator: Migrator = {
 
           const content = buildClaimRecordFrontmatter(claimId, articleSlug, lang, claim);
           try {
-            await fs.writeFile(claimRecordPath, content, "utf-8");
+            await io.writeFile(claimRecordPath, content);
             ctx.logger.info(`[rfc-0505] created claim record: ${lang}/${claimId}.md`);
           } catch (err) {
             throw new MigrationError(
@@ -161,7 +160,7 @@ export const rfc0505Migrator: Migrator = {
 
         // Delete the sidecar after transformation
         try {
-          await fs.unlink(sidecarPath);
+          await io.rm(sidecarPath);
           ctx.logger.info(`[rfc-0505] deleted sidecar: ${lang}/${sidecarFile}`);
         } catch (err) {
           throw new MigrationError(

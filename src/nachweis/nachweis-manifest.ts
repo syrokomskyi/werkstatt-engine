@@ -22,8 +22,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type {
@@ -45,6 +44,7 @@ import {
   type NachweisManifest,
   type NachweisManifestEntry,
 } from "./nachweis-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const NACHWEIS_EVIDENCE_KINDS = new Set([
   "client-statement",
@@ -104,13 +104,13 @@ export async function runNachweisManifestGenerate(
     }
   }
 
-  if (existsSync(evidenceDir)) {
-    const entries = await fs.readdir(evidenceDir, { withFileTypes: true });
+  if (await context.io.exists(evidenceDir)) {
+    const entries = await context.io.readdir(evidenceDir);
     for (const entry of entries) {
-      if (!entry.isFile()) continue;
+      if (!entry.isFile) continue;
       if (!entry.name.endsWith(".md") && !entry.name.endsWith(".yaml")) continue;
       const filePath = path.join(evidenceDir, entry.name);
-      const raw = await fs.readFile(filePath, "utf8");
+      const raw = await context.io.readFile(filePath);
       let data: Record<string, unknown>;
       if (entry.name.endsWith(".md")) {
         const parsed = parseMarkdownFrontmatter(raw);
@@ -186,8 +186,8 @@ export async function runNachweisManifestGenerate(
   };
 
   const outputDir = path.join(cachePath, MANIFEST_OUTPUT_DIR);
-  if (!existsSync(outputDir)) {
-    await fs.mkdir(outputDir, { recursive: true });
+  if (!await context.io.exists(outputDir)) {
+    await context.io.mkdir(outputDir);
   }
   const outputPath = path.join(outputDir, MANIFEST_OUTPUT_FILE);
   const manifestJson = JSON.stringify(manifest, null, 2) + "\n";

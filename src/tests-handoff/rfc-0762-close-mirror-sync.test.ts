@@ -19,6 +19,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // --- Mocks ---
 
@@ -259,6 +260,7 @@ test("close with external mirrors calls sternsystem.sync and sets mirror.synced=
     flags: { mission: "test-system-m000001", actor: "test-agent", "skip-evidence-sync": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -296,6 +298,7 @@ test("close with sync failure does not block close and sets mirror.synced=false"
     flags: { mission: "test-system-m000001", actor: "test-agent", "skip-evidence-sync": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -321,6 +324,7 @@ test("close without external mirrors does not call sternsystem.sync", async () =
     flags: { mission: "test-system-m000001", actor: "test-agent", "skip-evidence-sync": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;

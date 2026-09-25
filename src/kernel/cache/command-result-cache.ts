@@ -33,8 +33,6 @@ CommandResultCacheKey gains flagsHash (stableJsonHash over cache-visible resolve
 </CHANGE_SUMMARY>
 */
 
-import { readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import type { Dirent } from "node:fs";
 import picomatch from "picomatch";
@@ -48,6 +46,7 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import type { WorkspaceTreeIndex } from "./workspace-tree-index.ts";
 import { filterTreeIndex } from "./workspace-tree-index.ts";
+import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const COMMAND_RESULT_CACHE_NAMESPACE = "command_results";
 export const COMMAND_RESULT_CACHE_SCHEMA_VERSION = 2;
@@ -183,19 +182,19 @@ async function expandGlobs(
 
   // fs.walk.lint: allow — this walker matches files against picomatch glob
   // patterns relative to the workspace root, a contract collectFiles does not support (RFC-0390).
-  async function walk(dir: string): Promise<void> {
-    let entries: Dirent[];
+  async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+    let entries: DirEntry[];
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      entries = await io.readdir(dir);
     } catch {
       return;
     }
     for (const entry of entries) {
       const abs = join(dir, entry.name);
       const rel = toPosix(relative(workspaceRoot, abs));
-      if (entry.isDirectory()) {
+      if (entry.isDirectory) {
         await walk(abs);
-      } else if (entry.isFile() && isMatch(rel)) {
+      } else if (entry.isFile && isMatch(rel)) {
         matched.add(abs);
       }
     }
@@ -218,7 +217,7 @@ export async function computeInputsHash(
   reads: string[],
   baseDir: string,
   workspaceRoot: string,
-  treeIndex?: WorkspaceTreeIndex,
+  treeIndex?: WorkspaceTreeIndex, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ hash: string; metadata: InputsMetadataEntry[] }> {
   if (reads.length === 0) {
     return { hash: stableJsonHash({ reads: [] }), metadata: [] };
@@ -237,7 +236,7 @@ export async function computeInputsHash(
       continue;
     }
     hashes.push({ path: rel, hash: result.hash });
-    const s = await stat(abs);
+    const s = await io.stat(abs);
     metadata.push({ path: rel, mtimeMs: s.mtimeMs, size: s.size });
   }
   metadata.sort((a, b) => a.path.localeCompare(b.path));
@@ -257,15 +256,15 @@ export async function computeInputsHash(
  */
 export async function computeModuleHash(
   moduleSrcDir: string,
-  modulePaths?: string[],
+  modulePaths?: string[], io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   if (modulePaths && modulePaths.length > 0) {
     const hashes: string[] = [];
     for (const p of modulePaths) {
       const abs = join(moduleSrcDir, p);
-      if (!existsSync(abs)) continue;
-      const s = await stat(abs);
-      if (s.isDirectory()) {
+      if (!await io.exists(abs)) continue;
+      const s = await io.stat(abs);
+      if (s.isDirectory) {
         const result = await fingerprintTree(abs, {
           mode: "semantic",
           ignore: ["__tests__", "node_modules", "dist"],

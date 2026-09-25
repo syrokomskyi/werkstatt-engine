@@ -504,7 +504,7 @@ export async function runLeitstandShip(
   await fs.mkdir(operationsDir, { recursive: true });
 
   // --force: delete stale ship journal to start fresh
-  if (isForce && existsSync(journalPath)) {
+  if (isForce && await context.io.exists(journalPath)) {
     await fs.unlink(journalPath);
     logger.info(`  [ship] --force: deleted stale journal ${journalPath}`);
   }

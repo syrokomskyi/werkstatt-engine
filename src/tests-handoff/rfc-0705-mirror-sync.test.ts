@@ -18,6 +18,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // --- Mocks for mission.reconcile tests ---
 
@@ -196,6 +197,7 @@ test("reconcile with external mirrors calls sternsystem.sync and sets mirrorSync
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -223,6 +225,7 @@ test("reconcile with sync failure sets mirrorSync.succeeded=false and completes 
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -246,6 +249,7 @@ test("reconcile without external mirrors does not attempt sync", async () => {
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -419,6 +423,7 @@ test("close with desynced external mirrors throws with actionable error", async 
     flags: { mission: "test-system-m000001", actor: "test-agent", "skip-evidence-sync": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -446,6 +451,7 @@ test("close with no external mirrors does not throw on mirror check", async () =
     flags: { mission: "test-system-m000001", actor: "test-agent", "skip-evidence-sync": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;

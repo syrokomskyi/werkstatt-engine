@@ -14,11 +14,10 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
 import { CACHE_CLONE_COMMIT_GUARD_SCRIPT } from "../mission/cache-clone-commit-guard.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface BordbuchHookResult {
   installed: boolean;
@@ -43,20 +42,26 @@ fi
 export async function installBordbuchPreCommitHook(
   cacheClonePath: string,
   systemId: string,
+  io: WorkspaceIO,
 ): Promise<BordbuchHookResult> {
   const hooksDir = path.join(cacheClonePath, ".git", "hooks");
   const hookPath = path.join(hooksDir, "pre-commit");
 
-  if (!existsSync(path.join(cacheClonePath, ".git"))) {
+  if (!(await io.exists(path.join(cacheClonePath, ".git")))) {
     return { installed: false, hookPath, systemId };
   }
 
-  if (!existsSync(hooksDir)) {
-    await fs.mkdir(hooksDir, { recursive: true });
+  if (!(await io.exists(hooksDir))) {
+    await io.mkdir(hooksDir);
   }
 
   await writeFileIfChanged(hookPath, HOOK_SCRIPT);
-  await fs.chmod(hookPath, 0o755);
+  const chmodResult = await io.exec("chmod", ["755", hookPath]);
+  if (chmodResult.exitCode !== 0) {
+    throw new Error(
+      `chmod ${hookPath} exited ${chmodResult.exitCode}: ${chmodResult.stderr.slice(0, 200)}`,
+    );
+  }
 
   return { installed: true, hookPath, systemId };
 }

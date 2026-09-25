@@ -15,6 +15,7 @@ import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkst
 import { createMaterializeWorkspace, gitHead } from "./helpers/materialize-fixture.ts";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockPipeline = vi.hoisted(() => ({
   pipelineResult: {
@@ -178,6 +179,7 @@ test("preflight is skipped when state file HEAD matches cache clone HEAD", async
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -199,6 +201,7 @@ test("preflight runs normally when state file is missing", async () => {
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -233,6 +236,7 @@ test("preflight runs normally when state file HEAD does not match", async () => 
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -255,6 +259,7 @@ test("preflight runs normally when state file is corrupt", async () => {
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -290,6 +295,7 @@ test("--skip-preflight flag takes precedence over state file and does not consul
     flags: { mission: "test-system-m000001", "skip-preflight": true },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;

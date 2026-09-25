@@ -18,6 +18,7 @@ import type {
   KernelCommandInput,
   KernelFlagValue,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@warpgogol/werkstatt-engine/kernel")>();
@@ -89,6 +90,7 @@ function assertAllPhaseCallsValid(): void {
 }
 
 const context = {
+  io: createDefaultIO().io,
   workspaceRoot: "/tmp/test-hotfix",
   logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 } as unknown as KernelRuntimeContext;

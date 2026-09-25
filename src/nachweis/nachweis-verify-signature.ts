@@ -21,8 +21,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
-import fs from "node:fs/promises";
+
 import path from "node:path";
 import { verify as signingVerify, fromHex } from "@warpgogol/werkstatt-engine/signing";
 import type {
@@ -43,6 +42,7 @@ import {
   type TimestampAssurance,
 } from "./nachweis-n3-types.ts";
 import type { NachweisRecordPayload } from "./nachweis-sign.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export async function runNachweisVerifySignature(
   input: KernelCommandInput,
@@ -68,13 +68,13 @@ export async function runNachweisVerifySignature(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     throw new Error(
       `[nachweis.verify-signature] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
   }
 
-  const rawEvidence = await fs.readFile(evidenceFile, "utf8");
+  const rawEvidence = await context.io.readFile(evidenceFile);
   const { data: evidenceData } = parseMarkdownFrontmatter(rawEvidence);
 
   const payload: NachweisRecordPayload = {

@@ -13,11 +13,10 @@ regeneration + validation to the standard build pipeline. Never round-trips gene
 </CHANGE_SUMMARY>
 */
 
-import { spawn } from "node:child_process";
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { HandoffManifest } from "@warpgogol/werkstatt-engine/schemas";
 import type { AuthoredSet } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const TEXT_EXT = new Set([
   ".md",
@@ -59,7 +58,7 @@ export interface LoadedBundle {
 /** Load the manifest's authored entries: text into memory, binaries tracked by source path. */
 export async function loadAuthoredSet(
   bundleDir: string,
-  manifest: HandoffManifest,
+  manifest: HandoffManifest, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<LoadedBundle> {
   const authored: AuthoredSet = new Map();
   const binaries = new Map<string, string>();
@@ -69,7 +68,7 @@ export async function loadAuthoredSet(
     if (!appRel) continue;
     const abs = path.join(bundleDir, entry.path);
     if (isTextPath(appRel)) {
-      authored.set(appRel, await fs.readFile(abs, "utf8"));
+      authored.set(appRel, await io.readFile(abs));
     } else {
       binaries.set(appRel, abs);
     }
@@ -78,44 +77,40 @@ export async function loadAuthoredSet(
 }
 
 /** Write the (migrated) authored set + binaries into the target app directory. */
-export async function injectAuthoredSet(targetDir: string, loaded: LoadedBundle): Promise<number> {
+export async function injectAuthoredSet(targetDir: string, loaded: LoadedBundle, io: WorkspaceIO = createDefaultIO().io): Promise<number> {
   let written = 0;
   for (const [appRel, content] of loaded.authored) {
     const dest = path.join(targetDir, appRel);
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.writeFile(dest, content, "utf8");
+    await io.mkdir(path.dirname(dest));
+    await io.writeFile(dest, content);
     written++;
   }
   for (const [appRel, srcAbs] of loaded.binaries) {
     const dest = path.join(targetDir, appRel);
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.copyFile(srcAbs, dest);
+    await io.mkdir(path.dirname(dest));
+    await io.copyFile(srcAbs, dest);
     written++;
   }
   return written;
 }
 
-function runKernel(workspaceRoot: string, args: string[]): Promise<number> {
-  return new Promise((resolve) => {
-    const bin = path.join(workspaceRoot, "packages", "os", "site-kernel", "bin", "werkstatt.mjs");
-    const child = spawn(process.execPath, [bin, ...args], {
-      cwd: workspaceRoot,
-      stdio: "inherit",
-    });
-    child.on("close", (code) => resolve(code ?? 1));
-    child.on("error", () => resolve(1));
-  });
+async function runKernel(workspaceRoot: string, args: string[], io: WorkspaceIO = createDefaultIO().io): Promise<number> {
+  const bin = path.join(workspaceRoot, "packages", "os", "site-kernel", "bin", "werkstatt.mjs");
+  try {
+    const result = await io.exec(process.execPath, [bin, ...args], { cwd: workspaceRoot });
+    return result.exitCode ?? 1;
+  } catch {
+    return 1;
+  }
 }
 
-function runPnpm(workspaceRoot: string, args: string[]): Promise<number> {
-  return new Promise((resolve) => {
-    const child = spawn("pnpm", args, {
-      cwd: workspaceRoot,
-      stdio: "inherit",
-    });
-    child.on("close", (code) => resolve(code ?? 1));
-    child.on("error", () => resolve(1));
-  });
+async function runPnpm(workspaceRoot: string, args: string[], io: WorkspaceIO = createDefaultIO().io): Promise<number> {
+  try {
+    const result = await io.exec("pnpm", args, { cwd: workspaceRoot });
+    return result.exitCode ?? 1;
+  } catch {
+    return 1;
+  }
 }
 
 export interface RegenerationResult {

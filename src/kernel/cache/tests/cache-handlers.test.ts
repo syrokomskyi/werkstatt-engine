@@ -5,6 +5,7 @@ import { runKernelCacheStatus, runKernelCacheClear } from "../cache-handlers.ts"
 import { createCacheLayer } from "../cache-layer.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 
@@ -23,7 +24,7 @@ function makeContext(outputFormat: "pretty" | "json" = "json"): KernelRuntimeCon
     },
     dryRun: false,
     outputFormat,
-    io: {} as never,
+    io: createDefaultIO().io,
     actualState: {
       commands: new Map(),
       pipelines: new Map(),

@@ -17,12 +17,14 @@ import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkst
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
 import { computeEntryHash } from "./bordbuch-io.ts";
 import { runBordbuchRepair } from "./bordbuch-repair.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 const systemId = "test-system";
 
 function mockContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

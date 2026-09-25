@@ -20,6 +20,7 @@ vi.mock("../sternsystem/registry-io.ts", () => ({
 
 import { runMaterializeConfigValidate } from "./materialize-config-validate.ts";
 import { resolveCacheClonePath, discoverSystems } from "../sternsystem/registry-io.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockResolveCacheClonePath = vi.mocked(resolveCacheClonePath);
 const mockDiscoverSystems = vi.mocked(discoverSystems);
@@ -41,15 +42,8 @@ function makeContext(workspaceRoot: string) {
   return {
     workspaceRoot,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
-    io: {
+    io: createDefaultIO().io,
     actualState: undefined as never,
-      readFile: fs.readFile,
-      writeFile: fs.writeFile,
-      readdir: fs.readdir,
-      mkdir: fs.mkdir,
-      rm: fs.rm,
-      stat: fs.stat,
-    },
   } as never;
 }
 

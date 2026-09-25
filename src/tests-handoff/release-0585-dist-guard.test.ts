@@ -15,9 +15,11 @@ import { stringify as stringifyYaml } from "yaml";
 import { runReleaseReady } from "../release/release-commands.ts";
 import type { KernelRuntimeContext, KernelCommandInput } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

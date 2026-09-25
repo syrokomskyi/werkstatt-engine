@@ -19,9 +19,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 interface NeedThisMarker {
   file: string;
@@ -37,11 +37,11 @@ const NEED_THIS_REGEX = /NEED_THIS_[A-Z_]+/g;
  */
 async function scanFile(
   filePath: string,
-  logger: KernelRuntimeContext["logger"],
+  logger: KernelRuntimeContext["logger"], io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NeedThisMarker[]> {
   const markers: NeedThisMarker[] = [];
   try {
-    const content = await readFile(filePath, "utf-8");
+    const content = await io.readFile(filePath);
     const lines = content.split("\n");
 
     for (let i = 0; i < lines.length; i++) {
@@ -70,24 +70,24 @@ async function scanFile(
 async function scanDirectory(
   dirPath: string,
   extensions: string[] = [".md", ".txt", ".astro", ".ts", ".js"],
-  logger: KernelRuntimeContext["logger"],
+  logger: KernelRuntimeContext["logger"], io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NeedThisMarker[]> {
   const markers: NeedThisMarker[] = [];
 
   try {
-    const entries = await readdir(dirPath, { withFileTypes: true });
+    const entries = await io.readdir(dirPath);
 
     for (const entry of entries) {
       const fullPath = join(dirPath, entry.name);
 
-      if (entry.isDirectory()) {
+      if (entry.isDirectory) {
         // Skip node_modules and hidden directories
         if (entry.name.startsWith(".") || entry.name === "node_modules") {
           continue;
         }
         const nested = await scanDirectory(fullPath, extensions, logger);
         markers.push(...nested);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile) {
         const ext = entry.name.slice(entry.name.lastIndexOf("."));
         if (extensions.includes(ext)) {
           const fileMarkers = await scanFile(fullPath, logger);

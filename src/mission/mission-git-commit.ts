@@ -447,13 +447,13 @@ export async function runMissionGitCommit(
   const missionDir = resolveMissionDir(workspaceRoot, missionId);
   const workpieceDir = path.join(missionDir, "workpiece");
 
-  if (!existsSync(workpieceDir)) {
+  if (!await context.io.exists(workpieceDir)) {
     throw new Error(
       `[mission.git.commit] workpiece not found for mission '${missionId}' — run mission.materialize first`,
     );
   }
 
-  if (!existsSync(path.join(workpieceDir, ".git"))) {
+  if (!await context.io.exists(path.join(workpieceDir, ".git"))) {
     throw new Error(
       `[mission.git.commit] workpiece is not a git repository — run mission.materialize first`,
     );

@@ -32,7 +32,6 @@ fo-review REVIEW-CODE-2026-09-22-01 (needs-revision): input.argv now carries the
 */
 
 import { performance } from "node:perf_hooks";
-import { readFile } from "node:fs/promises";
 import { relative } from "node:path";
 import { createKernelLogger } from "../logger.ts";
 import { pipelineHint } from "../pipeline-hint.ts";
@@ -44,6 +43,7 @@ import {
   EMPTY_WORKPIECE_ENV,
   loadWorkpieceEnv,
   type WriteIntent,
+  type WorkspaceIO,
 } from "@warpgogol/werkstatt-shared/kernel";
 import type {
   CheckResult,
@@ -527,7 +527,7 @@ const EXECUTE_KERNEL_COMMAND_OPTION_KEYS = [
 ];
 
 export async function executeKernelCommand(
-  options: ExecuteKernelCommandOptions,
+  options: ExecuteKernelCommandOptions, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<KernelExecutionReport | KernelExecutionReport[]> {
   assertKnownOptionKeys(
     options,
@@ -555,7 +555,7 @@ export async function executeKernelCommand(
       if (workspaceConfig.moduleLoaders) {
         let moduleName: string | undefined;
         try {
-          const manifestRaw = await readFile(manifestFilePath(options.workspaceRoot), "utf-8");
+          const manifestRaw = await io.readFile(manifestFilePath(options.workspaceRoot));
           const manifest = yamlParse(manifestRaw) as CommandManifest;
           const entry = manifest.commands.find(
             (c) => c.name === options.commandName && c.providers.includes("workspace"),
@@ -698,7 +698,7 @@ export async function executeKernelCommand(
   // modules; fall back to full registry build if the manifest is missing/stale.
   let siteManifestModule: string | undefined;
   try {
-    const manifestRaw = await readFile(manifestFilePath(options.workspaceRoot), "utf-8");
+    const manifestRaw = await io.readFile(manifestFilePath(options.workspaceRoot));
     const manifest = yamlParse(manifestRaw) as CommandManifest;
     const entry = manifest.commands.find((c) => c.name === options.commandName);
     siteManifestModule = entry?.module ?? undefined;

@@ -20,13 +20,13 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 import { tsImport } from "tsx/esm/api";
 import type { DiscoveredSiteWorkspace, KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
 import { discoverSiteWorkspaces as discoverSitesFromResolver } from "./site-workspace-resolver.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 // @ai-invariant: Workspace discovery must remain read-only and avoid app-specific path assumptions outside explicit adapters.
 
 function unwrapConfig(moduleNamespace: Record<string, unknown>): unknown {
@@ -54,14 +54,14 @@ const APP_CONFIG_FILENAMES = [
   "kernel.config.mjs",
 ] as const;
 
-async function resolveAppConfigPath(toolsDirectory: string): Promise<string | undefined> {
+async function resolveAppConfigPath(
+  toolsDirectory: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | undefined> {
   for (const filename of APP_CONFIG_FILENAMES) {
     const filePath = path.join(toolsDirectory, filename);
-    try {
-      await fs.access(filePath);
+    if (await io.exists(filePath)) {
       return filePath;
-    } catch {
-      continue;
     }
   }
 
@@ -162,17 +162,20 @@ export async function loadWorkspaceConfig(
   return config;
 }
 
-export async function findWorkspaceRoot(startDirectory: string = process.cwd()): Promise<string> {
+export async function findWorkspaceRoot(
+  startDirectory: string = process.cwd(),
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
   let currentDirectory = path.resolve(startDirectory);
 
   while (true) {
     const packageJsonPath = path.join(currentDirectory, "package.json");
     const workspacePath = path.join(currentDirectory, "pnpm-workspace.yaml");
 
-    try {
-      await Promise.all([fs.access(packageJsonPath), fs.access(workspacePath)]);
+    if ((await io.exists(packageJsonPath)) && (await io.exists(workspacePath))) {
       return currentDirectory;
-    } catch {
+    }
+    {
       const parentDirectory = path.dirname(currentDirectory);
       if (parentDirectory === currentDirectory) {
         throw new Error(`Unable to locate a pnpm workspace root from ${startDirectory}.`);

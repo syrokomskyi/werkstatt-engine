@@ -20,6 +20,7 @@ import { runNotausgangExport } from "../notausgang/notausgang-commands.ts";
 import { runNotausgangValidate } from "../notausgang/notausgang-commands.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let testRoot: string;
 let workspaceRoot: string;
@@ -33,6 +34,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 function makeContext(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       section: () => {},

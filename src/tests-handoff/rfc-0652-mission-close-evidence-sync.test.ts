@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createLeitstandSystem } from "./helpers/leitstand-fixture.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   validateResult: {
@@ -182,6 +183,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: {
       info: () => {},

@@ -13,9 +13,6 @@ across the three new command handlers.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { spawn } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import type { ServiceEntry } from "@warpgogol/werkstatt-engine/schemas";
 import type { SmokeRunResult } from "@warpgogol/werkstatt-engine/testing/smoke";
@@ -26,6 +23,7 @@ import {
   findServiceEntry,
 } from "../sternsystem/registry-io.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface PreDeployGateResult {
   command: string;
@@ -87,60 +85,35 @@ export async function runWranglerDeploy(
   serviceDir: string,
   configName: string,
   env: Record<string, string>,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn("npx", ["--yes", "wrangler", "deploy", "--config", configName], {
+  try {
+    const result = await io.exec("npx", ["--yes", "wrangler", "deploy", "--config", configName], {
       cwd: serviceDir,
-      env: { ...process.env, ...env },
-      stdio: ["pipe", "pipe", "pipe"],
+      env,
     });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("error", () => {
-      resolve({ exitCode: 1, stdout, stderr: "Failed to spawn wrangler" });
-    });
-    child.on("exit", (code) => {
-      resolve({ exitCode: code ?? 1, stdout, stderr });
-    });
-  });
+    return { exitCode: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
+  } catch {
+    return { exitCode: 1, stdout: "", stderr: "Failed to spawn wrangler" };
+  }
 }
 
 export async function runWranglerRollback(
   serviceDir: string,
   env: Record<string, string>,
   versionId?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const args = ["--yes", "wrangler", "rollback"];
   if (versionId) {
     args.push(versionId);
   }
-  return new Promise((resolve) => {
-    const child = spawn("npx", args, {
-      cwd: serviceDir,
-      env: { ...process.env, ...env },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("error", () => {
-      resolve({ exitCode: 1, stdout, stderr: "Failed to spawn wrangler" });
-    });
-    child.on("exit", (code) => {
-      resolve({ exitCode: code ?? 1, stdout, stderr });
-    });
-  });
+  try {
+    const result = await io.exec("npx", args, { cwd: serviceDir, env });
+    return { exitCode: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
+  } catch {
+    return { exitCode: 1, stdout: "", stderr: "Failed to spawn wrangler" };
+  }
 }
 
 export function extractWorkersDevUrl(stdout: string): string | undefined {
@@ -169,10 +142,13 @@ export async function runHealthCheck(
   }
 }
 
-export async function parseEnvFile(envPath: string): Promise<Record<string, string>> {
+export async function parseEnvFile(
+  envPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
-  if (!existsSync(envPath)) return env;
-  const content = await fs.readFile(envPath, "utf8");
+  if (!(await io.exists(envPath))) return env;
+  const content = await io.readFile(envPath);
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
@@ -191,27 +167,16 @@ export async function parseEnvFile(envPath: string): Promise<Record<string, stri
 export async function runBuildCheck(
   serviceDir: string,
   logger: { info: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<PreDeployGateResult> {
   logger.info("[pre-deploy] running build:check (tsc --noEmit)…");
-  const result = await new Promise<{ exitCode: number; stdout: string; stderr: string }>(
-    (resolve) => {
-      const child = spawn("pnpm", ["run", "build:check"], {
-        cwd: serviceDir,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      let stdout = "";
-      let stderr = "";
-      child.stdout.on("data", (d) => {
-        stdout += d.toString();
-      });
-      child.stderr.on("data", (d) => {
-        stderr += d.toString();
-      });
-      child.on("error", () =>
-        resolve({ exitCode: 1, stdout, stderr: "Failed to spawn build:check" }),
-      );
-      child.on("exit", (code) => resolve({ exitCode: code ?? 1, stdout, stderr }));
-    },
+  const result = await io.exec("pnpm", ["run", "build:check"], { cwd: serviceDir }).then(
+    (r: { exitCode: number | null; stdout: string; stderr: string }) => ({
+      exitCode: r.exitCode ?? 1,
+      stdout: r.stdout,
+      stderr: r.stderr,
+    }),
+    () => ({ exitCode: 1, stdout: "", stderr: "Failed to spawn build:check" }),
   );
   return {
     command: "build:check",

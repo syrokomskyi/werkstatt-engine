@@ -12,8 +12,6 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { parseMarkdownFrontmatter } from "@warpgogol/werkstatt-shared/content";
@@ -28,6 +26,7 @@ import {
   resolveNachweisRawScreenshotR2Path,
   UnsupportedNachweisKindError,
 } from "../nachweis/nachweis-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export type EvidenceDownloadFn = (r2Path: string) => Promise<Uint8Array>;
 
@@ -44,11 +43,11 @@ interface LoadedEntity {
 }
 
 /** List language directories under src/content/business-profile, default lang first. */
-async function listProfileLangs(siteDir: string): Promise<string[]> {
+async function listProfileLangs(siteDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
   const profileRoot = path.join(siteDir, "src", "content", "business-profile");
-  if (!existsSync(profileRoot)) return [];
-  const entries = await fs.readdir(profileRoot, { withFileTypes: true });
-  const langs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+  if (!await io.exists(profileRoot)) return [];
+  const entries = await io.readdir(profileRoot);
+  const langs = entries.filter((e) => e.isDirectory).map((e) => e.name);
   let defaultLang: string | null = null;
   try {
     defaultLang = await resolveDefaultLang(siteDir);
@@ -61,19 +60,19 @@ async function listProfileLangs(siteDir: string): Promise<string[]> {
 async function loadEntities(
   siteDir: string,
   langs: string[],
-  entityType: string,
+  entityType: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<LoadedEntity[]> {
   const out: LoadedEntity[] = [];
   const seen = new Set<string>();
   for (const lang of langs) {
     const dir = resolvePbpEntityDir(siteDir, lang, entityType);
-    if (!existsSync(dir)) continue;
-    for (const file of await fs.readdir(dir)) {
-      if (!file.endsWith(".md")) continue;
-      const slug = file.slice(0, -3);
+    if (!await io.exists(dir)) continue;
+    for (const file of await io.readdir(dir)) {
+      if (!file.name.endsWith(".md")) continue;
+      const slug = file.name.slice(0, -3);
       if (seen.has(slug)) continue; // translations share identity — first (default lang) wins
       seen.add(slug);
-      const raw = await fs.readFile(path.join(dir, file), "utf8");
+      const raw = await io.readFile(path.join(dir, file.name));
       out.push({ slug, lang, data: parseMarkdownFrontmatter(raw).data });
     }
   }
@@ -205,10 +204,10 @@ export async function bundleEvidenceArtifacts(params: {
   systemId: string;
   download: EvidenceDownloadFn;
   logger?: { info(msg: string): void; warn(msg: string): void };
-}): Promise<EvidenceBundleResult> {
+}, io: WorkspaceIO = createDefaultIO().io): Promise<EvidenceBundleResult> {
   const { siteDir, stagingDir, systemId, download, logger } = params;
   const evidenceRoot = path.join(stagingDir, "evidence");
-  await fs.mkdir(evidenceRoot, { recursive: true }); // AC-4: emitted even when empty
+  await io.mkdir(evidenceRoot); // AC-4: emitted even when empty
 
   const langs = await listProfileLangs(siteDir);
   const sources = await loadEntities(siteDir, langs, "evidence-source");
@@ -244,7 +243,7 @@ export async function bundleEvidenceArtifacts(params: {
     }
 
     const sourceDir = path.join(evidenceRoot, source.slug);
-    await fs.mkdir(sourceDir, { recursive: true });
+    await io.mkdir(sourceDir);
     const artifacts: NonNullable<NotausgangEvidenceVerdict["artifacts"]> = [];
     const integrityLines: string[] = [];
 
@@ -266,8 +265,8 @@ export async function bundleEvidenceArtifacts(params: {
       const filename = path.basename(spec.r2Path);
       const relPath = `${spec.itemKey}/${filename}`;
       const dest = path.join(sourceDir, relPath);
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.writeFile(dest, bytes);
+      await io.mkdir(path.dirname(dest));
+      await io.writeFile(dest, bytes);
       integrityLines.push(`${recomputed}  ${relPath}`);
       artifacts.push({
         itemKey: spec.itemKey,
@@ -279,7 +278,7 @@ export async function bundleEvidenceArtifacts(params: {
       bundledArtifacts++;
     }
 
-    await fs.writeFile(path.join(sourceDir, "integrity.txt"), integrityLines.join("\n") + "\n");
+    await io.writeFile(path.join(sourceDir, "integrity.txt"), integrityLines.join("\n") + "\n");
     verdicts[source.slug] = { verdict: "bundled", artifacts };
     bundledSources++;
     logger?.info(`  evidence: bundled ${artifacts.length} artifact(s) for '${source.slug}'`);

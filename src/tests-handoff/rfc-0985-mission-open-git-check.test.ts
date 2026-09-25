@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { buildOpenSteps, type OpenStepCtx } from "../mission/mission-open.ts";
 import type { OperationStep } from "../journal/index.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 let cacheCloneDir: string;
@@ -61,6 +62,7 @@ function makeOpenCtx(overrides?: Partial<OpenStepCtx>): OpenStepCtx {
     operationId: "op-001",
     staleEntries: { hasStaleEntries: false, staleEntries: [] } as any,
     context: {
+      io: createDefaultIO().io,
       workspaceRoot: tmpDir,
       logger: {
         info: () => {},

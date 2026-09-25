@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -38,6 +37,7 @@ import {
   resolveDefaultLang,
   type NachweisApproveResult,
 } from "./nachweis-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -95,7 +95,7 @@ export async function runNachweisApprove(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     logger.warn(
       `[nachweis.approve] no evidence-source file found for slug '${slug}' — Bordbuch entry will still be written`,
     );

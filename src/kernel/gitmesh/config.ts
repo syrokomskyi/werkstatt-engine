@@ -25,10 +25,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { gitRemoteList } from "./git-ops.ts";
 import type { GitMeshConfig, GitMeshRemote } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CONFIG_FILENAME = "werkstatt.gitmesh.json";
 
@@ -74,15 +74,15 @@ export function validateConfig(config: unknown): asserts config is GitMeshConfig
   }
 }
 
-export async function loadGitMeshConfig(workspaceRoot: string): Promise<GitMeshConfig> {
+export async function loadGitMeshConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<GitMeshConfig> {
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
-  const raw = await readFile(configPath, "utf8");
+  const raw = await io.readFile(configPath);
   const parsed: unknown = JSON.parse(raw);
   validateConfig(parsed);
   return parsed;
 }
 
-export async function autoCreateConfigFromGit(workspaceRoot: string): Promise<GitMeshConfig> {
+export async function autoCreateConfigFromGit(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<GitMeshConfig> {
   const remotes = await gitRemoteList(workspaceRoot);
   const gitMeshRemotes: GitMeshRemote[] = remotes.map((r: { name: string; url: string }) => ({
     name: r.name,
@@ -96,7 +96,7 @@ export async function autoCreateConfigFromGit(workspaceRoot: string): Promise<Gi
   };
 
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
-  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  await io.writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
 
   return config;
 }

@@ -12,20 +12,20 @@ registry and the only one that touches the pin file itself.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0479_MIGRATOR_ID = "rfc-0479";
 
 async function transformPinCursor(
   data: SternsystemData,
-  ctx: MigrationContext,
+  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const pinPath = path.join(data.rootPath, "system.pin.json");
   let raw: string;
   try {
-    raw = await fs.readFile(pinPath, "utf8");
+    raw = await io.readFile(pinPath);
   } catch {
     ctx.logger.info(`[migrator rfc-0479] no system.pin.json found — nothing to migrate`);
     return data;
@@ -41,7 +41,7 @@ async function transformPinCursor(
 
   if (typeof cursor === "string") {
     json.migratorCursor = [RFC_0479_MIGRATOR_ID];
-    await fs.writeFile(pinPath, JSON.stringify(json, null, 2) + "\n", "utf8");
+    await io.writeFile(pinPath, JSON.stringify(json, null, 2) + "\n");
     ctx.logger.info(
       `[migrator rfc-0479] transformed migratorCursor from "${cursor}" to ["${RFC_0479_MIGRATOR_ID}"]`,
     );
@@ -49,7 +49,7 @@ async function transformPinCursor(
   }
 
   json.migratorCursor = [RFC_0479_MIGRATOR_ID];
-  await fs.writeFile(pinPath, JSON.stringify(json, null, 2) + "\n", "utf8");
+  await io.writeFile(pinPath, JSON.stringify(json, null, 2) + "\n");
   ctx.logger.info(
     `[migrator rfc-0479] migratorCursor was ${cursor === null ? "null" : typeof cursor} — set to ["${RFC_0479_MIGRATOR_ID}"]`,
   );

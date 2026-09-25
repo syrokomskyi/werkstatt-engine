@@ -19,9 +19,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
+import { spawn, spawnSync } from "node:child_process";
 import type {
   DiscoveredSiteWorkspace,
   KernelCommandInput,
@@ -30,6 +29,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 interface DevCriticalFile {
   readonly path: string;
@@ -62,11 +62,12 @@ async function ensureDevCriticalFiles(
   systemId: string,
   workspaceRoot: string,
   logger: KernelRuntimeContext["logger"],
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const missing: DevCriticalFile[] = [];
   for (const entry of DEV_CRITICAL_FILES) {
     const fullPath = path.join(workpiecePath, entry.path);
-    if (!existsSync(fullPath)) {
+    if (!(await io.exists(fullPath))) {
       missing.push(entry);
     }
   }
@@ -138,7 +139,7 @@ async function ensureDevCriticalFiles(
     }
 
     const fullPath = path.join(workpiecePath, entry.path);
-    if (!existsSync(fullPath)) {
+    if (!(await io.exists(fullPath))) {
       throw new Error(
         `[mission.preview] "${entry.command}" completed but "${entry.path}" was not created. ` +
           `This file is required for dev: ${entry.description}. ` +
@@ -187,7 +188,7 @@ export async function runMissionPreview(
   // RFC-0480: preview works for open, closed, and aborted missions
   const workpiecePath = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
 
-  if (!existsSync(workpiecePath)) {
+  if (!(await context.io.exists(workpiecePath))) {
     throw new Error(
       `[mission.preview] workpiece not found for mission '${missionId}' — run mission.materialize first`,
     );
@@ -285,7 +286,7 @@ export async function runMissionPreview(
       stdio: "inherit",
     });
 
-    child.on("exit", (code) => {
+    child.on("exit", (code: number | null) => {
       resolve({
         data: {
           missionId,
@@ -298,7 +299,7 @@ export async function runMissionPreview(
       });
     });
 
-    child.on("error", (err) => {
+    child.on("error", (err: Error) => {
       resolve({
         data: {
           missionId,

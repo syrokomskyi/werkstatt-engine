@@ -74,6 +74,7 @@ vi.mock("../schemas/naming-policy.ts", async (importOriginal) => {
 import { runSternsystemValidate } from "./sternsystem-validate.ts";
 import { discoverSystems, resolveMirrors } from "./registry-io.ts";
 import { loadAppRuntime } from "../kernel/runtime/registry.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockDiscoverSystems = vi.mocked(discoverSystems);
 const mockResolveMirrors = vi.mocked(resolveMirrors);
@@ -83,6 +84,7 @@ let tmpDir: string;
 
 function makeContext(workspaceRoot: string) {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       section() {},

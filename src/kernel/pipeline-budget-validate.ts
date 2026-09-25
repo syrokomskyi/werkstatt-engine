@@ -25,7 +25,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse as yamlParse } from "yaml";
 import {
@@ -42,6 +41,7 @@ import type {
   KernelNextStep,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const TELEMETRY_RELATIVE_PATH = join(
   "node_modules",
@@ -104,7 +104,7 @@ export async function runPipelineBudgetValidate(
   // Load committed budgets
   let budgets: StepBudget[] = [];
   try {
-    const raw = await readFile(budgetsFilePath(context.workspaceRoot), "utf8");
+    const raw = await context.io.readFile(budgetsFilePath(context.workspaceRoot));
     const parsed = yamlParse(raw) as PipelineBudgetsFile;
     if (Array.isArray(parsed.budgets)) {
       budgets = parsed.budgets;
@@ -140,7 +140,7 @@ export async function runPipelineBudgetValidate(
   // Load fresh telemetry
   let telemetryRecords: StepTelemetryRecord[] = [];
   try {
-    const raw = await readFile(join(context.workspaceRoot, TELEMETRY_RELATIVE_PATH), "utf8");
+    const raw = await context.io.readFile(join(context.workspaceRoot, TELEMETRY_RELATIVE_PATH));
     telemetryRecords = parseTelemetryHistory(raw).records;
   } catch {
     // No telemetry — all budgets get BUDGET-02 warnings

@@ -16,10 +16,7 @@ With --amend: update pin and open amend mission without creating a new registry 
 </CHANGE_SUMMARY>
 */
 
-import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
 import type {
   KernelCommandInput,
@@ -42,6 +39,7 @@ import { identityConfigPath } from "../identity/identity-io.ts";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface SternsystemRegisterData {
   command: "sternsystem.register";
@@ -82,11 +80,12 @@ export async function createContentStub(
   id: string,
   systemDir: string,
   cosmicStar?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const briefPath = join(workspaceRoot, "onboarding", id, ".input", "00-brief.md");
-  if (!existsSync(briefPath)) return;
+  if (!(await io.exists(briefPath))) return;
 
-  const raw = await readFile(briefPath, "utf8");
+  const raw = await io.readFile(briefPath);
   let brief: ReturnType<typeof parseBriefFrontmatter>;
   try {
     brief = parseBriefFrontmatter(raw);
@@ -95,7 +94,7 @@ export async function createContentStub(
   }
 
   const contentDir = join(systemDir, "src", "content");
-  await mkdir(contentDir, { recursive: true });
+  await io.mkdir(contentDir);
 
   const supported = brief.i18n.supported.map((l) => `    ${l}:\n      name: ${l}`).join("\n");
   const systemMd = `---
@@ -112,36 +111,49 @@ ${supported}
 legalJurisdiction: ${brief.legalJurisdiction}
 ---
 `;
-  await writeFile(join(contentDir, "system.md"), systemMd, "utf8");
+  await io.writeFile(join(contentDir, "system.md"), systemMd);
 }
 
-async function rollbackConfig(workspaceRoot: string, id: string): Promise<void> {
+async function rollbackConfig(
+  workspaceRoot: string,
+  id: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, id);
   const configPath = join(cacheClone, "system-config.yaml");
-  if (existsSync(configPath)) {
-    await rm(configPath, { force: true });
+  if (await io.exists(configPath)) {
+    await io.rm(configPath, { recursive: true });
   }
 }
 
-async function rollbackPin(systemDir: string): Promise<void> {
+async function rollbackPin(
+  systemDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const pinPath = join(systemDir, "system.pin.json");
-  if (existsSync(pinPath)) {
-    await rm(pinPath, { force: true });
+  if (await io.exists(pinPath)) {
+    await io.rm(pinPath, { recursive: true });
   }
 }
 
-async function rollbackContent(systemDir: string): Promise<void> {
+async function rollbackContent(
+  systemDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const contentPath = join(systemDir, "src", "content");
-  if (existsSync(contentPath)) {
-    await rm(contentPath, { recursive: true, force: true });
+  if (await io.exists(contentPath)) {
+    await io.rm(contentPath, { recursive: true });
   }
 }
 
-async function rollbackSystemDirIfEmpty(systemDir: string): Promise<void> {
-  if (!existsSync(systemDir)) return;
+async function rollbackSystemDirIfEmpty(
+  systemDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  if (!(await io.exists(systemDir))) return;
   const gitDir = join(systemDir, ".git");
-  if (existsSync(gitDir)) return;
-  await rm(systemDir, { recursive: true, force: true });
+  if (await io.exists(gitDir)) return;
+  await io.rm(systemDir, { recursive: true });
 }
 
 export async function runSternsystemRegister(
@@ -171,7 +183,7 @@ export async function runSternsystemRegister(
   // passport or blocks. An unsigned passport is worse than no registration.
   // Gates both register and --amend paths (amend missions close into signed bordbuch
   // commits + passport refresh, which need the same identity material).
-  const identityExists = existsSync(identityConfigPath(workspaceRoot));
+  const identityExists = await context.io.exists(identityConfigPath(workspaceRoot));
   const signingKeyConfigured = Boolean(
     process.env.SIGNING_PRIVATE_KEY || process.env.SIGNING_PRIVATE_KEY_PATH,
   );
@@ -281,7 +293,7 @@ export async function runSternsystemRegister(
   };
 
   const systemDir = resolveMirrorPath(workspaceRoot, mirrors[0].path);
-  await mkdir(systemDir, { recursive: true });
+  await context.io.mkdir(systemDir);
   await writeSystemConfig(workspaceRoot, id, newConfig);
 
   let pinCreated = false;
@@ -301,13 +313,29 @@ export async function runSternsystemRegister(
 
     // Commit config, pin, and content to cache clone before mission.open
     // so syncCacheClone's git reset --hard doesn't wipe uncommitted files
-    if (existsSync(join(systemDir, ".git"))) {
+    if (await context.io.exists(join(systemDir, ".git"))) {
       try {
-        execSync("git add -A", { cwd: systemDir, stdio: "pipe", timeout: 10_000 });
+        const addResult = await context.io.exec("sh", ["-c", "git add -A"], {
+          cwd: systemDir,
+          timeoutMs: 10000,
+        });
+        if (addResult.exitCode !== 0) {
+          throw new Error(
+            `git add -A exited ${addResult.exitCode}: ${addResult.stderr.slice(0, 200)}`,
+          );
+        }
         cacheCloneCommit(systemDir, `sternsystem.register: scaffold ${id}`);
         // Push to bare repo so syncCacheClone can fetch
         try {
-          execSync("git push origin main", { cwd: systemDir, stdio: "pipe", timeout: 10_000 });
+          const pushResult = await context.io.exec("sh", ["-c", "git push origin main"], {
+            cwd: systemDir,
+            timeoutMs: 10000,
+          });
+          if (pushResult.exitCode !== 0) {
+            throw new Error(
+              `git push exited ${pushResult.exitCode}: ${pushResult.stderr.slice(0, 200)}`,
+            );
+          }
         } catch {
           // push failure non-fatal
         }

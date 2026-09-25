@@ -13,6 +13,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, statSync } from "node:fs
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { installBordbuchPreCommitHook } from "../bordbuch/bordbuch-hook.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { tmpdir } from "node:os";
 
 let tmpDir: string;
@@ -32,7 +33,7 @@ function gitInit(dir: string): void {
 test("installBordbuchPreCommitHook writes hook to .git/hooks/pre-commit", async () => {
   gitInit(tmpDir);
 
-  const result = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
 
   expect(result.installed).toBe(true);
   expect(result.systemId).toBe("test-system");
@@ -43,7 +44,7 @@ test("installBordbuchPreCommitHook writes hook to .git/hooks/pre-commit", async 
 test("hook script is executable (mode 0o755)", async () => {
   gitInit(tmpDir);
 
-  const result = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
   const stat = statSync(result.hookPath);
   const mode = stat.mode & 0o777;
   expect(mode).toBe(0o755);
@@ -52,7 +53,7 @@ test("hook script is executable (mode 0o755)", async () => {
 test("hook script content matches RFC-0658 spec", async () => {
   gitInit(tmpDir);
 
-  const result = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
   const content = readFileSync(result.hookPath, "utf8");
 
   expect(content).toContain("#!/bin/sh");
@@ -66,10 +67,10 @@ test("hook script content matches RFC-0658 spec", async () => {
 test("idempotent: second call is a no-op (content unchanged)", async () => {
   gitInit(tmpDir);
 
-  const result1 = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result1 = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
   const content1 = readFileSync(result1.hookPath, "utf8");
 
-  const result2 = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result2 = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
   const content2 = readFileSync(result2.hookPath, "utf8");
 
   expect(content1).toBe(content2);
@@ -80,13 +81,13 @@ test("creates .git/hooks/ directory if missing", async () => {
   const hooksDir = join(tmpDir, ".git", "hooks");
   rmSync(hooksDir, { recursive: true, force: true });
 
-  const result = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
 
   expect(existsSync(result.hookPath)).toBe(true);
 });
 
 test("returns installed: false for non-git directory", async () => {
-  const result = await installBordbuchPreCommitHook(tmpDir, "test-system");
+  const result = await installBordbuchPreCommitHook(tmpDir, "test-system", createDefaultIO().io);
 
   expect(result.installed).toBe(false);
 });

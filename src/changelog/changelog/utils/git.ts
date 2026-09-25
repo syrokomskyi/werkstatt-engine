@@ -16,10 +16,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY> */
 
 import { simpleGit } from "simple-git";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RawCommit } from "../types.ts";
 import type { ChangelogCtx } from "../context.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CONVENTIONAL_REGEX = /^(feat|fix|refactor|docs|perf|test|build|ci|chore|style)(\(.+\))?(!)?:/;
 
@@ -124,8 +124,8 @@ export async function getLatestCommitHash(workspaceRoot: string): Promise<string
   return (await simpleGit(workspaceRoot).raw(["rev-parse", "HEAD"])).trim();
 }
 
-export async function getAppVersion(appDir: string): Promise<string> {
-  const raw = await readFile(join(appDir, "package.json"), "utf-8");
+export async function getAppVersion(appDir: string, io: WorkspaceIO): Promise<string> {
+  const raw = await io.readFile(join(appDir, "package.json"));
   return (JSON.parse(raw) as { version?: string }).version ?? "0.0.0";
 }
 // END_BLOCK_HELPERS

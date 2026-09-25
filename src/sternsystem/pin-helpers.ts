@@ -10,17 +10,17 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { SystemPin } from "@warpgogol/werkstatt-engine/schemas";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function highestRfcId(workspaceRoot: string): Promise<string> {
+export async function highestRfcId(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<string> {
   try {
-    const files = await fs.readdir(path.join(workspaceRoot, "docs", "rfcs"));
+    const files = await io.readdir(path.join(workspaceRoot, "docs", "rfcs"));
     let max = 0;
     for (const f of files) {
-      const m = /^[Rr][Ff][Cc]-(\d{4})/.exec(f);
+      const m = /^[Rr][Ff][Cc]-(\d{4})/.exec(f.name);
       if (m) max = Math.max(max, Number(m[1]));
     }
     return `RFC-${String(max).padStart(4, "0")}`;
@@ -30,10 +30,10 @@ export async function highestRfcId(workspaceRoot: string): Promise<string> {
 }
 
 export async function snapshotCapabilities(
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SystemPin["capabilities"]> {
   try {
-    const raw = await fs.readFile(path.join(workspaceRoot, "uni.registry.yaml"), "utf8");
+    const raw = await io.readFile(path.join(workspaceRoot, "uni.registry.yaml"));
     const parsed = parseYaml(raw) as {
       entries?: Array<{ id: string; semanticId?: string; version?: string; intent?: string[] }>;
     };

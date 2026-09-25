@@ -23,12 +23,14 @@ import { runNachweisSign } from "./nachweis-sign.ts";
 import { runNachweisTimestamp } from "./nachweis-timestamp.ts";
 import { runNachweisVerifySignature } from "./nachweis-verify-signature.ts";
 import { runNachweisApprove } from "./nachweis-approve.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 const systemId = "test-system";
 
 function mockContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

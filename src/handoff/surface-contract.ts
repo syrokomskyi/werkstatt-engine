@@ -16,8 +16,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -30,6 +29,7 @@ import {
   sitemapShape,
 } from "@warpgogol/werkstatt-shared/ontology/external-surfaces";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface SurfaceContractValidateData {
   systemId: string | null;
@@ -65,9 +65,9 @@ export async function runSurfaceContractValidate(
   const routeRegistryPath = path.join(siteDir, "src", "surface.generated.json");
   const routesPath = path.join(siteDir, "src", "content", "routes.yaml");
 
-  if (existsSync(routeRegistryPath)) {
+  if (await context.io.exists(routeRegistryPath)) {
     try {
-      const raw = await fs.readFile(routeRegistryPath, "utf8");
+      const raw = await context.io.readFile(routeRegistryPath);
       const routes = JSON.parse(raw) as Array<{ pattern?: string; path?: string }>;
       const contractPatterns = urlSchema.routePatterns.map((p) => p.pattern);
 
@@ -97,7 +97,7 @@ export async function runSurfaceContractValidate(
         message: `Failed to parse surface.generated.json: ${(err as Error).message}`,
       });
     }
-  } else if (existsSync(routesPath)) {
+  } else if (await context.io.exists(routesPath)) {
     // Fallback: check routes.yaml if surface.generated.json doesn't exist
     validatedSurfaces.push("url-schema (routes.yaml)");
   } else {
@@ -108,7 +108,7 @@ export async function runSurfaceContractValidate(
   // 2. Validate JSON-LD types
   // Check that any JSON-LD templates use only declared @type values
   const contentDir = path.join(siteDir, "src", "content");
-  if (existsSync(contentDir)) {
+  if (await context.io.exists(contentDir)) {
     const declaredTypes = new Set(jsonldTypes.types.map((t) => t["@type"]));
     // This is a lightweight check — full validation would scan all pages
     // For now, just verify the contract is loadable and types are declared
@@ -223,9 +223,9 @@ export async function runSurfaceContractValidate(
   // 3. Validate sitemap shape
   // Check that sitemap.xml (if exists) conforms to the declared shape
   const sitemapPath = path.join(siteDir, "dist", "sitemap.xml");
-  if (existsSync(sitemapPath)) {
+  if (await context.io.exists(sitemapPath)) {
     try {
-      const raw = await fs.readFile(sitemapPath, "utf8");
+      const raw = await context.io.readFile(sitemapPath);
       const requiredFields = sitemapShape.urlEntry.required;
       const hasLoc = raw.includes("<loc>");
       if (requiredFields.includes("loc") && !hasLoc) {

@@ -18,13 +18,14 @@ import { runIdentityCredentialVerify } from "../identity/identity-credential-ver
 import { runIdentityCredentialRevoke } from "../identity/identity-credential-revoke.ts";
 import { readIdentityConfig } from "../identity/identity-io.ts";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function makeInput(flags: Record<string, string | boolean>): KernelCommandInput {
   return { flags } as KernelCommandInput;
 }
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
-  return { workspaceRoot } as KernelRuntimeContext;
+  return { io: createDefaultIO().io, workspaceRoot } as KernelRuntimeContext;
 }
 
 describe("identity commands", () => {

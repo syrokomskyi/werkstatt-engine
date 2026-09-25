@@ -10,14 +10,13 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import {
   werkstattOperationRecordSchema,
   type WerkstattOperationRecord,
 } from "@warpgogol/werkstatt-engine/schemas";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const OPERATIONS_DIR = path.join(".werkstatt", "operations");
 
@@ -61,11 +60,11 @@ export async function startOperation(
   operationId: string,
   command: string,
   scopes: string[],
-  inputHash: string,
+  inputHash: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord> {
   const opsDir = resolveOperationsDir(workspaceRoot);
-  if (!existsSync(opsDir)) {
-    await fs.mkdir(opsDir, { recursive: true });
+  if (!await io.exists(opsDir)) {
+    await io.mkdir(opsDir);
   }
 
   const record: WerkstattOperationRecord = {
@@ -83,11 +82,7 @@ export async function startOperation(
   };
 
   werkstattOperationRecordSchema.parse(record);
-  await fs.writeFile(
-    resolveOperationPath(workspaceRoot, operationId),
-    JSON.stringify(record, null, 2) + "\n",
-    "utf8",
-  );
+  await io.writeFile(resolveOperationPath(workspaceRoot, operationId), JSON.stringify(record, null, 2) + "\n");
   return record;
 }
 
@@ -95,10 +90,10 @@ export async function completeOperation(
   workspaceRoot: string,
   operationId: string,
   resultHash: string | null,
-  artifacts: string[],
+  artifacts: string[], io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord> {
   const opPath = resolveOperationPath(workspaceRoot, operationId);
-  const raw = await fs.readFile(opPath, "utf8");
+  const raw = await io.readFile(opPath);
   const record = werkstattOperationRecordSchema.parse(JSON.parse(raw));
 
   record.state = "completed";
@@ -107,17 +102,17 @@ export async function completeOperation(
   record.artifacts = artifacts;
 
   werkstattOperationRecordSchema.parse(record);
-  await fs.writeFile(opPath, JSON.stringify(record, null, 2) + "\n", "utf8");
+  await io.writeFile(opPath, JSON.stringify(record, null, 2) + "\n");
   return record;
 }
 
 export async function failOperation(
   workspaceRoot: string,
   operationId: string,
-  error: string,
+  error: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord> {
   const opPath = resolveOperationPath(workspaceRoot, operationId);
-  const raw = await fs.readFile(opPath, "utf8");
+  const raw = await io.readFile(opPath);
   const record = werkstattOperationRecordSchema.parse(JSON.parse(raw));
 
   record.state = "failed";
@@ -125,17 +120,17 @@ export async function failOperation(
   record.error = error;
 
   werkstattOperationRecordSchema.parse(record);
-  await fs.writeFile(opPath, JSON.stringify(record, null, 2) + "\n", "utf8");
+  await io.writeFile(opPath, JSON.stringify(record, null, 2) + "\n");
   return record;
 }
 
 export async function readOperation(
   workspaceRoot: string,
-  operationId: string,
+  operationId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord | null> {
   const opPath = resolveOperationPath(workspaceRoot, operationId);
-  if (!existsSync(opPath)) return null;
-  const raw = await fs.readFile(opPath, "utf8");
+  if (!await io.exists(opPath)) return null;
+  const raw = await io.readFile(opPath);
   try {
     return werkstattOperationRecordSchema.parse(JSON.parse(raw));
   } catch {

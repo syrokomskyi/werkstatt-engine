@@ -19,7 +19,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -52,7 +51,7 @@ export async function runDeployAtomicSwap(
   }
 
   const dir = artifactDir(workspaceRoot, hash);
-  if (!existsSync(dir)) {
+  if (!(await context.io.exists(dir))) {
     throw new Error(`[deploy.atomic.swap] artifact ${hash} not found`);
   }
 
@@ -70,7 +69,7 @@ export async function runDeployAtomicSwap(
   const currentPath = currentSymlinkPath(workspaceRoot);
   const previousPath = previousSymlinkPath(workspaceRoot);
 
-  const oldCurrentHash = readSymlinkBasename(currentPath);
+  const oldCurrentHash = await readSymlinkBasename(currentPath, context.io);
   const startTime = Date.now();
 
   if (oldCurrentHash && oldCurrentHash !== hash) {

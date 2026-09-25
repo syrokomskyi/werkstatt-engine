@@ -20,9 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+
 import { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -36,6 +34,7 @@ import {
 } from "../sternsystem/registry-io.ts";
 import { filterEnv, sourceDotenv } from "../leitstand/adapters/index.ts";
 import { LAGEBILD_SECRET_NAMES, resolveWorkerName } from "./lagebild-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, name: string): string | undefined {
   const v = input.flags[name];
@@ -57,33 +56,19 @@ async function runWranglerSecretList(
   workerName: string,
   env: Record<string, string | undefined>,
   cwd: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(
+  try {
+    const envFiltered = Object.fromEntries(Object.entries(env).filter((e): e is [string, string] => e[1] !== undefined));
+    const result = await io.exec(
       "npx",
       ["--yes", "wrangler", "secret", "list", "--name", workerName],
-      {
-        cwd,
-        env: { ...process.env, ...env },
-        stdio: ["pipe", "pipe", "pipe"],
-      },
+      { cwd, env: envFiltered },
     );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("error", () => {
-      resolve({ exitCode: 1, stdout, stderr: "Failed to spawn wrangler" });
-    });
-    child.on("exit", (code) => {
-      resolve({ exitCode: code ?? 1, stdout, stderr });
-    });
-    child.stdin.end();
-  });
+    return { exitCode: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
+  } catch {
+    return { exitCode: 1, stdout: "", stderr: "Failed to spawn wrangler" };
+  }
 }
 
 export async function runLagebildValidate(
@@ -123,7 +108,7 @@ export async function runLagebildValidate(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = existsSync(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
@@ -154,8 +139,8 @@ export async function runLagebildValidate(
 
   // Check .env for LAGEBILD_API_KEY presence
   let apiKeyInEnv = false;
-  if (existsSync(envPath)) {
-    const rawEnv = await readFile(envPath, "utf8");
+  if (await context.io.exists(envPath)) {
+    const rawEnv = await context.io.readFile(envPath);
     for (const line of rawEnv.split("\n")) {
       const trimmed = line.trim();
       if (trimmed.startsWith("LAGEBILD_API_KEY=") && trimmed.length > "LAGEBILD_API_KEY=".length) {

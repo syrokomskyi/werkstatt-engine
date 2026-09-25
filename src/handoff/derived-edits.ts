@@ -12,10 +12,10 @@ decision record instead of silently regenerating, so hand edits are not lost wit
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { HandoffManifest } from "@warpgogol/werkstatt-engine/schemas";
 import { sha256OfBytes } from "./bundle-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface DerivedEditMismatch {
   path: string;
@@ -30,7 +30,7 @@ export interface DerivedEditMismatch {
  */
 export async function reportDerivedEdits(
   bundleDir: string,
-  manifest: HandoffManifest,
+  manifest: HandoffManifest, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DerivedEditMismatch[]> {
   const mismatches: DerivedEditMismatch[] = [];
 
@@ -40,7 +40,7 @@ export async function reportDerivedEdits(
     const abs = path.join(bundleDir, entry.path);
     let actualHash: string | null = null;
     try {
-      actualHash = sha256OfBytes(await fs.readFile(abs));
+      actualHash = sha256OfBytes(await io.readFile(abs));
     } catch {
       // File absent (could have been deleted) — report as mismatch.
       actualHash = null;

@@ -20,8 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -33,6 +32,7 @@ import {
   parseMarkdownFrontmatter,
   stringifyMarkdownFrontmatter,
 } from "@warpgogol/werkstatt-shared/content";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import {
   appendBatchAndCommitBordbuch,
   appendAndCommitBordbuch,
@@ -80,13 +80,13 @@ export async function runNachweisWithdraw(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     throw new Error(
       `[nachweis.withdraw] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
   }
 
-  const rawEvidence = await fs.readFile(evidenceFile, "utf8");
+  const rawEvidence = await context.io.readFile(evidenceFile);
   const { data: evidenceData, content: evidenceContent } = parseMarkdownFrontmatter(rawEvidence);
 
   // Check if already withdrawn (idempotent)
@@ -115,7 +115,7 @@ export async function runNachweisWithdraw(
   (evidenceData as Record<string, unknown>).publication = publication;
 
   const updatedContent = stringifyMarkdownFrontmatter(evidenceContent, evidenceData);
-  await fs.writeFile(evidenceFile, updatedContent, "utf8");
+  await context.io.writeFile(evidenceFile, updatedContent);
 
   // RFC-0872: conditionally revoke consent based on publication policy
   const kind = (evidenceData as Record<string, unknown>).kind as string | undefined;
@@ -126,8 +126,8 @@ export async function runNachweisWithdraw(
   const consentDir = resolvePbpEntityDir(cachePath, lang, "consent");
   const consentFile = path.join(consentDir, `${slug}.md`);
   let consentRevoked = false;
-  if (shouldRevokeConsent && existsSync(consentFile)) {
-    const rawConsent = await fs.readFile(consentFile, "utf8");
+  if (shouldRevokeConsent && await context.io.exists(consentFile)) {
+    const rawConsent = await context.io.readFile(consentFile);
     const { data: consentData, content: consentContent } = parseMarkdownFrontmatter(rawConsent);
     const existingScope =
       (consentData.consentScope as
@@ -147,7 +147,7 @@ export async function runNachweisWithdraw(
     delete consentData.grantedAt;
     delete consentData.method;
     const updatedConsent = stringifyMarkdownFrontmatter(consentContent, consentData);
-    await fs.writeFile(consentFile, updatedConsent, "utf8");
+    await context.io.writeFile(consentFile, updatedConsent);
     consentRevoked = true;
   }
 

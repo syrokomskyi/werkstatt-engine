@@ -105,6 +105,7 @@ vi.mock("../stale-entries.ts", () => ({
 }));
 
 import { runMissionValidate } from "../mission-materialization-commands.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const baseManifest = {
   id: "test-mission",
@@ -117,6 +118,7 @@ const baseManifest = {
 
 function makeContext(tmpDir: string) {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},

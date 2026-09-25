@@ -15,12 +15,12 @@ evidence survives process restarts and can be re-verified later.
 </CHANGE_SUMMARY>
 */
 
-import { mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { createRequire } from "node:module";
 
 import type { CompensationResult, ProbeResult } from "@warpgogol/werkstatt-shared/component";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const require_ = createRequire(import.meta.url);
 
@@ -50,33 +50,38 @@ export class CompensationStore {
   private readonly dbPath: string;
   private db: import("better-sqlite3").Database;
 
-  constructor(dbPath: string) {
+  private constructor(dbPath: string, db: import("better-sqlite3").Database) {
     this.dbPath = dbPath;
+    this.db = db;
+  }
+
+  static async create(dbPath: string, io: WorkspaceIO): Promise<CompensationStore> {
+    const open = (): import("better-sqlite3").Database => {
+      const BetterSqlite3 = require_("better-sqlite3") as typeof import("better-sqlite3");
+      const db = new BetterSqlite3(dbPath);
+      db.pragma("journal_mode = WAL");
+      db.pragma("busy_timeout = 5000");
+      db.exec(SCHEMA_DDL);
+      return db;
+    };
 
     try {
-      const BetterSqlite3 = require_("better-sqlite3") as typeof import("better-sqlite3");
-      mkdirSync(dirname(dbPath), { recursive: true });
-      this.db = new BetterSqlite3(dbPath);
-      this.db.pragma("journal_mode = WAL");
-      this.db.pragma("busy_timeout = 5000");
-      this.db.exec(SCHEMA_DDL);
+      await io.mkdir(dirname(dbPath));
+      return new CompensationStore(dbPath, open());
     } catch (err) {
-      if (existsSync(dbPath)) {
+      if (await io.exists(dbPath)) {
         try {
-          unlinkSync(dbPath);
+          await io.rm(dbPath);
         } catch {
-          // ignore unlink errors
+          // ignore rm errors
         }
       }
-      const BetterSqlite3 = require_("better-sqlite3") as typeof import("better-sqlite3");
-      mkdirSync(dirname(dbPath), { recursive: true });
-      this.db = new BetterSqlite3(dbPath);
-      this.db.pragma("journal_mode = WAL");
-      this.db.pragma("busy_timeout = 5000");
-      this.db.exec(SCHEMA_DDL);
+      await io.mkdir(dirname(dbPath));
+      const db = open();
       if (err instanceof Error) {
         console.warn(`compensation-evidence DB was corrupt and has been recreated: ${err.message}`);
       }
+      return new CompensationStore(dbPath, db);
     }
   }
 

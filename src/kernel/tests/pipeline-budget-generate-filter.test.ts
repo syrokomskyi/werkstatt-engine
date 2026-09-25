@@ -9,6 +9,7 @@ import {
   type StepTelemetryRecord,
 } from "../pipeline-budgets.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /*
 <MODULE_CONTRACT>
@@ -25,6 +26,7 @@ const FLEET_SITES_RELATIVE_PATH = join("fleet", "fleet.sites.yaml");
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
   } as unknown as KernelRuntimeContext;
 }

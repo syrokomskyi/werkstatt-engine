@@ -11,8 +11,8 @@
 </CHANGE_SUMMARY>
 */
 
-import { execSync } from "node:child_process";
 import { gitExec } from "./git-exec.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface CommitWerkstattResult {
   committed: boolean;
@@ -23,6 +23,7 @@ export async function commitWerkstattSideEffects(
   workspaceRoot: string,
   files: string[],
   message: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<CommitWerkstattResult> {
   for (const file of files) {
     gitExec(workspaceRoot, `add -- ${JSON.stringify(file)}`, { allowNonZero: true });
@@ -30,12 +31,11 @@ export async function commitWerkstattSideEffects(
 
   let hasStagedChanges: boolean;
   try {
-    execSync("git diff --cached --quiet", {
+    const diffResult = await io.exec("sh", ["-c", "git diff --cached --quiet"], {
       cwd: workspaceRoot,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 30_000,
+      timeoutMs: 30_000,
     });
-    hasStagedChanges = false;
+    hasStagedChanges = diffResult.exitCode !== 0;
   } catch {
     hasStagedChanges = true;
   }

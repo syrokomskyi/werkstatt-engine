@@ -20,6 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const _packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -70,6 +71,8 @@ export interface ChangelogCtx {
   repoUrl: string | undefined;
   /** {workspaceRoot}/prompts/ */
   promptsDir: string;
+  /** WorkspaceIO port for filesystem access (RFC-1149). */
+  io: import("@warpgogol/werkstatt-shared/kernel/workspace-io").WorkspaceIO;
 }
 // END_BLOCK_CTX
 
@@ -139,6 +142,7 @@ export function buildChangelogCtx(
         ? `${process.env["GITHUB_SERVER_URL"]}/${process.env["GITHUB_REPOSITORY"]}`
         : undefined),
     promptsDir: join(_packageRoot, "prompts"),
+    io: context.io,
   };
 }
 // END_BLOCK_BUILD

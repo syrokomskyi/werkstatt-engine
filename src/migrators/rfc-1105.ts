@@ -15,10 +15,10 @@ subpaths. Idempotent: specifiers without the `/share` segment are untouched.</pu
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
+import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_1105_MIGRATOR_ID = "rfc-1105";
 
@@ -129,10 +129,10 @@ export function mapShareSubpath(subpath: string): string | null {
   return null;
 }
 
-async function rewriteFile(filePath: string, ctx: MigrationContext): Promise<boolean> {
+async function rewriteFile(filePath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   let content: string;
   try {
-    content = await fs.readFile(filePath, "utf-8");
+    content = await io.readFile(filePath);
   } catch {
     return false;
   }
@@ -157,7 +157,7 @@ async function rewriteFile(filePath: string, ctx: MigrationContext): Promise<boo
   }
   if (rewritten === content) return false;
 
-  await fs.writeFile(filePath, rewritten, "utf-8");
+  await io.writeFile(filePath, rewritten);
   return true;
 }
 
@@ -167,20 +167,20 @@ export const rfc1105Migrator: Migrator = {
   toVersion: "6.231.0",
   description:
     "Rewrite `@warpgogol/werkstatt-shared` specifiers carrying the dissolved `share/` segment to post-dissolution top-level subpaths in workpiece authored sources (RFC-1105 share namespace dissolution). Bare barrel and test/config specifiers are logged for manual repair.",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const files: string[] = await collectFiles(path.join(data.rootPath, "src"), {
       extensions: [...SCAN_EXTENSIONS],
       ignore: (name) => SKIP_DIRS.has(name) || name.startsWith("-") || name.startsWith("old-"),
     });
     // Root-level config files can also carry specifiers (astro.config.mjs, etc.).
-    let rootEntries: import("node:fs").Dirent[] = [];
+    let rootEntries: DirEntry[] = [];
     try {
-      rootEntries = await fs.readdir(data.rootPath, { withFileTypes: true });
+      rootEntries = await io.readdir(data.rootPath);
     } catch {
       rootEntries = [];
     }
     for (const entry of rootEntries) {
-      if (entry.isFile() && SCAN_EXTENSIONS.has(path.extname(entry.name))) {
+      if (entry.isFile && SCAN_EXTENSIONS.has(path.extname(entry.name))) {
         files.push(path.join(data.rootPath, entry.name));
       }
     }

@@ -14,7 +14,6 @@ Scheduler: collectErrors option on executeScheduledSteps — read-only steps (Sc
 </CHANGE_SUMMARY>
 */
 
-import { access } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import path from "node:path";
 import type {
@@ -32,6 +31,7 @@ import {
   resolveSiteWorkspace,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface ValidatePostbuildStepResult {
   name: string;
@@ -99,9 +99,7 @@ export async function runValidatePostbuild(
   }
 
   const distPath = path.join(siteWorkspace.directory, "dist");
-  try {
-    await access(distPath);
-  } catch {
+  if (!(await context.io.exists(distPath))) {
     return {
       data: {
         command: "validate.postbuild",

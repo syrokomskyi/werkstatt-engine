@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runWorkpieceConfigPresenceCheck } from "./workpiece-config-presence-check.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function makeInput(flags: Record<string, unknown>): KernelCommandInput {
   return {
@@ -23,7 +24,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 }
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
-  return { workspaceRoot } as unknown as KernelRuntimeContext;
+  return { io: createDefaultIO().io, workspaceRoot } as unknown as KernelRuntimeContext;
 }
 
 let tempDir: string;

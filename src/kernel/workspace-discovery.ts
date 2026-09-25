@@ -20,10 +20,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { parse } from "yaml";
 import type { Diagnostic } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkspacePackageInfo {
   name: string;
@@ -58,9 +58,9 @@ function toPosixPath(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
-async function pathExists(filePath: string): Promise<boolean> {
+async function pathExists(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   try {
-    await readFile(filePath, "utf8");
+    await io.readFile(filePath);
     return true;
   } catch {
     return false;
@@ -99,7 +99,7 @@ function isSupportedWorkspacePattern(pattern: string): boolean {
     .every((segment) => segment === "*" || /^[a-zA-Z0-9._-]+$/.test(segment));
 }
 
-async function expandWorkspacePattern(workspaceRoot: string, pattern: string): Promise<string[]> {
+async function expandWorkspacePattern(workspaceRoot: string, pattern: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
   const segments = pattern.split("/").filter(Boolean);
   let candidates = [workspaceRoot];
 
@@ -109,12 +109,12 @@ async function expandWorkspacePattern(workspaceRoot: string, pattern: string): P
       if (segment === "*") {
         let entries;
         try {
-          entries = await readdir(candidate, { withFileTypes: true });
+          entries = await io.readdir(candidate);
         } catch {
           continue;
         }
         for (const entry of entries) {
-          if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name.startsWith("-"))
+          if (!entry.isDirectory || entry.name.startsWith(".") || entry.name.startsWith("-"))
             continue;
           nextCandidates.push(join(candidate, entry.name));
         }
@@ -143,10 +143,10 @@ export function workspacePackageKind(directory: string): WorkspacePackageInfo["k
 }
 
 export async function discoverWorkspacePackages(
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WorkspaceDiscoveryResult> {
   const diagnostics: Diagnostic[] = [];
-  const workspaceSource = await readFile(join(workspaceRoot, PNPM_WORKSPACE_PATH), "utf8");
+  const workspaceSource = await io.readFile(join(workspaceRoot, PNPM_WORKSPACE_PATH));
   const rawPackageGlobs = workspacePackageGlobsFromYaml(workspaceSource, diagnostics);
   const packageGlobs = rawPackageGlobs
     .filter((pattern) => !pattern.startsWith("!"))
@@ -229,7 +229,7 @@ export async function discoverWorkspacePackages(
     }
 
     const packageJsonPath = join(entry.absoluteDirectory, "package.json");
-    const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8")) as WorkspacePackageJson;
+    const packageJson = JSON.parse(await io.readFile(packageJsonPath)) as WorkspacePackageJson;
     if (!packageJson.name) {
       diagnostics.push(
         workspaceDiscoveryDiagnostic(

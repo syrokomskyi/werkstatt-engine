@@ -12,7 +12,6 @@ status. Thin wrappers around claims-repo.ts pure functions.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type {
@@ -29,6 +28,7 @@ import {
   verifyClaimOffline,
   type FleetClaimsConfig,
 } from "./claims-repo.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -68,7 +68,7 @@ export async function runFleetClaimsInit(
   try {
     const config: FleetClaimsConfig = { remotes, localPath, workerUrl };
     const configPath = path.join(context.workspaceRoot, "werkstatt.fleet.json");
-    await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+    await context.io.writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
 
     const clonePath = await ensureClaimsClone(context.workspaceRoot, config);
 

@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type { PropagationResult, HealthCheck } from "@warpgogol/werkstatt-engine/schemas";
 import { hashHtml } from "@warpgogol/werkstatt-engine/fingerprint";
@@ -51,6 +50,7 @@ export {
   readBehaviorSnapshot,
   verifyRedirectRoute,
 } from "./health-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const TRANSIENT_ERROR_PATTERNS: readonly RegExp[] = [
   /\b502\b/,
@@ -114,7 +114,7 @@ export function createCloudflareWorkersAdapter(exec?: CommandRunner): Deployment
   return {
     name: "cloudflare-workers",
 
-    async propagate(input: PropagateInput): Promise<PropagationResult> {
+    async propagate(input: PropagateInput, io: WorkspaceIO = createDefaultIO().io): Promise<PropagationResult> {
       const now = new Date().toISOString();
 
       const secretsEnv = input.secretsFilePath ? await sourceDotenv(input.secretsFilePath) : {};
@@ -125,7 +125,7 @@ export function createCloudflareWorkersAdapter(exec?: CommandRunner): Deployment
       }
 
       const serverDir = path.join(input.distPath, "server");
-      const wranglerConfigDir = existsSync(path.join(serverDir, "wrangler.json"))
+      const wranglerConfigDir = await io.exists(path.join(serverDir, "wrangler.json"))
         ? serverDir
         : input.distPath;
 

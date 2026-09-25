@@ -15,6 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { isRouteRedirected, collectRoutes } from "./behavior-snapshot-commands.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import {
   parseRedirectRules,
   extractRedirectTarget,
@@ -72,7 +73,7 @@ test("collectRoutes: excludes redirected routes from snapshot", async () => {
   await fs.writeFile(path.join(tmpDir, "de", "agb", "index.html"), "<html>de-agb</html>");
 
   const rules: RedirectRule[] = parseRedirectRules("/de/* / 308");
-  const routes = await collectRoutes(tmpDir, rules);
+  const routes = await collectRoutes(tmpDir, rules, createDefaultIO().io);
 
   const paths = routes.map((r) => r.path);
   expect(paths).toContain("/");
@@ -87,7 +88,7 @@ test("collectRoutes: without redirect rules, all routes included", async () => {
   await fs.writeFile(path.join(tmpDir, "agb", "index.html"), "<html>agb</html>");
   await fs.writeFile(path.join(tmpDir, "de", "agb", "index.html"), "<html>de-agb</html>");
 
-  const routes = await collectRoutes(tmpDir);
+  const routes = await collectRoutes(tmpDir, [], createDefaultIO().io);
 
   const paths = routes.map((r) => r.path);
   expect(paths).toContain("/");
@@ -113,7 +114,7 @@ test("collectRoutes: redirect pages get contentHash: null + redirectTarget", asy
   await fs.writeFile(path.join(tmpDir, "index.html"), normalHtml);
   await fs.writeFile(path.join(tmpDir, "de", "index.html"), redirectHtml);
 
-  const routes = await collectRoutes(tmpDir);
+  const routes = await collectRoutes(tmpDir, [], createDefaultIO().io);
 
   const homeRoute = routes.find((r) => r.path === "/");
   expect(homeRoute).toBeDefined();
@@ -132,7 +133,7 @@ test("collectRoutes: redirect page with unparseable target gets 'unknown'", asyn
     '<html><head><meta http-equiv="refresh" content="0"></head><body></body></html>';
   await fs.writeFile(path.join(tmpDir, "weird", "index.html"), redirectHtml);
 
-  const routes = await collectRoutes(tmpDir);
+  const routes = await collectRoutes(tmpDir, [], createDefaultIO().io);
   const weirdRoute = routes.find((r) => r.path === "/weird");
   expect(weirdRoute).toBeDefined();
   expect(weirdRoute!.contentHash).toBeNull();
@@ -141,7 +142,7 @@ test("collectRoutes: redirect page with unparseable target gets 'unknown'", asyn
 
 test("collectRoutes: non-redirect routes retain contentHash as string", async () => {
   await fs.writeFile(path.join(tmpDir, "index.html"), "<html>home</html>");
-  const routes = await collectRoutes(tmpDir);
+  const routes = await collectRoutes(tmpDir, [], createDefaultIO().io);
   expect(routes).toHaveLength(1);
   expect(routes[0].contentHash).not.toBeNull();
   expect(typeof routes[0].contentHash).toBe("string");

@@ -85,6 +85,7 @@ import {
 } from "./deploy-helpers.ts";
 import { buildAuthHeader } from "./deploy-execution.ts";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function _logCacheDirSize(cacheDir: string, logger: { info: (msg: string) => void }): void {
   try {
@@ -421,7 +422,8 @@ async function _runPreflight(
   channel: Channel,
   channelConfig: DeploymentChannel,
   adapter: DeploymentAdapter,
-  missionId?: string,
+  missionId: string | undefined,
+  io: WorkspaceIO,
   basePath?: string,
 ): Promise<PreflightCheck[]> {
   const checks: PreflightCheck[] = [];
@@ -430,8 +432,8 @@ async function _runPreflight(
   const manifestPath = path.join(workspaceRoot, "releases", releaseId, "release.yaml");
   checks.push({
     name: "release-ready",
-    passed: existsSync(manifestPath),
-    detail: existsSync(manifestPath) ? "Release manifest found" : "Release manifest missing",
+    passed: await io.exists(manifestPath),
+    detail: (await io.exists(manifestPath)) ? "Release manifest found" : "Release manifest missing",
   });
 
   // 2. Channel exists in deployment.channels
@@ -447,20 +449,21 @@ async function _runPreflight(
     name: "convention-env-exists",
     passed: true, // info-level — always passed
     detail:
-      basePath && existsSync(envPath)
+      basePath && (await io.exists(envPath))
         ? `.env found at ${envPath}`
         : `.env not found — using process.env fallback`,
   });
 
   // 4. Dist directory exists and artifact hash verifies
   const distPath = path.join(workspaceRoot, "releases", releaseId, "dist");
-  const artifactResult = await artifactStorePreflight(workspaceRoot, releaseId, distPath);
+  const artifactResult = await artifactStorePreflight(workspaceRoot, releaseId, distPath, io);
   checks.push({
     name: "artifact-hash",
-    passed: artifactResult.manifestFound && (artifactResult.hashVerified || !existsSync(distPath)),
+    passed:
+      artifactResult.manifestFound && (artifactResult.hashVerified || !(await io.exists(distPath))),
     detail: !artifactResult.manifestFound
       ? "Artifact manifest not found in store"
-      : !existsSync(distPath)
+      : !(await io.exists(distPath))
         ? "Dist missing locally (will rehydrate from store)"
         : artifactResult.hashVerified
           ? "Dist tree hash matches artifact manifest"
@@ -478,7 +481,7 @@ async function _runPreflight(
       "node_modules",
       ".bin",
     );
-    if (existsSync(workpieceBin)) {
+    if (await io.exists(workpieceBin)) {
       wranglerBinPath = workpieceBin;
     }
   }
@@ -490,7 +493,7 @@ async function _runPreflight(
   });
 
   // 6. Dist size within adapter-declared limits
-  if (existsSync(distPath)) {
+  if (await io.exists(distPath)) {
     const sizeCheck = await checkDistSize(distPath, adapter.getLimits());
     checks.push({
       name: "dist-size-limit",
@@ -510,8 +513,8 @@ async function _runPreflight(
   const bootSmokeEvidencePath = path.join(workspaceRoot, "releases", releaseId, "boot-smoke.json");
   checks.push({
     name: "boot-smoke-evidence",
-    passed: existsSync(bootSmokeEvidencePath),
-    detail: existsSync(bootSmokeEvidencePath)
+    passed: await io.exists(bootSmokeEvidencePath),
+    detail: (await io.exists(bootSmokeEvidencePath))
       ? "boot-smoke.json evidence found"
       : "boot-smoke.json evidence missing — run release.prepare to generate",
   });

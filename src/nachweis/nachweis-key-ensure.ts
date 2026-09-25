@@ -134,9 +134,9 @@ export async function runNachweisKeyEnsure(
     : null;
 
   let pubKeyJsonPath: string | null = null;
-  if (workpieceDir && existsSync(workpieceDir)) {
+  if (workpieceDir && await context.io.exists(workpieceDir)) {
     const workpiecePublicDir = path.join(workpieceDir, "public");
-    if (existsSync(workpiecePublicDir)) {
+    if (await context.io.exists(workpiecePublicDir)) {
       pubKeyJsonPath = await writePublicKeyJson(
         workpiecePublicDir,
         result.keyId,

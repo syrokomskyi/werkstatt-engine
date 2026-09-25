@@ -16,7 +16,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
  ***************************************************************/
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { atomicWrite } from "../utils/atomic-fs.ts";
 import type { ChangelogCtx } from "../context.ts";
@@ -40,6 +39,7 @@ export async function writeVersionedFile(
   await atomicWrite(
     filePath,
     `<!-- release-id: ${date} -->\n<!-- version: ${version} -->\n\n${content}`,
+    ctx.io,
   );
   console.log(`[CL-INDEX][writeVersionedFile][ATOMIC_WRITE] path=${filePath}`);
   return filename;
@@ -74,14 +74,14 @@ export async function rebuildIndex(
 ): Promise<void> {
   let current = "";
   try {
-    current = await readFile(ctx.indexFile, "utf-8");
+    current = await ctx.io.readFile(ctx.indexFile);
   } catch {
     current = `# Changelog\n\nAll notable changes to **${ctx.appName}**.\n\n${MARKER_START}\n${MARKER_END}\n`;
   }
 
   const entry = `- **[${version}](./${ctx.detailsDir.split("/").pop()}/${filename})** (${date})`;
   const newContent = replaceBetweenMarkers(current, entry);
-  await atomicWrite(ctx.indexFile, newContent);
+  await atomicWrite(ctx.indexFile, newContent, ctx.io);
   console.log(`[CL-INDEX][rebuildIndex][DONE] indexFile=${ctx.indexFile}`);
 }
 // END_BLOCK_REBUILD

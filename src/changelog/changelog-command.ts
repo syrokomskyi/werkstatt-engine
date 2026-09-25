@@ -16,7 +16,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -39,15 +38,15 @@ import { writeVersionedFile, rebuildIndex } from "./changelog/core/index-rebuild
 // START_BLOCK_STATE
 async function loadState(ctx: ChangelogCtx): Promise<SystemState> {
   try {
-    return JSON.parse(await readFile(ctx.statePath, "utf-8")) as SystemState;
+    return JSON.parse(await ctx.io.readFile(ctx.statePath)) as SystemState;
   } catch {
     return { lastProcessedCommitHash: "", lastVersion: "", processedWindows: [] };
   }
 }
 
 async function saveState(state: SystemState, ctx: ChangelogCtx): Promise<void> {
-  await mkdir(ctx.statePath.replace(/[/\\][^/\\]+$/, ""), { recursive: true });
-  await writeFile(ctx.statePath, JSON.stringify(state, null, 2), "utf-8");
+  await ctx.io.mkdir(ctx.statePath.replace(/[/\\][^/\\]+$/, ""));
+  await ctx.io.writeFile(ctx.statePath, JSON.stringify(state, null, 2));
 }
 // END_BLOCK_STATE
 
@@ -103,7 +102,7 @@ export async function runChangelogGenerate(
   }
 
   const grouped = await groupCommits(classified, ctx);
-  const currentVersion = await getAppVersion(ctx.appDir);
+  const currentVersion = await getAppVersion(ctx.appDir, ctx.io);
   const bump = calculateNextVersion(currentVersion, classified, ctx.confidenceThreshold);
 
   context.logger.info(
@@ -160,7 +159,7 @@ export async function runChangelogRebuildIndex(
   const ctx = buildChangelogCtx(input, context);
   const state = await loadState(ctx);
   const date = formatDateISO(new Date());
-  const version = state.lastVersion || (await getAppVersion(ctx.appDir));
+  const version = state.lastVersion || (await getAppVersion(ctx.appDir, ctx.io));
   const filename = `changelog-${date}-v${version}.md`;
   await rebuildIndex(date, version, filename, ctx);
   return {
@@ -193,7 +192,7 @@ export async function runChangelogBackfill(
   );
   const classified = await classifyBatch(rawCommits.map(sanitizeCommit), ctx);
   const grouped = await groupCommits(classified, ctx);
-  const currentVersion = await getAppVersion(ctx.appDir);
+  const currentVersion = await getAppVersion(ctx.appDir, ctx.io);
   const bump = calculateNextVersion(currentVersion, classified, ctx.confidenceThreshold);
   const commitLinks = buildCommitLinksMap(rawCommits, ctx.repoUrl);
   const content = await writeChangelog(grouped, bump.version, ctx, commitLinks);
@@ -219,10 +218,10 @@ export async function runChangelogBackfill(
 async function bumpAppVersion(newVersion: string, ctx: ChangelogCtx): Promise<void> {
   const pkgPath = `${ctx.appDir}/package.json`;
   try {
-    const raw = await readFile(pkgPath, "utf-8");
+    const raw = await ctx.io.readFile(pkgPath);
     const pkg = JSON.parse(raw) as Record<string, unknown>;
     pkg["version"] = newVersion;
-    await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+    await ctx.io.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   } catch (err) {
     console.warn("[CL-MAIN][bumpAppVersion][FAILED]", err);
   }

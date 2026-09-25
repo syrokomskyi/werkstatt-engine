@@ -23,6 +23,7 @@ import { signAuthorization, writeAuthorization, type HandoverAuthorizationV1 } f
 import { buildPassportPayload, signPassport, type SignedSitePassport } from "./passport.ts";
 import { writePassport } from "./registry-io.ts";
 import { runSternsystemHandoverComplete } from "./sternsystem-handover-complete.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 let recipientRoot: string;
@@ -79,6 +80,7 @@ function setupSystem(root: string, id: string): void {
 function mockContext(root: string): KernelRuntimeContext {
   const noop = () => {};
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       info: noop,

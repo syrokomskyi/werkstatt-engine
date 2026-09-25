@@ -11,12 +11,11 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseMarkdownFrontmatter } from "@warpgogol/werkstatt-shared/content";
 import type { NotausgangFeatureNote } from "@warpgogol/werkstatt-engine/schemas";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export type FeatureVerdict = NotausgangFeatureNote["verdict"];
 
@@ -84,19 +83,19 @@ function signalForFeatureId(featureId: string): FeatureSignal {
   };
 }
 
-async function readSystemMdFrontmatter(siteDir: string): Promise<Record<string, unknown>> {
+async function readSystemMdFrontmatter(siteDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<Record<string, unknown>> {
   const systemMd = path.join(siteDir, "src", "content", "system.md");
-  if (!existsSync(systemMd)) return {};
-  const raw = await fs.readFile(systemMd, "utf8");
+  if (!await io.exists(systemMd)) return {};
+  const raw = await io.readFile(systemMd);
   return parseMarkdownFrontmatter(raw).data;
 }
 
-async function readEntitlements(siteDir: string): Promise<string[]> {
+async function readEntitlements(siteDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
   // Opportunistic only: entitlements.generated.yaml is gitignored in cache clones.
   const p = path.join(siteDir, "src", "entitlements.generated.yaml");
-  if (!existsSync(p)) return [];
+  if (!await io.exists(p)) return [];
   try {
-    const parsed = parseYaml(await fs.readFile(p, "utf8")) as { features?: unknown };
+    const parsed = parseYaml(await io.readFile(p)) as { features?: unknown };
     return Array.isArray(parsed.features) ? parsed.features.map(String) : [];
   } catch {
     return [];
@@ -108,7 +107,7 @@ async function readEntitlements(siteDir: string): Promise<string[]> {
  * Any disagreement between declared and detected signals resolves to needs-backend.
  */
 export async function buildFeatureInventory(
-  input: FeatureInventoryInput,
+  input: FeatureInventoryInput, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NotausgangFeatureNote[]> {
   const detected = new Map<string, FeatureSignal>();
 
@@ -134,10 +133,10 @@ export async function buildFeatureInventory(
     typeof deployment?.adapter === "string" && deployment.adapter.includes("worker");
 
   // Source 3: content-tree markers
-  const portalContent = existsSync(path.join(input.siteDir, "src", "content", "portal"));
+  const portalContent = await io.exists(path.join(input.siteDir, "src", "content", "portal"));
 
   // Source 4: release dist markers — _worker.js proves worker-level serving
-  const distHasWorker = existsSync(path.join(input.distDir, "_worker.js"));
+  const distHasWorker = await io.exists(path.join(input.distDir, "_worker.js"));
 
   if (workerAdapter || distHasWorker) {
     if (!detected.has("worker-serving")) {

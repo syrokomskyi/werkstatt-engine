@@ -14,6 +14,7 @@ import path from "node:path";
 import os from "node:os";
 import { runSternsystemStatus } from "../sternsystem-status.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let testRoot: string;
 let workspaceRoot: string;
@@ -37,7 +38,7 @@ function makeInput(flags: Record<string, boolean | string | string[]> = {}): Ker
 }
 
 function makeContext(): KernelRuntimeContext {
-  return { workspaceRoot, logger: console } as unknown as KernelRuntimeContext;
+  return { io: createDefaultIO().io, workspaceRoot, logger: console } as unknown as KernelRuntimeContext;
 }
 
 async function writeSystemState(state: Record<string, unknown>): Promise<void> {

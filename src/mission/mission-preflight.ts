@@ -22,7 +22,6 @@
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
   CheckResult,
@@ -35,6 +34,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeRegisteredCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const PREFLIGHT_CHECKS = ["ownership.sync.validate", "generated.stale.validate"] as const;
 
@@ -94,7 +94,7 @@ export async function runMissionPreflight(
   }
 
   const cacheClonePath = resolveCacheClonePath(context.workspaceRoot, systemId);
-  if (!existsSync(cacheClonePath)) {
+  if (!await context.io.exists(cacheClonePath)) {
     return {
       data: {
         command: "mission.preflight",

@@ -25,13 +25,13 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { byteHashFile } from "@warpgogol/werkstatt-engine/fingerprint";
 
 import type { CacheLayer } from "./cache-layer.ts";
 import { listRfcFiles, parseRfcFile, type ParsedRfc } from "@warpgogol/forge/os/rfc";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_CACHE_NAMESPACE = "rfc_entries";
 export const RFC_CACHE_SCHEMA_VERSION = 1;
@@ -135,7 +135,7 @@ async function getCachedEntryForFile(
   cache: CacheLayer,
   rfcDirPath: string,
   fileName: string,
-  forceRefresh: boolean,
+  forceRefresh: boolean, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<RfcCacheEntry | undefined> {
   if (!forceRefresh && cache.available) {
     const cached = await cache.get(RFC_CACHE_NAMESPACE, fileName);
@@ -147,7 +147,7 @@ async function getCachedEntryForFile(
       } else {
         const filePath = join(rfcDirPath, fileName);
         try {
-          const fileStat = await stat(filePath);
+          const fileStat = await io.stat(filePath);
           if (
             fileStat.mtimeMs === cachedEntry.mtime &&
             cachedEntry.contentHash === cached.contentHash
@@ -167,8 +167,8 @@ async function getCachedEntryForFile(
   let fileContent: string;
   let mtime: number;
   try {
-    fileContent = await readFile(filePath, "utf-8");
-    const fileStat = await stat(filePath);
+    fileContent = await io.readFile(filePath);
+    const fileStat = await io.stat(filePath);
     mtime = fileStat.mtimeMs;
   } catch {
     return undefined;

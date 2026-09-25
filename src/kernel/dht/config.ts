@@ -25,9 +25,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dhtConfigSchema, type DHTConfig } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CONFIG_FILENAME = "werkstatt.dht.json";
 
@@ -40,16 +40,16 @@ export function validateDhtConfig(config: unknown): DHTConfig {
   return dhtConfigSchema.parse(config);
 }
 
-export async function loadDhtConfig(workspaceRoot: string): Promise<DHTConfig> {
+export async function loadDhtConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<DHTConfig> {
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
-  const raw = await readFile(configPath, "utf8");
+  const raw = await io.readFile(configPath);
   const parsed: unknown = JSON.parse(raw);
   return validateDhtConfig(parsed);
 }
 
 export async function createDhtConfig(
   workspaceRoot: string,
-  options: { bind?: string; bootstrap?: string[] },
+  options: { bind?: string; bootstrap?: string[] }, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DHTConfig> {
   const config: DHTConfig = {
     bindAddr: options.bind ?? DEFAULT_BIND_ADDR,
@@ -61,7 +61,7 @@ export async function createDhtConfig(
 
   const validated = validateDhtConfig(config);
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
-  await writeFile(configPath, JSON.stringify(validated, null, 2) + "\n", "utf8");
+  await io.writeFile(configPath, JSON.stringify(validated, null, 2) + "\n");
 
   return validated;
 }

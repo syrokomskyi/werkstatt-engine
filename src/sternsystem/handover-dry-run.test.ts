@@ -26,6 +26,7 @@ import {
 import { runSternsystemHandoverPrepare } from "./sternsystem-handover-prepare.ts";
 import { runSternsystemHandoverComplete } from "./sternsystem-handover-complete.ts";
 import { resolveAuthorizationPath } from "./handover.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 
@@ -46,6 +47,7 @@ function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 function makeContext(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       section: () => {},

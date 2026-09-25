@@ -19,10 +19,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { FingerprintFileResult, FingerprintOptions, FingerprintResult } from "./types.ts";
 import { normalizeFile } from "./normalizers/index.ts";
 import { normalizeFileStable } from "./normalizers/stable.ts";
@@ -31,9 +31,10 @@ import { normalizePathSep, shouldIgnore } from "./path-matcher.ts";
 export async function fingerprintFile(
   filePath: string,
   options: FingerprintOptions,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<FingerprintFileResult> {
   const absPath = path.resolve(filePath);
-  const bytes = await readFile(absPath);
+  const bytes = await io.readFileBytes(absPath);
 
   if (options.mode === "byte") {
     return {
@@ -72,15 +73,20 @@ export async function fingerprintFile(
   };
 }
 
-async function walkTree(root: string, ignore: string[], acc: string[]): Promise<void> {
-  const entries = await readdir(root, { withFileTypes: true });
+async function walkTree(
+  root: string,
+  ignore: string[],
+  acc: string[],
+  io: WorkspaceIO,
+): Promise<void> {
+  const entries = await io.readdir(root);
   for (const entry of entries) {
     const abs = path.join(root, entry.name);
     const rel = path.relative(process.cwd(), abs);
     if (shouldIgnore(rel, ignore)) continue;
-    if (entry.isDirectory()) {
-      await walkTree(abs, ignore, acc);
-    } else if (entry.isFile()) {
+    if (entry.isDirectory) {
+      await walkTree(abs, ignore, acc, io);
+    } else if (entry.isFile) {
       acc.push(abs);
     }
   }
@@ -89,18 +95,19 @@ async function walkTree(root: string, ignore: string[], acc: string[]): Promise<
 export async function fingerprintTree(
   root: string,
   options: FingerprintOptions,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<FingerprintResult> {
   const absRoot = path.resolve(root);
   const ignore = options.ignore ?? [];
   const files: string[] = [];
-  await walkTree(absRoot, ignore, files);
+  await walkTree(absRoot, ignore, files, io);
   files.sort();
 
   const results: FingerprintFileResult[] = [];
   const warnings: string[] = [];
   for (const file of files) {
     try {
-      const result = await fingerprintFile(file, options);
+      const result = await fingerprintFile(file, options, io);
       results.push(result);
     } catch (err) {
       const relPath = normalizePathSep(path.relative(absRoot, file));
@@ -108,7 +115,7 @@ export async function fingerprintTree(
       const warning = `fingerprintTree: ${options.mode} normalization failed for ${relPath} (${message}); falling back to byte hash`;
       console.warn(warning);
       warnings.push(warning);
-      const bytes = await readFile(file);
+      const bytes = await io.readFileBytes(file);
       results.push({
         path: normalizePathSep(file),
         mode: "byte",

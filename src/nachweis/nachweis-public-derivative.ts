@@ -19,8 +19,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -31,6 +30,7 @@ import {
   parseMarkdownFrontmatter,
   stringifyMarkdownFrontmatter,
 } from "@warpgogol/werkstatt-shared/content";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import {
@@ -82,17 +82,17 @@ export async function runNachweisPublicDerivative(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     throw new Error(
       `[nachweis.public-derivative] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
   }
 
-  if (!existsSync(filePath)) {
+  if (!await context.io.exists(filePath)) {
     throw new Error(`[nachweis.public-derivative] NOT_FOUND: file '${filePath}' not found`);
   }
 
-  const rawEvidence = await fs.readFile(evidenceFile, "utf8");
+  const rawEvidence = await context.io.readFile(evidenceFile);
   const { data: evidenceData, content: evidenceContent } = parseMarkdownFrontmatter(rawEvidence);
 
   const recordId = (evidenceData.recordId as string | undefined) ?? `nr_${slug}`;
@@ -138,8 +138,8 @@ export async function runNachweisPublicDerivative(
     };
   }
 
-  const fileBuffer = await fs.readFile(filePath);
-  await uploadToR2(new Uint8Array(fileBuffer), r2Path);
+  const fileBuffer = await context.io.readFileBytes(filePath);
+  await uploadToR2(fileBuffer, r2Path);
 
   items.public = {
     sha256: publicDerivativeSha256,
@@ -149,7 +149,7 @@ export async function runNachweisPublicDerivative(
   evidenceData.items = items;
 
   const updatedContent = stringifyMarkdownFrontmatter(evidenceContent, evidenceData);
-  await fs.writeFile(evidenceFile, updatedContent, "utf8");
+  await context.io.writeFile(evidenceFile, updatedContent);
 
   const operationId = generateOperationId();
   await acquireLock(

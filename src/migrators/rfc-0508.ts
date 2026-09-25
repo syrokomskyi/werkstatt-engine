@@ -14,10 +14,10 @@ and consent placeholder fields if absent. Idempotent: running twice produces the
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0508_MIGRATOR_ID = "rfc-0508";
 
@@ -66,12 +66,12 @@ export const rfc0508Migrator: Migrator = {
   toVersion: "4.16.0",
   description:
     "Add participantType: human, status, visibility, relationshipType, and consent placeholder to Person records in people/<lang>/*.md. Advances migratorCursor for RFC-0508 (Participant data model).",
-  transform: async (data: SternsystemData, ctx: MigrationContext) => {
+  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
     const peopleBaseDir = path.join(data.rootPath, "src", "content", "people");
 
     let langDirs: string[];
     try {
-      langDirs = await fs.readdir(peopleBaseDir);
+      langDirs = (await io.readdir(peopleBaseDir)).map(e => e.name);
     } catch {
       ctx.logger.info(`[rfc-0508] no people directory at ${peopleBaseDir} — skipping`);
       langDirs = [];
@@ -79,15 +79,15 @@ export const rfc0508Migrator: Migrator = {
 
     for (const lang of langDirs) {
       const langPath = path.join(peopleBaseDir, lang);
-      const stat = await fs.stat(langPath).catch(() => null);
-      if (!stat?.isDirectory()) continue;
+      const stat = await io.stat(langPath).catch(() => null);
+      if (!stat?.isDirectory) continue;
 
-      const peopleFiles = (await fs.readdir(langPath)).filter((f) => f.endsWith(".md"));
+      const peopleFiles = (await io.readdir(langPath)).filter((f) => f.name.endsWith(".md"));
       for (const peopleFile of peopleFiles) {
-        const filePath = path.join(langPath, peopleFile);
+        const filePath = path.join(langPath, peopleFile.name);
         let content: string;
         try {
-          content = await fs.readFile(filePath, "utf-8");
+          content = await io.readFile(filePath);
         } catch {
           continue;
         }
@@ -144,7 +144,7 @@ export const rfc0508Migrator: Migrator = {
 
         if (modified) {
           try {
-            await fs.writeFile(filePath, updated, "utf-8");
+            await io.writeFile(filePath, updated);
             ctx.logger.info(`[rfc-0508] updated participant record: ${lang}/${peopleFile}`);
           } catch (err) {
             throw new MigrationError(

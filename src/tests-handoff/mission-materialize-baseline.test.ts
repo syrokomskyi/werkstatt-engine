@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockExecuteKernelCommand = vi.hoisted(() => ({
   calls: [] as Array<{ commandName: string; argv?: string[] }>,
@@ -228,6 +229,7 @@ test("RFC-0617: mission.materialize calls compass.audit.baseline with --workpiec
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -264,6 +266,7 @@ test("RFC-0617: compass.audit.baseline failure is non-fatal (materialization suc
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;

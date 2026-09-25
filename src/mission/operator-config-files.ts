@@ -17,9 +17,8 @@ Follows the same pattern as env-persist.ts (RFC-0822) but for non-env operator c
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface OperatorConfigPersistResult {
   copied: string[];
@@ -33,7 +32,7 @@ export const OPERATOR_CONFIG_FILES = [
 
 export async function persistOperatorConfigFiles(
   workpieceDir: string,
-  cacheCloneDir: string,
+  cacheCloneDir: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<OperatorConfigPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -41,10 +40,10 @@ export async function persistOperatorConfigFiles(
   for (const entry of OPERATOR_CONFIG_FILES) {
     const src = path.join(workpieceDir, entry);
     const dest = path.join(cacheCloneDir, entry);
-    if (!existsSync(src)) continue;
+    if (!await io.exists(src)) continue;
     try {
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.copyFile(src, dest);
+      await io.mkdir(path.dirname(dest));
+      await io.copyFile(src, dest);
       copied.push(entry);
     } catch {
       skipped.push(entry);
@@ -56,7 +55,7 @@ export async function persistOperatorConfigFiles(
 
 export async function restoreOperatorConfigFiles(
   cacheCloneDir: string,
-  workpieceDir: string,
+  workpieceDir: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<OperatorConfigPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -64,10 +63,10 @@ export async function restoreOperatorConfigFiles(
   for (const entry of OPERATOR_CONFIG_FILES) {
     const src = path.join(cacheCloneDir, entry);
     const dest = path.join(workpieceDir, entry);
-    if (!existsSync(src)) continue;
+    if (!await io.exists(src)) continue;
     try {
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.copyFile(src, dest);
+      await io.mkdir(path.dirname(dest));
+      await io.copyFile(src, dest);
       copied.push(entry);
     } catch {
       skipped.push(entry);

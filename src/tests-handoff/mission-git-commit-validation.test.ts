@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   validatorResults: {} as Record<string, { ok: boolean; exitCode: number; summary: string }>,
@@ -231,7 +232,7 @@ test("validator fails — commit blocked, no new commit in git log", async () =>
   const input = {
     flags: { mission: "test-system-m000001", message: "add offering" },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   const result = await runMissionGitCommit(input, context);
   expect(result.exitCode).toBe(1);
@@ -261,7 +262,7 @@ test("no content files — no validators run, commit succeeds", async () => {
   const input = {
     flags: { mission: "test-system-m000001", message: "update config" },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   const result = await runMissionGitCommit(input, context);
   expect(result.exitCode ?? 0).toBe(0);
@@ -297,7 +298,7 @@ test("staged changes preserved on validation failure", async () => {
   const input = {
     flags: { mission: "test-system-m000001", message: "add offering" },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   await runMissionGitCommit(input, context);
 
@@ -341,7 +342,7 @@ test("RFC-1095: --rfc records CHANGE_SUMMARY item and writes X-RFC trailer (AC-1
       rfc: "RFC-1095",
     },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   const result = await runMissionGitCommit(input, context);
   expect(result.exitCode ?? 0).toBe(0);
@@ -367,7 +368,7 @@ test("RFC-1095: --adr writes X-ADR trailer", async () => {
   const input = {
     flags: { mission: "test-system-m000001", message: "chore: config tweak", adr: "ADR-0042" },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   const result = await runMissionGitCommit(input, context);
   expect(result.exitCode ?? 0).toBe(0);

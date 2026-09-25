@@ -22,12 +22,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
-import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -42,6 +39,7 @@ import {
   type AssessmentIngestResult,
 } from "./nachweis-io.ts";
 import { runNachweisAssessmentIngest } from "./nachweis-assessment-ingest.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -308,9 +306,11 @@ export function aggregateCategories(
 
 // ── Lighthouse runner ───────────────────────────────────────────────────────
 
-export async function checkChromeAvailable(): Promise<boolean> {
+export async function checkChromeAvailable(
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   const chromePath = process.env.CHROME_PATH ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? null;
-  if (chromePath && existsSync(chromePath)) return true;
+  if (chromePath && (await io.exists(chromePath))) return true;
 
   const commonPaths = [
     "/usr/bin/google-chrome",
@@ -323,7 +323,7 @@ export async function checkChromeAvailable(): Promise<boolean> {
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
   ];
   for (const p of commonPaths) {
-    if (existsSync(p)) return true;
+    if (await io.exists(p)) return true;
   }
 
   return false;
@@ -357,12 +357,12 @@ function runLighthouseProcess(
       resolve({ exitCode: 124, stderr: `${stderr}\nTIMEOUT after ${timeoutMs}ms` });
     }, timeoutMs);
 
-    child.on("close", (code) => {
+    child.on("close", (code: number | null) => {
       clearTimeout(timer);
       resolve({ exitCode: code ?? 1, stderr });
     });
 
-    child.on("error", (err) => {
+    child.on("error", (err: Error) => {
       clearTimeout(timer);
       resolve({ exitCode: 1, stderr: `${stderr}\n${err.message}` });
     });
@@ -374,6 +374,7 @@ async function runLighthouseBatch(
   runs: number,
   workDir: string,
   timeoutPerRunMs: number,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<LighthouseRunResult[]> {
   const results: LighthouseRunResult[] = [];
 
@@ -389,7 +390,7 @@ async function runLighthouseBatch(
       );
     }
 
-    if (!existsSync(lhrPath)) {
+    if (!(await io.exists(lhrPath))) {
       throw new LighthouseBatchError(
         "LIGHTHOUSE_CANONICAL_BATCH_INCOMPLETE",
         `Run ${runIndex}/${runs} produced no LHR file at ${lhrPath}`,
@@ -398,7 +399,7 @@ async function runLighthouseBatch(
 
     let lhr: LhrJson;
     try {
-      const raw = await fs.readFile(lhrPath, "utf8");
+      const raw = await io.readFile(lhrPath);
       lhr = parseLhrJson(raw);
     } catch {
       throw new LighthouseBatchError(
@@ -450,6 +451,7 @@ async function writeMethodologyArtifact(
     requestedUrl: string;
     finalUrl: string;
   },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const methodologyPath = path.join(workDir, "methodology.json");
   const methodology = {
@@ -469,7 +471,7 @@ async function writeMethodologyArtifact(
       platform: process.platform,
     },
   };
-  await fs.writeFile(methodologyPath, JSON.stringify(methodology, null, 2), "utf8");
+  await io.writeFile(methodologyPath, JSON.stringify(methodology, null, 2));
   return methodologyPath;
 }
 
@@ -690,7 +692,7 @@ export async function runNachweisLighthouseMeasure(
     );
   }
 
-  const workDir = await mkdtemp(path.join(tmpdir(), "lighthouse-measure-"));
+  const workDir = await context.io.mkdtemp(path.join(tmpdir(), "lighthouse-measure-"));
   const timeoutPerRunMs = 120_000;
 
   try {
@@ -734,7 +736,7 @@ export async function runNachweisLighthouseMeasure(
     }
 
     const bundlePath = path.join(workDir, "assessment-bundle.json");
-    await fs.writeFile(bundlePath, JSON.stringify(bundle, null, 2), "utf8");
+    await context.io.writeFile(bundlePath, JSON.stringify(bundle, null, 2));
 
     logger.info(
       `[nachweis.measure.lighthouse] ${runs} runs complete, lighthouseVersion=${firstRun.lighthouseVersion}, delegating to nachweis.assessment.ingest`,
@@ -781,6 +783,6 @@ export async function runNachweisLighthouseMeasure(
       summary,
     };
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true });
+    await context.io.rm(workDir, { recursive: true });
   }
 }

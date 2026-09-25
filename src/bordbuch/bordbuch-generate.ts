@@ -12,8 +12,6 @@
 */
 
 import { dirname, join } from "node:path";
-import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -29,6 +27,7 @@ import {
 } from "@warpgogol/werkstatt-shared/surface/io";
 import type { SurfaceModuleContext } from "@warpgogol/werkstatt-shared/surface";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FREEZE_FILE = "src/surface/freeze.generated.yaml";
 
@@ -77,6 +76,7 @@ async function buildProjection(
   workspaceRoot: string,
   systemId: string,
   entries: BordbuchEntry[],
+  io: WorkspaceIO,
 ): Promise<BordbuchProjection> {
   const systemDir = await resolveBordbuchProjectionDir(workspaceRoot, systemId);
   const moduleContexts = await loadSurfaceModuleContexts(systemDir).catch(() => ({
@@ -102,8 +102,8 @@ async function buildProjection(
   let frozenScopes = 0;
   try {
     const freezePath = join(systemDir, FREEZE_FILE);
-    if (existsSync(freezePath)) {
-      const freeze = JSON.parse(await readFile(freezePath, "utf8")) as { frozen?: unknown[] };
+    if (await io.exists(freezePath)) {
+      const freeze = JSON.parse(await io.readFile(freezePath)) as { frozen?: unknown[] };
       frozenScopes = Array.isArray(freeze.frozen) ? freeze.frozen.length : 0;
     }
   } catch {
@@ -197,7 +197,7 @@ export async function runBordbuchGenerate(
 
   try {
     const entries = await readBordbuch(workspaceRoot, systemId);
-    const projection = await buildProjection(workspaceRoot, systemId, entries);
+    const projection = await buildProjection(workspaceRoot, systemId, entries, context.io);
 
     const projectionDir = await resolveBordbuchProjectionDir(workspaceRoot, systemId);
     const baseDir = join(projectionDir, "public", ".well-known");
@@ -205,9 +205,9 @@ export async function runBordbuchGenerate(
     const htmlPath = join(baseDir, "bordbuch", "index.html");
     const statusPath = join(projectionDir, "bordbuch", "status.generated.yaml");
 
-    await mkdir(dirname(jsonPath), { recursive: true });
-    await mkdir(dirname(htmlPath), { recursive: true });
-    await mkdir(dirname(statusPath), { recursive: true });
+    await context.io.mkdir(dirname(jsonPath));
+    await context.io.mkdir(dirname(htmlPath));
+    await context.io.mkdir(dirname(statusPath));
 
     const json = `${JSON.stringify(projection, null, 2)}\n`;
     const html = renderHtml(projection, entries);

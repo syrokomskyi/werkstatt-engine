@@ -28,9 +28,13 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { open, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { open } from "node:fs/promises";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import type { GitMeshSyncResult } from "./types.ts";
 import { loadOrCreateConfig } from "./config.ts";
 import {
@@ -44,31 +48,35 @@ import {
   gitRevParseHead,
   gitRevParseRemote,
 } from "./git-ops.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const LOCK_FILE = ".git/gitmesh.lock";
 const LAST_SYNC_FILE = ".git/gitmesh.last-sync";
 
 const STALE_LOCK_THRESHOLD_MS = 360_000; // 6 minutes — matches git operation timeout
 
-async function acquireLock(workspaceRoot: string): Promise<() => Promise<void>> {
+async function acquireLock(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<() => Promise<void>> {
   const lockPath = join(workspaceRoot, LOCK_FILE);
   try {
     const handle = await open(lockPath, "wx");
-    return async () => {
+    return async (io: WorkspaceIO = createDefaultIO().io) => {
       await handle.close();
-      await unlink(lockPath).catch(() => {});
+      await io.rm(lockPath).catch(() => {});
     };
   } catch {
     // Check if lock is stale (older than 6 minutes)
     try {
-      const lockContent = await readFile(lockPath, "utf8");
+      const lockContent = await io.readFile(lockPath);
       const lockTime = parseInt(lockContent.trim(), 10);
       if (!isNaN(lockTime) && Date.now() - lockTime > STALE_LOCK_THRESHOLD_MS) {
-        await unlink(lockPath);
+        await io.rm(lockPath);
         const handle = await open(lockPath, "wx");
-        return async () => {
+        return async (io: WorkspaceIO = createDefaultIO().io) => {
           await handle.close();
-          await unlink(lockPath).catch(() => {});
+          await io.rm(lockPath).catch(() => {});
         };
       }
     } catch {
@@ -91,7 +99,7 @@ export async function runGitMeshSync(
 ): Promise<KernelCommandResult<GitMeshSyncResult>> {
   const { workspaceRoot } = context;
   const releaseLock = await acquireLock(workspaceRoot);
-  await writeFile(join(workspaceRoot, LOCK_FILE), String(Date.now()), "utf8").catch(() => {});
+  await context.io.writeFile(join(workspaceRoot, LOCK_FILE), String(Date.now())).catch(() => {});
 
   try {
     const config = await loadOrCreateConfig(workspaceRoot);
@@ -288,7 +296,7 @@ export async function runGitMeshSync(
 
     // Write last-sync timestamp
     const lastSyncPath = join(workspaceRoot, LAST_SYNC_FILE);
-    await writeFile(lastSyncPath, new Date().toISOString(), "utf8");
+    await context.io.writeFile(lastSyncPath, new Date().toISOString());
 
     return {
       data: {

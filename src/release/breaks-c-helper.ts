@@ -13,19 +13,18 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export async function checkBreaksCDeclaration(
   workspaceRoot: string,
-  rfcId: string,
+  rfcId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<boolean> {
   const rfcPath = path.join(workspaceRoot, "docs", "rfcs", `rfc-${rfcId}.md`);
-  if (!existsSync(rfcPath)) {
+  if (!await io.exists(rfcPath)) {
     return false;
   }
-  const rfcRaw = await fs.readFile(rfcPath, "utf8");
+  const rfcRaw = await io.readFile(rfcPath);
   const fmMatch = rfcRaw.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) {
     return false;

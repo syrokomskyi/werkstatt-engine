@@ -953,7 +953,7 @@ export async function runMissionValidate(
   if (!force && !effectiveFast) {
     const distributionMetaPath = path.join(distributionDir, "build-input-hash.json");
     const distributionDistDir = path.join(distributionDir, "dist");
-    if (existsSync(distributionMetaPath) && existsSync(distributionDistDir)) {
+    if (await context.io.exists(distributionMetaPath) && await context.io.exists(distributionDistDir)) {
       let canReuse = false;
       let storedHash: string | null = null;
       try {
@@ -979,7 +979,7 @@ export async function runMissionValidate(
         logger.info(`  Distribution reuse: build-input-hash matched — skipping build cycle`);
         // Copy distribution/dist/ to workpiece/dist/ if missing
         const workpieceDistDir = path.join(workpieceDir, "dist");
-        if (!existsSync(workpieceDistDir)) {
+        if (!await context.io.exists(workpieceDistDir)) {
           logger.info(`  Copying distribution/dist/ to workpiece/dist/…`);
           await copyDir(distributionDistDir, workpieceDistDir);
         }
@@ -989,7 +989,7 @@ export async function runMissionValidate(
         let reusedSitemapHash = "sha256:reused";
         try {
           const buildManifestPath = path.join(distributionDir, "build-manifest.json");
-          if (existsSync(buildManifestPath)) {
+          if (await context.io.exists(buildManifestPath)) {
             const manifestData = JSON.parse(await fs.readFile(buildManifestPath, "utf8"));
             reusedRouteCount = manifestData.routeCount ?? 0;
             reusedSitemapHash = manifestData.sitemapHash ?? "sha256:reused";
@@ -1401,7 +1401,7 @@ export async function runMissionValidate(
 
   // RFC-0522: warn on dirty cache clone — reconcile will fail until resolved
   const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
-  if (existsSync(path.join(systemDir, ".git"))) {
+  if (await context.io.exists(path.join(systemDir, ".git"))) {
     const cacheDirtyCheck = isWorkpieceDirty(systemDir);
     if (cacheDirtyCheck.dirty) {
       logger.warn(
@@ -1525,7 +1525,7 @@ export async function runMissionBuild(
         buildRouteCount = Math.max(...nums, 0);
       }
       const sitemapPath = path.join(workpieceDir, "dist", "sitemap-index.xml");
-      if (existsSync(sitemapPath)) {
+      if (await context.io.exists(sitemapPath)) {
         const { byteHashFile } = await import("@warpgogol/werkstatt-engine/fingerprint");
         buildSitemapHash = await byteHashFile(sitemapPath);
       }
@@ -1735,7 +1735,7 @@ export async function runMissionReconcile(
   // Check validation has passed
   const evidenceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "evidence");
   const validationPath = path.join(evidenceDir, "validation-report.json");
-  if (!existsSync(validationPath)) {
+  if (!await context.io.exists(validationPath)) {
     throw new Error(
       `[mission.reconcile] mission '${missionId}' has not passed validation — run mission.validate first`,
     );

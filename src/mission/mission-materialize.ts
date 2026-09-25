@@ -286,7 +286,7 @@ async function generateFullBoilerplate(
   // Resolve domain from system.md in the staging directory
   const systemMdPath = path.join(stagingDir, "src", "content", "system.md");
   let domain = "";
-  if (existsSync(systemMdPath)) {
+  if (await context.io.exists(systemMdPath)) {
     try {
       const raw = readFileSync(systemMdPath, "utf8");
       const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
@@ -359,7 +359,7 @@ async function generateFullBoilerplate(
   logger.info(`  Wrote ${templateFiles.length} template files`);
 
   // Validate system.md presence before running generators (RFC-0389 failure modes)
-  if (!existsSync(systemMdPath)) {
+  if (!(await context.io.exists(systemMdPath))) {
     throw new Error(
       `[mission.materialize] system.md not found in staging directory — Sternsystem data set is incomplete`,
     );
@@ -442,7 +442,7 @@ async function generateFullBoilerplate(
   // .env.example has empty values with # How to obtain: instructions;
   // .env is the single template for the operator to fill in.
   const envExamplePath = path.join(stagingDir, ".env.example");
-  if (existsSync(envExamplePath)) {
+  if (await context.io.exists(envExamplePath)) {
     const envExampleContent = await fs.readFile(envExamplePath, "utf8");
     await atomicWriteFile(path.join(stagingDir, ".env"), envExampleContent);
     regeneratedFiles.push(".env.example");
@@ -910,9 +910,9 @@ export async function runMissionMaterializeInternal(
   if (
     manifest.materializedAt &&
     !force &&
-    existsSync(workpieceDirForRescue) &&
-    existsSync(path.join(workpieceDirForRescue, ".git")) &&
-    !existsSync(path.join(workpieceDirForRescue, ".closed"))
+    (await context.io.exists(workpieceDirForRescue)) &&
+    (await context.io.exists(path.join(workpieceDirForRescue, ".git"))) &&
+    !(await context.io.exists(path.join(workpieceDirForRescue, ".closed")))
   ) {
     let dirty = false;
     try {
@@ -970,7 +970,7 @@ export async function runMissionMaterializeInternal(
   // Non-fatal: non-git cache clones skip hook installation silently.
   let bordbuchHookInstalled = false;
   try {
-    const hookResult = await installBordbuchPreCommitHook(systemDir, manifest.systemId);
+    const hookResult = await installBordbuchPreCommitHook(systemDir, manifest.systemId, context.io);
     bordbuchHookInstalled = hookResult.installed;
     if (hookResult.installed) {
       logger.info(`  Installed bordbuch pre-commit hook in cache clone`);
@@ -983,7 +983,7 @@ export async function runMissionMaterializeInternal(
 
   const pinPath = path.join(systemDir, "system.pin.json");
 
-  if (!existsSync(pinPath)) {
+  if (!(await context.io.exists(pinPath))) {
     throw new Error(`[mission.materialize] system '${manifest.systemId}' has no system.pin.json`);
   }
 

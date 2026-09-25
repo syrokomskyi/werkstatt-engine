@@ -22,9 +22,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import path from "node:path";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { execSync } from "node:child_process";
 import type { DeploymentAdapter, PropagateInput, HealthInput } from "./adapter.ts";
 import type {
   DeploymentStaticConfig,
@@ -55,6 +52,7 @@ import {
   signLatestBuildArtifacts,
 } from "../integrity/signing.ts";
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const noopLogger = {
   info: (_m: string) => {},
@@ -268,6 +266,7 @@ async function runHealthCheckWithRetry(
 export async function executeDeployPhases(
   ctx: DeployExecutionContext,
   channel: "dev" | "alt" | "main",
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DeployExecutionResult> {
   const channelConfig = getChannelConfig(ctx.systemConfig, channel);
   const deploymentUrl = channelConfig.url ?? "";
@@ -317,13 +316,17 @@ export async function executeDeployPhases(
     if (ctx.releaseId) {
       const releaseDir = path.join(ctx.workspaceRoot, "releases", ctx.releaseId);
       const distDir = path.join(releaseDir, "dist");
-      if (!existsSync(distDir)) {
+      if (!(await io.exists(distDir))) {
         try {
-          execSync("pnpm build", {
+          const buildResult = await io.exec("sh", ["-c", "pnpm build"], {
             cwd: ctx.workspaceRoot,
-            stdio: "pipe",
-            timeout: 600000,
+            timeoutMs: 600000,
           });
+          if (buildResult.exitCode !== 0) {
+            throw new Error(
+              `pnpm build exited ${buildResult.exitCode}: ${buildResult.stderr.slice(-400)}`,
+            );
+          }
         } catch (err) {
           failingPhase = "build";
           throw new Error(`Build failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -334,8 +337,8 @@ export async function executeDeployPhases(
 
       buildIdentityPath = path.join(distDir, "client", ".well-known", "build-identity.json");
       try {
-        if (existsSync(buildIdentityPath)) {
-          const existing = JSON.parse(await fs.readFile(buildIdentityPath, "utf8"));
+        if (await io.exists(buildIdentityPath)) {
+          const existing = JSON.parse(await io.readFile(buildIdentityPath));
           localDistTreeHash = existing.distTreeHash ?? "";
         }
         if (!localDistTreeHash) {
@@ -356,7 +359,7 @@ export async function executeDeployPhases(
     }
 
     // --- RFC-0931: Signing phase (non-fatal if no key configured) ---
-    if (ctx.releaseId && buildIdentityPath && existsSync(buildIdentityPath)) {
+    if (ctx.releaseId && buildIdentityPath && (await io.exists(buildIdentityPath))) {
       try {
         const secretsEnv = ctx.secretsFilePath ? await sourceDotenv(ctx.secretsFilePath) : {};
         const signEnv = { ...filterEnv(process.env), ...secretsEnv };
@@ -372,7 +375,7 @@ export async function executeDeployPhases(
               privateKeyPem = privateKeyEnv;
               privateKeyBytes = await loadPrivateKey({ pem: privateKeyEnv });
             } else {
-              privateKeyPem = await fs.readFile(privateKeyPath!, "utf8");
+              privateKeyPem = await io.readFile(privateKeyPath!);
               privateKeyBytes = await loadPrivateKey({
                 filePath: privateKeyPath!,
                 encoding: "pem",
@@ -585,9 +588,9 @@ export async function executeDeployPhases(
         );
         const metadataPath = path.join(evidenceDir, "evidence-metadata.json");
         const studyRunPath = path.join(evidenceDir, "study-run.json");
-        if (existsSync(metadataPath) && existsSync(studyRunPath)) {
-          const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8"));
-          const studyRun = JSON.parse(await fs.readFile(studyRunPath, "utf8"));
+        if ((await io.exists(metadataPath)) && (await io.exists(studyRunPath))) {
+          const metadata = JSON.parse(await io.readFile(metadataPath));
+          const studyRun = JSON.parse(await io.readFile(studyRunPath));
           if (metadata.commitSha !== ctx.commitSha || studyRun.missionId !== ctx.missionId) {
             failingPhase = "axiom-evidence-gate";
             throw new Error(
@@ -698,7 +701,7 @@ export async function executeDeployPhases(
       buildSkipped,
       buildIdentity: {
         releaseId: ctx.releaseId ?? "",
-        written: existsSync(buildIdentityPath),
+        written: await io.exists(buildIdentityPath),
         path: buildIdentityPath,
       },
       releaseSignResult,
@@ -735,7 +738,7 @@ export async function executeDeployPhases(
       buildSkipped,
       buildIdentity: {
         releaseId: ctx.releaseId ?? "",
-        written: existsSync(buildIdentityPath),
+        written: await io.exists(buildIdentityPath),
         path: buildIdentityPath,
       },
       releaseSignResult,

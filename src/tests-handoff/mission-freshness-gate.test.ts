@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockState = vi.hoisted(() => ({
   validateResult: {
@@ -241,6 +242,7 @@ test("freshness gate: passes when workpiece HEAD matches workpieceHeadAtReconcil
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -272,6 +274,7 @@ test("freshness gate: blocks when workpiece HEAD differs from workpieceHeadAtRec
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -296,6 +299,7 @@ test("freshness gate: fails closed when reconciliation report is missing", async
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -326,6 +330,7 @@ test("freshness gate: blocks when report lacks workpieceHeadAtReconcile field", 
     flags: { mission: "test-system-m000001", actor: "test-agent" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
@@ -359,6 +364,7 @@ test("freshness gate: --skip-reconcile-check bypasses the gate", async () => {
     },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

@@ -24,7 +24,6 @@ import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import crypto from "node:crypto";
 import { GroupedReleaseSchema, type ClassifiedCommit, type GroupedRelease } from "../types.ts";
@@ -78,7 +77,7 @@ export async function groupCommits(
     .update(filtered.map((c) => c.hash).join(","))
     .digest("hex");
   const promptFile = join(ctx.promptsDir, "grouper.md");
-  const promptHash = await hashPromptFile(promptFile);
+  const promptHash = await hashPromptFile(promptFile, ctx.io);
   const key = buildCacheKey({
     treeHash: rawHash,
     files: filtered.map((c) => c.module),
@@ -93,7 +92,7 @@ export async function groupCommits(
     if (p.success) return p.data;
   }
 
-  const systemPrompt = await readFile(promptFile, "utf-8").catch(() => DEFAULT_GROUPER_PROMPT);
+  const systemPrompt = await ctx.io.readFile(promptFile).catch(() => DEFAULT_GROUPER_PROMPT);
   const client =
     ctx.llmProvider === "anthropic"
       ? createAnthropic({ apiKey: ctx.llmApiKey })(ctx.llmModel)

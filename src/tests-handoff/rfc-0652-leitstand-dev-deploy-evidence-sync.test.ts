@@ -12,8 +12,10 @@
 import { test, expect } from "vitest";
 import { runLeitstandDevDeploy } from "../leitstand/leitstand-commands.ts";
 import type { KernelRuntimeContext, KernelCommandInput } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const context = {
+  io: createDefaultIO().io,
   workspaceRoot: "/tmp",
   logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 } as unknown as KernelRuntimeContext;

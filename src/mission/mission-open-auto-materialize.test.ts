@@ -95,6 +95,7 @@ import {
 } from "../sternsystem/registry-io.ts";
 import { runMissionMaterializeInternal } from "./mission-materialize.ts";
 import { commitWerkstattSideEffects } from "../werkstatt/index.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockAppendAndCommit = vi.mocked(appendAndCommitBordbuch);
 const mockReadSystemConfig = vi.mocked(readSystemConfig);
@@ -149,6 +150,7 @@ afterEach(async () => {
 
 function makeContext() {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

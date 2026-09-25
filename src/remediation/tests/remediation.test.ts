@@ -27,6 +27,7 @@ import type {
   KernelCommandDefinition,
 } from "@warpgogol/werkstatt-shared/kernel";
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function makeCommand(
   name: string,
@@ -56,6 +57,7 @@ function makeContext(
   };
   const actualState = buildActualState([mod]);
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     actualState,
     dryRun: false,

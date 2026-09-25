@@ -24,10 +24,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import { loadDhtConfig } from "./config.ts";
 import { loadCache } from "./cache.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const IDENTITY_FILENAME = "werkstatt.identity.json";
 const SWIM_FILENAME = "werkstatt.swim.json";
@@ -64,7 +64,7 @@ export async function runDhtStatus(
   // Check identity
   let identityBootstrapped = false;
   try {
-    await readFile(join(workspaceRoot, IDENTITY_FILENAME), "utf8");
+    await context.io.readFile(join(workspaceRoot, IDENTITY_FILENAME));
     identityBootstrapped = true;
   } catch {
     // Not bootstrapped
@@ -73,7 +73,7 @@ export async function runDhtStatus(
   // Check SWIM
   let swimConfigured = false;
   try {
-    await readFile(join(workspaceRoot, SWIM_FILENAME), "utf8");
+    await context.io.readFile(join(workspaceRoot, SWIM_FILENAME));
     swimConfigured = true;
   } catch {
     // Not configured

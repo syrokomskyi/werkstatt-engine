@@ -22,6 +22,7 @@ import type {
   KernelCommandInput,
   KernelFlagValue,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // Track executeKernelCommand calls to verify unprotect/protect invocations
 let executeKernelCommandCalls: Array<{ commandName: string; argv: string[] }> = [];
@@ -98,6 +99,7 @@ const { readSystemStateSmart } = await import("../sternsystem/registry-io.ts");
 const mockReadSystemStateSmart = readSystemStateSmart as unknown as ReturnType<typeof vi.fn>;
 
 const context = {
+  io: createDefaultIO().io,
   workspaceRoot: "/tmp/test-workspace-0938",
   logger: {
     info: () => {},

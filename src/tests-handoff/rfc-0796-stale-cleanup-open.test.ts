@@ -14,6 +14,7 @@ import { join, basename } from "node:path";
 import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // Mock bordbuch validation to bypass pre-flight gate (we're testing stale entry cleanup, not bordbuch)
 vi.mock("../bordbuch/bordbuch-io.ts", () => ({
@@ -150,6 +151,7 @@ function makeInput(): KernelCommandInput {
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;

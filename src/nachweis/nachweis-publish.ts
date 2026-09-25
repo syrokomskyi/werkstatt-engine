@@ -21,8 +21,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -34,6 +33,7 @@ import {
   parseMarkdownFrontmatter,
   stringifyMarkdownFrontmatter,
 } from "@warpgogol/werkstatt-shared/content";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import {
@@ -82,21 +82,21 @@ export async function runNachweisPublish(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     throw new Error(
       `[nachweis.publish] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
   }
 
-  const rawEvidence = await fs.readFile(evidenceFile, "utf8");
+  const rawEvidence = await context.io.readFile(evidenceFile);
   const { data: evidenceData, content: evidenceContent } = parseMarkdownFrontmatter(rawEvidence);
 
   // Read Consent entity
   const consentDir = resolvePbpEntityDir(cachePath, lang, "consent");
   const consentFile = path.join(consentDir, `${slug}.md`);
   let consentData: Record<string, unknown> | undefined;
-  if (existsSync(consentFile)) {
-    const rawConsent = await fs.readFile(consentFile, "utf8");
+  if (await context.io.exists(consentFile)) {
+    const rawConsent = await context.io.readFile(consentFile);
     consentData = parseMarkdownFrontmatter(rawConsent).data;
   }
 
@@ -149,7 +149,7 @@ export async function runNachweisPublish(
   evidenceData.publication = publication;
 
   const updatedContent = stringifyMarkdownFrontmatter(evidenceContent, evidenceData);
-  await fs.writeFile(evidenceFile, updatedContent, "utf8");
+  await context.io.writeFile(evidenceFile, updatedContent);
 
   // Append Bordbuch entry
   const operationId = generateOperationId();

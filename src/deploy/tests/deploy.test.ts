@@ -33,11 +33,13 @@ import { runDeployAtomicRollback } from "../atomic-rollback.ts";
 import { runDeployArtifactGc } from "../artifact-gc.ts";
 import { runDeployStatus } from "../deploy-status.ts";
 import type { ArtifactManifest } from "../types.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 
 function mockContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},
@@ -182,8 +184,8 @@ test("deploy.atomic.swap: first deploy creates current symlink, no previous", as
   expect(result.data?.swapped).toBe(true);
   expect(result.data?.newHash).toBe(hash);
   expect(result.data?.previousHash).toBeNull();
-  expect(readSymlinkBasename(currentSymlinkPath(tmpDir))).toBe(hash);
-  expect(readSymlinkBasename(previousSymlinkPath(tmpDir))).toBeNull();
+  expect(await readSymlinkBasename(currentSymlinkPath(tmpDir))).toBe(hash);
+  expect(await readSymlinkBasename(previousSymlinkPath(tmpDir))).toBeNull();
 });
 
 test("deploy.atomic.swap: second deploy updates current and creates previous", async () => {
@@ -197,8 +199,8 @@ test("deploy.atomic.swap: second deploy updates current and creates previous", a
   expect(result.data?.swapped).toBe(true);
   expect(result.data?.newHash).toBe(hash2);
   expect(result.data?.previousHash).toBe(hash1);
-  expect(readSymlinkBasename(currentSymlinkPath(tmpDir))).toBe(hash2);
-  expect(readSymlinkBasename(previousSymlinkPath(tmpDir))).toBe(hash1);
+  expect(await readSymlinkBasename(currentSymlinkPath(tmpDir))).toBe(hash2);
+  expect(await readSymlinkBasename(previousSymlinkPath(tmpDir))).toBe(hash1);
 });
 
 test("deploy.atomic.swap: rejects corrupted artifact with hash-mismatch", async () => {
@@ -223,7 +225,7 @@ test("deploy.atomic.rollback: rolls back to previous artifact", async () => {
 
   expect(result.data?.swapped).toBe(true);
   expect(result.data?.newHash).toBe(hash1);
-  expect(readSymlinkBasename(currentSymlinkPath(tmpDir))).toBe(hash1);
+  expect(await readSymlinkBasename(currentSymlinkPath(tmpDir))).toBe(hash1);
 });
 
 test("deploy.atomic.rollback: fails with no-previous-artifact on first deploy", async () => {

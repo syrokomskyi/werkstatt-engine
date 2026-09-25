@@ -13,7 +13,6 @@ cross-referencing validator rules[] declarations to identify uncovered ruleIds.
 </CHANGE_SUMMARY>
 */
 
-import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "../kernel/generated-marker.ts";
@@ -24,6 +23,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CATALOG_RELATIVE_PATH = join("docs", "remediation-catalog.generated.yaml");
 
@@ -86,7 +86,7 @@ export async function runRemediationCatalogGenerate(
     ownerCommand: "remediation.catalog.generate",
   });
   const yaml = yamlStringify(file, { sortMapEntries: false });
-  await mkdir(dirname(catalogPath), { recursive: true });
+  await context.io.mkdir(dirname(catalogPath));
   await writeFileAtomic(catalogPath, `${header}\n${yaml}`);
 
   return {

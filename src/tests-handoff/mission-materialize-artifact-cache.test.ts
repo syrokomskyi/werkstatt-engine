@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createMaterializeWorkspace, gitInit, gitCommit } from "./helpers/materialize-fixture.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockPipeline = vi.hoisted(() => ({
   forceUsed: undefined as boolean | undefined,
@@ -201,6 +202,7 @@ async function runMaterialize(
     flags: { mission: "test-system-m000001", ...flags },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {} },
   } as unknown as KernelRuntimeContext;

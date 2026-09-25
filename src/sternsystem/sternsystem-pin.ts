@@ -11,8 +11,7 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import type {
@@ -29,6 +28,7 @@ import {
   resolveCacheClonePath,
 } from "./registry-io.ts";
 import { highestRfcId, snapshotCapabilities } from "./pin-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface SternsystemPinData {
   systemId: string;
@@ -61,7 +61,7 @@ export async function runSternsystemPin(
   const config = await readSystemConfigSmart(workspaceRoot, id);
 
   const cacheDir = resolveCacheClonePath(workspaceRoot, id);
-  if (!existsSync(cacheDir)) {
+  if (!await context.io.exists(cacheDir)) {
     throw new Error(
       `[sternsystem.pin] cache clone for '${id}' is absent — run sternsystem.register first`,
     );
@@ -71,9 +71,9 @@ export async function runSternsystemPin(
 
   // Check for downgrade if a pin already exists
   const pinPath = path.join(cacheDir, "system.pin.json");
-  if (existsSync(pinPath) && requestedPlatform) {
+  if (await context.io.exists(pinPath) && requestedPlatform) {
     try {
-      const raw = await fs.readFile(pinPath, "utf8");
+      const raw = await context.io.readFile(pinPath);
       const existing = systemPinSchema.parse(JSON.parse(raw)) as SystemPin;
       if (compareSemver(requestedPlatform, existing.platform.version) < 0) {
         throw new Error(

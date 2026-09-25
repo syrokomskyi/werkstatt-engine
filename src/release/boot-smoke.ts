@@ -638,14 +638,14 @@ export async function runBootSmokeCommand(
   } else {
     // Default: workpiece dist/ (open mission) or releases/<id>/dist/
     const workpieceDist = path.join(workspaceRoot, "missions", "workpiece", "dist");
-    if (existsSync(workpieceDist)) {
+    if (await context.io.exists(workpieceDist)) {
       distDir = workpieceDist;
     } else {
       distDir = path.join(workspaceRoot, "releases", siteId, "dist");
     }
   }
 
-  if (!existsSync(distDir)) {
+  if (!await context.io.exists(distDir)) {
     return {
       data: {
         booted: false,

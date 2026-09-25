@@ -17,8 +17,8 @@ validation.state.inspect.
 */
 
 import { join } from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface ValidationState {
   missionId: string;
@@ -47,11 +47,11 @@ export function resolveValidationStatePath(workspaceRoot: string, missionId: str
 
 export async function readValidationState(
   workspaceRoot: string,
-  missionId: string,
+  missionId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ValidationState | null> {
   const path = resolveValidationStatePath(workspaceRoot, missionId);
   try {
-    const content = await readFile(path, "utf-8");
+    const content = await io.readFile(path);
     return JSON.parse(content) as ValidationState;
   } catch {
     return null;
@@ -60,11 +60,11 @@ export async function readValidationState(
 
 export async function writeValidationState(
   workspaceRoot: string,
-  state: ValidationState,
+  state: ValidationState, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const path = resolveValidationStatePath(workspaceRoot, state.missionId);
-  await mkdir(join(path, ".."), { recursive: true });
-  await writeFile(path, JSON.stringify(state, null, 2) + "\n", "utf-8");
+  await io.mkdir(join(path, ".."));
+  await io.writeFile(path, JSON.stringify(state, null, 2) + "\n");
 }
 
 /**

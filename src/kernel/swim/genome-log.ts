@@ -27,10 +27,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, appendFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { signBytes, verifyBytes } from "@warpgogol/werkstatt-shared/passport";
 import type { GenomeLogEntry, SwimMembershipView, SwimMember, SwimMemberStatus } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const GENOME_LOG_FILENAME = "werkstatt.genome.log";
 const GENOME_LOG_SIZE_THRESHOLD = 10 * 1024 * 1024;
@@ -63,21 +63,21 @@ export async function verifyGenomeEntry(
 
 export async function appendGenomeEntry(
   workspaceRoot: string,
-  entry: GenomeLogEntry,
+  entry: GenomeLogEntry, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const logPath = join(workspaceRoot, GENOME_LOG_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  await appendFile(logPath, line, "utf8");
+  await io.appendFile(logPath, line);
 }
 
 export async function readGenomeLog(
   workspaceRoot: string,
-  publicKeyMultibase?: string,
+  publicKeyMultibase?: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ entries: GenomeLogEntry[]; skipped: number }> {
   const logPath = join(workspaceRoot, GENOME_LOG_FILENAME);
   let raw: string;
   try {
-    raw = await readFile(logPath, "utf8");
+    raw = await io.readFile(logPath);
   } catch {
     return { entries: [], skipped: 0 };
   }
@@ -157,10 +157,10 @@ export function deriveMembershipView(entries: GenomeLogEntry[]): SwimMembershipV
   return { members, total, alive, suspect, dead };
 }
 
-export async function getGenomeLogSize(workspaceRoot: string): Promise<number> {
+export async function getGenomeLogSize(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<number> {
   const logPath = join(workspaceRoot, GENOME_LOG_FILENAME);
   try {
-    const stats = await stat(logPath);
+    const stats = await io.stat(logPath);
     return stats.size;
   } catch {
     return 0;

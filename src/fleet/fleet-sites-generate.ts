@@ -19,8 +19,6 @@
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import type {
@@ -36,6 +34,7 @@ import {
   readSystemState,
 } from "../sternsystem/registry-io.ts";
 import type { SystemConfig } from "@warpgogol/werkstatt-shared/ontology/operations";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FLEET_SITES_FILE = "fleet/fleet.sites.yaml";
 
@@ -71,14 +70,14 @@ function extractMirrorProtocols(config: SystemConfig): string[] {
 
 async function buildFleetSiteRecord(
   workspaceRoot: string,
-  config: SystemConfig,
+  config: SystemConfig, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<FleetSiteRecord> {
   const cacheClonePath = resolveCacheClonePath(workspaceRoot, config.id);
   const relPath = relative(workspaceRoot, cacheClonePath).replace(/\\/g, "/");
 
   let platformVersion = "unknown";
   try {
-    const pinRaw = await readFile(join(cacheClonePath, "system.pin.json"), "utf8");
+    const pinRaw = await io.readFile(join(cacheClonePath, "system.pin.json"));
     const pin = JSON.parse(pinRaw) as { platform?: { version?: string } };
     platformVersion = pin.platform?.version ?? "unknown";
   } catch {
@@ -137,7 +136,7 @@ export async function runFleetSitesGenerate(
   const fleetSites: FleetSitesFile = { sites: records };
 
   const outputPath = join(workspaceRoot, FLEET_SITES_FILE);
-  await mkdir(dirname(outputPath), { recursive: true });
+  await context.io.mkdir(dirname(outputPath));
 
   const header = buildGeneratedHeader({
     filePath: FLEET_SITES_FILE,
@@ -161,7 +160,7 @@ export async function runFleetSitesGenerate(
 }
 
 export async function validateFleetSitesDrift(
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ drifted: boolean; expected: string; actual: string }> {
   const { systems } = await discoverSystems(workspaceRoot);
 
@@ -174,11 +173,11 @@ export async function validateFleetSitesDrift(
   const expectedContent = yamlStringify({ sites: records });
 
   const filePath = join(workspaceRoot, FLEET_SITES_FILE);
-  if (!existsSync(filePath)) {
+  if (!await io.exists(filePath)) {
     return { drifted: true, expected: expectedContent, actual: "" };
   }
 
-  const raw = await readFile(filePath, "utf8");
+  const raw = await io.readFile(filePath);
   const { content: actualContent } = stripGeneratedMarker(raw);
 
   return {

@@ -8,6 +8,7 @@
 */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // Mock registry-io
 vi.mock("../sternsystem/registry-io.ts", () => ({
@@ -29,20 +30,26 @@ vi.mock("../leitstand/adapters/index.ts", () => ({
   filterEnv: vi.fn((env: Record<string, string | undefined>) => env),
 }));
 
-// Mock node:fs and node:fs/promises for .env read/write
-vi.mock("node:fs", () => ({
+// Mock node:fs and node:fs/promises for .env read/write.
+// Spread-actual: the WorkspaceIO default adapter needs the rest of the real
+// fs surface (rename, mkdir, stat, …) — full replacement leaves them undefined.
+vi.mock("node:fs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs")>()),
   existsSync: vi.fn(() => false),
 }));
 
-const mockReadFile = vi.fn();
-const mockWriteFile = vi.fn();
-vi.mock("node:fs/promises", () => ({
+const { mockReadFile, mockWriteFile, mockSpawn } = vi.hoisted(() => ({
+  mockReadFile: vi.fn(),
+  mockWriteFile: vi.fn(),
+  mockSpawn: vi.fn(),
+}));
+vi.mock("node:fs/promises", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs/promises")>()),
   readFile: mockReadFile,
   writeFile: mockWriteFile,
 }));
 
 // Mock node:child_process for wrangler secret list (used by validate handler)
-const mockSpawn = vi.fn();
 vi.mock("node:child_process", () => ({
   spawn: mockSpawn,
 }));
@@ -63,7 +70,7 @@ function mockSpawnChild(stdout: string, stderr: string = "", exitCode: number = 
   const dataCbs: ((d: Buffer) => void)[] = [];
   const stderrCbs: ((d: Buffer) => void)[] = [];
   const exitCbs: ((code: number | null) => void)[] = [];
-  mockSpawn.mockReturnValueOnce({
+  const mockChild = {
     stdout: {
       on: (_event: string, cb: (d: Buffer) => void) => {
         if (_event === "data") dataCbs.push(cb);
@@ -75,16 +82,25 @@ function mockSpawnChild(stdout: string, stderr: string = "", exitCode: number = 
       },
     },
     on: (event: string, cb: (...args: unknown[]) => void) => {
-      if (event === "exit") exitCbs.push(cb as (code: number | null) => void);
+      if (event === "exit" || event === "close") exitCbs.push(cb as (code: number | null) => void);
     },
     stdin: {
       write: () => {},
-      end: () => {
-        for (const cb of dataCbs) cb(Buffer.from(stdout));
-        if (stderr) for (const cb of stderrCbs) cb(Buffer.from(stderr));
-        for (const cb of exitCbs) cb(exitCode);
-      },
+      end: () => {},
     },
+    kill: () => {},
+  };
+  // execImpl listens on "close" and never calls stdin.end — the fire must be
+  // scheduled when spawn() is invoked (not at mockSpawnChild setup): fs awaits
+  // between setup and io.exec would burn the event-loop turn and fire with
+  // empty handler arrays. Handlers attach synchronously after spawn returns.
+  mockSpawn.mockImplementationOnce(() => {
+    setImmediate(() => {
+      for (const cb of dataCbs) cb(Buffer.from(stdout));
+      if (stderr) for (const cb of stderrCbs) cb(Buffer.from(stderr));
+      for (const cb of exitCbs) cb(exitCode);
+    });
+    return mockChild;
   });
 }
 
@@ -93,9 +109,12 @@ function makeInput(flags: Record<string, unknown>) {
 }
 
 function makeContext(workspaceRoot: string) {
-  return { workspaceRoot, dryRun: false, site: undefined } as unknown as Parameters<
-    typeof runLagebildConnect
-  >[1];
+  return {
+    io: createDefaultIO().io,
+    workspaceRoot,
+    dryRun: false,
+    site: undefined,
+  } as unknown as Parameters<typeof runLagebildConnect>[1];
 }
 
 const mockConfig = {
@@ -127,7 +146,7 @@ const mockState = {
   ownershipRequired: false,
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(readSystemConfigSmart).mockReset();
   vi.mocked(readSystemStateSmart).mockReset();
   vi.mocked(writeSystemStateSmart).mockReset();
@@ -137,6 +156,14 @@ beforeEach(() => {
   mockWriteFile.mockReset();
   mockFetch.mockReset();
   mockSpawn.mockReset();
+
+  // io.writeFile goes through writeFileAtomic (temp write + fsRename) — a bare
+  // vi.fn() no-ops the temp write and rename fails ENOENT. Route the mocks to
+  // the real fs; per-test mockResolvedValue can still override.
+  const realFsPromises =
+    await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  mockReadFile.mockImplementation(realFsPromises.readFile as never);
+  mockWriteFile.mockImplementation(realFsPromises.writeFile as never);
 
   vi.mocked(readSystemConfigSmart).mockResolvedValue(structuredClone(mockConfig) as never);
   vi.mocked(readSystemStateSmart).mockResolvedValue(structuredClone(mockState) as never);
@@ -149,7 +176,6 @@ beforeEach(() => {
   mockFetch.mockResolvedValue({ ok: true, status: 200 } as never);
   vi.mocked(existsSync).mockReturnValue(false);
   mockReadFile.mockResolvedValue("");
-  mockWriteFile.mockResolvedValue(undefined);
 });
 
 describe("RFC-1065: lagebild.connect", () => {

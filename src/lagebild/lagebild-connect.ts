@@ -20,8 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -37,6 +35,7 @@ import {
 import { sourceDotenv, filterEnv } from "../leitstand/adapters/index.ts";
 import { runWranglerSecretPut } from "../leitstand/adapters/wrangler-secrets.ts";
 import { LAGEBILD_SECRET_NAMES, resolveWorkerName } from "./lagebild-helpers.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, name: string): string | undefined {
   const v = input.flags[name];
@@ -103,7 +102,7 @@ export async function runLagebildConnect(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = existsSync(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
@@ -180,12 +179,12 @@ export async function runLagebildConnect(
 
 async function mergeLagebildIntoEnv(
   cacheCloneDir: string,
-  values: Record<string, string>,
+  values: Record<string, string>, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const envPath = join(cacheCloneDir, ".env");
   let lines: string[] = [];
-  if (existsSync(envPath)) {
-    const raw = await readFile(envPath, "utf8");
+  if (await io.exists(envPath)) {
+    const raw = await io.readFile(envPath);
     lines = raw.split("\n");
   }
 
@@ -212,5 +211,5 @@ async function mergeLagebildIntoEnv(
   }
   filtered.push("");
 
-  await writeFile(envPath, filtered.join("\n"), "utf8");
+  await io.writeFile(envPath, filtered.join("\n"));
 }

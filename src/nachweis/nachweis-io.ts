@@ -22,8 +22,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parse as yamlParse } from "yaml";
 import { z } from "zod";
@@ -31,6 +29,7 @@ import { byteHashFile } from "@warpgogol/werkstatt-engine/fingerprint";
 import { loadSystemManifest } from "@warpgogol/werkstatt-shared/content";
 import { createR2Client, resolveR2ConfigFromEnv, MissingEnvError } from "../evidence/r2-client.ts";
 import { resolveCacheClonePath, resolveActiveWorkpieceDir } from "../sternsystem/registry-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const NACHWEIS_BUCKET = "nachweis";
 
@@ -523,13 +522,13 @@ export async function resolveDefaultLang(cachePath: string): Promise<string> {
   return i18n.default;
 }
 
-export async function readEntitledFeaturesFromCache(cachePath: string): Promise<string[] | null> {
+export async function readEntitledFeaturesFromCache(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[] | null> {
   const entitlementsPath = path.join(cachePath, "src", "entitlements.generated.yaml");
-  if (!existsSync(entitlementsPath)) {
+  if (!await io.exists(entitlementsPath)) {
     return null;
   }
   try {
-    const raw = await fs.readFile(entitlementsPath, "utf8");
+    const raw = await io.readFile(entitlementsPath);
     const parsed = yamlParse(raw) as { features?: unknown };
     return Array.isArray(parsed.features) ? parsed.features.map(String) : null;
   } catch {

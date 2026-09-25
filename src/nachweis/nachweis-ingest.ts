@@ -19,8 +19,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -38,6 +37,7 @@ import {
   makeSkipResult,
   type NachweisIngestResult,
 } from "./nachweis-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -79,7 +79,7 @@ export async function runNachweisIngest(
     ) as unknown as KernelCommandResult<NachweisIngestResult>;
   }
 
-  if (!existsSync(filePath)) {
+  if (!await context.io.exists(filePath)) {
     throw new Error(`[nachweis.ingest] NOT_FOUND: file '${filePath}' does not exist`);
   }
   if (!filePath.toLowerCase().endsWith(".pdf")) {
@@ -114,8 +114,8 @@ export async function runNachweisIngest(
     };
   }
 
-  const fileBuffer = await fs.readFile(filePath);
-  const uploadBuffer = new Uint8Array(fileBuffer);
+  const fileBuffer = await context.io.readFileBytes(filePath);
+  const uploadBuffer = fileBuffer;
 
   // ADR-0025: heartbeat for potentially long R2 upload
   const startTime = Date.now();

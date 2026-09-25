@@ -15,8 +15,7 @@ the cursor, and writes a migration report to evidence/.</purpose>
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -30,6 +29,7 @@ import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { migratorsToApply } from "../migrators/registry.ts";
 import type { SternsystemData, MigrationContext, MigrationViolation } from "../migrators/types.ts";
 import { MigrationError } from "../migrators/types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface MissionMigrateData {
   missionId: string;
@@ -92,16 +92,16 @@ export async function runMissionMigrate(
     const missionDir = resolveMissionDir(workspaceRoot, missionId);
     const workpieceDir = path.join(missionDir, "workpiece");
 
-    if (!existsSync(workpieceDir)) {
+    if (!await context.io.exists(workpieceDir)) {
       throw new Error("[mission.migrate] workpiece not found — run mission.materialize first");
     }
 
     const pinPath = path.join(workpieceDir, "system.pin.json");
-    if (!existsSync(pinPath)) {
+    if (!await context.io.exists(pinPath)) {
       throw new Error("[mission.migrate] system.pin.json not found in workpiece");
     }
 
-    const pinRaw = await fs.readFile(pinPath, "utf8");
+    const pinRaw = await context.io.readFile(pinPath);
     const pin = JSON.parse(pinRaw) as Record<string, unknown>;
     const cursorRaw = pin.migratorCursor;
     const cursor: string[] = Array.isArray(cursorRaw) ? cursorRaw : [];
@@ -186,18 +186,18 @@ export async function runMissionMigrate(
     const status: "pass" | "blocked" | "fail" = blockedMigrator !== null ? "blocked" : "pass";
 
     if (appliedMigrators.length > 0) {
-      const updatedPinRaw = await fs.readFile(pinPath, "utf8");
+      const updatedPinRaw = await context.io.readFile(pinPath);
       const updatedPin = JSON.parse(updatedPinRaw) as Record<string, unknown>;
       const currentCursor: string[] = Array.isArray(updatedPin.migratorCursor)
         ? updatedPin.migratorCursor
         : [];
       const newCursor = [...new Set([...currentCursor, ...appliedMigrators])];
       updatedPin.migratorCursor = newCursor;
-      await fs.writeFile(pinPath, JSON.stringify(updatedPin, null, 2) + "\n", "utf8");
+      await context.io.writeFile(pinPath, JSON.stringify(updatedPin, null, 2) + "\n");
     }
 
     const evidenceDir = path.join(missionDir, "evidence");
-    await fs.mkdir(evidenceDir, { recursive: true });
+    await context.io.mkdir(evidenceDir);
     const report = {
       schemaVersion: "1.0.0",
       missionId,

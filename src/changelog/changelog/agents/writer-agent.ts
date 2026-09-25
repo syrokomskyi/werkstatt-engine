@@ -19,7 +19,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import crypto from "node:crypto";
 import type { GroupedRelease } from "../types.ts";
@@ -71,7 +70,7 @@ export async function writeChangelog(
     return `## ${version} (${release.date})\n\nNo changes in this release window.\n`;
 
   const promptFile = join(ctx.promptsDir, "writer.md");
-  const promptHash = await hashPromptFile(promptFile);
+  const promptHash = await hashPromptFile(promptFile, ctx.io);
   const releaseHash = crypto.createHash("sha256").update(JSON.stringify(release)).digest("hex");
   const key = buildCacheKey({
     treeHash: releaseHash,
@@ -84,7 +83,7 @@ export async function writeChangelog(
   const cached = await cacheGet(key, ctx);
   if (typeof cached === "string") return cached;
 
-  const systemPrompt = await readFile(promptFile, "utf-8").catch(() => DEFAULT_WRITER_PROMPT);
+  const systemPrompt = await ctx.io.readFile(promptFile).catch(() => DEFAULT_WRITER_PROMPT);
   const client =
     ctx.llmProvider === "anthropic"
       ? createAnthropic({ apiKey: ctx.llmApiKey })(ctx.llmModel)

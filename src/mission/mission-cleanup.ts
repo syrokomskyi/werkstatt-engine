@@ -13,15 +13,15 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { lstatSync } from "node:fs";
 import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface MissionCleanupData {
   missionId: string;
@@ -82,7 +82,7 @@ export async function runMissionCleanup(
   // --stale-dirs mode: RFC-0985 Measure 6 — archive aborted missions, remove stub dirs
   if (staleDirs) {
     const missionsDir = path.join(workspaceRoot, "missions");
-    if (!existsSync(missionsDir)) {
+    if (!(await context.io.exists(missionsDir))) {
       return {
         data: {
           missionId: "*",
@@ -100,19 +100,19 @@ export async function runMissionCleanup(
 
     const archived: string[] = [];
     const warnings: string[] = [];
-    const entries = await fs.readdir(missionsDir, { withFileTypes: true });
+    const entries = await context.io.readdir(missionsDir);
 
     for (const entry of entries) {
       if (entry.name === "archive") continue;
-      if (entry.isSymbolicLink()) continue;
-      if (!entry.isDirectory()) continue;
-
       const missionDir = path.join(missionsDir, entry.name);
+      if (lstatSync(missionDir).isSymbolicLink()) continue;
+      if (!entry.isDirectory) continue;
+
       const missionFile = path.join(missionDir, "mission.yaml");
 
-      if (!existsSync(missionFile)) {
+      if (!(await context.io.exists(missionFile))) {
         // Stub directory from failed mission.open — remove it
-        await fs.rm(missionDir, { recursive: true, force: true });
+        await context.io.rm(missionDir, { recursive: true });
         removedPaths.push(`${entry.name} (stub — no mission.yaml)`);
         logger.info(`  Removed stub directory '${entry.name}'`);
         continue;
@@ -123,12 +123,15 @@ export async function runMissionCleanup(
         if (manifest.state === "aborted") {
           // Move to archive/aborted/
           const archiveDir = path.join(missionsDir, "archive", "aborted", entry.name);
-          await fs.mkdir(path.dirname(archiveDir), { recursive: true });
+          await context.io.mkdir(path.dirname(archiveDir));
           try {
-            await fs.rename(missionDir, archiveDir);
+            await context.io.rename(missionDir, archiveDir);
           } catch {
-            await fs.cp(missionDir, archiveDir, { recursive: true, force: true });
-            await fs.rm(missionDir, { recursive: true, force: true });
+            const cpResult = await context.io.exec("cp", ["-r", "-f", missionDir, archiveDir]);
+            if (cpResult.exitCode !== 0) {
+              throw new Error(`cp failed for '${entry.name}': ${cpResult.stderr.slice(0, 200)}`);
+            }
+            await context.io.rm(missionDir, { recursive: true });
           }
           archived.push(entry.name);
           logger.info(`  Archived aborted mission '${entry.name}'`);
@@ -166,14 +169,14 @@ export async function runMissionCleanup(
     const workpieceDir = path.join(missionDir, "workpiece");
     const distributionDir = path.join(missionDir, "distribution");
 
-    if (existsSync(workpieceDir)) {
-      await fs.rm(workpieceDir, { recursive: true, force: true });
+    if (await context.io.exists(workpieceDir)) {
+      await context.io.rm(workpieceDir, { recursive: true });
       removedPaths.push("workpiece");
       logger.info(`  Removed workpiece for mission '${missionId}'`);
     }
 
-    if (existsSync(distributionDir)) {
-      await fs.rm(distributionDir, { recursive: true, force: true });
+    if (await context.io.exists(distributionDir)) {
+      await context.io.rm(distributionDir, { recursive: true });
       removedPaths.push("distribution");
       logger.info(`  Removed distribution for mission '${missionId}'`);
     }
@@ -185,13 +188,13 @@ export async function runMissionCleanup(
     const axiomEvidenceDir = path.join(missionDir, "evidence", "axiom");
     if (evidenceRetentionDays === 0) {
       skipped.push("evidence/axiom (preserved — retention=0)");
-    } else if (existsSync(axiomEvidenceDir)) {
+    } else if (await context.io.exists(axiomEvidenceDir)) {
       const metadataPath = path.join(axiomEvidenceDir, "evidence-metadata.json");
-      if (!existsSync(metadataPath)) {
+      if (!(await context.io.exists(metadataPath))) {
         skipped.push("evidence/axiom (no metadata — preserved)");
       } else {
         try {
-          const raw = await fs.readFile(metadataPath, "utf8");
+          const raw = await context.io.readFile(metadataPath);
           const meta = JSON.parse(raw) as { runTimestamp?: string };
           if (!meta.runTimestamp) {
             skipped.push("evidence/axiom (no runTimestamp — preserved)");
@@ -199,7 +202,7 @@ export async function runMissionCleanup(
             const runTime = new Date(meta.runTimestamp).getTime();
             const cutoff = Date.now() - evidenceRetentionDays * 24 * 60 * 60 * 1000;
             if (runTime < cutoff) {
-              await fs.rm(axiomEvidenceDir, { recursive: true, force: true });
+              await context.io.rm(axiomEvidenceDir, { recursive: true });
               removedPaths.push("evidence/axiom");
               evidenceCleaned = true;
               logger.info(
@@ -240,7 +243,7 @@ export async function runMissionCleanup(
     }
 
     const missionsDir = path.join(workspaceRoot, "missions");
-    if (!existsSync(missionsDir)) {
+    if (!(await context.io.exists(missionsDir))) {
       return {
         data: { missionId: "*", removedPaths, skipped, evidenceCleaned, evidenceRetentionDays },
         summary: `[mission.cleanup] no missions directory found`,
@@ -253,14 +256,14 @@ export async function runMissionCleanup(
       };
     }
 
-    const entries = await fs.readdir(missionsDir, { withFileTypes: true });
+    const entries = await context.io.readdir(missionsDir);
     const now = Date.now();
 
     for (const entry of entries) {
       if (entry.name === "archive") continue;
-      if (entry.isSymbolicLink()) continue;
-      if (!entry.isDirectory()) continue;
       const missionDir = path.join(missionsDir, entry.name);
+      if (lstatSync(missionDir).isSymbolicLink()) continue;
+      if (!entry.isDirectory) continue;
 
       try {
         const manifest = await readMissionManifest(workspaceRoot, entry.name);
@@ -284,28 +287,28 @@ export async function runMissionCleanup(
         const workpieceDir = path.join(missionDir, "workpiece");
         const distributionDir = path.join(missionDir, "distribution");
 
-        if (existsSync(workpieceDir)) {
-          await fs.rm(workpieceDir, { recursive: true, force: true });
+        if (await context.io.exists(workpieceDir)) {
+          await context.io.rm(workpieceDir, { recursive: true });
           removedPaths.push(`${entry.name}/workpiece`);
         }
-        if (existsSync(distributionDir)) {
-          await fs.rm(distributionDir, { recursive: true, force: true });
+        if (await context.io.exists(distributionDir)) {
+          await context.io.rm(distributionDir, { recursive: true });
           removedPaths.push(`${entry.name}/distribution`);
         }
 
         // RFC-0652: Age-based Axiom evidence cleanup in --older-than mode
         const axiomEvidenceDir = path.join(missionDir, "evidence", "axiom");
-        if (evidenceRetentionDays > 0 && existsSync(axiomEvidenceDir)) {
+        if (evidenceRetentionDays > 0 && (await context.io.exists(axiomEvidenceDir))) {
           const metadataPath = path.join(axiomEvidenceDir, "evidence-metadata.json");
-          if (existsSync(metadataPath)) {
+          if (await context.io.exists(metadataPath)) {
             try {
-              const raw = await fs.readFile(metadataPath, "utf8");
+              const raw = await context.io.readFile(metadataPath);
               const meta = JSON.parse(raw) as { runTimestamp?: string };
               if (meta.runTimestamp) {
                 const runTime = new Date(meta.runTimestamp).getTime();
                 const cutoff = Date.now() - evidenceRetentionDays * 24 * 60 * 60 * 1000;
                 if (runTime < cutoff) {
-                  await fs.rm(axiomEvidenceDir, { recursive: true, force: true });
+                  await context.io.rm(axiomEvidenceDir, { recursive: true });
                   removedPaths.push(`${entry.name}/evidence/axiom`);
                   evidenceCleaned = true;
                 }

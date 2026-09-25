@@ -14,6 +14,7 @@ import os from "node:os";
 import { runSternsystemValidate } from "../sternsystem-validate.ts";
 import { runLeitstandHealth } from "../../leitstand/leitstand-commands.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let testRoot: string;
 let workspaceRoot: string;
@@ -55,6 +56,7 @@ function makeInput(flags: Record<string, boolean | string | string[]> = {}): Ker
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;

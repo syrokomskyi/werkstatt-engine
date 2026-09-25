@@ -21,8 +21,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import type {
@@ -51,6 +49,7 @@ import type {
   SichtpassChannelState,
   SichtpassPseoModule,
 } from "./sichtpass-snapshot.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -91,19 +90,19 @@ interface CoverageLedgerData {
 
 async function readContentRegressionSnapshot(
   cachePath: string,
-  _systemId: string,
+  _systemId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ContentRegressionSnapshotData> {
   const snapshotDir = path.join(cachePath, ".cache", "content-regression");
-  if (!existsSync(snapshotDir)) {
+  if (!await io.exists(snapshotDir)) {
     return { contentHash: null, routeCount: 0 };
   }
   try {
-    const files = await fs.readdir(snapshotDir);
-    const snapshotFile = files.find((f) => f.endsWith(".snapshot.yaml"));
+    const files = await io.readdir(snapshotDir);
+    const snapshotFile = files.find((f) => f.name.endsWith(".snapshot.yaml"));
     if (!snapshotFile) {
       return { contentHash: null, routeCount: 0 };
     }
-    const raw = await fs.readFile(path.join(snapshotDir, snapshotFile), "utf8");
+    const raw = await io.readFile(path.join(snapshotDir, snapshotFile.name));
     const parsed = parseYaml(raw) as {
       contentHash?: string;
       routes?: unknown[];
@@ -117,13 +116,13 @@ async function readContentRegressionSnapshot(
   }
 }
 
-async function readBehaviorSnapshot(cachePath: string): Promise<BehaviorSnapshotData> {
+async function readBehaviorSnapshot(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<BehaviorSnapshotData> {
   const filePath = path.join(cachePath, "behavior.snapshot.generated.yaml");
-  if (!existsSync(filePath)) {
+  if (!await io.exists(filePath)) {
     return { routeCount: 0 };
   }
   try {
-    const raw = await fs.readFile(filePath, "utf8");
+    const raw = await io.readFile(filePath);
     const parsed = parseYaml(raw) as { routes?: unknown[] };
     return {
       routeCount: Array.isArray(parsed.routes) ? parsed.routes.length : 0,
@@ -135,15 +134,15 @@ async function readBehaviorSnapshot(cachePath: string): Promise<BehaviorSnapshot
 
 async function readNachweisManifest(
   workspaceRoot: string,
-  systemId: string,
+  systemId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NachweisManifestData> {
   try {
     const cachePath = await resolveNachweisCachePath(workspaceRoot, systemId);
     const manifestPath = path.join(cachePath, "public", "nachweise", "manifest.json");
-    if (!existsSync(manifestPath)) {
+    if (!await io.exists(manifestPath)) {
       return { count: 0, slugs: [] };
     }
-    const raw = await fs.readFile(manifestPath, "utf8");
+    const raw = await io.readFile(manifestPath);
     const parsed = JSON.parse(raw) as { records?: Array<{ slug?: string }> };
     const records = Array.isArray(parsed.records) ? parsed.records : [];
     return {
@@ -192,13 +191,13 @@ async function readSystemStateData(
   }
 }
 
-async function readPseoModules(cachePath: string): Promise<PseoModulesData> {
+async function readPseoModules(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<PseoModulesData> {
   const statusPath = path.join(cachePath, "bordbuch", "status.generated.yaml");
-  if (!existsSync(statusPath)) {
+  if (!await io.exists(statusPath)) {
     return { modules: [] };
   }
   try {
-    const raw = await fs.readFile(statusPath, "utf8");
+    const raw = await io.readFile(statusPath);
     const parsed = parseYaml(raw) as {
       pseo?: {
         modules?: Array<{
@@ -221,13 +220,13 @@ async function readPseoModules(cachePath: string): Promise<PseoModulesData> {
   }
 }
 
-async function readCoverageLedger(cachePath: string): Promise<CoverageLedgerData> {
+async function readCoverageLedger(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<CoverageLedgerData> {
   const ledgerPath = path.join(cachePath, "provenance", "coverage-ledger.yaml");
-  if (!existsSync(ledgerPath)) {
+  if (!await io.exists(ledgerPath)) {
     return { atoms: 0, pages: [] };
   }
   try {
-    const raw = await fs.readFile(ledgerPath, "utf8");
+    const raw = await io.readFile(ledgerPath);
     const parsed = parseYaml(raw) as {
       atoms?: Array<{ pageId?: string; supersededBy?: string }>;
     };

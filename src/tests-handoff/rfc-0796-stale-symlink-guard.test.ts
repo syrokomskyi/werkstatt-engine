@@ -16,6 +16,7 @@ import { runMissionCleanup } from "../mission/mission-cleanup.ts";
 import type { BordbuchEntry } from "@warpgogol/werkstatt-engine/schemas";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 
@@ -58,6 +59,7 @@ function writeMissionManifest(
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},

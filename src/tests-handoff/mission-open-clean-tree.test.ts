@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // RFC-0951: mock runMissionMaterializeInternal so mission.open doesn't require a real system
 // The mock simulates the git commit of mission.yaml that the real internal function does
@@ -144,7 +145,7 @@ lastRelease: null
       actor: "test-agent",
     },
   } as unknown as KernelCommandInput;
-  const context = { workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
 
   await runMissionOpen(input, context);
 

@@ -16,24 +16,23 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function atomicWriteFile(targetPath: string, content: string): Promise<void> {
+export async function atomicWriteFile(targetPath: string, content: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   const dir = path.dirname(targetPath);
   const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
 
-  if (!existsSync(dir)) {
-    await fs.mkdir(dir, { recursive: true });
+  if (!await io.exists(dir)) {
+    await io.mkdir(dir);
   }
 
-  await fs.writeFile(tmpPath, content, "utf8");
+  await io.writeFile(tmpPath, content);
   try {
-    await fs.rename(tmpPath, targetPath);
+    await io.rename(tmpPath, targetPath);
   } catch (err) {
     try {
-      await fs.unlink(tmpPath);
+      await io.rm(tmpPath);
     } catch {
       // ignore
     }
@@ -43,11 +42,11 @@ export async function atomicWriteFile(targetPath: string, content: string): Prom
 
 const RENAME_RETRYABLE_CODES = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
 
-async function renameWithRetry(src: string, dest: string, maxRetries = 5): Promise<void> {
+async function renameWithRetry(src: string, dest: string, maxRetries = 5, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      await fs.rename(src, dest);
+      await io.rename(src, dest);
       return;
     } catch (err) {
       lastErr = err;
@@ -65,11 +64,11 @@ async function renameWithRetry(src: string, dest: string, maxRetries = 5): Promi
 export async function atomicMoveDir(
   stagingDir: string,
   targetDir: string,
-  options?: { replace?: boolean },
+  options?: { replace?: boolean }, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   let trashDir: string | undefined;
 
-  if (existsSync(targetDir)) {
+  if (await io.exists(targetDir)) {
     if (!options?.replace) {
       throw new Error(
         `[werkstatt.atomic] target '${targetDir}' already exists — use --replace to overwrite`,
@@ -80,22 +79,22 @@ export async function atomicMoveDir(
     // where deletion fails. Strategy: rename old target to trash, then rename
     // staging into place, then best-effort delete trash.
     trashDir = `${targetDir}.trash-${process.pid}-${Date.now()}`;
-    if (existsSync(trashDir)) {
-      await fs.rm(trashDir, { recursive: true, force: true }).catch(() => {});
+    if (await io.exists(trashDir)) {
+      await io.rm(trashDir, { recursive: true }).catch(() => {});
     }
     await renameWithRetry(targetDir, trashDir);
   }
 
   const parentDir = path.dirname(targetDir);
-  if (!existsSync(parentDir)) {
-    await fs.mkdir(parentDir, { recursive: true });
+  if (!await io.exists(parentDir)) {
+    await io.mkdir(parentDir);
   }
 
   await renameWithRetry(stagingDir, targetDir);
 
   // Best-effort cleanup of the old directory
-  if (trashDir && existsSync(trashDir)) {
-    await fs.rm(trashDir, { recursive: true, force: true }).catch(() => {
+  if (trashDir && await io.exists(trashDir)) {
+    await io.rm(trashDir, { recursive: true }).catch(() => {
       // Ignore — trash will be cleaned up on next run or manually.
     });
   }

@@ -21,8 +21,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import {
@@ -32,6 +31,7 @@ import {
   toHex,
   getPublicKey,
 } from "@warpgogol/werkstatt-engine/signing";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -82,13 +82,13 @@ export async function runNachweisSign(
     ) as unknown as KernelCommandResult<NachweisSignResult>;
   }
 
-  if (!existsSync(keyFilePath)) {
+  if (!await context.io.exists(keyFilePath)) {
     throw new Error(
       `[nachweis.sign] KEY_NOT_FOUND: private key file '${keyFilePath}' does not exist. Run nachweis.key.ensure first.`,
     );
   }
 
-  const privateKeyHex = (await fs.readFile(keyFilePath, "utf8")).trim();
+  const privateKeyHex = (await context.io.readFile(keyFilePath)).trim();
   const privateKeyBytes = fromHex(privateKeyHex);
 
   const cachePath = await resolveNachweisCachePath(workspaceRoot, systemId);
@@ -96,13 +96,13 @@ export async function runNachweisSign(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     throw new Error(
       `[nachweis.sign] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
   }
 
-  const rawEvidence = await fs.readFile(evidenceFile, "utf8");
+  const rawEvidence = await context.io.readFile(evidenceFile);
   const { data: evidenceData } = parseMarkdownFrontmatter(rawEvidence);
 
   const payload: NachweisRecordPayload = {

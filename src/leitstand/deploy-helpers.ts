@@ -24,8 +24,6 @@ resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand 
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
@@ -59,6 +57,7 @@ import {
   verifyStoredObject,
   type R2StorageConfig,
 } from "../certification/storage/index.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export function flagSite(input: { flags: Record<string, unknown> }): string | undefined {
   const v = input.flags["site"];
@@ -111,12 +110,12 @@ function formatGateDecisionMissingHint(filePath: string): string {
   }
 }
 
-export async function loadGateDecision(filePath: string): Promise<GateDecisionV1> {
-  if (!existsSync(filePath)) {
+export async function loadGateDecision(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<GateDecisionV1> {
+  if (!await io.exists(filePath)) {
     const hint = formatGateDecisionMissingHint(filePath);
     throw new Error(`[deploy] gate decision file not found: ${filePath}${hint}`);
   }
-  const content = await fs.readFile(filePath, "utf8");
+  const content = await io.readFile(filePath);
   const parsed = JSON.parse(content);
   const result = gateDecisionV1Schema.safeParse(parsed);
   if (!result.success) {
@@ -128,13 +127,13 @@ export async function loadGateDecision(filePath: string): Promise<GateDecisionV1
 }
 
 export async function loadMainVerificationDecision(
-  filePath: string,
+  filePath: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<MainVerificationDecisionV1> {
-  if (!existsSync(filePath)) {
+  if (!await io.exists(filePath)) {
     const dir = path.dirname(filePath);
     let available: string[] = [];
     try {
-      available = (await fs.readdir(dir))
+      available = ((await io.readdir(dir)).map(e => e.name))
         .filter((f) => f.endsWith("-main-verification.json"))
         .sort();
     } catch {
@@ -149,7 +148,7 @@ export async function loadMainVerificationDecision(
         `the main-verification file. The expected path is gate-decisions/<release>-main-verification.json.`,
     );
   }
-  const content = await fs.readFile(filePath, "utf8");
+  const content = await io.readFile(filePath);
   const parsed = JSON.parse(content);
   const result = mainVerificationDecisionV1Schema.safeParse(parsed);
   if (!result.success) {
@@ -157,7 +156,7 @@ export async function loadMainVerificationDecision(
     const releasePrefix = path.basename(filePath).replace(/-main-verification\.json$/, "");
     let available: string[] = [];
     try {
-      available = (await fs.readdir(dir)).filter((f) => f.startsWith(releasePrefix)).sort();
+      available = ((await io.readdir(dir)).map(e => e.name)).filter((f) => f.startsWith(releasePrefix)).sort();
     } catch {
       /* ignore */
     }
@@ -183,15 +182,15 @@ export interface ResolvedArtifactHash {
 
 export async function resolveArtifactHash(
   artifactHashFlag: string | undefined,
-  releaseDir: string | undefined,
+  releaseDir: string | undefined, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ResolvedArtifactHash> {
   if (artifactHashFlag && isSha256Digest(artifactHashFlag)) {
     return { hash: artifactHashFlag, source: "flag" };
   }
 
-  if (releaseDir && existsSync(releaseDir)) {
+  if (releaseDir && await io.exists(releaseDir)) {
     const artifactPath = path.join(releaseDir, "artifact.tar.gz");
-    if (existsSync(artifactPath)) {
+    if (await io.exists(artifactPath)) {
       return {
         hash: await byteHashFile(artifactPath),
         source: "artifact.tar.gz",
@@ -200,9 +199,9 @@ export async function resolveArtifactHash(
     }
 
     const releaseYamlPath = path.join(releaseDir, "release.yaml");
-    if (existsSync(releaseYamlPath)) {
+    if (await io.exists(releaseYamlPath)) {
       try {
-        const content = await fs.readFile(releaseYamlPath, "utf8");
+        const content = await io.readFile(releaseYamlPath);
         const match = content.match(/^distTreeHash:\s*(sha256:[a-f0-9]{64})\s*$/m);
         if (match && isSha256Digest(match[1])) {
           return { hash: match[1], source: "release.yaml", path: releaseYamlPath };
@@ -378,10 +377,10 @@ export async function writeDeploymentEffectRecord(
   record: DeploymentEffectRecordV1,
   deploymentUrl?: string,
   workerVersionId?: string,
-  releaseId?: string,
+  releaseId?: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const dir = path.join(cacheCloneDir, "deployment-operations");
-  await fs.mkdir(dir, { recursive: true });
+  await io.mkdir(dir);
   const filePath = path.join(dir, `${record.operationId}.json`);
   let payload: Record<string, unknown> = { ...record };
   if (deploymentUrl) payload = { ...payload, deploymentUrl };

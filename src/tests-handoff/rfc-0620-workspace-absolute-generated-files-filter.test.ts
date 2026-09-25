@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createMaterializeWorkspace } from "./helpers/materialize-fixture.ts";
 import { tmpdir } from "node:os";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockPipeline = vi.hoisted(() => ({
   pipelineResult: {
@@ -157,6 +158,7 @@ async function materializeAndGetWorkpiecePublic(): Promise<string> {
     flags: { mission: "test-system-m000001" },
   } as unknown as KernelCommandInput;
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpWorkspace,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;

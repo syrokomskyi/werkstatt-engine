@@ -20,6 +20,7 @@ import { describe, it, expect, vi } from "vitest";
 import { toApiRecord, runDnsRecordUpsert } from "./dns-record-upsert.ts";
 import type { DnsRecordDeclaration } from "@warpgogol/werkstatt-shared/ontology/schemas";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("./dns-helpers.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("./dns-helpers.ts")>();
@@ -341,6 +342,7 @@ describe("RFC-0817: dns.record.upsert graceful skip", () => {
     } as unknown as KernelCommandInput;
 
     const context = {
+      io: createDefaultIO().io,
       workspaceRoot: "/test",
     } as unknown as KernelRuntimeContext;
 

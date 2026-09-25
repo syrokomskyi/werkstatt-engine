@@ -27,6 +27,43 @@ let mockExistsSync: any;
 
 vi.mock("node:child_process", () => ({
   execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
+  // io.exec goes through spawn — emulate execFileSync semantics: return value
+  // becomes stdout + close(0), a thrown error becomes stderr + close(status).
+  // Fire is scheduled at spawn() call time so execImpl's handlers are attached
+  // before the callbacks run.
+  spawn: (cmd: string, args?: string[]) => {
+    let dataCb: ((d: Buffer) => void) | undefined;
+    let errCb: ((d: Buffer) => void) | undefined;
+    const closeCbs: ((code: number | null) => void)[] = [];
+    setImmediate(() => {
+      try {
+        const out = mockExecFileSync(cmd, args);
+        dataCb?.(Buffer.from(String(out ?? "")));
+        for (const cb of closeCbs) cb(0);
+      } catch (err) {
+        const e = err as { stderr?: Buffer | string; status?: number };
+        if (e?.stderr) errCb?.(Buffer.from(String(e.stderr)));
+        for (const cb of closeCbs) cb(typeof e?.status === "number" ? e.status : 1);
+      }
+    });
+    return {
+      stdout: {
+        on: (e: string, cb: (d: Buffer) => void) => {
+          if (e === "data") dataCb = cb;
+        },
+      },
+      stderr: {
+        on: (e: string, cb: (d: Buffer) => void) => {
+          if (e === "data") errCb = cb;
+        },
+      },
+      on: (e: string, cb: (...a: unknown[]) => void) => {
+        if (e === "close" || e === "exit") closeCbs.push(cb as (c: number | null) => void);
+      },
+      stdin: { write: () => {}, end: () => {} },
+      kill: () => {},
+    };
+  },
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -59,8 +96,14 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", () => ({
   KERNEL_UNIVERSAL_FLAGS: {},
 }));
 
+// Real fs for mock impls: io.writeFile goes through writeFileAtomic (temp write
+// + real fsRename) and io.mkdir/fsMkdir must create the parent dir — bare
+// vi.fn() no-ops leave rename ENOENT and write ENOENT.
+const realFsPromises = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+
 import { runColdE2e } from "../e2e/cold.ts";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockedExec = vi.mocked(executeKernelCommand);
 
@@ -75,7 +118,7 @@ function makeContext(workspaceRoot: string) {
     logger: { info: () => {}, event: () => {}, getEvents: () => [] },
     dryRun: false,
     outputFormat: "pretty" as const,
-    io: {} as never,
+    io: createDefaultIO().io,
     actualState: {} as never,
   };
 }
@@ -86,8 +129,8 @@ describe("werkstatt.e2e.cold", () => {
   beforeEach(() => {
     mockExecFileSync = vi.fn();
     mockMkdtemp = vi.fn(async () => join(tmpDir, "cold-root"));
-    mockMkdir = vi.fn(async () => undefined);
-    mockWriteFile = vi.fn(async () => undefined);
+    mockMkdir = vi.fn(async (p: string) => { await realFsPromises.mkdir(p, { recursive: true }); });
+    mockWriteFile = vi.fn(async (p: string, c: string | Uint8Array) => { await realFsPromises.writeFile(p, c); });
     mockReadFile = vi.fn(async () => "");
     mockReaddir = vi.fn(async () => [] as never);
     mockRm = vi.fn(async () => undefined);
@@ -117,7 +160,7 @@ describe("werkstatt.e2e.cold", () => {
 
   it("returns interventions=0 and exit 0 when all steps succeed", async () => {
     mockExecFileSync.mockReturnValue("");
-    mockReaddir = vi.fn(async () => ["m000001"] as never);
+    mockReaddir = vi.fn(async () => [{ name: "m000001", isFile: () => false, isDirectory: () => true }] as never);
     mockReadFile = vi.fn(async () => "" as never);
 
     mockedExec.mockImplementation((cmdInput: { commandName?: string }) => {

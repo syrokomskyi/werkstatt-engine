@@ -13,9 +13,9 @@ the bundle's golden one so absorb can confirm the catch-up preserved them.</purp
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import { sha256OfBytes } from "./bundle-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface ValidationPack {
   /** Output-relative POSIX paths of rendered HTML routes, sorted. */
@@ -42,9 +42,9 @@ export interface ValidationDiff {
 
 const LLMS_FILES = ["llms.txt", "llms-full.txt"];
 
-async function exists(p: string): Promise<boolean> {
+async function exists(p: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
   try {
-    await fs.stat(p);
+    await io.stat(p);
     return true;
   } catch {
     return false;
@@ -62,16 +62,16 @@ async function resolveOutputDir(appDir: string): Promise<string | null> {
 
 async function walkHtml(root: string): Promise<string[]> {
   const out: string[] = [];
-  async function rec(dir: string): Promise<void> {
+  async function rec(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      entries = await io.readdir(dir);
     } catch {
       return;
     }
     for (const e of entries) {
       const abs = path.join(dir, e.name);
-      if (e.isDirectory()) {
+      if (e.isDirectory) {
         if (e.name === "_astro" || e.name === "_img" || e.name === "_video") continue;
         await rec(abs);
       } else if (e.name.endsWith(".html")) {
@@ -83,21 +83,21 @@ async function walkHtml(root: string): Promise<string[]> {
   return out.sort();
 }
 
-async function hashIfExists(p: string): Promise<string | null> {
+async function hashIfExists(p: string, io: WorkspaceIO = createDefaultIO().io): Promise<string | null> {
   try {
-    return sha256OfBytes(await fs.readFile(p));
+    return sha256OfBytes(await io.readFile(p));
   } catch {
     return null;
   }
 }
 
-async function readScores(outDir: string, appDir: string): Promise<ValidationPack["scores"]> {
+async function readScores(outDir: string, appDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<ValidationPack["scores"]> {
   for (const candidate of [
     path.join(outDir, ".well-known", "cosmic-passport.json"),
     path.join(appDir, "dist", ".well-known", "cosmic-passport.json"),
   ]) {
     try {
-      const raw = await fs.readFile(candidate, "utf8");
+      const raw = await io.readFile(candidate);
       const parsed = JSON.parse(raw) as {
         scores?: { nebula?: number; pillars?: Record<string, { score?: number }> };
       };

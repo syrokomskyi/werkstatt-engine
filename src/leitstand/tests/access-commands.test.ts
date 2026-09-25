@@ -8,6 +8,7 @@
 */
 
 import { describe, expect, it, vi } from "vitest";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("../../sternsystem/registry-io.ts", () => ({
   readSystemConfigSmart: vi.fn(),
@@ -23,7 +24,7 @@ function makeInput(flags: Record<string, unknown>) {
 }
 
 function makeContext(workspaceRoot: string) {
-  return { workspaceRoot, dryRun: false, site: undefined } as unknown as Parameters<
+  return { io: createDefaultIO().io, workspaceRoot, dryRun: false, site: undefined } as unknown as Parameters<
     typeof runLeitstandAccessStatus
   >[1];
 }

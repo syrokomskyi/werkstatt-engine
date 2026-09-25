@@ -16,8 +16,6 @@ mission.git.commit separately to group multiple writes into one commit.
 </CHANGE_SUMMARY>
 */
 
-import { writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -26,6 +24,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "../mission/mission-io.ts";
 import { isClientEditable } from "./dna-22-checker.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkpieceWriteResult {
   path: string;
@@ -62,7 +61,7 @@ export async function runWorkpieceWrite(
   const { workspaceRoot, logger } = context;
 
   const manifestPath = path.join(resolveMissionDir(workspaceRoot, missionId), "mission.yaml");
-  if (!existsSync(manifestPath)) {
+  if (!await context.io.exists(manifestPath)) {
     throw new Error(`[workpiece.write] Mission '${missionId}' is not open or does not exist`);
   }
 
@@ -74,7 +73,7 @@ export async function runWorkpieceWrite(
   }
 
   const workpieceDir = path.join(resolveMissionDir(workspaceRoot, missionId), "workpiece");
-  if (!existsSync(workpieceDir)) {
+  if (!await context.io.exists(workpieceDir)) {
     throw new Error(
       `[workpiece.write] Workpiece for mission '${missionId}' not found. Run mission.materialize first.`,
     );
@@ -94,11 +93,11 @@ export async function runWorkpieceWrite(
   const content = await readStdin();
 
   const parentDir = path.dirname(resolvedPath);
-  if (!existsSync(parentDir)) {
-    await mkdir(parentDir, { recursive: true });
+  if (!await context.io.exists(parentDir)) {
+    await context.io.mkdir(parentDir);
   }
 
-  await writeFile(resolvedPath, content, "utf8");
+  await context.io.writeFile(resolvedPath, content);
   const bytesWritten = Buffer.byteLength(content, "utf8");
   logger.info(`[workpiece.write] ${missionId}: wrote ${normalizedPath} (${bytesWritten} bytes)`);
 

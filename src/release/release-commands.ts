@@ -59,10 +59,7 @@ HARDCODED_VALUES_AUDIT (RFC-0980):
 // Any change to Miniflare options, language detection, or module enumeration
 // MUST be accompanied by a test update. See ADR-0067 for testing strategy.
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
 import type {
   DiscoveredSiteWorkspace,
   KernelCommandInput,
@@ -104,6 +101,7 @@ import {
   type LegacyReleaseDiagnostic,
 } from "@warpgogol/werkstatt-shared/ontology/operations";
 import type { ReleaseArtifactRef } from "@warpgogol/werkstatt-shared/ontology/operations";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -128,18 +126,24 @@ function deriveReleaseId(systemId: string, existing: string[]): string {
   return `${systemId}-r${String(next).padStart(6, "0")}`;
 }
 
-async function listReleaseIds(workspaceRoot: string): Promise<string[]> {
+async function listReleaseIds(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const releasesDir = path.join(workspaceRoot, "releases");
-  if (!existsSync(releasesDir)) return [];
-  const entries = await fs.readdir(releasesDir, { withFileTypes: true });
-  return entries.filter((e) => e.isDirectory() && !e.name.includes(".staging-")).map((e) => e.name);
+  if (!(await io.exists(releasesDir))) return [];
+  const entries = await io.readdir(releasesDir);
+  return entries.filter((e) => e.isDirectory && !e.name.includes(".staging-")).map((e) => e.name);
 }
 
-async function readEntitlementFeatures(dir: string): Promise<string[] | null> {
+async function readEntitlementFeatures(
+  dir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[] | null> {
   try {
     const filePath = path.join(dir, "src", "entitlements.generated.yaml");
-    if (!existsSync(filePath)) return null;
-    const raw = await fs.readFile(filePath, "utf8");
+    if (!(await io.exists(filePath))) return null;
+    const raw = await io.readFile(filePath);
     const parsed = parseYaml(raw) as { features?: unknown };
     return Array.isArray(parsed.features) ? parsed.features.map(String) : null;
   } catch {
@@ -153,6 +157,7 @@ async function logEntitlementDiff(
   releasesBase: string,
   systemReleases: string[],
   currentReleaseId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   try {
     const currentFeatures = await readEntitlementFeatures(workpieceDir);
@@ -178,7 +183,7 @@ async function logEntitlementDiff(
 
     // Try dist/client first (build output), then release root
     const distClientDir = path.join(prevReleaseDir, "dist", "client");
-    if (existsSync(distClientDir)) {
+    if (await io.exists(distClientDir)) {
       prevFeatures = await readEntitlementFeatures(distClientDir);
     }
     if (!prevFeatures) {
@@ -227,12 +232,13 @@ export class LegacyReleaseError extends Error {
 export async function readReleaseManifest(
   workspaceRoot: string,
   releaseId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ReleaseManifest> {
   const manifestPath = path.join(workspaceRoot, "releases", releaseId, "release.yaml");
-  if (!existsSync(manifestPath)) {
+  if (!(await io.exists(manifestPath))) {
     throw new Error(`[release] release '${releaseId}' not found`);
   }
-  const content = await fs.readFile(manifestPath, "utf8");
+  const content = await io.readFile(manifestPath);
   const parsed = parseYaml(content);
   const result = releaseManifestSchema.safeParse(parsed);
   if (result.success) {
@@ -305,7 +311,7 @@ export async function runReleasePrepare(
   // Check validation has passed
   const missionDir = resolveMissionDir(workspaceRoot, missionId);
   const validationPath = path.join(missionDir, "evidence", "validation-report.json");
-  if (!existsSync(validationPath)) {
+  if (!(await context.io.exists(validationPath))) {
     throw new Error(`[release.prepare] mission '${missionId}' has not passed validation`);
   }
 
@@ -329,26 +335,26 @@ export async function runReleasePrepare(
 
     try {
       const releasesBase = path.join(workspaceRoot, "releases");
-      await fs.mkdir(releasesBase, { recursive: true });
+      await context.io.mkdir(releasesBase);
 
       const stagingDir = resolveStagingDir(
         workspaceRoot,
         path.join(releasesBase, releaseId),
         operationId,
       );
-      if (existsSync(stagingDir)) {
-        await fs.rm(stagingDir, { recursive: true, force: true });
+      if (await context.io.exists(stagingDir)) {
+        await context.io.rm(stagingDir, { recursive: true });
       }
-      await fs.mkdir(stagingDir, { recursive: true });
+      await context.io.mkdir(stagingDir);
 
       // Copy validation and materialization reports
       const evidenceDir = path.join(missionDir, "evidence");
-      if (existsSync(evidenceDir)) {
-        await fs.mkdir(path.join(stagingDir), { recursive: true });
+      if (await context.io.exists(evidenceDir)) {
+        await context.io.mkdir(path.join(stagingDir));
         for (const report of ["validation-report.json", "materialization-report.json"]) {
           const src = path.join(evidenceDir, report);
-          if (existsSync(src)) {
-            await fs.copyFile(src, path.join(stagingDir, report));
+          if (await context.io.exists(src)) {
+            await context.io.copyFile(src, path.join(stagingDir, report));
           }
         }
       }
@@ -367,11 +373,11 @@ export async function runReleasePrepare(
 
       const distributionMetaPath = path.join(missionDir, "distribution", "build-input-hash.json");
       const canReuseDistribution =
-        existsSync(distributionDir) &&
-        existsSync(distributionMetaPath) &&
-        (await (async () => {
+        (await context.io.exists(distributionDir)) &&
+        (await context.io.exists(distributionMetaPath)) &&
+        (await (async (io: WorkspaceIO = createDefaultIO().io) => {
           try {
-            const meta = JSON.parse(await fs.readFile(distributionMetaPath, "utf8"));
+            const meta = JSON.parse(await io.readFile(distributionMetaPath));
             return meta.buildInputHash === buildInputHash;
           } catch {
             return false;
@@ -381,18 +387,20 @@ export async function runReleasePrepare(
       // RFC-0634: Capture commitSha from workpiece git HEAD (not monorepo HEAD)
       let commitSha = "unknown";
       try {
-        commitSha = execSync("git rev-parse HEAD", {
+        const revResult = await context.io.exec("sh", ["-c", "git rev-parse HEAD"], {
           cwd: workpieceDir,
-          encoding: "utf-8",
-          stdio: "pipe",
-        }).trim();
+        });
+        if (revResult.exitCode !== 0) {
+          throw new Error(`git rev-parse exited ${revResult.exitCode}`);
+        }
+        commitSha = revResult.stdout.trim();
       } catch {
         logger.warn("[release.prepare] could not read workpiece HEAD sha");
       }
 
       // RFC-0634: Write preliminary build-identity.json to workpiece/public/.well-known/ before build
       const publicWellKnownDir = path.join(workpieceDir, "public", ".well-known");
-      await fs.mkdir(publicWellKnownDir, { recursive: true });
+      await context.io.mkdir(publicWellKnownDir);
       const preliminaryBuildIdentity = {
         releaseId,
         systemId,
@@ -414,11 +422,11 @@ export async function runReleasePrepare(
       logger.info(`  Wrote preliminary build-identity.json to workpiece/public/.well-known/`);
 
       if (canReuseDistribution) {
-        await fs.mkdir(distDest, { recursive: true });
+        await context.io.mkdir(distDest);
         await copyDir(distributionDir, distDest);
         buildReused = true;
         logger.info(`  Reused distribution from mission.build (build input hash matched)`);
-      } else if (existsSync(workpieceDir)) {
+      } else if (await context.io.exists(workpieceDir)) {
         // RFC-0356: run build.prepare → astro build → build.post unconditionally.
         // All three phases must succeed — without build.post the distribution is
         // unsigned (text.normalize.apply, passport.emit, etc. never run).
@@ -472,11 +480,15 @@ export async function runReleasePrepare(
 
         logger.info(`  Running astro build in ${workpieceDir}…`);
         try {
-          execSync("pnpm exec astro build", {
+          const buildResult = await context.io.exec("sh", ["-c", "pnpm exec astro build"], {
             cwd: workpieceDir,
-            stdio: "pipe",
-            timeout: 300_000,
+            timeoutMs: 300_000,
           });
+          if (buildResult.exitCode !== 0) {
+            throw new Error(
+              `astro build exited ${buildResult.exitCode}: ${buildResult.stderr.slice(-400)}`,
+            );
+          }
         } catch (err) {
           const buildError = err instanceof Error ? err.message : String(err);
           throw new Error(`[release.prepare] astro build failed: ${buildError.slice(0, 200)}`);
@@ -491,8 +503,8 @@ export async function runReleasePrepare(
         }
 
         const workpieceDist = path.join(workpieceDir, "dist");
-        if (existsSync(workpieceDist)) {
-          await fs.mkdir(distDest, { recursive: true });
+        if (await context.io.exists(workpieceDist)) {
+          await context.io.mkdir(distDest);
           await copyDir(workpieceDist, distDest);
         } else {
           throw new Error(`[release.prepare] astro build produced no dist/ directory`);
@@ -510,13 +522,15 @@ export async function runReleasePrepare(
         ".well-known",
         "build-identity.json",
       );
-      if (existsSync(distClientBuildIdentityPath)) {
-        await fs.rm(distClientBuildIdentityPath, { force: true });
+      if (await context.io.exists(distClientBuildIdentityPath)) {
+        await context.io.rm(distClientBuildIdentityPath, { recursive: true });
         logger.info(`  Removed preliminary build-identity.json from dist/ before hashing`);
       }
 
       // RFC-0634: Clean up preliminary from workpiece/public/.well-known/
-      await fs.rm(path.join(publicWellKnownDir, "build-identity.json"), { force: true });
+      await context.io.rm(path.join(publicWellKnownDir, "build-identity.json"), {
+        recursive: true,
+      });
 
       // RFC-0961: Boot-smoke — boot built worker in miniflare and execute representative requests
       const { runBootSmoke, planBootSmokeRequests, detectBootSmokeLanguages } =
@@ -525,11 +539,11 @@ export async function runReleasePrepare(
       // correct paths relative to the dist directory. Fall back to workpiece
       // wrangler.jsonc if the Astro output doesn't exist.
       const astroWranglerPath = path.join(distDest, "server", "wrangler.json");
-      const wranglerConfigPath = existsSync(astroWranglerPath)
+      const wranglerConfigPath = (await context.io.exists(astroWranglerPath))
         ? astroWranglerPath
         : path.join(workpieceDir, "wrangler.jsonc");
       let bootSmokeVerdict: "pass" | "fail" = "pass";
-      if (existsSync(wranglerConfigPath)) {
+      if (await context.io.exists(wranglerConfigPath)) {
         // When using the Astro-generated wrangler.json, the base directory is
         // dist/server/ (entry.mjs and assets.directory are relative to it).
         const bootSmokeDistDir =
@@ -587,7 +601,7 @@ export async function runReleasePrepare(
 
       // RFC-0585: Capture behavior snapshots and run diff
       // Astro Cloudflare adapter outputs HTML to dist/client/ — scan that for routes
-      const clientDistDir = existsSync(path.join(distDest, "client"))
+      const clientDistDir = (await context.io.exists(path.join(distDest, "client")))
         ? path.join(distDest, "client")
         : distDest;
       const readableSnapshotPath = path.join(stagingDir, "readable-snapshot.json");
@@ -608,7 +622,7 @@ export async function runReleasePrepare(
       );
       if (!readableResult.data)
         throw new Error("[release.prepare] readable snapshot capture returned no data");
-      await fs.writeFile(
+      await context.io.writeFile(
         readableSnapshotPath,
         JSON.stringify(readableResult.data.wrapper, null, 2) + "\n",
       );
@@ -627,7 +641,7 @@ export async function runReleasePrepare(
       );
       if (!productionResult.data)
         throw new Error("[release.prepare] production snapshot capture returned no data");
-      await fs.writeFile(
+      await context.io.writeFile(
         productionSnapshotPath,
         JSON.stringify(productionResult.data.wrapper, null, 2) + "\n",
       );
@@ -641,7 +655,7 @@ export async function runReleasePrepare(
       );
       if (!diffResult.data)
         throw new Error("[release.prepare] behavior snapshot diff returned no data");
-      await fs.writeFile(snapshotDiffPath, JSON.stringify(diffResult.data, null, 2) + "\n");
+      await context.io.writeFile(snapshotDiffPath, JSON.stringify(diffResult.data, null, 2) + "\n");
 
       const snapshotDiffVerdict = diffResult.data.verdict as "pass" | "fail";
       if (snapshotDiffVerdict === "fail") {
@@ -661,7 +675,7 @@ export async function runReleasePrepare(
 
       // RFC-0608: Write build-identity.json into dist/client/.well-known/
       const wellKnownDir = path.join(distDest, "client", ".well-known");
-      await fs.mkdir(wellKnownDir, { recursive: true });
+      await context.io.mkdir(wellKnownDir);
       const buildIdentity = {
         releaseId,
         systemId,
@@ -718,8 +732,8 @@ export async function runReleasePrepare(
       // RFC-0761: Copy .env from workpiece to release directory
       const srcEnv = path.join(workpieceDir, ".env");
       const destEnv = path.join(stagingDir, ".env");
-      if (existsSync(srcEnv)) {
-        await fs.copyFile(srcEnv, destEnv);
+      if (await context.io.exists(srcEnv)) {
+        await context.io.copyFile(srcEnv, destEnv);
         logger.info(`  Copied .env to release`);
       } else {
         logger.warn(
@@ -729,8 +743,8 @@ export async function runReleasePrepare(
 
       // Atomic rename
       const finalDir = path.join(releasesBase, releaseId);
-      if (existsSync(finalDir)) {
-        await fs.rm(finalDir, { recursive: true, force: true });
+      if (await context.io.exists(finalDir)) {
+        await context.io.rm(finalDir, { recursive: true });
       }
       await atomicMoveDir(stagingDir, finalDir);
 
@@ -741,9 +755,9 @@ export async function runReleasePrepare(
 
       // RFC-0655: sync close-report.json releaseId after writing mission.yaml
       const closeReportPath = path.join(missionDir, "evidence", "close-report.json");
-      if (existsSync(closeReportPath)) {
+      if (await context.io.exists(closeReportPath)) {
         try {
-          const closeReportRaw = await fs.readFile(closeReportPath, "utf8");
+          const closeReportRaw = await context.io.readFile(closeReportPath);
           const closeReport = JSON.parse(closeReportRaw) as Record<string, unknown>;
           closeReport.releaseId = releaseId;
           await atomicWriteFile(closeReportPath, JSON.stringify(closeReport, null, 2) + "\n");
@@ -837,17 +851,21 @@ export async function runReleasePrepare(
   }
 }
 
-async function copyDir(src: string, dest: string): Promise<void> {
-  if (!existsSync(src)) return;
-  await fs.mkdir(dest, { recursive: true });
-  const entries = await fs.readdir(src, { withFileTypes: true });
+async function copyDir(
+  src: string,
+  dest: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  if (!(await io.exists(src))) return;
+  await io.mkdir(dest);
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       await copyDir(srcPath, destPath);
     } else {
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -872,7 +890,7 @@ export async function runReleaseReady(
   if (!releaseId) throw new Error("[release.ready] --release is required");
 
   const releaseDir = path.join(workspaceRoot, "releases", releaseId);
-  if (!existsSync(releaseDir)) {
+  if (!(await context.io.exists(releaseDir))) {
     throw new Error(`[release.ready] release '${releaseId}' not found`);
   }
 
@@ -893,7 +911,7 @@ export async function runReleaseReady(
 
   // RFC-0585: Check dist directory exists
   const distDir = path.join(releaseDir, "dist");
-  if (!existsSync(distDir)) {
+  if (!(await context.io.exists(distDir))) {
     throw new Error(
       `[release.ready] release '${releaseId}' has no dist/ directory — run release.prepare to build and stage the distribution`,
     );
@@ -927,7 +945,13 @@ export async function runReleaseReady(
     // release.ready already holds release:${releaseId} and system:${systemId} locks,
     // so we call the lock-free core directly — not runArtifactStorePut which would deadlock.
     // distDir was already declared and validated above (RFC-0585 check).
-    const artifactResult = await storeArtifactCore(workspaceRoot, releaseId, distDir, systemId);
+    const artifactResult = await storeArtifactCore(
+      workspaceRoot,
+      releaseId,
+      distDir,
+      systemId,
+      context.io,
+    );
 
     // Update manifest with artifact reference and state transition in a single write
     const artifactRef: ReleaseArtifactRef = {
@@ -1008,7 +1032,7 @@ export async function runReleaseValidate(
   if (!releaseId) throw new Error("[release.validate] --release is required");
 
   const releaseDir = path.join(workspaceRoot, "releases", releaseId);
-  const manifestFound = existsSync(releaseDir);
+  const manifestFound = await context.io.exists(releaseDir);
 
   if (!manifestFound) {
     logger.error(`[release.validate] release '${releaseId}' not found`);
@@ -1037,7 +1061,7 @@ export async function runReleaseValidate(
       );
     }
   } else {
-    artifactPresent = existsSync(distDir) || manifest.artifact !== null;
+    artifactPresent = (await context.io.exists(distDir)) || manifest.artifact !== null;
   }
 
   logger.success(`[release.validate] ${releaseId} valid (state: ${releaseState})`);
@@ -1085,19 +1109,19 @@ export async function runReleaseList(
   const systemFilter = flagString(input, "site");
 
   const releasesDir = path.join(workspaceRoot, "releases");
-  if (!existsSync(releasesDir)) {
+  if (!(await context.io.exists(releasesDir))) {
     return {
       data: { releases: [], count: 0, legacyInvalid: [] },
       summary: `[release.list] 0 releases`,
     };
   }
 
-  const entries = await fs.readdir(releasesDir, { withFileTypes: true });
+  const entries = await context.io.readdir(releasesDir);
   const releases: Array<{ releaseId: string; systemId: string; state: string }> = [];
   const legacyInvalid: LegacyReleaseDiagnostic[] = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.includes(".staging-")) continue;
+    if (!entry.isDirectory || entry.name.includes(".staging-")) continue;
     const releaseId = entry.name;
     try {
       const manifest = await readReleaseManifest(workspaceRoot, releaseId);
@@ -1248,6 +1272,7 @@ async function validateReleaseState(
   workspaceRoot: string,
   target: { missionId: string | null; releaseId: string | null; systemId: string | null },
   _logger: { warn: (msg: string) => void; info: (msg: string) => void },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ReleaseStateCheck[]> {
   const checks: ReleaseStateCheck[] = [];
   const { missionId, releaseId, systemId } = target;
@@ -1267,7 +1292,7 @@ async function validateReleaseState(
   if (missionReleaseId) {
     const releaseDir = path.join(workspaceRoot, "releases", missionReleaseId);
     const releaseYaml = path.join(releaseDir, "release.yaml");
-    if (!existsSync(releaseDir) || !existsSync(releaseYaml)) {
+    if (!(await io.exists(releaseDir)) || !(await io.exists(releaseYaml))) {
       checks.push({
         rule: "mission-yaml-release-id-exists",
         status: "fail",
@@ -1295,7 +1320,7 @@ async function validateReleaseState(
       "evidence",
       "close-report.json",
     );
-    if (!existsSync(closeReportPath)) {
+    if (!(await io.exists(closeReportPath))) {
       checks.push({
         rule: "close-report-release-id-consistent",
         status: "warn",
@@ -1303,7 +1328,7 @@ async function validateReleaseState(
       });
     } else {
       try {
-        const raw = await fs.readFile(closeReportPath, "utf8");
+        const raw = await io.readFile(closeReportPath);
         const report = JSON.parse(raw) as Record<string, unknown>;
         const closeReportReleaseId = (report.releaseId as string | null) ?? null;
         if (missionReleaseId && closeReportReleaseId !== missionReleaseId) {
@@ -1482,9 +1507,9 @@ export async function runDistDeterminismValidate(
     const missionDir = resolveMissionDir(workspaceRoot, missionId!);
     const workpieceDist = path.join(missionDir, "workpiece", "dist");
     const distributionDist = path.join(missionDir, "distribution", "dist");
-    if (existsSync(workpieceDist)) {
+    if (await context.io.exists(workpieceDist)) {
       distPath = workpieceDist;
-    } else if (existsSync(distributionDist)) {
+    } else if (await context.io.exists(distributionDist)) {
       distPath = distributionDist;
     } else {
       return {
@@ -1502,7 +1527,7 @@ export async function runDistDeterminismValidate(
     }
   }
 
-  if (!existsSync(distPath)) {
+  if (!(await context.io.exists(distPath))) {
     return {
       data: {
         distPath,
@@ -1585,13 +1610,13 @@ export async function runReleaseSign(
   if (!releaseId) throw new Error("[release.sign] --release is required");
 
   const releaseDir = path.join(workspaceRoot, "releases", releaseId);
-  if (!existsSync(releaseDir)) {
+  if (!(await context.io.exists(releaseDir))) {
     throw new Error(`[release.sign] release directory not found: ${releaseDir}`);
   }
 
   const distDir = path.join(releaseDir, "dist");
   const buildIdentityPath = path.join(distDir, "client", ".well-known", "build-identity.json");
-  if (!existsSync(buildIdentityPath)) {
+  if (!(await context.io.exists(buildIdentityPath))) {
     throw new Error(
       `[release.sign] build-identity.json not found at ${buildIdentityPath}. Run release.prepare first.`,
     );
@@ -1616,7 +1641,7 @@ export async function runReleaseSign(
       privateKeyPem = privateKeyEnv;
       privateKeyBytes = await loadPrivateKey({ pem: privateKeyEnv });
     } else {
-      privateKeyPem = await fs.readFile(privateKeyPath!, "utf8");
+      privateKeyPem = await context.io.readFile(privateKeyPath!);
       privateKeyBytes = await loadPrivateKey({
         filePath: privateKeyPath!,
         encoding: "pem",

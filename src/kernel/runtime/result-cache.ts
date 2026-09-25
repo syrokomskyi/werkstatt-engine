@@ -23,7 +23,6 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
 </CHANGE_SUMMARY>
 */
 
-import { access } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
 import { stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
@@ -46,6 +45,7 @@ import {
 } from "../cache/command-result-cache.ts";
 import { filterTreeIndex } from "../cache/workspace-tree-index.ts";
 import { deriveModuleBasePath } from "./registry.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // @ai-invariant: Command-result caching lives only in executeRegisteredCommand — never read or write command_results from pipeline executors directly.
 
@@ -157,6 +157,7 @@ export async function resolveResultCache(
 export async function readCommandResult(
   cache: KernelResultCacheContext,
   call: CommandResultCacheCall,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<KernelExecutionReport | null> {
   if (call.dryRun || call.force) return null;
   if (!isCommandCacheable(call.command)) return null;
@@ -209,9 +210,7 @@ export async function readCommandResult(
   if (writes.length > 0) {
     for (const writePath of writes) {
       const abs = join(call.baseDir, writePath);
-      try {
-        await access(abs);
-      } catch {
+      if (!(await io.exists(abs))) {
         return null;
       }
     }
@@ -314,6 +313,7 @@ async function tryMtimeFastPath(
   moduleSrcDir: string,
   moduleHashCache: Map<string, string>,
   flagsHash: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<KernelExecutionReport | null> {
   const treeIndex = cache.treeIndex;
   if (!treeIndex) return null;
@@ -362,9 +362,7 @@ async function tryMtimeFastPath(
   if (writes.length > 0) {
     for (const writePath of writes) {
       const abs = join(baseDir, writePath);
-      try {
-        await access(abs);
-      } catch {
+      if (!(await io.exists(abs))) {
         return null;
       }
     }

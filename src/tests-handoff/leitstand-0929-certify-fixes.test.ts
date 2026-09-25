@@ -19,6 +19,7 @@ import type {
   KernelCommandInput,
   KernelFlagValue,
 } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../sternsystem/registry-io.ts")>();
@@ -84,6 +85,7 @@ const mockReaddir = fsMock.readdir as unknown as ReturnType<typeof vi.fn>;
 const mockReadFile = fsMock.readFile as unknown as ReturnType<typeof vi.fn>;
 
 const context = {
+  io: createDefaultIO().io,
   workspaceRoot: "/tmp/test-workspace",
   logger: {
     info: () => {},

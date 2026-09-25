@@ -1,6 +1,7 @@
 import { test, expect } from "vitest";
 import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 import { executeKernelCommand, parseKernelArgv, resolveCommandFlags } from "../index.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 /*
 <MODULE_CONTRACT>
@@ -150,6 +151,7 @@ test("parseKernelArgv: schema-less commands parse exactly as before (golden fixt
 test("executeKernelCommand: unknown option key fails with an explicit error naming argv (regression: commit 8b3e62ab)", async () => {
   try {
     await executeKernelCommand({
+      io: createDefaultIO().io,
       workspaceRoot: process.cwd(),
       commandName: "noop",
       args: ["--phase=05-audit"],

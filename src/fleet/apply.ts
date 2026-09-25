@@ -37,6 +37,7 @@ import {
 } from "../sternsystem/registry-io.ts";
 import { appendRecord, readJournal } from "../journal/jsonl.ts";
 import type { FleetSiteRecord } from "./fleet-sites-generate.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FLEET_SITES_FILE = "fleet/fleet.sites.yaml";
 const FLEET_OPERATIONS_DIR = "fleet/operations";
@@ -125,6 +126,7 @@ async function regenerateRegistry(
   logger.info("[fleet.apply] Registry stale or missing — regenerating via fleet.sites.generate");
   const { runFleetSitesGenerate } = await import("./fleet-sites-generate.ts");
   const result = await runFleetSitesGenerate({ flags: {}, argv: [] }, {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger,
   } as KernelRuntimeContext);

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { stringify as yamlStringify } from "yaml";
 import { runFleetSitesGenerate, validateFleetSitesDrift } from "./fleet-sites-generate.ts";
 import type { KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
@@ -21,7 +22,7 @@ function makeContext(workspaceRoot: string): KernelRuntimeContext {
     siteExplicit: false,
     dryRun: false,
     outputFormat: "text",
-    io: { write: () => {}, read: () => "" },
+    io: createDefaultIO().io,
     actualState: undefined,
   } as unknown as KernelRuntimeContext;
 }

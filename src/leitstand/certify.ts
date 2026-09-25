@@ -26,7 +26,6 @@ resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand 
 */
 
 import path from "node:path";
-import fs from "node:fs/promises";
 import type {
   KernelCommandInput,
   KernelRuntimeContext,
@@ -59,6 +58,7 @@ import { evidenceEnvelopeV1Schema } from "../certification/contracts/evidence.ts
 import type { ReleaseCandidateV1 } from "../certification/contracts/candidate.ts";
 import type { CertificationPolicyBundleV1 } from "../certification/contracts/policy-bundle.ts";
 import { gateDecisionV1Schema } from "../certification/contracts/decisions.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const PIN_DELETION_PROPAGATION_DELAY_MS = 5000;
 
@@ -93,7 +93,7 @@ async function tryReuseEvidence(
   cacheCloneDir: string,
   releaseId: string,
   artifactHash: Sha256Digest,
-  forceRequested: boolean,
+  forceRequested: boolean, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<EvidenceCacheEntry | null> {
   // RFC-0867: The sequential deployment pipeline (dev → alt → main) uses the same
   // certification profile and policy bundle for all gates of a given release.
@@ -106,7 +106,7 @@ async function tryReuseEvidence(
   const gateDecisionsDir = path.join(cacheCloneDir, "gate-decisions");
   let entries: string[];
   try {
-    entries = await fs.readdir(gateDecisionsDir);
+    entries = (await io.readdir(gateDecisionsDir)).map(e => e.name);
   } catch {
     return null;
   }
@@ -120,7 +120,7 @@ async function tryReuseEvidence(
 
     let decision: GateDecisionV1;
     try {
-      const content = await fs.readFile(path.join(gateDecisionsDir, decisionFile), "utf8");
+      const content = await io.readFile(path.join(gateDecisionsDir, decisionFile));
       const parsed = JSON.parse(content);
       const result = gateDecisionV1Schema.safeParse(parsed);
       if (!result.success) continue;
@@ -137,7 +137,7 @@ async function tryReuseEvidence(
 
     let sidecar: EvidenceCacheSidecar;
     try {
-      const sidecarContent = await fs.readFile(path.join(gateDecisionsDir, sidecarFile), "utf8");
+      const sidecarContent = await io.readFile(path.join(gateDecisionsDir, sidecarFile));
       const sidecarParsed = JSON.parse(sidecarContent);
       if (
         sidecarParsed.schema !== "werkstatt/evidence-cache@1" ||
@@ -192,7 +192,7 @@ async function writeEvidenceSidecar(
   artifactHash: Sha256Digest,
   evidence: EvidenceEnvelopeV1[],
   producedAt: string,
-  producedByGate: GateChannel,
+  producedByGate: GateChannel, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   const sidecar: EvidenceCacheSidecar = {
     schema: "werkstatt/evidence-cache@1",
@@ -203,7 +203,7 @@ async function writeEvidenceSidecar(
     producedByGate,
   };
   const outputDir = path.join(cacheCloneDir, "gate-decisions");
-  await fs.mkdir(outputDir, { recursive: true });
+  await io.mkdir(outputDir);
   const sidecarPath = path.join(outputDir, `${releaseId}-evidence.json`);
   await writeFileIfChanged(sidecarPath, JSON.stringify(sidecar, null, 2) + "\n");
   return sidecarPath;
@@ -357,7 +357,7 @@ export async function runLeitstandCertify(
 
   // Inner function containing all certification logic. The try/finally wrapper
   // below ensures the PIN is restored even on early returns or thrown errors.
-  const certifyCore = async (): Promise<KernelCommandResult<CertifyResult>> => {
+  const certifyCore = async (io: WorkspaceIO = createDefaultIO().io): Promise<KernelCommandResult<CertifyResult>> => {
     const reuseEntry = await tryReuseEvidence(
       cacheCloneDir,
       releaseId,
@@ -456,7 +456,7 @@ export async function runLeitstandCertify(
     };
 
     const handler: ProducerExecutionHandlerV1 = async (
-      execInput: ProducerExecutionInputV1,
+      execInput: ProducerExecutionInputV1, io: WorkspaceIO = createDefaultIO().io,
     ): Promise<EvidenceEnvelopeV1> => {
       const evidenceId = `ev-${execInput.producerId}-${now.toLowerCase().replace(/[:.]/g, "-")}`;
       const diagnostics: Array<{
@@ -480,7 +480,7 @@ export async function runLeitstandCertify(
               ".well-known",
               "build-identity.json",
             );
-            const identity = JSON.parse(await fs.readFile(buildIdentityPath, "utf8"));
+            const identity = JSON.parse(await io.readFile(buildIdentityPath));
             missionId = identity.missionId;
           } catch {
             // build-identity.json not yet written or malformed — missionId unavailable
@@ -709,7 +709,7 @@ export async function runLeitstandCertify(
     };
 
     const outputDir = path.join(cacheCloneDir, "gate-decisions");
-    await fs.mkdir(outputDir, { recursive: true });
+    await io.mkdir(outputDir);
     const outputPath = path.join(outputDir, `${releaseId}-${gate}.json`);
     await writeFileIfChanged(outputPath, JSON.stringify(gateDecision, null, 2) + "\n");
 
@@ -885,17 +885,17 @@ export async function runLeitstandCertify(
 
 async function resolveDevBaseUrl(
   cacheCloneDir: string,
-  baseUrlFlag: string | undefined,
+  baseUrlFlag: string | undefined, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string | undefined> {
   const opsDir = path.join(cacheCloneDir, "deployment-operations");
   let latestDevUrl: string | undefined;
   try {
-    const entries = await fs.readdir(opsDir);
+    const entries = await io.readdir(opsDir);
     let latestAt = "";
     for (const entry of entries) {
-      if (!entry.endsWith(".json")) continue;
+      if (!entry.name.endsWith(".json")) continue;
       try {
-        const content = await fs.readFile(path.join(opsDir, entry), "utf8");
+        const content = await io.readFile(path.join(opsDir, entry.name));
         const record = JSON.parse(content) as {
           channel?: string;
           timestamp?: string;

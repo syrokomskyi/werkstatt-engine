@@ -26,7 +26,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { WorkshopCapacity } from "./types.ts";
 import { workshopCapacitySchema } from "./types.ts";
@@ -37,6 +36,7 @@ import {
   WerkstattIdentityConfigSchema,
   type WerkstattIdentityConfig,
 } from "@warpgogol/werkstatt-shared/passport";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const IDENTITY_FILENAME = "werkstatt.identity.json";
 const PASSPORT_SIGNING_KEY_ENV = "PASSPORT_SIGNING_KEY";
@@ -49,9 +49,9 @@ interface DhtCapacityPublishResult {
   diagnostics?: string[];
 }
 
-async function loadIdentityConfig(workspaceRoot: string): Promise<WerkstattIdentityConfig> {
+async function loadIdentityConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<WerkstattIdentityConfig> {
   const identityPath = join(workspaceRoot, IDENTITY_FILENAME);
-  const raw = await readFile(identityPath, "utf8");
+  const raw = await io.readFile(identityPath);
   const parsed = JSON.parse(raw);
   return WerkstattIdentityConfigSchema.parse(parsed);
 }

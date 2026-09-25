@@ -56,6 +56,7 @@ vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
 
 import { runReleaseStateValidate } from "../release/release-commands.ts";
 import type { ReleaseStateCheck } from "../release/release-commands.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,6 +74,7 @@ async function cleanup(dir: string): Promise<void> {
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

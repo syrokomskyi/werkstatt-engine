@@ -19,7 +19,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -221,7 +220,7 @@ export async function runEvidenceFetch(
     ? objects.filter((obj) => !obj.key.slice(runPrefix.length).startsWith("raw/"))
     : objects;
 
-  await fs.mkdir(outputDir, { recursive: true });
+  await context.io.mkdir(outputDir);
 
   const downloadedFiles: string[] = [];
   let totalBytes = 0;
@@ -231,11 +230,11 @@ export async function runEvidenceFetch(
     if (!relPath) continue;
 
     const destPath = path.join(outputDir, relPath);
-    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    await context.io.mkdir(path.dirname(destPath));
 
     try {
       const result = await client.getObject(obj.key);
-      await fs.writeFile(destPath, result.body);
+      await context.io.writeFile(destPath, result.body);
       downloadedFiles.push(relPath);
       totalBytes += result.body.byteLength;
     } catch (err) {

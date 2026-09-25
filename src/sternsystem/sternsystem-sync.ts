@@ -18,7 +18,7 @@
 */
 
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import { tmpdir } from "node:os";
 import * as fs from "node:fs/promises";
@@ -90,7 +90,7 @@ export async function runSternsystemSync(
 
   const { gitMirrors, cachePath } = resolveMirrors(workspaceRoot, config);
   const bareRepoPath = resolveMirrorPath(workspaceRoot, gitMirrors[0].path);
-  if (!existsSync(bareRepoPath)) {
+  if (!await context.io.exists(bareRepoPath)) {
     throw new Error(`[sternsystem.sync] bare repo not found at ${bareRepoPath}`);
   }
 
@@ -103,7 +103,7 @@ export async function runSternsystemSync(
   }
   const branchName = branch.replace("refs/heads/", "");
 
-  if (existsSync(path.join(cachePath, ".git"))) {
+  if (await context.io.exists(path.join(cachePath, ".git"))) {
     // ADR-0086: sweep all dirty operational files (operations/ journals, status
     // files) into a commit before pushing. The cache clone is system-managed —
     // dirty state is operational output, not user work. Closed missions never

@@ -14,18 +14,17 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { appendFile, readFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type { JournalRecord } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function appendRecord(journalPath: string, record: JournalRecord): Promise<void> {
+export async function appendRecord(journalPath: string, record: JournalRecord, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   const dir = path.dirname(journalPath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
+  if (!await io.exists(dir)) {
+    await io.mkdir(dir);
   }
   const line = JSON.stringify(record) + "\n";
-  await appendFile(journalPath, line, "utf8");
+  await io.appendFile(journalPath, line);
 }
 
 export class TornLineError extends Error {
@@ -39,11 +38,11 @@ export class TornLineError extends Error {
   }
 }
 
-export async function readJournal(journalPath: string): Promise<JournalRecord[]> {
-  if (!existsSync(journalPath)) {
+export async function readJournal(journalPath: string, io: WorkspaceIO = createDefaultIO().io): Promise<JournalRecord[]> {
+  if (!await io.exists(journalPath)) {
     return [];
   }
-  const content = await readFile(journalPath, "utf8");
+  const content = await io.readFile(journalPath);
   if (content.length === 0) {
     return [];
   }

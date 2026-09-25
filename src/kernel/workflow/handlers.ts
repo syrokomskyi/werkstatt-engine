@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 import { listStaticCommandSurface } from "../runtime.ts";
@@ -38,6 +37,7 @@ import {
   type WorkflowLintViolation,
   type WorkflowListEntry,
 } from "./types.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const WORKFLOW_DIR = ".agents/workflows";
 const WORKFLOW_AMEND_DIR = ".agents/workflows-amend";
@@ -89,20 +89,22 @@ const PENDING_ACCEPTED_RFC_COMMANDS = new Set([
   "biome.css.generate",
 ]);
 
-async function pathExists(target: string): Promise<boolean> {
-  try {
-    await fs.access(target);
-    return true;
-  } catch {
-    return false;
-  }
+async function pathExists(
+  target: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
+  return io.exists(target);
 }
 
-async function readWorkflowFiles(workspaceRoot: string, dir: string) {
+async function readWorkflowFiles(
+  workspaceRoot: string,
+  dir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+) {
   const directory = path.join(workspaceRoot, dir);
-  const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
+  const entries = await io.readdir(directory).catch(() => []);
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md")
+    .filter((entry) => entry.isFile && entry.name.endsWith(".md") && entry.name !== "README.md")
     .map((entry) => path.join(directory, entry.name))
     .sort();
 }
@@ -156,7 +158,11 @@ function validateFrontmatter(file: string, value: unknown): WorkflowFrontmatter 
 }
 
 /** Load one chain's workflow files. The chain a file belongs to is fixed by its directory. */
-async function loadWorkflows(workspaceRoot: string, chain: WorkflowChain = "greenfield") {
+async function loadWorkflows(
+  workspaceRoot: string,
+  chain: WorkflowChain = "greenfield",
+  io: WorkspaceIO = createDefaultIO().io,
+) {
   const dir = chain === "amend" ? WORKFLOW_AMEND_DIR : WORKFLOW_DIR;
   const files = await readWorkflowFiles(workspaceRoot, dir);
   const workflows: Array<{
@@ -169,7 +175,7 @@ async function loadWorkflows(workspaceRoot: string, chain: WorkflowChain = "gree
   for (const file of files) {
     const relativeFile = path.relative(workspaceRoot, file).replace(/\\/g, "/");
     try {
-      const source = await fs.readFile(file, "utf8");
+      const source = await io.readFile(file);
       workflows.push({
         relativeFile,
         chain,

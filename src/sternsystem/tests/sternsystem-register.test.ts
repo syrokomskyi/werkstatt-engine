@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { runSternsystemRegister } from "../sternsystem-register.ts";
 import { IDENTITY_CONFIG_FILENAME } from "../../identity/identity-io.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tempDir: string;
 const savedEnv: Record<string, string | undefined> = {};
@@ -42,6 +43,7 @@ function makeInput(): KernelCommandInput {
 
 function makeContext(): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tempDir,
     logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
   } as unknown as KernelRuntimeContext;

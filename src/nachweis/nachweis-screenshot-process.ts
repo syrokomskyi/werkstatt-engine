@@ -20,8 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
+
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type {
@@ -33,6 +32,7 @@ import {
   parseMarkdownFrontmatter,
   stringifyMarkdownFrontmatter,
 } from "@warpgogol/werkstatt-shared/content";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
@@ -95,13 +95,13 @@ export async function runNachweisScreenshotProcess(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!existsSync(evidenceFile)) {
+  if (!await context.io.exists(evidenceFile)) {
     throw new Error(
       `[nachweis.screenshot.process] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
   }
 
-  const rawEvidence = await fs.readFile(evidenceFile, "utf8");
+  const rawEvidence = await context.io.readFile(evidenceFile);
   const { data: evidenceData } = parseMarkdownFrontmatter(rawEvidence);
   const websiteScreenshot = evidenceData.websiteScreenshot as
     | {
@@ -137,9 +137,9 @@ export async function runNachweisScreenshotProcess(
   let rawFilePath: string;
   let rawBuffer: Uint8Array;
 
-  if (existsSync(localRawPath)) {
+  if (await context.io.exists(localRawPath)) {
     rawFilePath = localRawPath;
-    rawBuffer = new Uint8Array(await fs.readFile(localRawPath));
+    rawBuffer = new Uint8Array(await context.io.readFileBytes(localRawPath));
   } else {
     // Fallback: download from R2 private
     const r2Key = rawArtifact.r2Key;
@@ -162,8 +162,8 @@ export async function runNachweisScreenshotProcess(
       "raw",
       originalFilename,
     );
-    await fs.mkdir(path.dirname(rawFilePath), { recursive: true });
-    await fs.writeFile(rawFilePath, rawBuffer);
+    await context.io.mkdir(path.dirname(rawFilePath));
+    await context.io.writeFile(rawFilePath, rawBuffer);
   }
 
   // Compute SHA-256 of raw file
@@ -229,18 +229,18 @@ export async function runNachweisScreenshotProcess(
   const displaySha256 = createHash("sha256").update(displayBuffer).digest("hex");
 
   // Upload to R2 public (backup/archive)
-  await uploadToR2(new Uint8Array(displayBuffer), r2Key, "image/webp");
+  await uploadToR2(displayBuffer, r2Key, "image/webp");
 
   // Copy to public/ for serving from the site
   const publicScreenshotDir = path.join(cachePath, "public", "nachweis-screenshots");
   const publicScreenshotPath = path.join(publicScreenshotDir, `${slug}.webp`);
   const publicUrl = `/nachweis-screenshots/${slug}.webp`;
-  await fs.mkdir(publicScreenshotDir, { recursive: true });
+  await context.io.mkdir(publicScreenshotDir);
   await writeFileIfChanged(publicScreenshotPath, Buffer.from(displayBuffer));
 
   // Update EvidenceSource.websiteScreenshot, preserving rawArtifact
   const { data: currentEvidence, content: evidenceContent } = parseMarkdownFrontmatter(
-    await fs.readFile(evidenceFile, "utf8"),
+    await context.io.readFile(evidenceFile),
   );
   const currentScreenshot = (currentEvidence.websiteScreenshot ?? {}) as Record<string, unknown>;
   currentEvidence.websiteScreenshot = {
@@ -253,7 +253,7 @@ export async function runNachweisScreenshotProcess(
     ...(capturedAt ? { capturedAt } : {}),
   };
   const updatedContent = stringifyMarkdownFrontmatter(evidenceContent, currentEvidence);
-  await fs.writeFile(evidenceFile, updatedContent, "utf8");
+  await context.io.writeFile(evidenceFile, updatedContent);
 
   logger.info(
     `[nachweis.screenshot.process] processed display variant for '${slug}' to ${publicUrl}`,

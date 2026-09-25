@@ -26,10 +26,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readdir, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { Dirent } from "node:fs";
 import picomatch from "picomatch";
+import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkspaceTreeEntry {
   mtimeMs: number;
@@ -60,22 +60,22 @@ export async function buildWorkspaceTreeIndex(
   const exclude = new Set(excludeDirs ?? DEFAULT_EXCLUDE_DIRS);
   const index: WorkspaceTreeIndex = new Map();
 
-  async function walk(dir: string): Promise<void> {
-    let entries: Dirent[];
+  async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+    let entries: DirEntry[];
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      entries = await io.readdir(dir);
     } catch {
       return;
     }
     for (const entry of entries) {
-      if (entry.isDirectory()) {
+      if (entry.isDirectory) {
         if (exclude.has(entry.name)) continue;
         await walk(join(dir, entry.name));
-      } else if (entry.isFile()) {
+      } else if (entry.isFile) {
         const abs = join(dir, entry.name);
         const rel = toPosix(relative(workspaceRoot, abs));
         try {
-          const s = await stat(abs);
+          const s = await io.stat(abs);
           index.set(rel, { mtimeMs: s.mtimeMs, size: s.size });
         } catch {
           // skip files that disappear between readdir and stat

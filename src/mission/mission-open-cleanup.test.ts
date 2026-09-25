@@ -92,6 +92,7 @@ vi.mock("./mission-materialize.ts", () => ({
 import { runMissionOpen } from "./mission-open.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { readSystemConfig, discoverSystems } from "../sternsystem/registry-io.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const mockAppendAndCommit = vi.mocked(appendAndCommitBordbuch);
 const mockReadSystemConfig = vi.mocked(readSystemConfig);
@@ -140,6 +141,7 @@ test("cleans up mission directory when bordbuch push fails", async () => {
   } as never;
 
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},
@@ -170,6 +172,7 @@ test("cleans up mission directory when bordbuch commit fails", async () => {
   } as never;
 
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},
@@ -201,6 +204,7 @@ test("lists available systems when --system is not found", async () => {
   } as never;
 
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},
@@ -229,6 +233,7 @@ test("succeeds end-to-end when all preconditions are met", async () => {
   } as never;
 
   const context = {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: {
       info: () => {},

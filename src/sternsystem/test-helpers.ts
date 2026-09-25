@@ -17,10 +17,10 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export function makeInput(flags: Record<string, unknown>): KernelCommandInput {
   return {
@@ -31,6 +31,7 @@ export function makeInput(flags: Record<string, unknown>): KernelCommandInput {
 
 export function makeContext(root: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: root,
     logger: {
       section: () => {},
@@ -48,9 +49,9 @@ export interface MirrorEntry {
   storageType: "non-bare" | "bare" | "bundle";
 }
 
-export async function writeSystemConfig(root: string, mirrors: MirrorEntry[]): Promise<void> {
+export async function writeSystemConfig(root: string, mirrors: MirrorEntry[], io: WorkspaceIO = createDefaultIO().io): Promise<void> {
   const cacheDir = join(root, "..", "systems-cache", "test-bundle");
-  await mkdir(cacheDir, { recursive: true });
+  await io.mkdir(cacheDir);
   const config = {
     schemaVersion: "system-config/v1",
     id: "test-bundle",
@@ -61,7 +62,7 @@ export async function writeSystemConfig(root: string, mirrors: MirrorEntry[]): P
     registeredAt: "2026-01-01T00:00:00Z",
     notes: "",
   };
-  await writeFile(join(cacheDir, "system-config.yaml"), stringifyYaml(config) + "\n", "utf8");
+  await io.writeFile(join(cacheDir, "system-config.yaml"), stringifyYaml(config) + "\n");
 
   const pin = {
     schemaVersion: "system-pin/v1",
@@ -79,25 +80,21 @@ export async function writeSystemConfig(root: string, mirrors: MirrorEntry[]): P
     capabilities: [],
   };
   const pinJson = JSON.stringify(pin, null, 2) + "\n";
-  await writeFile(join(cacheDir, "system.pin.json"), pinJson, "utf8");
+  await io.writeFile(join(cacheDir, "system.pin.json"), pinJson);
 
   // Also write pin to the cache dir resolved from mirrors[0].path (may differ)
   const mirrorCacheDir = join(root, mirrors[0].path.replace(/^\.\//, ""));
   if (mirrorCacheDir !== cacheDir) {
-    await mkdir(mirrorCacheDir, { recursive: true });
-    await writeFile(join(mirrorCacheDir, "system.pin.json"), pinJson, "utf8");
+    await io.mkdir(mirrorCacheDir);
+    await io.writeFile(join(mirrorCacheDir, "system.pin.json"), pinJson);
   }
 }
 
-export const BASE_SETUP = async (root: string) => {
-  await mkdir(join(root, "docs", "rfcs"), { recursive: true });
-  await writeFile(join(root, "docs", "rfcs", "RFC-0001-test.md"), "", "utf8");
-  await writeFile(join(root, "package.json"), JSON.stringify({ version: "4.5.0" }), "utf8");
-  await writeFile(
-    join(root, "uni.registry.yaml"),
-    JSON.stringify({ entries: [{ id: "test", semanticId: "test", version: "1.0.0", intent: [] }] }),
-    "utf8",
-  );
-  await mkdir(join(root, "packages", "dummy"), { recursive: true });
-  await writeFile(join(root, "packages", "dummy", "index.ts"), "export const x = 1;\n", "utf8");
+export const BASE_SETUP = async (root: string, io: WorkspaceIO = createDefaultIO().io) => {
+  await io.mkdir(join(root, "docs", "rfcs"));
+  await io.writeFile(join(root, "docs", "rfcs", "RFC-0001-test.md"), "");
+  await io.writeFile(join(root, "package.json"), JSON.stringify({ version: "4.5.0" }));
+  await io.writeFile(join(root, "uni.registry.yaml"), JSON.stringify({ entries: [{ id: "test", semanticId: "test", version: "1.0.0", intent: [] }] }));
+  await io.mkdir(join(root, "packages", "dummy"));
+  await io.writeFile(join(root, "packages", "dummy", "index.ts"), "export const x = 1;\n");
 };

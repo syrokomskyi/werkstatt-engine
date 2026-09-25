@@ -32,12 +32,12 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile as writeFileRaw, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
 import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
 import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FLEET_SITES_RELATIVE_PATH = join("fleet", "fleet.sites.yaml");
 
@@ -97,16 +97,16 @@ export function budgetsFilePath(workspaceRoot: string): string {
  */
 export async function appendStepTelemetry(
   workspaceRoot: string,
-  record: StepTelemetryRecord,
+  record: StepTelemetryRecord, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   try {
     const filePath = telemetryPath(workspaceRoot);
-    await mkdir(dirname(filePath), { recursive: true });
+    await io.mkdir(dirname(filePath));
     const line = `${JSON.stringify(record)}\n`;
 
     let existing = "";
     try {
-      existing = await readFile(filePath, "utf8");
+      existing = await io.readFile(filePath);
     } catch {
       existing = "";
     }
@@ -123,7 +123,7 @@ export async function appendStepTelemetry(
       next = lines.join("\n") + "\n";
     }
 
-    await writeFileRaw(filePath, next, "utf8");
+    await io.writeFile(filePath, next);
   } catch {
     // Telemetry is best-effort; never let a persistence failure surface to the caller.
   }
@@ -140,17 +140,17 @@ export async function appendStepTelemetry(
  */
 export async function batchAppendStepTelemetry(
   workspaceRoot: string,
-  records: StepTelemetryRecord[],
+  records: StepTelemetryRecord[], io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   if (records.length === 0) return;
   try {
     const filePath = telemetryPath(workspaceRoot);
-    await mkdir(dirname(filePath), { recursive: true });
+    await io.mkdir(dirname(filePath));
     const lines = records.map((r) => JSON.stringify(r)).join("\n") + "\n";
 
     let existing = "";
     try {
-      existing = await readFile(filePath, "utf8");
+      existing = await io.readFile(filePath);
     } catch {
       existing = "";
     }
@@ -167,7 +167,7 @@ export async function batchAppendStepTelemetry(
       next = allLines.join("\n") + "\n";
     }
 
-    await writeFileRaw(filePath, next, "utf8");
+    await io.writeFile(filePath, next);
   } catch {
     // Telemetry is best-effort; never let a persistence failure surface to the caller.
   }
@@ -271,10 +271,10 @@ function historyHash(raw: string): string {
 
 /** Reads the committed budgets file. Returns null when absent or unparseable. */
 export async function loadPipelineBudgets(
-  workspaceRoot: string,
+  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<PipelineBudgetsFile | null> {
   try {
-    const raw = await readFile(budgetsFilePath(workspaceRoot), "utf8");
+    const raw = await io.readFile(budgetsFilePath(workspaceRoot));
     const parsed = yamlParse(raw) as PipelineBudgetsFile;
     if (!Array.isArray(parsed.budgets)) return null;
     return parsed;
@@ -318,9 +318,9 @@ export interface PipelineBudgetGenerateResult {
  * Returns null when the file is absent or unparseable — in that case, no filtering
  * is applied (backward compatible with pre-RFC-0963 behavior).
  */
-async function loadRegisteredSiteIds(workspaceRoot: string): Promise<Set<string> | null> {
+async function loadRegisteredSiteIds(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<Set<string> | null> {
   try {
-    const raw = await readFile(join(workspaceRoot, FLEET_SITES_RELATIVE_PATH), "utf8");
+    const raw = await io.readFile(join(workspaceRoot, FLEET_SITES_RELATIVE_PATH));
     const parsed = yamlParse(raw) as { sites?: Array<{ id: string }> };
     if (!Array.isArray(parsed.sites)) return null;
     return new Set(parsed.sites.map((s) => s.id));
@@ -337,7 +337,7 @@ export async function runPipelineBudgetGenerate(
 
   let raw = "";
   try {
-    raw = await readFile(telemetryPath(context.workspaceRoot), "utf8");
+    raw = await context.io.readFile(telemetryPath(context.workspaceRoot));
   } catch {
     return {
       data: {
@@ -395,7 +395,7 @@ export async function runPipelineBudgetGenerate(
     const emptyContent = `${buildGeneratedHeader({ filePath: BUDGETS_RELATIVE_PATH, ownerCommand: "pipeline.budget.generate" })}${yamlStringify(emptyFile)}\n`;
     if (!dryRun) {
       const outputPath = budgetsFilePath(context.workspaceRoot);
-      await mkdir(dirname(outputPath), { recursive: true });
+      await context.io.mkdir(dirname(outputPath));
       await writeFileAtomic(outputPath, emptyContent);
     }
     return {
@@ -425,7 +425,7 @@ export async function runPipelineBudgetGenerate(
   const content = `${buildGeneratedHeader({ filePath: BUDGETS_RELATIVE_PATH, ownerCommand: "pipeline.budget.generate" })}${yamlStringify(file)}\n`;
   if (!dryRun) {
     const outputPath = budgetsFilePath(context.workspaceRoot);
-    await mkdir(dirname(outputPath), { recursive: true });
+    await context.io.mkdir(dirname(outputPath));
     await writeFileAtomic(outputPath, content);
   }
 
@@ -448,9 +448,9 @@ export async function runPipelineBudgetGenerate(
 }
 
 // Re-exported for tests that want to assert against the real fs stat of the history file.
-export async function telemetryFileSizeBytes(workspaceRoot: string): Promise<number> {
+export async function telemetryFileSizeBytes(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<number> {
   try {
-    const s = await stat(telemetryPath(workspaceRoot));
+    const s = await io.stat(telemetryPath(workspaceRoot));
     return s.size;
   } catch {
     return 0;

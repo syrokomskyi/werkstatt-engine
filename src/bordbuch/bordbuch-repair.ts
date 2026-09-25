@@ -17,8 +17,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -271,7 +269,9 @@ export async function runBordbuchRepair(
     }
 
     const recomputedHashes = repairedEntries.length;
-    const originalContent = existsSync(filePath) ? await fs.readFile(filePath, "utf8") : "";
+    const originalContent = (await context.io.exists(filePath))
+      ? await context.io.readFile(filePath)
+      : "";
     const repairedNdjson = entriesToNdjson(repairedEntries);
 
     await atomicWriteFile(filePath, repairedNdjson);
@@ -331,7 +331,7 @@ export async function runBordbuchRepair(
       }
     }
 
-    if (existsSync(path.join(cacheCloneDir, ".git"))) {
+    if (await context.io.exists(path.join(cacheCloneDir, ".git"))) {
       const totalRepairs = orphans.length + unmatched.length;
       const commitResult = await commitAndPushBordbuch(
         cacheCloneDir,

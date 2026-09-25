@@ -121,6 +121,7 @@ vi.mock("../workpiece-config-presence-check.ts", () => ({
 }));
 
 import { runMissionValidate } from "../mission-materialization-commands.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const baseManifest = {
   id: "test-mission",
@@ -133,6 +134,7 @@ const baseManifest = {
 
 function makeContext(tmpDir: string) {
   return {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},
@@ -269,6 +271,7 @@ test("AC-5: --fast with all-passed previous report does NOT overwrite validation
 test("AC-2 + AC-3: --fast with no previous report falls back to full run and warns", async () => {
   const warnCalls: string[] = [];
   const ctx = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},
@@ -302,6 +305,7 @@ test("AC-8 + AC-9: --fast with corrupt previous report falls back to full run an
 
   const warnCalls: string[] = [];
   const ctx = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},
@@ -338,6 +342,7 @@ test("AC-10 + AC-11: --fast with mismatched missionId falls back to full run and
 
   const warnCalls: string[] = [];
   const ctx = {
+    io: createDefaultIO().io,
     workspaceRoot: tmpDir,
     logger: {
       info: () => {},

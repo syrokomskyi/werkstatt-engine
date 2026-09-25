@@ -18,7 +18,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { existsSync } from "node:fs";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -45,7 +44,7 @@ export async function runDeployArtifactVerify(
   }
 
   const dir = artifactDir(workspaceRoot, hash);
-  if (!existsSync(dir)) {
+  if (!(await context.io.exists(dir))) {
     logger.error(`[deploy.artifact.verify] artifact ${hash} not found`);
     return {
       data: { verified: false, hash, expectedHash: hash, signatureVerified: false },
@@ -57,7 +56,7 @@ export async function runDeployArtifactVerify(
   const manifest = await readManifest(workspaceRoot, hash);
   const distDir = distPath(workspaceRoot, hash);
 
-  if (!existsSync(distDir)) {
+  if (!(await context.io.exists(distDir))) {
     logger.error(`[deploy.artifact.verify] dist directory missing for artifact ${hash}`);
     return {
       data: { verified: false, hash, expectedHash: manifest.hash, signatureVerified: false },

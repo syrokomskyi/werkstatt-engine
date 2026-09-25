@@ -20,7 +20,6 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dnsRecordFileSchema } from "@warpgogol/werkstatt-shared/ontology/schemas";
 import { flagString } from "./dns-helpers.ts";
@@ -65,7 +64,7 @@ export async function runDnsRecordsSchemaValidate(
   for (const filePath of filePaths) {
     let raw: string;
     try {
-      raw = await readFile(filePath, "utf-8");
+      raw = await context.io.readFile(filePath);
     } catch {
       continue;
     }

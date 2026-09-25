@@ -14,8 +14,6 @@
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
@@ -41,6 +39,7 @@ import { readSystemConfig, resolveCacheClonePath } from "../sternsystem/registry
 import { bundleEvidenceArtifacts } from "./evidence-bundle.ts";
 import { buildFeatureInventory, renderFeatureNotes } from "./feature-notes.ts";
 import { downloadFromR2 } from "../nachweis/nachweis-io.ts";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -83,17 +82,17 @@ function shouldSkipForSecretScan(relPath: string): boolean {
   );
 }
 
-async function copyDir(src: string, dest: string): Promise<void> {
-  if (!existsSync(src)) return;
-  await fs.mkdir(dest, { recursive: true });
-  const entries = await fs.readdir(src, { withFileTypes: true });
+async function copyDir(src: string, dest: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+  if (!await io.exists(src)) return;
+  await io.mkdir(dest);
+  const entries = await io.readdir(src);
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
+    if (entry.isDirectory) {
       await copyDir(srcPath, destPath);
     } else {
-      await fs.copyFile(srcPath, destPath);
+      await io.copyFile(srcPath, destPath);
     }
   }
 }
@@ -102,13 +101,13 @@ function isRuntimeFile(fileName: string): boolean {
   return RUNTIME_FILE_PATTERNS.some((p) => fileName.startsWith(p) || fileName === p);
 }
 
-async function scanForSecrets(dir: string): Promise<Array<{ file: string; pattern: string }>> {
+async function scanForSecrets(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<Array<{ file: string; pattern: string }>> {
   const findings: Array<{ file: string; pattern: string }> = [];
 
   for (const fullPath of await collectFiles(dir)) {
     const relPath = path.relative(dir, fullPath).replace(/\\/g, "/");
     if (shouldSkipForSecretScan(relPath)) continue;
-    const content = await fs.readFile(fullPath, "utf8").catch(() => "");
+    const content = await io.readFile(fullPath).catch(() => "");
     for (const pattern of SECRET_PATTERNS) {
       if (pattern.test(content)) {
         findings.push({ file: relPath, pattern: pattern.source });
@@ -179,8 +178,8 @@ export async function runNotausgangExport(
   }
 
   const outputPath = path.resolve(workspaceRoot, outputFlag);
-  if (existsSync(outputPath)) {
-    const entries = await fs.readdir(outputPath);
+  if (await context.io.exists(outputPath)) {
+    const entries = await context.io.readdir(outputPath);
     if (entries.length > 0) {
       throw new Error(`[notausgang.export] output path '${outputFlag}' exists and is non-empty`);
     }
@@ -189,11 +188,11 @@ export async function runNotausgangExport(
   // Read release manifest
   const releaseDir = path.join(workspaceRoot, "releases", releaseId);
   const releaseManifestPath = path.join(releaseDir, "release.yaml");
-  if (!existsSync(releaseManifestPath)) {
+  if (!await context.io.exists(releaseManifestPath)) {
     throw new Error(`[notausgang.export] release '${releaseId}' not found`);
   }
 
-  const releaseManifestRaw = await fs.readFile(releaseManifestPath, "utf8");
+  const releaseManifestRaw = await context.io.readFile(releaseManifestPath);
   const releaseManifest = parseYaml(releaseManifestRaw) as Record<string, string>;
 
   if (releaseManifest.state !== "ready") {
@@ -212,47 +211,47 @@ export async function runNotausgangExport(
   logger.info(`  Staging: ${stagingDir}`);
 
   try {
-    await fs.mkdir(stagingDir, { recursive: true });
+    await context.io.mkdir(stagingDir);
 
     // Copy site data (from the resolved site workspace)
     const siteSrcDir = path.join(siteWorkspace.directory, "src", "content");
     const siteDest = path.join(stagingDir, "site", "src", "content");
-    if (existsSync(siteSrcDir)) {
+    if (await context.io.exists(siteSrcDir)) {
       await copyDir(siteSrcDir, siteDest);
     }
 
     // Copy provenance if present
     const provenanceDir = path.join(siteWorkspace.directory, "provenance");
-    if (existsSync(provenanceDir)) {
+    if (await context.io.exists(provenanceDir)) {
       await copyDir(provenanceDir, path.join(stagingDir, "site", "provenance"));
     }
 
     // Copy dist from release
     const distSrc = path.join(releaseDir, "dist");
-    if (existsSync(distSrc)) {
+    if (await context.io.exists(distSrc)) {
       await copyDir(distSrc, path.join(stagingDir, "dist"));
     }
 
     // Copy artifact manifest if present — convert JSON to YAML (RFC-0376)
     const artifactManifestSrcPath = path.join(releaseDir, "artifact-manifest.json");
     const artifactManifestDestPath = path.join(stagingDir, "artifact-manifest.yaml");
-    if (existsSync(artifactManifestSrcPath)) {
-      const artifactJson = JSON.parse(await fs.readFile(artifactManifestSrcPath, "utf8"));
+    if (await context.io.exists(artifactManifestSrcPath)) {
+      const artifactJson = JSON.parse(await context.io.readFile(artifactManifestSrcPath));
       await atomicWriteFile(artifactManifestDestPath, stringifyYaml(artifactJson) + "\n");
     }
 
     // Copy Bordbuch
     const cacheDir = resolveCacheClonePath(workspaceRoot, systemId);
     const bordbuchPath = path.join(cacheDir, "bordbuch", "events.ndjson");
-    if (existsSync(bordbuchPath)) {
-      await fs.mkdir(path.join(stagingDir, "bordbuch"), { recursive: true });
-      await fs.copyFile(bordbuchPath, path.join(stagingDir, "bordbuch", "events.ndjson"));
+    if (await context.io.exists(bordbuchPath)) {
+      await context.io.mkdir(path.join(stagingDir, "bordbuch"));
+      await context.io.copyFile(bordbuchPath, path.join(stagingDir, "bordbuch", "events.ndjson"));
     }
 
     // Copy pin — convert JSON to YAML (RFC-0376)
     const pinSrcPath = path.join(cacheDir, "system.pin.json");
-    if (existsSync(pinSrcPath)) {
-      const pinJson = JSON.parse(await fs.readFile(pinSrcPath, "utf8"));
+    if (await context.io.exists(pinSrcPath)) {
+      const pinJson = JSON.parse(await context.io.readFile(pinSrcPath));
       await atomicWriteFile(
         path.join(stagingDir, "system.pin.yaml"),
         stringifyYaml(pinJson) + "\n",
@@ -261,15 +260,15 @@ export async function runNotausgangExport(
 
     // Copy behavior snapshots
     const snapshotsDir = path.join(stagingDir, "behavior-snapshots");
-    await fs.mkdir(snapshotsDir, { recursive: true });
+    await context.io.mkdir(snapshotsDir);
     for (const snapshot of [
       "readable-snapshot.json",
       "production-snapshot.json",
       "snapshot-diff.json",
     ]) {
       const src = path.join(releaseDir, snapshot);
-      if (existsSync(src)) {
-        await fs.copyFile(src, path.join(snapshotsDir, snapshot));
+      if (await context.io.exists(src)) {
+        await context.io.copyFile(src, path.join(snapshotsDir, snapshot));
       }
     }
 
@@ -308,7 +307,7 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
     const behaviorSnapshotHash = (
       await fingerprintTree(path.join(stagingDir, "behavior-snapshots"), { mode: "semantic" })
     ).value;
-    const artifactManifestHash = existsSync(artifactManifestDestPath)
+    const artifactManifestHash = await context.io.exists(artifactManifestDestPath)
       ? (await fingerprintFile(artifactManifestDestPath, { mode: "byte" })).hash
       : "sha256:absent";
 
@@ -346,14 +345,8 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
     );
 
     // RFC-1120: offline verifier + verification guide (copied verbatim)
-    await fs.copyFile(
-      path.join(resolveTemplatesDir(), "verify.py"),
-      path.join(stagingDir, "verify.py"),
-    );
-    await fs.copyFile(
-      path.join(resolveTemplatesDir(), "verification.md"),
-      path.join(stagingDir, "verification.md"),
-    );
+    await context.io.copyFile(path.join(resolveTemplatesDir(), "verify.py"), path.join(stagingDir, "verify.py"));
+    await context.io.copyFile(path.join(resolveTemplatesDir(), "verification.md"), path.join(stagingDir, "verification.md"));
 
     // Write manifest as YAML (RFC-0376) + JSON twin for the stdlib verifier (RFC-1120)
     const manifest = {
@@ -421,8 +414,8 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
     };
   } catch (error) {
     // Cleanup staging on failure
-    if (existsSync(stagingDir)) {
-      await fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    if (await context.io.exists(stagingDir)) {
+      await context.io.rm(stagingDir, { recursive: true }).catch(() => {});
     }
     throw error;
   }
@@ -460,10 +453,10 @@ const BORDBUCH_REQUIRED_FIELDS = ["id", "kind", "occurredAt", "systemId"] as con
 
 async function validateBordbuch(
   bordbuchPath: string,
-  expectedSystemId: string,
+  expectedSystemId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NotausgangViolation[]> {
   const violations: NotausgangViolation[] = [];
-  const content = await fs.readFile(bordbuchPath, "utf8");
+  const content = await io.readFile(bordbuchPath);
   const lines = content.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
@@ -527,7 +520,7 @@ export async function runNotausgangValidate(
   if (!exportPath) throw new Error("[notausgang.validate] --path is required");
 
   const exportDir = path.resolve(workspaceRoot, exportPath);
-  if (!existsSync(exportDir)) {
+  if (!await context.io.exists(exportDir)) {
     throw new Error(`[notausgang.validate] export path '${exportPath}' not found`);
   }
 
@@ -540,9 +533,9 @@ export async function runNotausgangValidate(
   let manifestStatus: CheckStatus = "missing";
   let manifest: NotausgangManifest | null = null;
 
-  if (existsSync(manifestYamlPath)) {
+  if (await context.io.exists(manifestYamlPath)) {
     try {
-      const raw = await fs.readFile(manifestYamlPath, "utf8");
+      const raw = await context.io.readFile(manifestYamlPath);
       const parsed = parseYaml(raw);
       const result = notausgangManifestSchema.safeParse(parsed);
       if (result.success) {
@@ -574,9 +567,9 @@ export async function runNotausgangValidate(
 
   // RFC-1120 NA-MANIFEST-02: JSON twin must exist, parse, and match the YAML manifest
   let manifestJson: Record<string, unknown> | null = null;
-  if (existsSync(manifestJsonPath)) {
+  if (await context.io.exists(manifestJsonPath)) {
     try {
-      manifestJson = JSON.parse(await fs.readFile(manifestJsonPath, "utf8")) as Record<
+      manifestJson = JSON.parse(await context.io.readFile(manifestJsonPath)) as Record<
         string,
         unknown
       >;
@@ -611,7 +604,7 @@ export async function runNotausgangValidate(
   // --- Legacy artifact-manifest.json check ---
   const artifactManifestYamlPath = path.join(exportDir, "artifact-manifest.yaml");
   const artifactManifestJsonPath = path.join(exportDir, "artifact-manifest.json");
-  if (existsSync(artifactManifestJsonPath)) {
+  if (await context.io.exists(artifactManifestJsonPath)) {
     violations.push({
       rule: "legacy-json-artifact",
       message: "artifact-manifest.json found — export must be re-generated as YAML",
@@ -622,7 +615,7 @@ export async function runNotausgangValidate(
   // --- Legacy system.pin.json check ---
   const pinYamlPath = path.join(exportDir, "system.pin.yaml");
   const pinJsonPath = path.join(exportDir, "system.pin.json");
-  if (existsSync(pinJsonPath)) {
+  if (await context.io.exists(pinJsonPath)) {
     violations.push({
       rule: "legacy-pin-format",
       message: "system.pin.json found — export must be re-generated with system.pin.yaml",
@@ -634,7 +627,7 @@ export async function runNotausgangValidate(
   const distDir = path.join(exportDir, "dist");
   let distStatus: CheckStatus = "missing";
   let distHashMatch = false;
-  if (existsSync(distDir)) {
+  if (await context.io.exists(distDir)) {
     distStatus = "valid";
     if (manifest) {
       try {
@@ -665,7 +658,7 @@ export async function runNotausgangValidate(
   const siteDir = path.join(exportDir, "site");
   let siteStatus: CheckStatus = "missing";
   let siteHashMatch = false;
-  if (existsSync(siteDir)) {
+  if (await context.io.exists(siteDir)) {
     siteStatus = "valid";
     if (manifest) {
       try {
@@ -696,7 +689,7 @@ export async function runNotausgangValidate(
   const bordbuchPath = path.join(exportDir, "bordbuch", "events.ndjson");
   let bordbuchStatus: CheckStatus = "missing";
   let bordbuchHashMatch = false;
-  if (existsSync(bordbuchPath)) {
+  if (await context.io.exists(bordbuchPath)) {
     bordbuchStatus = "valid";
     if (manifest) {
       try {
@@ -733,11 +726,11 @@ export async function runNotausgangValidate(
 
   // --- system.pin.yaml content validation ---
   let pinStatus: CheckStatus = "missing";
-  if (existsSync(pinYamlPath)) {
+  if (await context.io.exists(pinYamlPath)) {
     pinStatus = "valid";
     if (manifest) {
       try {
-        const pinRaw = await fs.readFile(pinYamlPath, "utf8");
+        const pinRaw = await context.io.readFile(pinYamlPath);
         const pinData = parseYaml(pinRaw) as Record<string, unknown>;
         const pinSystemId = pinData?.systemId;
         const pinPlatformVersion = (pinData?.platform as Record<string, unknown> | undefined)
@@ -778,7 +771,7 @@ export async function runNotausgangValidate(
   const snapshotsDir = path.join(exportDir, "behavior-snapshots");
   let snapshotsStatus: CheckStatus = "missing";
   let snapshotHashMatch = false;
-  if (existsSync(snapshotsDir)) {
+  if (await context.io.exists(snapshotsDir)) {
     snapshotsStatus = "valid";
     if (manifest) {
       try {
@@ -808,7 +801,7 @@ export async function runNotausgangValidate(
   // --- Artifact manifest hash verification ---
   let artifactManifestStatus: CheckStatus = "missing";
   let artifactHashMatch = false;
-  if (existsSync(artifactManifestYamlPath)) {
+  if (await context.io.exists(artifactManifestYamlPath)) {
     artifactManifestStatus = "valid";
     if (manifest) {
       try {
@@ -855,7 +848,7 @@ export async function runNotausgangValidate(
   for (const [sourceId] of bundledSources) {
     const sourceDir = path.join(evidenceDir, sourceId);
     const integrityPath = path.join(sourceDir, "integrity.txt");
-    if (!existsSync(integrityPath)) {
+    if (!await context.io.exists(integrityPath)) {
       violations.push({
         rule: "NA-EVIDENCE-01",
         message: `manifest records evidence '${sourceId}' as bundled but evidence/${sourceId}/integrity.txt is missing`,
@@ -865,12 +858,12 @@ export async function runNotausgangValidate(
   }
 
   // NA-EVIDENCE-02: re-verify each integrity.txt line against artifact bytes
-  if (existsSync(evidenceDir)) {
-    for (const entry of await fs.readdir(evidenceDir, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
+  if (await context.io.exists(evidenceDir)) {
+    for (const entry of await context.io.readdir(evidenceDir)) {
+      if (!entry.isDirectory) continue;
       const integrityPath = path.join(evidenceDir, entry.name, "integrity.txt");
-      if (!existsSync(integrityPath)) continue;
-      const lines = (await fs.readFile(integrityPath, "utf8"))
+      if (!await context.io.exists(integrityPath)) continue;
+      const lines = (await context.io.readFile(integrityPath))
         .split("\n")
         .filter((l) => l.trim().length > 0);
       for (const line of lines) {
@@ -886,7 +879,7 @@ export async function runNotausgangValidate(
         const expected = line.slice(0, sep).trim();
         const rel = line.slice(sep + 2).trim();
         const artifactPath = path.join(evidenceDir, entry.name, rel);
-        if (!existsSync(artifactPath)) {
+        if (!await context.io.exists(artifactPath)) {
           violations.push({
             rule: "NA-EVIDENCE-02",
             message: `artifact '${rel}' listed in integrity.txt is missing`,
@@ -908,14 +901,14 @@ export async function runNotausgangValidate(
 
   // NA-FEATURES-01: feature-notes.md present and non-empty
   const featureNotesPath = path.join(exportDir, "feature-notes.md");
-  if (!existsSync(featureNotesPath)) {
+  if (!await context.io.exists(featureNotesPath)) {
     violations.push({
       rule: "NA-FEATURES-01",
       message: "feature-notes.md not found — export must be re-generated (RFC-1120)",
       file: "feature-notes.md",
     });
   } else {
-    const content = await fs.readFile(featureNotesPath, "utf8");
+    const content = await context.io.readFile(featureNotesPath);
     if (content.trim().length === 0) {
       violations.push({
         rule: "NA-FEATURES-01",
@@ -927,7 +920,7 @@ export async function runNotausgangValidate(
 
   // NA-VERIFIER-01: verifier files present
   for (const rel of ["verify.py", "verification.md", "SHA256SUMS.txt"]) {
-    if (!existsSync(path.join(exportDir, rel))) {
+    if (!await context.io.exists(path.join(exportDir, rel))) {
       violations.push({
         rule: "NA-VERIFIER-01",
         message: `${rel} not found — export must be re-generated (RFC-1120)`,
@@ -938,9 +931,9 @@ export async function runNotausgangValidate(
 
   // --- Runtime files check ---
   let runtimeFilesAbsent = true;
-  if (existsSync(siteDir)) {
-    async function checkRuntime(d: string) {
-      const entries = await fs.readdir(d, { withFileTypes: true });
+  if (await context.io.exists(siteDir)) {
+    async function checkRuntime(d: string, io: WorkspaceIO = createDefaultIO().io) {
+      const entries = await io.readdir(d);
       for (const entry of entries) {
         if (isRuntimeFile(entry.name)) {
           runtimeFilesAbsent = false;
@@ -951,7 +944,7 @@ export async function runNotausgangValidate(
           });
           return;
         }
-        if (entry.isDirectory()) {
+        if (entry.isDirectory) {
           await checkRuntime(path.join(d, entry.name));
         }
       }

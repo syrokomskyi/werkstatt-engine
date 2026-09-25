@@ -23,8 +23,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import { readFile, unlink } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   snapshotCanonicalJsonObjectV1,
@@ -34,6 +32,7 @@ import { signBytes, verifyBytes, toHex, fromHex } from "@warpgogol/werkstatt-eng
 import { resolveCacheClonePath } from "./registry-io.ts";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { z } from "zod";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface HandoverAuthorizationV1 {
   schema: "handover-authorization/v1";
@@ -149,11 +148,11 @@ export function resolveAuthorizationPath(workspaceRoot: string, systemId: string
 
 export async function readAuthorization(
   workspaceRoot: string,
-  systemId: string,
+  systemId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SignedHandoverAuthorization | null> {
   const filePath = resolveAuthorizationPath(workspaceRoot, systemId);
-  if (!existsSync(filePath)) return null;
-  const raw = await readFile(filePath, "utf8");
+  if (!await io.exists(filePath)) return null;
+  const raw = await io.readFile(filePath);
   return JSON.parse(raw) as SignedHandoverAuthorization;
 }
 
@@ -170,11 +169,11 @@ export async function writeAuthorization(
 
 export async function removeAuthorization(
   workspaceRoot: string,
-  systemId: string,
+  systemId: string, io: WorkspaceIO = createDefaultIO().io,
 ): Promise<boolean> {
   const filePath = resolveAuthorizationPath(workspaceRoot, systemId);
-  if (!existsSync(filePath)) return false;
-  await unlink(filePath);
+  if (!await io.exists(filePath)) return false;
+  await io.rm(filePath);
   return true;
 }
 

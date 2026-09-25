@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ClassifiedCommitSchema, type RawCommit, type ClassifiedCommit } from "../types.ts";
 import { sanitizeCommit } from "../utils/sanitize.ts";
@@ -91,7 +90,7 @@ export async function classifyCommit(
   if (sanitized.isConventional) return deterministicClassify(commit);
 
   const promptFile = join(ctx.promptsDir, "classifier.md");
-  const promptHash = await hashPromptFile(promptFile);
+  const promptHash = await hashPromptFile(promptFile, ctx.io);
   const key = buildCacheKey({
     treeHash: commit.treeHash,
     files: commit.files,
@@ -106,7 +105,7 @@ export async function classifyCommit(
     if (p.success) return p.data;
   }
 
-  const systemPrompt = await readFile(promptFile, "utf-8").catch(() => DEFAULT_CLASSIFIER_PROMPT);
+  const systemPrompt = await ctx.io.readFile(promptFile).catch(() => DEFAULT_CLASSIFIER_PROMPT);
   const input = {
     message: sanitized.message,
     body: sanitized.body ?? "",

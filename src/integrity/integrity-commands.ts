@@ -16,7 +16,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -42,6 +41,7 @@ import {
   verifyManifestSignature,
   writeText,
 } from "@warpgogol/werkstatt-engine/integrity";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function requireApp(context: KernelRuntimeContext) {
   if (!context.site) {
@@ -141,15 +141,18 @@ export async function runIntegrityBuildRecord(
   };
 }
 
-async function loadPrivateKeyPem(appDirectory: string): Promise<string> {
+async function loadPrivateKeyPem(
+  appDirectory: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
   const keyPath = await optionalEnv("SIGNING_PRIVATE_KEY_PATH", appDirectory);
   if (keyPath) {
-    return fs.readFile(path.resolve(appDirectory, keyPath), "utf8");
+    return await io.readFile(path.resolve(appDirectory, keyPath));
   }
 
   const defaultKeyPath = path.join(appDirectory, ".integrity/keys/studio.private.pem");
   try {
-    return await fs.readFile(defaultKeyPath, "utf8");
+    return await io.readFile(defaultKeyPath);
   } catch {
     // Fallback to env variable
   }
@@ -210,12 +213,10 @@ export async function runIntegrityVerifyRelease(
   let resolvedKeyPath: string | undefined = publicKeyPemPath;
   if (!resolvedKeyPath && !publicKeyUrl && !manifest.publicKeyUrl) {
     const defaultPublicKeyPath = path.join(app.directory, "public/studio.public.pem");
-    try {
-      await fs.access(defaultPublicKeyPath);
+    if (await context.io.exists(defaultPublicKeyPath)) {
       resolvedKeyPath = defaultPublicKeyPath;
-    } catch {
-      // No default key file, will fail below with proper error
     }
+    // No default key file → will fail below with proper error
   }
 
   // Resolve relative paths against app.directory (loadPublicKeyPem uses path.resolve against process.cwd())

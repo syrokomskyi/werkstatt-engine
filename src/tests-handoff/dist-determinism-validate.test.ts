@@ -27,6 +27,7 @@ vi.mock("../mission/mission-io.ts", () => ({
 
 import { runDistDeterminismValidate } from "../release/release-commands.ts";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
 
@@ -36,6 +37,7 @@ function makeInput(flags: Record<string, string>): KernelCommandInput {
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
   return {
+    io: createDefaultIO().io,
     workspaceRoot,
     logger: { info: () => {}, warn: () => {}, success: () => {}, error: () => {} },
   } as unknown as KernelRuntimeContext;
