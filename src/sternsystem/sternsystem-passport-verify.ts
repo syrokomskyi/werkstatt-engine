@@ -21,7 +21,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
 import { isBordbuchDriftBookkeepingOnly } from "./passport-staleness.ts";
-import { readPassport, resolveCacheClonePath } from "./registry-io.ts";
+import { readPassport } from "./registry-io.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 
 export interface SternsystemPassportVerifyData {
@@ -85,8 +85,6 @@ export async function runSternsystemPassportVerify(
   let resourcesMatch = true;
 
   if (valid && !offline) {
-    const cacheClonePath = resolveCacheClonePath(workspaceRoot, systemId);
-
     const freshPayload = await buildPassportPayload({
       systemId,
       werkstattRoot: workspaceRoot,
@@ -118,8 +116,6 @@ export async function runSternsystemPassportVerify(
         resourcesMatch = false;
       }
     }
-
-    void cacheClonePath;
   }
 
   if (valid && bordbuchHeadMatches && resourcesMatch) {
