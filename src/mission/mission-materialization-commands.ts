@@ -55,6 +55,7 @@ import { resolveActor } from "./actor-identity.ts";
 import { resolveCacheClonePath, readSystemConfig } from "../sternsystem/registry-io.ts";
 import { orchestrateSnap01Recovery } from "./snapshot-auto-regen.ts";
 import { commitBordbuchProjections } from "../bordbuch/bordbuch-commit.ts";
+import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import type { WorkpieceConfigPresenceResult } from "./workpiece-config-presence-check.ts";
 import {
   restoreCacheCloneGitignore,

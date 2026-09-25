@@ -68,6 +68,7 @@ const WRITER_ROLE_KINDS: Record<string, BordbuchEntryKind[]> = {
     "mission-close",
     "mission-abort",
     "mission-open-rolled-back",
+    "mission-reconcile",
     "preflight-skipped",
   ],
   release: ["release-ready", "release-rolled-back"],

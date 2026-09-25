@@ -555,12 +555,13 @@ export async function runSternsystemValidate(
     if (await bordbuchFileExists(cacheDir, context.io)) {
       try {
         const bordbuchPath = bordbuchPathFor(cacheDir);
-        const { bordbuchEntries, rangeShas, gitLogShas, externalEditBaselineSha } =
+        const { bordbuchEntries, rangeShas, gitLogShas, gitLogSubjects, externalEditBaselineSha } =
           await collectExternalEditInputs(cacheDir, bordbuchPath, context.io);
         const guardResult = evaluateExternalEditGate({
           systemId: entry.id,
           bordbuchEntries,
           gitLogShas,
+          gitLogSubjects,
           rangeShas,
           externalEditBaselineSha,
         });

@@ -9,6 +9,7 @@
   <item>RFC-0520: initial extraction of Bordbuch reading and git rev-list I/O from sternsystem.validate inline block.</item>
   <item>ADR-0040: add JSDoc return-type contract to bordbuchPathFor.</item>
   <item>ADR-0091: collect externalEditBaselineSha from system-state.yaml via loose read — malformed values reach the guard as baseline-missing.</item>
+  <item>RFC-0520 follow-up: read bordbuch `kind` field (the schema field — `type` never existed, so every commit was untraced) and collect git subjects so the guard can whitelist pipeline bookkeeping commits.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */
@@ -19,11 +20,15 @@ import { parse as parseYaml } from "yaml";
 
 export interface ExternalEditCollectorOutput {
   bordbuchEntries: Array<{
-    type?: string;
+    kind?: string;
     metadata?: { commitSha?: string; preReconcileSha?: string };
   }>;
   rangeShas: string[];
   gitLogShas: string[];
+  /** Commit subjects aligned with gitLogShas order — used by the guard to
+   * whitelist machine-authored pipeline bookkeeping commits (Bordbuch:,
+   * chore:, system-state:, …) that can never carry a forward trace. */
+  gitLogSubjects: string[];
   // ADR-0091: optional baseline SHA from system-state.yaml — undefined when the
   // field is absent or the state file cannot be read.
   externalEditBaselineSha?: string;
@@ -43,11 +48,11 @@ export async function collectExternalEditInputs(
   for (const line of lines) {
     try {
       const entry = JSON.parse(line) as {
-        type?: string;
+        kind?: string;
         metadata?: { commitSha?: string; preReconcileSha?: string };
       };
       bordbuchEntries.push(entry);
-      if (entry.type === "mission-reconcile" && entry.metadata?.commitSha) {
+      if (entry.kind === "mission-reconcile" && entry.metadata?.commitSha) {
         if (entry.metadata.preReconcileSha) {
           const rangeResult = await io.exec(
             "git",
@@ -68,12 +73,21 @@ export async function collectExternalEditInputs(
   }
 
   let gitLogShas: string[] = [];
-  const logResult = await io.exec("git", ["rev-list", "--all"], { cwd: cacheDir });
+  let gitLogSubjects: string[] = [];
+  const logResult = await io.exec("git", ["log", "--all", "--format=%H%x00%s"], { cwd: cacheDir });
   if (logResult.exitCode === 0) {
-    gitLogShas = logResult.stdout
-      .split("\n")
-      .map((s) => s.trim())
-      .filter((l) => l.length > 0);
+    for (const line of logResult.stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const sep = trimmed.indexOf("\x00");
+      if (sep === -1) {
+        gitLogShas.push(trimmed);
+        gitLogSubjects.push("");
+      } else {
+        gitLogShas.push(trimmed.slice(0, sep));
+        gitLogSubjects.push(trimmed.slice(sep + 1));
+      }
+    }
   }
 
   // ADR-0091: loose read of the baseline field — no full schema parse, so a
@@ -91,7 +105,7 @@ export async function collectExternalEditInputs(
     // Missing or unparseable state file — baseline unset, guard runs unfiltered
   }
 
-  return { bordbuchEntries, rangeShas, gitLogShas, externalEditBaselineSha };
+  return { bordbuchEntries, rangeShas, gitLogShas, gitLogSubjects, externalEditBaselineSha };
 }
 
 export async function bordbuchFileExists(

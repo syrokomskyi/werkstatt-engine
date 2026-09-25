@@ -26,7 +26,7 @@ test("empty Bordbuch, empty git log → verdict: pass", () => {
 test("Bordbuch has reconcile SHA, git log matches → verdict: pass", () => {
   const result = evaluateExternalEditGate({
     systemId,
-    bordbuchEntries: [{ type: "mission-reconcile", metadata: { commitSha: "abc123" } }],
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "abc123" } }],
     gitLogShas: ["abc123"],
     rangeShas: [],
   });
@@ -36,7 +36,7 @@ test("Bordbuch has reconcile SHA, git log matches → verdict: pass", () => {
 test("git log has SHA not in Bordbuch → verdict: fail, rule: external-edit-detected", () => {
   const result = evaluateExternalEditGate({
     systemId,
-    bordbuchEntries: [{ type: "mission-reconcile", metadata: { commitSha: "abc123" } }],
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "abc123" } }],
     gitLogShas: ["abc123", "def456"],
     rangeShas: [],
   });
@@ -51,7 +51,7 @@ test("Bordbuch has reconcile entry with rangeShas, all SHAs accounted for → ve
   const result = evaluateExternalEditGate({
     systemId,
     bordbuchEntries: [
-      { type: "mission-reconcile", metadata: { commitSha: "abc123", preReconcileSha: "pre000" } },
+      { kind: "mission-reconcile", metadata: { commitSha: "abc123", preReconcileSha: "pre000" } },
     ],
     gitLogShas: ["abc123", "range1", "range2"],
     rangeShas: ["range1", "range2"],
@@ -63,7 +63,7 @@ test("git log has SHAs in range but also extra SHAs → verdict: fail", () => {
   const result = evaluateExternalEditGate({
     systemId,
     bordbuchEntries: [
-      { type: "mission-reconcile", metadata: { commitSha: "abc123", preReconcileSha: "pre000" } },
+      { kind: "mission-reconcile", metadata: { commitSha: "abc123", preReconcileSha: "pre000" } },
     ],
     gitLogShas: ["abc123", "range1", "range2", "extra999"],
     rangeShas: ["range1", "range2"],
@@ -77,7 +77,7 @@ test("git log has SHAs in range but also extra SHAs → verdict: fail", () => {
 test("baseline SHA grandfathers itself and all older commits → verdict: pass", () => {
   const result = evaluateExternalEditGate({
     systemId,
-    bordbuchEntries: [{ type: "mission-reconcile", metadata: { commitSha: "new001" } }],
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "new001" } }],
     // rev-list order: newest-first — old001..old003 pre-date Bordbuch tracing
     gitLogShas: ["new001", "base00", "old001", "old002", "old003"],
     rangeShas: [],
@@ -90,7 +90,7 @@ test("baseline SHA grandfathers itself and all older commits → verdict: pass",
 test("baseline SHA with newer untraced commit → fail reports only the newer commit", () => {
   const result = evaluateExternalEditGate({
     systemId,
-    bordbuchEntries: [{ type: "mission-reconcile", metadata: { commitSha: "new001" } }],
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "new001" } }],
     gitLogShas: ["untraced", "new001", "base00", "old001", "old002"],
     rangeShas: [],
     externalEditBaselineSha: "base00",
@@ -117,7 +117,7 @@ test("baseline SHA as newest commit → entire history grandfathered → verdict
 test("baseline SHA absent from rev-list → external-edit-baseline-missing violation", () => {
   const result = evaluateExternalEditGate({
     systemId,
-    bordbuchEntries: [{ type: "mission-reconcile", metadata: { commitSha: "abc123" } }],
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "abc123" } }],
     gitLogShas: ["abc123"],
     rangeShas: [],
     externalEditBaselineSha: "missing0",
@@ -131,7 +131,7 @@ test("baseline SHA absent from rev-list → external-edit-baseline-missing viola
 test("no baseline → untraced legacy history still flagged (unchanged behavior)", () => {
   const result = evaluateExternalEditGate({
     systemId,
-    bordbuchEntries: [{ type: "mission-reconcile", metadata: { commitSha: "abc123" } }],
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "abc123" } }],
     gitLogShas: ["abc123", "legacy1", "legacy2"],
     rangeShas: [],
   });

@@ -3,12 +3,12 @@
 <purpose>external-edit-guard — pure external-edit guard extracted from the sternsystem.validate inline block (RFC-0520).</purpose>
 <non-goals>
   <item>Does not read Bordbuch or run git rev-list — the caller gathers I/O and passes results.</item>
-  <item>Does not fix the type vs kind field mismatch — pre-existing bug deferred to separate RFC.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0520: initial extraction of Bordbuch-vs-git-log guard as pure function.</item>
   <item>ADR-0091: add externalEditBaselineSha input — positional grandfathering of pre-baseline rev-list commits and external-edit-baseline-missing violation.</item>
+  <item>RFC-0520 follow-up: read bordbuch `kind` field (the `type` field never existed — guard was silently dead) and whitelist pipeline bookkeeping subject prefixes so machine-authored commits pass.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -17,13 +17,33 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import type { GuardResult } from "../handoff/guards.ts";
 
+/**
+ * Commit subjects the pipeline authors itself in the cache clone — bordbuch
+ * ledger commits, state/pin/materialization bookkeeping, merges, rescues.
+ * These can never be traced by a forward-referencing entry (the entry's own
+ * commit SHA cannot be known before the entry is hash-chained and written),
+ * so they are whitelisted by convention. A human/external edit with any other
+ * subject still flags.
+ */
+const PIPELINE_SUBJECT_PREFIXES = [
+  "Bordbuch:",
+  "chore:",
+  "system-state:",
+  "state:",
+  "materialize from pin",
+  "reconcile mission",
+  "rescue:",
+  "restore cache-clone",
+];
+
 export interface ExternalEditGuardInput {
   systemId: string;
   bordbuchEntries: Array<{
-    type?: string;
+    kind?: string;
     metadata?: { commitSha?: string; preReconcileSha?: string };
   }>;
   gitLogShas: string[];
+  gitLogSubjects?: string[];
   rangeShas: string[];
   // ADR-0091: optional baseline SHA from system-state.yaml — commits
   // at-or-older-than this SHA in rev-list order are grandfathered.
@@ -65,12 +85,24 @@ export function evaluateExternalEditGate(input: ExternalEditGuardInput): Externa
 
   const expectedShas = new Set<string>();
   for (const entry of bordbuchEntries) {
-    if (entry.type === "mission-reconcile" && entry.metadata?.commitSha) {
+    if (entry.kind === "mission-reconcile" && entry.metadata?.commitSha) {
       expectedShas.add(entry.metadata.commitSha);
     }
   }
   for (const sha of rangeShas) {
     expectedShas.add(sha);
+  }
+
+  // Pipeline bookkeeping commits carry machine-authored subjects — whitelist
+  // them so the guard only flags commits with foreign (human/tool) subjects.
+  if (input.gitLogSubjects) {
+    for (let i = 0; i < effectiveGitLogShas.length; i++) {
+      const sha = gitLogShas.indexOf(effectiveGitLogShas[i]!);
+      const subject = sha === -1 ? "" : (input.gitLogSubjects[sha] ?? "");
+      if (PIPELINE_SUBJECT_PREFIXES.some((prefix) => subject.startsWith(prefix))) {
+        expectedShas.add(effectiveGitLogShas[i]!);
+      }
+    }
   }
 
   const unexpectedShas = effectiveGitLogShas.filter((sha) => !expectedShas.has(sha));
