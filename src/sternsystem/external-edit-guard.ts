@@ -34,6 +34,7 @@ const PIPELINE_SUBJECT_PREFIXES = [
   "reconcile mission",
   "rescue:",
   "restore cache-clone",
+  "cache-clone:",
 ];
 
 export interface ExternalEditGuardInput {
