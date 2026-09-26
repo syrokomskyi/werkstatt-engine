@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1074: extract persistDistribution helper — shared by runMissionValidate and runMissionBuild to copy dist, write build-input-hash.json, and write build-manifest.json.</item>
   <item>RFC-1086: add --fast flag to mission.validate for incremental validation — reads previous validation-report.json, skips passed phases, cascades re-run of downstream phases.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028</history>
+  <item>ADR-0093: emit mission-reconcile bordbuch entry in reconcile steps — metadata.commitSha (merge head) plus mergedShas[] (every merged workpiece commit) so the external-edit guard traces all pipeline-authored commits regardless of subject.</item>
+  <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074</history>
 </CHANGE_SUMMARY>
 */
 
@@ -1730,6 +1730,7 @@ export interface MissionReconcileData {
   commitSha: string | null;
   preReconcileSha: string | null;
   reconciledAt: string;
+  mergedShas: string[];
   autoResolvedPaths?: string[];
   workpieceAutoCommitted: boolean;
   workpieceCommitSha: string | null;
@@ -1835,6 +1836,7 @@ export async function runMissionReconcile(
       preReconcileSha: null,
       mergeCommitSha: null,
       transferredCommits: 0,
+      mergedShas: [],
       copiedPaths: [],
       autoResolvedPaths: [],
       workpieceHeadAtReconcile: null,
@@ -1900,6 +1902,7 @@ export async function runMissionReconcile(
         systemId: manifest.systemId,
         commitSha: cc.commitSha,
         preReconcileSha: cc.preReconcileSha,
+        mergedShas: cc.mergedShas,
         reconciledAt: now,
         ...(cc.autoResolvedPaths.length > 0 ? { autoResolvedPaths: cc.autoResolvedPaths } : {}),
         workpieceAutoCommitted: cc.workpieceCommit.committed,
@@ -1941,6 +1944,7 @@ export interface ReconcileStepCtx {
   preReconcileSha: string | null;
   mergeCommitSha: string | null;
   transferredCommits: number;
+  mergedShas: string[];
   copiedPaths: string[];
   autoResolvedPaths: string[];
   workpieceHeadAtReconcile: string | null;
@@ -2285,16 +2289,24 @@ export async function buildReconcileSteps(
         ).trim();
         if (cc.preReconcileSha) {
           try {
-            const countOutput = (
+            // ADR-0093: capture every merged workpiece commit SHA, not just the
+            // count — the bordbuch-append step records them for the
+            // external-edit guard.
+            const shaListOutput = (
               await shExec(
-                `git rev-list --count ${cc.preReconcileSha}..FETCH_HEAD`,
+                `git rev-list ${cc.preReconcileSha}..FETCH_HEAD`,
                 cc.systemDir,
                 cc.context.io,
               )
             ).trim();
-            cc.transferredCommits = parseInt(countOutput, 10);
+            cc.mergedShas = shaListOutput
+              .split("\n")
+              .map((l) => l.trim())
+              .filter((l) => l.length > 0);
+            cc.transferredCommits = cc.mergedShas.length;
           } catch {
             cc.transferredCommits = 0;
+            cc.mergedShas = [];
           }
         }
         cc.context.logger.info(
@@ -2307,6 +2319,33 @@ export async function buildReconcileSteps(
               `  If you expected changes, the workpiece may have no operator commits — check mission.git.commit output.\n`,
           );
         }
+      },
+    },
+    {
+      // ADR-0093: record the reconcile trace — commitSha is the merge/head
+      // commit, mergedShas[] lists every workpiece commit folded into the
+      // cache clone. The external-edit guard treats all of them as traced.
+      name: "bordbuch-append",
+      run: async (c: unknown) => {
+        const cc = c as ReconcileStepCtx;
+        await appendAndCommitBordbuch(
+          cc.workspaceRoot,
+          cc.manifest.systemId,
+          "mission-reconcile",
+          `Mission ${cc.missionId} reconciled`,
+          cc.actor,
+          {
+            missionId: cc.missionId,
+            writerRole: "mission",
+            metadata: {
+              commitSha: cc.commitSha,
+              preReconcileSha: cc.preReconcileSha,
+              mergedShas: cc.mergedShas,
+              transferredCommits: cc.transferredCommits,
+            },
+          },
+          `Bordbuch: mission-reconcile ${cc.missionId}`,
+        );
       },
     },
     {
@@ -2422,6 +2461,7 @@ export async function buildReconcileSteps(
           reconciledAt: cc.now,
           mergeCommitSha: cc.mergeCommitSha,
           transferredCommits: cc.transferredCommits,
+          mergedShas: cc.mergedShas,
           zeroTransferWarning: cc.transferredCommits === 0,
           message: cc.message,
           copiedPaths: cc.copiedPaths,

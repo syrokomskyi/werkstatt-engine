@@ -6,11 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0520: initial extraction of Bordbuch reading and git rev-list I/O from sternsystem.validate inline block.</item>
   <item>ADR-0040: add JSDoc return-type contract to bordbuchPathFor.</item>
   <item>ADR-0091: collect externalEditBaselineSha from system-state.yaml via loose read — malformed values reach the guard as baseline-missing.</item>
   <item>RFC-0520 follow-up: read bordbuch `kind` field (the schema field — `type` never existed, so every commit was untraced) and collect git subjects so the guard can whitelist pipeline bookkeeping commits.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>ADR-0093: collect mergedShas[] from mission-reconcile entry metadata so the guard can trace every merged workpiece commit.</item>
+  <history>RFC-0520</history>
 </CHANGE_SUMMARY>
 */
 
@@ -21,7 +22,7 @@ import { parse as parseYaml } from "yaml";
 export interface ExternalEditCollectorOutput {
   bordbuchEntries: Array<{
     kind?: string;
-    metadata?: { commitSha?: string; preReconcileSha?: string };
+    metadata?: { commitSha?: string; preReconcileSha?: string; mergedShas?: string[] };
   }>;
   rangeShas: string[];
   gitLogShas: string[];
@@ -49,7 +50,7 @@ export async function collectExternalEditInputs(
     try {
       const entry = JSON.parse(line) as {
         kind?: string;
-        metadata?: { commitSha?: string; preReconcileSha?: string };
+        metadata?: { commitSha?: string; preReconcileSha?: string; mergedShas?: string[] };
       };
       bordbuchEntries.push(entry);
       if (entry.kind === "mission-reconcile" && entry.metadata?.commitSha) {

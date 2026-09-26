@@ -139,3 +139,81 @@ test("no baseline → untraced legacy history still flagged (unchanged behavior)
   expect(result.violations[0]!.rule).toBe("external-edit-detected");
   expect(result.violations[0]!.message).toContain("2 commit(s)");
 });
+
+// ADR-0093: mergedShas tracing
+
+test("mergedShas[] traces every merged workpiece commit → verdict: pass", () => {
+  const result = evaluateExternalEditGate({
+    systemId,
+    bordbuchEntries: [
+      {
+        kind: "mission-reconcile",
+        metadata: { commitSha: "merge01", mergedShas: ["wp001", "wp002", "wp003"] },
+      },
+    ],
+    gitLogShas: ["merge01", "wp001", "wp002", "wp003"],
+    rangeShas: [],
+  });
+  expect(result.verdict).toBe("pass");
+  expect(result.violations).toHaveLength(0);
+});
+
+test("mergedShas[] entry plus an untraced commit → fail reports only the untraced one", () => {
+  const result = evaluateExternalEditGate({
+    systemId,
+    bordbuchEntries: [
+      {
+        kind: "mission-reconcile",
+        metadata: { commitSha: "merge01", mergedShas: ["wp001", "wp002"] },
+      },
+    ],
+    gitLogShas: ["merge01", "wp001", "wp002", "extern1"],
+    rangeShas: [],
+  });
+  expect(result.verdict).toBe("fail");
+  expect(result.violations).toHaveLength(1);
+  expect(result.violations[0]!.rule).toBe("external-edit-detected");
+  expect(result.violations[0]!.message).toContain("1 commit(s)");
+  expect(result.violations[0]!.message).toContain("extern1");
+});
+
+test("legacy entry without mergedShas → only commitSha traced (unchanged behavior)", () => {
+  const result = evaluateExternalEditGate({
+    systemId,
+    bordbuchEntries: [{ kind: "mission-reconcile", metadata: { commitSha: "merge01" } }],
+    gitLogShas: ["merge01", "wp001"],
+    rangeShas: [],
+  });
+  expect(result.verdict).toBe("fail");
+  expect(result.violations[0]!.message).toContain("wp001");
+});
+
+test("mergedShas[] on a non-mission-reconcile kind is ignored", () => {
+  const result = evaluateExternalEditGate({
+    systemId,
+    bordbuchEntries: [
+      { kind: "deployment", metadata: { mergedShas: ["wp001"] } },
+      { kind: "mission-reconcile", metadata: { commitSha: "merge01" } },
+    ],
+    gitLogShas: ["merge01", "wp001"],
+    rangeShas: [],
+  });
+  expect(result.verdict).toBe("fail");
+  expect(result.violations[0]!.message).toContain("wp001");
+});
+
+test("multiple reconcile entries accumulate mergedShas across missions", () => {
+  const result = evaluateExternalEditGate({
+    systemId,
+    bordbuchEntries: [
+      { kind: "mission-reconcile", metadata: { commitSha: "merge01", mergedShas: ["wp001"] } },
+      {
+        kind: "mission-reconcile",
+        metadata: { commitSha: "merge02", mergedShas: ["wp002", "wp003"] },
+      },
+    ],
+    gitLogShas: ["merge02", "wp002", "wp003", "merge01", "wp001"],
+    rangeShas: [],
+  });
+  expect(result.verdict).toBe("pass");
+});

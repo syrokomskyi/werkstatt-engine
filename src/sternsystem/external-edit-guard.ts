@@ -9,6 +9,7 @@
   <item>RFC-0520: initial extraction of Bordbuch-vs-git-log guard as pure function.</item>
   <item>ADR-0091: add externalEditBaselineSha input — positional grandfathering of pre-baseline rev-list commits and external-edit-baseline-missing violation.</item>
   <item>RFC-0520 follow-up: read bordbuch `kind` field (the `type` field never existed — guard was silently dead) and whitelist pipeline bookkeeping subject prefixes so machine-authored commits pass.</item>
+  <item>ADR-0093: trace metadata.mergedShas[] from mission-reconcile entries — every merged workpiece commit counts as pipeline-authored, not just the merge head in commitSha.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -41,7 +42,7 @@ export interface ExternalEditGuardInput {
   systemId: string;
   bordbuchEntries: Array<{
     kind?: string;
-    metadata?: { commitSha?: string; preReconcileSha?: string };
+    metadata?: { commitSha?: string; preReconcileSha?: string; mergedShas?: string[] };
   }>;
   gitLogShas: string[];
   gitLogSubjects?: string[];
@@ -86,8 +87,15 @@ export function evaluateExternalEditGate(input: ExternalEditGuardInput): Externa
 
   const expectedShas = new Set<string>();
   for (const entry of bordbuchEntries) {
-    if (entry.kind === "mission-reconcile" && entry.metadata?.commitSha) {
+    if (entry.kind !== "mission-reconcile") continue;
+    if (entry.metadata?.commitSha) {
       expectedShas.add(entry.metadata.commitSha);
+    }
+    // ADR-0093: every workpiece commit folded into the cache clone by
+    // reconcile is pipeline-authored — trace each SHA, not just the merge
+    // head. Legacy entries without mergedShas fall back to commitSha only.
+    for (const sha of entry.metadata?.mergedShas ?? []) {
+      expectedShas.add(sha);
     }
   }
   for (const sha of rangeShas) {
