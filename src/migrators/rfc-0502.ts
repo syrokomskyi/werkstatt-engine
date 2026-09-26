@@ -50,12 +50,16 @@ export const rfc0502Migrator: Migrator = {
   toVersion: "4.14.0",
   description:
     "Create initial author record file surface/authors/{lang}/andrii-syrokomskyi.md if it does not exist. Advances migratorCursor for RFC-0502 (ratgeber editorial provenance — authors, sources, claims, and review metadata).",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const authorsBaseDir = path.join(data.rootPath, "src", "content", "surface", "authors");
 
     let langDirs: string[];
     try {
-      langDirs = (await io.readdir(authorsBaseDir)).map(e => e.name);
+      langDirs = (await io.readdir(authorsBaseDir)).map((e) => e.name);
     } catch {
       ctx.logger.info(`[rfc-0502] no authors directory at ${authorsBaseDir} — creating`);
       await io.mkdir(authorsBaseDir);
@@ -72,7 +76,8 @@ export const rfc0502Migrator: Migrator = {
       }
 
       const authorFile = path.join(langPath, "andrii-syrokomskyi.md");
-      const exists = await io.stat(authorFile)
+      const exists = await io
+        .stat(authorFile)
         .then(() => true)
         .catch(() => false);
 

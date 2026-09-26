@@ -8,9 +8,33 @@ import type { FleetSiteRecord } from "./fleet-sites-generate.ts";
 
 describe("FleetSiteRecord wave partitioning", () => {
   const sites: FleetSiteRecord[] = [
-    { id: "a", path: "../systems-cache/a", platformVersion: "1", channels: { dev: { releaseId: null }, alt: { releaseId: null }, main: { releaseId: null } }, mirrors: { count: 1, protocols: ["file"] }, activeMission: null, canary: true },
-    { id: "b", path: "../systems-cache/b", platformVersion: "1", channels: { dev: { releaseId: null }, alt: { releaseId: null }, main: { releaseId: null } }, mirrors: { count: 1, protocols: ["file"] }, activeMission: null, canary: false },
-    { id: "c", path: "../systems-cache/c", platformVersion: "1", channels: { dev: { releaseId: null }, alt: { releaseId: null }, main: { releaseId: null } }, mirrors: { count: 1, protocols: ["file"] }, activeMission: null, canary: false },
+    {
+      id: "a",
+      path: "../systems-cache/a",
+      platformVersion: "1",
+      channels: { dev: { releaseId: null }, alt: { releaseId: null }, main: { releaseId: null } },
+      mirrors: { count: 1, protocols: ["file"] },
+      activeMission: null,
+      canary: true,
+    },
+    {
+      id: "b",
+      path: "../systems-cache/b",
+      platformVersion: "1",
+      channels: { dev: { releaseId: null }, alt: { releaseId: null }, main: { releaseId: null } },
+      mirrors: { count: 1, protocols: ["file"] },
+      activeMission: null,
+      canary: false,
+    },
+    {
+      id: "c",
+      path: "../systems-cache/c",
+      platformVersion: "1",
+      channels: { dev: { releaseId: null }, alt: { releaseId: null }, main: { releaseId: null } },
+      mirrors: { count: 1, protocols: ["file"] },
+      activeMission: null,
+      canary: false,
+    },
   ];
 
   it("partitions canary sites into canary wave", () => {
@@ -47,8 +71,20 @@ describe("FleetApplyResult structure", () => {
     const entries = [
       { site: "a", wave: "canary" as const, status: "ok" as const, exitCode: 0, durationMs: 100 },
       { site: "b", wave: "rest" as const, status: "failed" as const, exitCode: 1, durationMs: 200 },
-      { site: "c", wave: "rest" as const, status: "skipped(stop-threshold)" as const, exitCode: null, durationMs: 0 },
-      { site: "d", wave: "rest" as const, status: "skipped(precondition)" as const, exitCode: -1, durationMs: 0 },
+      {
+        site: "c",
+        wave: "rest" as const,
+        status: "skipped(stop-threshold)" as const,
+        exitCode: null,
+        durationMs: 0,
+      },
+      {
+        site: "d",
+        wave: "rest" as const,
+        status: "skipped(precondition)" as const,
+        exitCode: -1,
+        durationMs: 0,
+      },
     ];
     const ok = entries.filter((e) => e.status === "ok").length;
     const failed = entries.filter((e) => e.status === "failed").length;

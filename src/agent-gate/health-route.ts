@@ -61,9 +61,7 @@ export async function runAgentHealth(
   const manifestOk = manifestRes?.ok === true;
 
   const knowledgeRef = manifest.knowledge[0]?.url;
-  const knowledgeOk = knowledgeRef
-    ? (await selfFetch(deps, knowledgeRef))?.ok === true
-    : true; // vacuous — surface declares no knowledge refs
+  const knowledgeOk = knowledgeRef ? (await selfFetch(deps, knowledgeRef))?.ok === true : true; // vacuous — surface declares no knowledge refs
 
   const identityRes = await selfFetch(deps, BUILD_IDENTITY_PATH);
   let contentHash = "";

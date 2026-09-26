@@ -12,7 +12,12 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { IssuerRegistryEntryV1, AttestationVerificationV1, SignedDecisionV1, SignedRootV1 } from "../contracts/authority.ts";
+import type {
+  IssuerRegistryEntryV1,
+  AttestationVerificationV1,
+  SignedDecisionV1,
+  SignedRootV1,
+} from "../contracts/authority.ts";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
 export interface IssuerRegistryV1 {
@@ -30,9 +35,7 @@ export interface IssuerRegistryAddFailureV1 {
   message: string;
 }
 
-export type IssuerRegistryAddOutcomeV1 =
-  | IssuerRegistryAddResultV1
-  | IssuerRegistryAddFailureV1;
+export type IssuerRegistryAddOutcomeV1 = IssuerRegistryAddResultV1 | IssuerRegistryAddFailureV1;
 
 export function createIssuerRegistry(): IssuerRegistryV1 {
   return { entries: new Map() };
@@ -59,10 +62,7 @@ export function addIssuer(
   return { ok: true, registry: { entries: newEntries } };
 }
 
-export function isIssuerRegistered(
-  registry: IssuerRegistryV1,
-  issuerId: string,
-): boolean {
+export function isIssuerRegistered(registry: IssuerRegistryV1, issuerId: string): boolean {
   return registry.entries.has(issuerId);
 }
 
@@ -86,13 +86,9 @@ export interface AttestationVerifyFailureV1 {
   message: string;
 }
 
-export type AttestationVerifyOutcomeV1 =
-  | AttestationVerifyResultV1
-  | AttestationVerifyFailureV1;
+export type AttestationVerifyOutcomeV1 = AttestationVerifyResultV1 | AttestationVerifyFailureV1;
 
-export function verifyAttestation(
-  input: AttestationVerifyInputV1,
-): AttestationVerifyOutcomeV1 {
+export function verifyAttestation(input: AttestationVerifyInputV1): AttestationVerifyOutcomeV1 {
   const entry = input.registry.entries.get(input.issuerId);
   if (!entry) {
     return {
@@ -135,8 +131,7 @@ export interface SignedDecisionVerifyFailureV1 {
 }
 
 export type SignedDecisionVerifyOutcomeV1 =
-  | SignedDecisionVerifyResultV1
-  | SignedDecisionVerifyFailureV1;
+  SignedDecisionVerifyResultV1 | SignedDecisionVerifyFailureV1;
 
 export function verifySignedDecision(
   signed: SignedDecisionV1,
@@ -169,9 +164,7 @@ export interface SignedRootVerifyFailureV1 {
   message: string;
 }
 
-export type SignedRootVerifyOutcomeV1 =
-  | SignedRootVerifyResultV1
-  | SignedRootVerifyFailureV1;
+export type SignedRootVerifyOutcomeV1 = SignedRootVerifyResultV1 | SignedRootVerifyFailureV1;
 
 export function verifySignedRoot(
   signed: SignedRootV1,

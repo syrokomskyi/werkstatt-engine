@@ -145,7 +145,10 @@ lastRelease: null
       actor: "test-agent",
     },
   } as unknown as KernelCommandInput;
-  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
 
   await runMissionOpen(input, context);
 

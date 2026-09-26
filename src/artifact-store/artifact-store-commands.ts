@@ -237,7 +237,14 @@ export async function runArtifactStorePut(
   );
 
   try {
-    const result = await storeArtifactCore(workspaceRoot, releaseId, distDir, systemId, context.io, sitePath);
+    const result = await storeArtifactCore(
+      workspaceRoot,
+      releaseId,
+      distDir,
+      systemId,
+      context.io,
+      sitePath,
+    );
 
     logger.success(
       `[artifact.store.put] stored artifact for ${releaseId}: ${result.distArtifactHash}`,

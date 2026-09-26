@@ -10,11 +10,9 @@
 </CHANGE_SUMMARY>
 */
 
-
 export {
   runBehaviorSnapshotCapture,
   type BehaviorSnapshotCaptureData,
   runBehaviorSnapshotDiff,
   type BehaviorSnapshotDiffData,
 } from "./behavior-snapshot-commands.ts";
-

@@ -14,9 +14,12 @@ import {
 import type { CertificationDossierEventV1 } from "../certification/contracts/dossier.ts";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
-const DIGEST_A = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Sha256Digest;
-const DIGEST_B = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as Sha256Digest;
-const DIGEST_C = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" as Sha256Digest;
+const DIGEST_A =
+  "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Sha256Digest;
+const DIGEST_B =
+  "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as Sha256Digest;
+const DIGEST_C =
+  "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" as Sha256Digest;
 
 function mkEvent(
   candidateId: string,

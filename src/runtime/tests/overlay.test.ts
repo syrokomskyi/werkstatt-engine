@@ -7,7 +7,7 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 
-const VALID_SHA = "sha256:" + "a".repeat(64) as Sha256Digest;
+const VALID_SHA = ("sha256:" + "a".repeat(64)) as Sha256Digest;
 
 function makeDeclaration(id: string): ComponentDeclaration {
   return {

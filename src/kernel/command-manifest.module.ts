@@ -22,36 +22,34 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createCommandManifestModule(): Promise<ModuleExport> {
-const { runCommandManifestGenerate } = await import("./command-manifest.ts");
+  const { runCommandManifestGenerate } = await import("./command-manifest.ts");
   return {
-  name: "command-manifest",
-  version: "0.1.0",
+    name: "command-manifest",
+    version: "0.1.0",
 
     declarations: [],
-  commands: [
-    {
-      name: "command.manifest.generate",
-      modulePath: "packages/werkstatt-engine/src/kernel/command-manifest.module.ts",
-      description:
-        "Aggregate every registered command's metadata (flags, IO globs, mutability, timeouts, pipeline " +
-        "membership) into docs/command-manifest.generated.yaml — the single machine-readable command " +
-        "description. Use --dry-run to preview without writing (RFC-0266).",
-      scope: "workspace",
-      mutatesState: true,
-      writes: ["docs/command-manifest.generated.yaml"],
-      generates: [{ path: "docs/command-manifest.generated.yaml", phase: "build.prepare" }],
-      cacheable: false,
-      flags: {
-        "dry-run": {
-          kind: "boolean",
-          description: "Preview the manifest without writing the file.",
+    commands: [
+      {
+        name: "command.manifest.generate",
+        modulePath: "packages/werkstatt-engine/src/kernel/command-manifest.module.ts",
+        description:
+          "Aggregate every registered command's metadata (flags, IO globs, mutability, timeouts, pipeline " +
+          "membership) into docs/command-manifest.generated.yaml — the single machine-readable command " +
+          "description. Use --dry-run to preview without writing (RFC-0266).",
+        scope: "workspace",
+        mutatesState: true,
+        writes: ["docs/command-manifest.generated.yaml"],
+        generates: [{ path: "docs/command-manifest.generated.yaml", phase: "build.prepare" }],
+        cacheable: false,
+        flags: {
+          "dry-run": {
+            kind: "boolean",
+            description: "Preview the manifest without writing the file.",
+          },
         },
+        execute: runCommandManifestGenerate,
       },
-      execute: runCommandManifestGenerate,
-    }
-  ],
-  pipelines: [
-
-  ]};
+    ],
+    pipelines: [],
+  };
 }
-;

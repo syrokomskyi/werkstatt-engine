@@ -66,7 +66,8 @@ test("sternsystem.validate emits no deployment violations when deployment is abs
   const result = await runSternsystemValidate(makeInput({ id: systemId }), makeContext());
   const violations = result.data?.violations ?? [];
   const deploymentViolations = violations.filter(
-    (v) => v.rule.includes("deploy") || v.rule.includes("channel") || v.message.includes("deployment"),
+    (v) =>
+      v.rule.includes("deploy") || v.rule.includes("channel") || v.message.includes("deployment"),
   );
   expect(
     deploymentViolations,

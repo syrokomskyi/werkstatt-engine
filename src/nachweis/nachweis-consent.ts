@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -86,7 +85,7 @@ export async function runNachweisConsentUpdate(
   const consentDir = resolvePbpEntityDir(cachePath, lang, "consent");
   const consentFile = path.join(consentDir, `${consentId}.md`);
 
-  if (!await context.io.exists(consentFile)) {
+  if (!(await context.io.exists(consentFile))) {
     throw new Error(
       `[nachweis.consent.update] NOT_FOUND: consent '${consentId}' not found at ${consentFile}`,
     );

@@ -21,7 +21,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import path from "node:path";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import {
@@ -82,7 +81,7 @@ export async function runNachweisSign(
     ) as unknown as KernelCommandResult<NachweisSignResult>;
   }
 
-  if (!await context.io.exists(keyFilePath)) {
+  if (!(await context.io.exists(keyFilePath))) {
     throw new Error(
       `[nachweis.sign] KEY_NOT_FOUND: private key file '${keyFilePath}' does not exist. Run nachweis.key.ensure first.`,
     );
@@ -96,7 +95,7 @@ export async function runNachweisSign(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!await context.io.exists(evidenceFile)) {
+  if (!(await context.io.exists(evidenceFile))) {
     throw new Error(
       `[nachweis.sign] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );

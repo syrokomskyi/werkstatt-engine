@@ -76,10 +76,7 @@ describe("restoreEnvFilesFromCacheClone", () => {
   });
 
   test("replaces PUBLIC_IMAGE_PROVIDER with build-portable", async () => {
-    writeFileSync(
-      join(cacheCloneDir, ".env"),
-      "PUBLIC_IMAGE_PROVIDER=astro\nOTHER=value\n",
-    );
+    writeFileSync(join(cacheCloneDir, ".env"), "PUBLIC_IMAGE_PROVIDER=astro\nOTHER=value\n");
     await restoreEnvFilesFromCacheClone(cacheCloneDir, workpieceDir);
     const content = readFileSync(join(workpieceDir, ".env"), "utf8");
     expect(content).toContain("PUBLIC_IMAGE_PROVIDER=build-portable");

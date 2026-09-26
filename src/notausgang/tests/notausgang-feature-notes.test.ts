@@ -55,9 +55,7 @@ test("detects entitlementsOverride features from system.md frontmatter", async (
 test("detects integrations from system.md frontmatter as needs-backend", async () => {
   await writeSystemMd({ integrations: { matomo: { enabled: true }, uchat: {} } });
   const features = await inventory();
-  expect(features.find((f) => f.feature === "integrations.matomo")?.verdict).toBe(
-    "needs-backend",
-  );
+  expect(features.find((f) => f.feature === "integrations.matomo")?.verdict).toBe("needs-backend");
   expect(features.find((f) => f.feature === "integrations.uchat")?.verdict).toBe("needs-backend");
 });
 

@@ -28,12 +28,16 @@ export const rfc0501Migrator: Migrator = {
   toVersion: "4.13.0",
   description:
     "Set existing published ratgeber articles to review-required — their prose bodies don't have the 10-section structure yet. Advances migratorCursor for RFC-0501 (ratgeber article types, mandatory structure, and publication gate).",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const articlesBaseDir = path.join(data.rootPath, "src", "content", "surface", "articles");
 
     let langDirs: string[];
     try {
-      langDirs = (await io.readdir(articlesBaseDir)).map(e => e.name);
+      langDirs = (await io.readdir(articlesBaseDir)).map((e) => e.name);
     } catch {
       ctx.logger.info(`[rfc-0501] no articles directory at ${articlesBaseDir} — skipping`);
       return data;
@@ -46,7 +50,7 @@ export const rfc0501Migrator: Migrator = {
 
       let files: string[];
       try {
-        files = (await io.readdir(langPath)).map(e => e.name);
+        files = (await io.readdir(langPath)).map((e) => e.name);
       } catch {
         continue;
       }

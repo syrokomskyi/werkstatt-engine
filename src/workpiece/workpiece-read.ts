@@ -53,8 +53,11 @@ export async function runWorkpieceRead(
 
   const { workspaceRoot, logger } = context;
 
-  const manifestPath = path.join(await resolveMissionDir(workspaceRoot, missionId, context.io), "mission.yaml");
-  if (!await context.io.exists(manifestPath)) {
+  const manifestPath = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "mission.yaml",
+  );
+  if (!(await context.io.exists(manifestPath))) {
     throw new Error(`[workpiece.read] Mission '${missionId}' is not open or does not exist`);
   }
 
@@ -65,8 +68,11 @@ export async function runWorkpieceRead(
     );
   }
 
-  const workpieceDir = path.join(await resolveMissionDir(workspaceRoot, missionId, context.io), "workpiece");
-  if (!await context.io.exists(workpieceDir)) {
+  const workpieceDir = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "workpiece",
+  );
+  if (!(await context.io.exists(workpieceDir))) {
     throw new Error(
       `[workpiece.read] Workpiece for mission '${missionId}' not found. Run mission.materialize first.`,
     );
@@ -83,7 +89,7 @@ export async function runWorkpieceRead(
     throw new Error(`Path '${normalizedPath}' is outside client-editable surface (DNA-22)`);
   }
 
-  if (!await context.io.exists(resolvedPath)) {
+  if (!(await context.io.exists(resolvedPath))) {
     throw new Error(`[workpiece.read] File not found: ${normalizedPath}`);
   }
 

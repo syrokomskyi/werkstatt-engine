@@ -72,11 +72,7 @@ describe("resolveSiteFlagAlias (RFC-1126)", () => {
   });
 
   it("supports the --site=value inline form", async () => {
-    const { argv } = await resolveSiteFlagAlias(
-      ["--site=warpgogol-com"],
-      cmd({ id: str() }),
-      root,
-    );
+    const { argv } = await resolveSiteFlagAlias(["--site=warpgogol-com"], cmd({ id: str() }), root);
     expect(argv).toEqual(["--id", "warpgogol-com"]);
   });
 
@@ -181,11 +177,7 @@ describe("resolveSiteFlagAlias (RFC-1126)", () => {
   });
 
   it("is a no-op without --site in argv", async () => {
-    const { argv } = await resolveSiteFlagAlias(
-      ["--id", "x"],
-      cmd({ id: str() }),
-      root,
-    );
+    const { argv } = await resolveSiteFlagAlias(["--id", "x"], cmd({ id: str() }), root);
     expect(argv).toEqual(["--id", "x"]);
   });
 });

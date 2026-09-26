@@ -25,30 +25,30 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createNachweisModule(): Promise<ModuleExport> {
   const { runNachweisIngest } = await import("./nachweis-ingest.ts");
-      const { runNachweisValidate } = await import("./nachweis-validate.ts");
-      const { runNachweisManifestGenerate } = await import("./nachweis-manifest.ts");
-      const { runNachweisConsentUpdate } = await import("./nachweis-consent.ts");
-      const { runNachweisPublish } = await import("./nachweis-publish.ts");
-      const { runNachweisWithdraw } = await import("./nachweis-withdraw.ts");
-      const { runNachweisApprove } = await import("./nachweis-approve.ts");
-      const { runNachweisPublicDerivative } = await import("./nachweis-public-derivative.ts");
-      const { runNachweisKeyEnsure } = await import("./nachweis-key-ensure.ts");
-      const { runNachweisSign } = await import("./nachweis-sign.ts");
-      const { runNachweisTimestamp } = await import("./nachweis-timestamp.ts");
-      const { runNachweisVerifySignature } = await import("./nachweis-verify-signature.ts");
-      const { runNachweisAssessmentIngest } = await import("./nachweis-assessment-ingest.ts");
-      const { runNachweisLighthouseMeasure } = await import("./nachweis-lighthouse-measure.ts");
-      const { runNachweisCloudflareAgentReadinessMeasure } =
-        await import("./nachweis-cloudflare-agent-readiness-measure.ts");
-      const { runNachweisScreenshotUpload } = await import("./nachweis-screenshot-upload.ts");
-      const { runNachweisScreenshotIngest } = await import("./nachweis-screenshot-ingest.ts");
-      const { runNachweisScreenshotProcess } = await import("./nachweis-screenshot-process.ts");
+  const { runNachweisValidate } = await import("./nachweis-validate.ts");
+  const { runNachweisManifestGenerate } = await import("./nachweis-manifest.ts");
+  const { runNachweisConsentUpdate } = await import("./nachweis-consent.ts");
+  const { runNachweisPublish } = await import("./nachweis-publish.ts");
+  const { runNachweisWithdraw } = await import("./nachweis-withdraw.ts");
+  const { runNachweisApprove } = await import("./nachweis-approve.ts");
+  const { runNachweisPublicDerivative } = await import("./nachweis-public-derivative.ts");
+  const { runNachweisKeyEnsure } = await import("./nachweis-key-ensure.ts");
+  const { runNachweisSign } = await import("./nachweis-sign.ts");
+  const { runNachweisTimestamp } = await import("./nachweis-timestamp.ts");
+  const { runNachweisVerifySignature } = await import("./nachweis-verify-signature.ts");
+  const { runNachweisAssessmentIngest } = await import("./nachweis-assessment-ingest.ts");
+  const { runNachweisLighthouseMeasure } = await import("./nachweis-lighthouse-measure.ts");
+  const { runNachweisCloudflareAgentReadinessMeasure } =
+    await import("./nachweis-cloudflare-agent-readiness-measure.ts");
+  const { runNachweisScreenshotUpload } = await import("./nachweis-screenshot-upload.ts");
+  const { runNachweisScreenshotIngest } = await import("./nachweis-screenshot-ingest.ts");
+  const { runNachweisScreenshotProcess } = await import("./nachweis-screenshot-process.ts");
   return {
     name: "nachweis",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "nachweis.ingest",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -78,7 +78,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisIngest,
       },
-    {
+      {
         name: "nachweis.validate",
         contract: "nachweis",
         rules: [],
@@ -98,7 +98,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisValidate,
       },
-    {
+      {
         name: "nachweis.manifest.generate",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         description:
@@ -126,7 +126,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         ],
         execute: runNachweisManifestGenerate,
       },
-    {
+      {
         name: "nachweis.consent.update",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -159,7 +159,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisConsentUpdate,
       },
-    {
+      {
         name: "nachweis.publish",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -178,7 +178,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisPublish,
       },
-    {
+      {
         name: "nachweis.withdraw",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -198,7 +198,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisWithdraw,
       },
-    {
+      {
         name: "nachweis.approve",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -231,7 +231,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisApprove,
       },
-    {
+      {
         name: "nachweis.public-derivative",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -260,7 +260,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisPublicDerivative,
       },
-    {
+      {
         name: "nachweis.key.ensure",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [
@@ -291,7 +291,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisKeyEnsure,
       },
-    {
+      {
         name: "nachweis.sign",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -316,7 +316,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisSign,
       },
-    {
+      {
         name: "nachweis.timestamp",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -346,7 +346,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisTimestamp,
       },
-    {
+      {
         name: "nachweis.assessment.ingest",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -373,7 +373,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisAssessmentIngest,
       },
-    {
+      {
         name: "nachweis.measure.lighthouse",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -422,7 +422,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisLighthouseMeasure,
       },
-    {
+      {
         name: "nachweis.measure.cloudflare-agent-readiness",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -467,7 +467,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisCloudflareAgentReadinessMeasure,
       },
-    {
+      {
         name: "nachweis.verify-signature",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -486,7 +486,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisVerifySignature,
       },
-    {
+      {
         name: "nachweis.screenshot.upload",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -515,7 +515,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisScreenshotUpload,
       },
-    {
+      {
         name: "nachweis.screenshot.ingest",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
@@ -551,7 +551,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         writes: [],
         execute: runNachweisScreenshotIngest,
       },
-    {
+      {
         name: "nachweis.screenshot.process",
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [
@@ -583,9 +583,8 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         reads: [],
         writes: [],
         execute: runNachweisScreenshotProcess,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

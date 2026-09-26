@@ -10,7 +10,6 @@
 </CHANGE_SUMMARY>
 */
 
-
 export {
   runArtifactStorePut,
   type ArtifactStorePutData,
@@ -26,4 +25,3 @@ export {
   type ArtifactPreflightResult,
   artifactStoreRehydrate,
 } from "./artifact-store-commands.ts";
-

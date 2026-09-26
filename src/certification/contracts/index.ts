@@ -31,11 +31,7 @@ export {
   safeSemanticPathSchema,
   safeLocatorSchema,
 } from "./identifiers.ts";
-export type {
-  GateChannel,
-  Environment,
-  CertificationStatus,
-} from "./identifiers.ts";
+export type { GateChannel, Environment, CertificationStatus } from "./identifiers.ts";
 
 export {
   buildConfigV1Schema,

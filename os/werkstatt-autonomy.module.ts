@@ -17,7 +17,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../src/kernel/types.ts";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "../src/kernel/types.ts";
 import type { ModuleExport } from "../src/runtime/desired-state.ts";
 import {
   runAutonomyValidate,
@@ -27,7 +31,7 @@ import {
 export const werkstattAutonomyModule: ModuleExport = {
   name: "werkstatt-autonomy",
   version: "0.1.0",
-    declarations: [],
+  declarations: [],
   commands: [
     {
       name: "werkstatt.autonomy.validate",
@@ -55,8 +59,7 @@ export const werkstattAutonomyModule: ModuleExport = {
               : `Autonomy guard failed — ${result.violations.length} violation${result.violations.length === 1 ? "" : "s"} in ${result.scannedFiles} files`,
         };
       },
-    }
+    },
   ],
-  pipelines: [
-
-  ]};
+  pipelines: [],
+};

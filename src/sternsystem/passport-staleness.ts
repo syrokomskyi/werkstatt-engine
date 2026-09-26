@@ -23,9 +23,7 @@ import type { BordbuchEntry, BordbuchEntryKind } from "@warpgogol/werkstatt-engi
  * treated as state-changing, so a new bookkeeping kind must be added
  * explicitly or it will (correctly) stale passports.
  */
-export const BOOKKEEPING_BORDBUCH_KINDS: ReadonlySet<BordbuchEntryKind> = new Set([
-  "mirror-sync",
-]);
+export const BOOKKEEPING_BORDBUCH_KINDS: ReadonlySet<BordbuchEntryKind> = new Set(["mirror-sync"]);
 
 /**
  * ADR-0092: true when every entry appended after `recordedHead` is a

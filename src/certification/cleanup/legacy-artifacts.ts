@@ -19,11 +19,7 @@ import type { CleanCutoverMarkerV1 } from "../cutover/marker.ts";
 export type CleanupMode = "dry-run" | "apply";
 
 export type LegacyCategory =
-  | "superseded-workpiece"
-  | "build-output"
-  | "staging-payload"
-  | "snapshot"
-  | "cached-build";
+  "superseded-workpiece" | "build-output" | "staging-payload" | "snapshot" | "cached-build";
 
 export type ProtectedCategory =
   | "git-repository"
@@ -122,8 +118,7 @@ export interface CleanupPrerequisiteFailureV1 {
 }
 
 export type CleanupPrerequisiteOutcomeV1 =
-  | CleanupPrerequisiteResultV1
-  | CleanupPrerequisiteFailureV1;
+  CleanupPrerequisiteResultV1 | CleanupPrerequisiteFailureV1;
 
 export function verifyCleanupPrerequisites(
   prereqs: CleanupPrerequisitesV1,
@@ -140,7 +135,8 @@ export function verifyCleanupPrerequisites(
     return {
       ok: false,
       ruleId: "CERT-CLEANUP-02",
-      message: "bootstrap exception must be closed before legacy cleanup — cutover marker shows open exception",
+      message:
+        "bootstrap exception must be closed before legacy cleanup — cutover marker shows open exception",
     };
   }
 
@@ -228,10 +224,7 @@ export function buildInventory(
   };
 }
 
-export function buildPlan(
-  inventory: CleanupInventoryV1,
-  createdAt: string,
-): CleanupPlanV1 {
+export function buildPlan(inventory: CleanupInventoryV1, createdAt: string): CleanupPlanV1 {
   const pathsToDelete = inventory.legacyArtifacts
     .filter((a) => a.allowedForDeletion)
     .map((a) => a.path);
@@ -274,13 +267,9 @@ export interface PlanValidationFailureV1 {
   message: string;
 }
 
-export type PlanValidationOutcomeV1 =
-  | PlanValidationResultV1
-  | PlanValidationFailureV1;
+export type PlanValidationOutcomeV1 = PlanValidationResultV1 | PlanValidationFailureV1;
 
-export function validatePlan(
-  input: PlanValidationInputV1,
-): PlanValidationOutcomeV1 {
+export function validatePlan(input: PlanValidationInputV1): PlanValidationOutcomeV1 {
   if (input.plan.planHash !== input.expectedPlanHash) {
     return {
       ok: false,
@@ -362,15 +351,11 @@ export function buildReport(
   };
 }
 
-export function isSafeNoOp(
-  report: CleanupReportV1,
-): boolean {
+export function isSafeNoOp(report: CleanupReportV1): boolean {
   return report.mode === "apply" && report.tombstones.length === 0 && report.freedBytes === 0;
 }
 
-export function verifyReportIntegrity(
-  report: CleanupReportV1,
-): boolean {
+export function verifyReportIntegrity(report: CleanupReportV1): boolean {
   const expectedFreed = report.tombstones.reduce((sum, t) => sum + t.sizeBytes, 0);
   return expectedFreed === report.freedBytes;
 }
@@ -382,14 +367,9 @@ export interface PathSafetyCheckV1 {
   withinAllowedRoot: boolean;
 }
 
-export function checkPathSafety(
-  check: PathSafetyCheckV1,
-  allowedRoots: string[],
-): boolean {
+export function checkPathSafety(check: PathSafetyCheckV1, allowedRoots: string[]): boolean {
   if (check.isSymlink && check.symlinkTarget) {
-    const targetWithinAllowed = allowedRoots.some((root) =>
-      check.symlinkTarget!.startsWith(root)
-    );
+    const targetWithinAllowed = allowedRoots.some((root) => check.symlinkTarget!.startsWith(root));
     if (!targetWithinAllowed) return false;
   }
   return check.withinAllowedRoot;

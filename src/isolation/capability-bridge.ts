@@ -74,9 +74,7 @@ export function createCapabilityBridge(opts: CapabilityBridgeOptions): ICapabili
       };
     }
 
-    const granted = opts.policy.grantedCommands.some(
-      (c) => String(c) === String(command),
-    );
+    const granted = opts.policy.grantedCommands.some((c) => String(c) === String(command));
     if (!granted) {
       const response: CapabilityBridgeResponseV1 = {
         schema: "werkstatt/capability-bridge-response@1",

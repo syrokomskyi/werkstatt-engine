@@ -75,15 +75,18 @@ function mapConsentStatus(
 
 async function migrateConsentFiles(
   rootPath: string,
-  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const bpBaseDir = path.join(rootPath, "src", "content", "business-profile");
 
   let langDirs: string[];
   try {
-    langDirs = (await io.readdir(bpBaseDir)).map(e => e.name);
+    langDirs = (await io.readdir(bpBaseDir)).map((e) => e.name);
   } catch {
-    ctx.logger.info(`[rfc-0885] no business-profile directory at ${bpBaseDir} — skipping consent migration`);
+    ctx.logger.info(
+      `[rfc-0885] no business-profile directory at ${bpBaseDir} — skipping consent migration`,
+    );
     return;
   }
 
@@ -137,13 +140,14 @@ async function migrateConsentFiles(
 
 async function migrateEvidenceSourceFiles(
   rootPath: string,
-  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const bpBaseDir = path.join(rootPath, "src", "content", "business-profile");
 
   let langDirs: string[];
   try {
-    langDirs = (await io.readdir(bpBaseDir)).map(e => e.name);
+    langDirs = (await io.readdir(bpBaseDir)).map((e) => e.name);
   } catch {
     return;
   }

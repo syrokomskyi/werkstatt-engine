@@ -47,9 +47,10 @@ export interface CreateAgentReflectRouteOptions {
   lawKernelSummary: LawKernelSummary;
 }
 
-export function createAgentReflectRoute(
-  options: CreateAgentReflectRouteOptions,
-): { GET: APIRoute; OPTIONS: APIRoute } {
+export function createAgentReflectRoute(options: CreateAgentReflectRouteOptions): {
+  GET: APIRoute;
+  OPTIONS: APIRoute;
+} {
   return {
     GET: async ({ clientAddress }) => {
       const limit = REFLECT_RATE_LIMITER.check(clientAddress || "unknown");

@@ -31,7 +31,4 @@ export type {
   CapabilityInvocationV1,
 } from "./store.ts";
 
-export {
-  createInMemoryArtifactStore,
-  createProviderAdmissionStore,
-} from "./store.ts";
+export { createInMemoryArtifactStore, createProviderAdmissionStore } from "./store.ts";

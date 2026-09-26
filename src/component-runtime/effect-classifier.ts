@@ -16,10 +16,7 @@ EffectDeclarationExt.
 </CHANGE_SUMMARY>
 */
 
-import type {
-  EffectClass,
-  EffectDeclarationExt,
-} from "@warpgogol/werkstatt-shared/component";
+import type { EffectClass, EffectDeclarationExt } from "@warpgogol/werkstatt-shared/component";
 
 export class EffectClassifier {
   private readonly registry: Map<string, EffectDeclarationExt>;
@@ -54,7 +51,12 @@ const DEFAULT_DECLARATIONS: readonly EffectDeclarationExt[] = [
     compensation: {
       compensatingOperation: "leitstand.dev-deploy.rollback",
       verificationProbes: [
-        { type: "http-status", target: "https://dev.example.com", expected: "200", timeoutMs: 30000 },
+        {
+          type: "http-status",
+          target: "https://dev.example.com",
+          expected: "200",
+          timeoutMs: 30000,
+        },
       ],
       verificationTimeoutMs: 30000,
       failureMode: "blocking",

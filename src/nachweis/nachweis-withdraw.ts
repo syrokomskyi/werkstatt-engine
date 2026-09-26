@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -80,7 +79,7 @@ export async function runNachweisWithdraw(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!await context.io.exists(evidenceFile)) {
+  if (!(await context.io.exists(evidenceFile))) {
     throw new Error(
       `[nachweis.withdraw] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );
@@ -126,7 +125,7 @@ export async function runNachweisWithdraw(
   const consentDir = resolvePbpEntityDir(cachePath, lang, "consent");
   const consentFile = path.join(consentDir, `${slug}.md`);
   let consentRevoked = false;
-  if (shouldRevokeConsent && await context.io.exists(consentFile)) {
+  if (shouldRevokeConsent && (await context.io.exists(consentFile))) {
     const rawConsent = await context.io.readFile(consentFile);
     const { data: consentData, content: consentContent } = parseMarkdownFrontmatter(rawConsent);
     const existingScope =

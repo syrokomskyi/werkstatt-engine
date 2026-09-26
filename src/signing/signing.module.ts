@@ -26,9 +26,9 @@ export async function createSigningModule(): Promise<ModuleExport> {
   return {
     name: "signing",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "signing.key.generate",
         modulePath: "packages/werkstatt-engine/src/signing/signing.module.ts",
         description:
@@ -54,9 +54,8 @@ export async function createSigningModule(): Promise<ModuleExport> {
           },
         },
         execute: runSigningKeyGenerate,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

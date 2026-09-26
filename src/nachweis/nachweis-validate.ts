@@ -74,10 +74,11 @@ interface PbpEntityRecord {
 async function readPbpEntitiesByType(
   cachePath: string,
   entityType: string,
-  lang: string, io: WorkspaceIO = createDefaultIO().io,
+  lang: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<PbpEntityRecord[]> {
   const dir = resolvePbpEntityDir(cachePath, lang, entityType);
-  if (!await io.exists(dir)) return [];
+  if (!(await io.exists(dir))) return [];
   const entries = await io.readdir(dir);
   const records: PbpEntityRecord[] = [];
   for (const entry of entries) {

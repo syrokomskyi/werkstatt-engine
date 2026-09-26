@@ -122,7 +122,12 @@ beforeEach(async () => {
       systemId: SYSTEM_ID,
       cosmicStar: "Vega",
       pinnedAt: "2026-07-12T10:00:00.000Z",
-      platform: { version: "4.5.0", commit: "0000000", rfcHead: "RFC-0000", platformSemanticHash: "sha256:abc" },
+      platform: {
+        version: "4.5.0",
+        commit: "0000000",
+        rfcHead: "RFC-0000",
+        platformSemanticHash: "sha256:abc",
+      },
       migratorCursor: "4.5.0",
       capabilities: [],
     }),
@@ -132,11 +137,19 @@ beforeEach(async () => {
   // Site workspace fixture (apps/<id> — resolver target when no mission/cache package.json)
   const appDir = join(workspaceRoot, "apps", SYSTEM_ID);
   await mkdir(join(appDir, "src", "content"), { recursive: true });
-  await writeFile(join(appDir, "package.json"), JSON.stringify({ name: SYSTEM_ID, version: "1.0.0" }), "utf8");
+  await writeFile(
+    join(appDir, "package.json"),
+    JSON.stringify({ name: SYSTEM_ID, version: "1.0.0" }),
+    "utf8",
+  );
   await writeFile(join(appDir, "src", "content", "test.md"), "# Test\n", "utf8");
 
   await mkdir(join(workspaceRoot, "docs", "rfcs"), { recursive: true });
-  await writeFile(join(workspaceRoot, "package.json"), JSON.stringify({ version: "4.5.0" }), "utf8");
+  await writeFile(
+    join(workspaceRoot, "package.json"),
+    JSON.stringify({ version: "4.5.0" }),
+    "utf8",
+  );
 });
 
 afterEach(async () => {

@@ -29,7 +29,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import { join, relative, sep } from "node:path";
 import picomatch from "picomatch";
-import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type DirEntry,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkspaceTreeEntry {
   mtimeMs: number;

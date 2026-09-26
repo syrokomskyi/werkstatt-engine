@@ -18,7 +18,11 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io
 const mockState = vi.hoisted(() => ({
   executeKernelCommandCalls: [] as Array<Record<string, unknown>>,
   executeKernelCommandShouldThrow: false,
-  commitWorkpieceIfDirtyCalls: [] as Array<{ workpieceDir: string; missionId: string; message?: string }>,
+  commitWorkpieceIfDirtyCalls: [] as Array<{
+    workpieceDir: string;
+    missionId: string;
+    message?: string;
+  }>,
   commitWorkpieceIfDirtyResult: { committed: false, commitSha: null as string | null },
 }));
 
@@ -28,17 +32,19 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", () => ({
     if (mockState.executeKernelCommandShouldThrow) {
       throw new Error("mock executeKernelCommand failure");
     }
-    return { data: { command: "behavior.snapshot.generate", routeCount: 5, written: true }, exitCode: 0, ok: true };
+    return {
+      data: { command: "behavior.snapshot.generate", routeCount: 5, written: true },
+      exitCode: 0,
+      ok: true,
+    };
   }),
 }));
 
 vi.mock("../mission/mission-git-commit.ts", () => ({
-  commitWorkpieceIfDirty: vi.fn(
-    (workpieceDir: string, missionId: string, message?: string) => {
-      mockState.commitWorkpieceIfDirtyCalls.push({ workpieceDir, missionId, message });
-      return mockState.commitWorkpieceIfDirtyResult;
-    },
-  ),
+  commitWorkpieceIfDirty: vi.fn((workpieceDir: string, missionId: string, message?: string) => {
+    mockState.commitWorkpieceIfDirtyCalls.push({ workpieceDir, missionId, message });
+    return mockState.commitWorkpieceIfDirtyResult;
+  }),
   countOperatorCommits: vi.fn(() => ({ hasOperatorCommits: true })),
   cacheCloneCommit: vi.fn(),
 }));
@@ -114,8 +120,14 @@ test("behavior-snapshot-refresh skips when skipBehaviorSnapshot is true", async 
   const step = await getBehaviorSnapshotRefreshStep();
   await step!.run!(makeCtx({ skipBehaviorSnapshot: true }));
 
-  expect(mockState.executeKernelCommandCalls, "executeKernelCommand must not be called when skipped").toHaveLength(0);
-  expect(mockState.commitWorkpieceIfDirtyCalls, "commitWorkpieceIfDirty must not be called when skipped").toHaveLength(0);
+  expect(
+    mockState.executeKernelCommandCalls,
+    "executeKernelCommand must not be called when skipped",
+  ).toHaveLength(0);
+  expect(
+    mockState.commitWorkpieceIfDirtyCalls,
+    "commitWorkpieceIfDirty must not be called when skipped",
+  ).toHaveLength(0);
 });
 
 test("behavior-snapshot-refresh is non-fatal on executeKernelCommand failure", async () => {
@@ -131,7 +143,10 @@ test("behavior-snapshot-refresh is non-fatal on executeKernelCommand failure", a
   ).resolves.toBeUndefined();
 
   expect(mockState.executeKernelCommandCalls).toHaveLength(1);
-  expect(mockState.commitWorkpieceIfDirtyCalls, "commitWorkpieceIfDirty must not be called when generate fails").toHaveLength(0);
+  expect(
+    mockState.commitWorkpieceIfDirtyCalls,
+    "commitWorkpieceIfDirty must not be called when generate fails",
+  ).toHaveLength(0);
 
   mockState.executeKernelCommandShouldThrow = false;
 });

@@ -18,7 +18,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import type {
   KernelCommandInput,
   KernelCommandResult,

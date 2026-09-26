@@ -522,9 +522,12 @@ export async function resolveDefaultLang(cachePath: string): Promise<string> {
   return i18n.default;
 }
 
-export async function readEntitledFeaturesFromCache(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[] | null> {
+export async function readEntitledFeaturesFromCache(
+  cachePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[] | null> {
   const entitlementsPath = path.join(cachePath, "src", "entitlements.generated.yaml");
-  if (!await io.exists(entitlementsPath)) {
+  if (!(await io.exists(entitlementsPath))) {
     return null;
   }
   try {

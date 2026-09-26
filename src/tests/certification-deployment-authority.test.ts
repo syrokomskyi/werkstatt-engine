@@ -21,10 +21,14 @@ import type {
 } from "../certification/contracts/decisions.ts";
 import type { GateChannel } from "../certification/contracts/identifiers.ts";
 
-const D = "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
-const D1 = "sha256:1111111111111111111111111111111111111111111111111111111111111111" as string as Sha256Digest;
-const _D2 = "sha256:2222222222222222222222222222222222222222222222222222222222222222" as string as Sha256Digest;
-const _D3 = "sha256:3333333333333333333333333333333333333333333333333333333333333333" as string as Sha256Digest;
+const D =
+  "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
+const D1 =
+  "sha256:1111111111111111111111111111111111111111111111111111111111111111" as string as Sha256Digest;
+const _D2 =
+  "sha256:2222222222222222222222222222222222222222222222222222222222222222" as string as Sha256Digest;
+const _D3 =
+  "sha256:3333333333333333333333333333333333333333333333333333333333333333" as string as Sha256Digest;
 const TS = "2026-08-15T12:00:00Z";
 
 function mkGateDecision(
@@ -172,9 +176,7 @@ describe("authorizeDeployment", () => {
   });
 
   it("rejects unknown gate", () => {
-    const result = authorizeDeployment(
-      mkAuthInput({ gate: "unknown" as CertificationGate }),
-    );
+    const result = authorizeDeployment(mkAuthInput({ gate: "unknown" as CertificationGate }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-DEPLOY-01");
@@ -237,9 +239,7 @@ describe("authorizeDeployment", () => {
   });
 
   it("rejects missing artifact readiness", () => {
-    const result = authorizeDeployment(
-      mkAuthInput({ artifactReadinessVerified: false }),
-    );
+    const result = authorizeDeployment(mkAuthInput({ artifactReadinessVerified: false }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-DEPLOY-08");
@@ -268,9 +268,7 @@ describe("authorizeDeployment", () => {
 });
 
 describe("verifyMainPromotion", () => {
-  function mkMainInput(
-    overrides: Partial<MainVerificationInputV1> = {},
-  ): MainVerificationInputV1 {
+  function mkMainInput(overrides: Partial<MainVerificationInputV1> = {}): MainVerificationInputV1 {
     return {
       candidateId: "cand-001",
       mainVerificationDecision: mkMainVerificationDecision(),
@@ -316,9 +314,7 @@ describe("verifyMainPromotion", () => {
   });
 
   it("rejects without durable sync", () => {
-    const result = verifyMainPromotion(
-      mkMainInput({ durableSyncVerified: false }),
-    );
+    const result = verifyMainPromotion(mkMainInput({ durableSyncVerified: false }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-DEPLOY-12");
@@ -362,9 +358,7 @@ describe("evaluateRollback", () => {
   });
 
   it("denies rollback during shared outage", () => {
-    const result = evaluateRollback(
-      mkRollbackInput({ sharedOutageDetected: true }),
-    );
+    const result = evaluateRollback(mkRollbackInput({ sharedOutageDetected: true }));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.rollbackAuthorized).toBe(false);
@@ -373,9 +367,7 @@ describe("evaluateRollback", () => {
   });
 
   it("denies rollback when artifact not ready", () => {
-    const result = evaluateRollback(
-      mkRollbackInput({ rollbackArtifactReadinessVerified: false }),
-    );
+    const result = evaluateRollback(mkRollbackInput({ rollbackArtifactReadinessVerified: false }));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.rollbackAuthorized).toBe(false);
@@ -384,9 +376,7 @@ describe("evaluateRollback", () => {
   });
 
   it("denies rollback to same candidate", () => {
-    const result = evaluateRollback(
-      mkRollbackInput({ rollbackCandidateId: "cand-001" }),
-    );
+    const result = evaluateRollback(mkRollbackInput({ rollbackCandidateId: "cand-001" }));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.rollbackAuthorized).toBe(false);
@@ -396,9 +386,7 @@ describe("evaluateRollback", () => {
 });
 
 describe("evaluateCrashRecovery", () => {
-  function mkCrashState(
-    overrides: Partial<CrashRecoveryStateV1> = {},
-  ): CrashRecoveryStateV1 {
+  function mkCrashState(overrides: Partial<CrashRecoveryStateV1> = {}): CrashRecoveryStateV1 {
     return {
       operationId: "op-001",
       candidateId: "cand-001",
@@ -525,20 +513,56 @@ describe("buildDeploymentEffectRecord", () => {
 
   it("produces deterministic hash for same input", () => {
     const r1 = buildDeploymentEffectRecord(
-      "op-001", "cand-001", "dev-deploy", "dev", D, "dec-001", false, null, "deployed", TS,
+      "op-001",
+      "cand-001",
+      "dev-deploy",
+      "dev",
+      D,
+      "dec-001",
+      false,
+      null,
+      "deployed",
+      TS,
     );
     const r2 = buildDeploymentEffectRecord(
-      "op-001", "cand-001", "dev-deploy", "dev", D, "dec-001", false, null, "deployed", TS,
+      "op-001",
+      "cand-001",
+      "dev-deploy",
+      "dev",
+      D,
+      "dec-001",
+      false,
+      null,
+      "deployed",
+      TS,
     );
     expect(r1.effectHash).toBe(r2.effectHash);
   });
 
   it("produces different hash for different input", () => {
     const r1 = buildDeploymentEffectRecord(
-      "op-001", "cand-001", "dev-deploy", "dev", D, "dec-001", false, null, "deployed", TS,
+      "op-001",
+      "cand-001",
+      "dev-deploy",
+      "dev",
+      D,
+      "dec-001",
+      false,
+      null,
+      "deployed",
+      TS,
     );
     const r2 = buildDeploymentEffectRecord(
-      "op-002", "cand-001", "dev-deploy", "dev", D, "dec-001", false, null, "deployed", TS,
+      "op-002",
+      "cand-001",
+      "dev-deploy",
+      "dev",
+      D,
+      "dec-001",
+      false,
+      null,
+      "deployed",
+      TS,
     );
     expect(r1.effectHash).not.toBe(r2.effectHash);
   });

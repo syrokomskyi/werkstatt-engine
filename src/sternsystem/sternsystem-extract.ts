@@ -47,8 +47,12 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
 
 const EXTRACTION_DATA_PATHS = ["src/content", "public", "provenance"];
 
-async function copyDir(src: string, dest: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
-  if (!await io.exists(src)) return;
+async function copyDir(
+  src: string,
+  dest: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  if (!(await io.exists(src))) return;
   await io.mkdir(dest);
   const entries = await io.readdir(src);
   for (const entry of entries) {
@@ -73,7 +77,7 @@ export async function runSternsystemExtract(
   if (!siteId) throw new Error("[sternsystem.extract] --site is required");
 
   const appDir = path.join(workspaceRoot, "apps", siteId);
-  if (!await context.io.exists(appDir)) {
+  if (!(await context.io.exists(appDir))) {
     throw new Error(`[sternsystem.extract] apps/${siteId}/ does not exist`);
   }
 

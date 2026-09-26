@@ -26,10 +26,12 @@ export type DossierHashFailureV1 = {
   readonly message: string;
 };
 
-export type DossierEventHashResultV1 = {
-  readonly ok: true;
-  readonly eventHash: Sha256Digest;
-} | DossierHashFailureV1;
+export type DossierEventHashResultV1 =
+  | {
+      readonly ok: true;
+      readonly eventHash: Sha256Digest;
+    }
+  | DossierHashFailureV1;
 
 export function computeDossierEventHash(
   event: CertificationDossierEventV1,

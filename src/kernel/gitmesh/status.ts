@@ -27,7 +27,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join } from "node:path";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import type { GitMeshStatus } from "./types.ts";
 import { loadGitMeshConfig } from "./config.ts";
 import {
@@ -79,7 +83,12 @@ export async function runGitMeshStatus(
 
   for (const remote of config.remotes) {
     try {
-      const sha = await gitRevParseRemote(remote.name, config.trackedBranch, workspaceRoot, context.io);
+      const sha = await gitRevParseRemote(
+        remote.name,
+        config.trackedBranch,
+        workspaceRoot,
+        context.io,
+      );
       const timestamp = await gitCommitTimestamp(sha, workspaceRoot, context.io);
       if (timestamp > latestTimestamp) {
         latestTimestamp = timestamp;

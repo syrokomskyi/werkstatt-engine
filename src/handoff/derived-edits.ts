@@ -30,7 +30,8 @@ export interface DerivedEditMismatch {
  */
 export async function reportDerivedEdits(
   bundleDir: string,
-  manifest: HandoffManifest, io: WorkspaceIO = createDefaultIO().io,
+  manifest: HandoffManifest,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DerivedEditMismatch[]> {
   const mismatches: DerivedEditMismatch[] = [];
 

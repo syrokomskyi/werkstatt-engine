@@ -12,8 +12,4 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-export type {
-  IntegrationRunResult,
-  IntegrationTestSummary,
-  IntegrationEvidence,
-} from "./types.ts";
+export type { IntegrationRunResult, IntegrationTestSummary, IntegrationEvidence } from "./types.ts";

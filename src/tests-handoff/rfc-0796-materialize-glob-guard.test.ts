@@ -40,9 +40,8 @@ function writePkgJson(dir: string, name: string, deps?: Record<string, string>):
 
 describe("RFC-0796: checkWorkspaceGlobsForStalePackages", () => {
   test("clean workspace — no stale packages", async () => {
-    const { checkWorkspaceGlobsForStalePackages } = await import(
-      "../mission/mission-materialize.ts"
-    );
+    const { checkWorkspaceGlobsForStalePackages } =
+      await import("../mission/mission-materialize.ts");
     writeWorkspaceYaml(tmpDir, ["packages/*"]);
     writePkgJson(join(tmpDir, "packages", "pkg-a"), "@test/pkg-a", {
       "@test/pkg-b": "workspace:*",
@@ -56,9 +55,8 @@ describe("RFC-0796: checkWorkspaceGlobsForStalePackages", () => {
   });
 
   test("stale workspace:* reference to missing package", async () => {
-    const { checkWorkspaceGlobsForStalePackages } = await import(
-      "../mission/mission-materialize.ts"
-    );
+    const { checkWorkspaceGlobsForStalePackages } =
+      await import("../mission/mission-materialize.ts");
     writeWorkspaceYaml(tmpDir, ["packages/*", "missions/*/workpiece"]);
     writePkgJson(join(tmpDir, "packages", "pkg-a"), "@test/pkg-a", {
       "@test/missing-pkg": "workspace:*",
@@ -72,9 +70,8 @@ describe("RFC-0796: checkWorkspaceGlobsForStalePackages", () => {
   });
 
   test("no pnpm-workspace.yaml returns ok", async () => {
-    const { checkWorkspaceGlobsForStalePackages } = await import(
-      "../mission/mission-materialize.ts"
-    );
+    const { checkWorkspaceGlobsForStalePackages } =
+      await import("../mission/mission-materialize.ts");
 
     const result = await checkWorkspaceGlobsForStalePackages(tmpDir);
 
@@ -83,9 +80,8 @@ describe("RFC-0796: checkWorkspaceGlobsForStalePackages", () => {
   });
 
   test("non-workspace dependencies are not checked", async () => {
-    const { checkWorkspaceGlobsForStalePackages } = await import(
-      "../mission/mission-materialize.ts"
-    );
+    const { checkWorkspaceGlobsForStalePackages } =
+      await import("../mission/mission-materialize.ts");
     writeWorkspaceYaml(tmpDir, ["packages/*"]);
     writePkgJson(join(tmpDir, "packages", "pkg-a"), "@test/pkg-a", {
       "some-external-pkg": "^1.0.0",

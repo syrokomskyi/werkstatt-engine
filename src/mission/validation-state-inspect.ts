@@ -20,10 +20,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
-import {
-  readValidationState,
-  type ValidatorState,
-} from "./validation-state.ts";
+import { readValidationState, type ValidatorState } from "./validation-state.ts";
 import { createCacheLayer, type CacheEntryInfo } from "../kernel/cache/cache-layer.ts";
 import { COMMAND_RESULT_CACHE_NAMESPACE } from "../kernel/cache/command-result-cache.ts";
 

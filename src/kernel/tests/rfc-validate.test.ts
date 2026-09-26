@@ -3,7 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { test, expect } from "vitest";
 import { runRfcValidate } from "@warpgogol/forge/os/rfc";
-import type { KernelCommandInput, KernelLogger, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelLogger,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
 
 /*

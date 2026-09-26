@@ -17,18 +17,15 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createIdentityModule(): Promise<ModuleExport> {
   const { runIdentityBootstrap } = await import("../identity/identity-bootstrap.ts");
-      const { runIdentityCredentialIssue } =
-        await import("../identity/identity-credential-issue.ts");
-      const { runIdentityCredentialVerify } =
-        await import("../identity/identity-credential-verify.ts");
-      const { runIdentityCredentialRevoke } =
-        await import("../identity/identity-credential-revoke.ts");
+  const { runIdentityCredentialIssue } = await import("../identity/identity-credential-issue.ts");
+  const { runIdentityCredentialVerify } = await import("../identity/identity-credential-verify.ts");
+  const { runIdentityCredentialRevoke } = await import("../identity/identity-credential-revoke.ts");
   return {
     name: "identity",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "identity.bootstrap",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
@@ -53,11 +50,12 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runIdentityBootstrap,
       },
-    {
+      {
         name: "identity.credential.issue",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
-        description: "Issue a SiteOwnershipCredential or ActorDelegationCredential (RFC-0558). Required flags: `--type`, `--subject`, `--site`.",
+        description:
+          "Issue a SiteOwnershipCredential or ActorDelegationCredential (RFC-0558). Required flags: `--type`, `--subject`, `--site`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -91,10 +89,11 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runIdentityCredentialIssue,
       },
-    {
+      {
         name: "identity.credential.verify",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
-        description: "Verify a credential's signature, revocation status, and expiry (RFC-0558). Required flags: `--credential-id`.",
+        description:
+          "Verify a credential's signature, revocation status, and expiry (RFC-0558). Required flags: `--credential-id`.",
         scope: "workspace",
         supportsAllSites: false,
         flags: {
@@ -108,11 +107,12 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runIdentityCredentialVerify,
       },
-    {
+      {
         name: "identity.credential.revoke",
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
-        description: "Revoke a credential by adding it to the revocation list (RFC-0558). Required flags: `--credential-id`.",
+        description:
+          "Revoke a credential by adding it to the revocation list (RFC-0558). Required flags: `--credential-id`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -127,9 +127,8 @@ export async function createIdentityModule(): Promise<ModuleExport> {
         reads: ["werkstatt.identity.json"],
         cacheable: false,
         execute: runIdentityCredentialRevoke,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

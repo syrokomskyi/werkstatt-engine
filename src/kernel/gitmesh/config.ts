@@ -75,7 +75,10 @@ export function validateConfig(config: unknown): asserts config is GitMeshConfig
   }
 }
 
-export async function loadGitMeshConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<GitMeshConfig> {
+export async function loadGitMeshConfig(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<GitMeshConfig> {
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
   const raw = await io.readFile(configPath);
   const parsed: unknown = JSON.parse(raw);
@@ -83,7 +86,10 @@ export async function loadGitMeshConfig(workspaceRoot: string, io: WorkspaceIO =
   return parsed;
 }
 
-export async function autoCreateConfigFromGit(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<GitMeshConfig> {
+export async function autoCreateConfigFromGit(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<GitMeshConfig> {
   const remotes = await gitRemoteList(workspaceRoot, io);
   const gitMeshRemotes: GitMeshRemote[] = remotes.map((r: { name: string; url: string }) => ({
     name: r.name,

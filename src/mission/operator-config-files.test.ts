@@ -55,9 +55,9 @@ test("persistOperatorConfigFiles copies root-level and src-level files to cache 
   expect(result.skipped).toHaveLength(0);
   expect(existsSync(path.join(cacheCloneDir, ".lighthouse-budget-ignore"))).toBe(true);
   expect(existsSync(path.join(cacheCloneDir, "src", "image-delivery.config.yaml"))).toBe(true);
-  expect(
-    await fs.readFile(path.join(cacheCloneDir, ".lighthouse-budget-ignore"), "utf8"),
-  ).toBe("orphan.js\nunused.css\n");
+  expect(await fs.readFile(path.join(cacheCloneDir, ".lighthouse-budget-ignore"), "utf8")).toBe(
+    "orphan.js\nunused.css\n",
+  );
 });
 
 test("persistOperatorConfigFiles silently skips missing files", async () => {
@@ -120,10 +120,7 @@ test("restoreOperatorConfigFiles does NOT modify file contents", async () => {
 
   await restoreOperatorConfigFiles(cacheCloneDir, workpieceDir);
 
-  const restored = await fs.readFile(
-    path.join(workpieceDir, ".lighthouse-budget-ignore"),
-    "utf8",
-  );
+  const restored = await fs.readFile(path.join(workpieceDir, ".lighthouse-budget-ignore"), "utf8");
   expect(restored).toBe(originalContent);
 });
 

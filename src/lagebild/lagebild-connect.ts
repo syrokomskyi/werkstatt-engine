@@ -102,7 +102,7 @@ export async function runLagebildConnect(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = (await context.io.exists(envPath)) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
@@ -179,7 +179,8 @@ export async function runLagebildConnect(
 
 async function mergeLagebildIntoEnv(
   cacheCloneDir: string,
-  values: Record<string, string>, io: WorkspaceIO = createDefaultIO().io,
+  values: Record<string, string>,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const envPath = join(cacheCloneDir, ".env");
   let lines: string[] = [];

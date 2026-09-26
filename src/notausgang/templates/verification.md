@@ -1,8 +1,6 @@
 # Verifying this package
 
-This Notausgang export is self-verifying. Two paths are available: the bundled
-script (recommended) and a fully manual fallback that needs only `sha256sum`
-(or `shasum -a 256` on macOS).
+This Notausgang export is self-verifying. Two paths are available: the bundled script (recommended) and a fully manual fallback that needs only `sha256sum` (or `shasum -a 256` on macOS).
 
 ## Automated verification (recommended)
 
@@ -20,8 +18,7 @@ The script checks, in order:
 4. Every file in the package is covered by `SHA256SUMS.txt` (completeness).
 5. Every `evidence/<source-id>/integrity.txt` entry matches its artifact bytes.
 
-Exit code `0` means the package is intact. Any `FAIL` line names the exact
-file and the expected vs. actual digest.
+Exit code `0` means the package is intact. Any `FAIL` line names the exact file and the expected vs. actual digest.
 
 ## Manual fallback
 
@@ -35,10 +32,7 @@ sha256sum --check SHA256SUMS.txt
 cd evidence/<source-id> && sha256sum --check integrity.txt
 ```
 
-`SHA256SUMS.txt` itself is the trust root of the package: it is not covered by
-its own list. If you received the package over an untrusted channel, compare
-`notausgang-manifest.yaml` fields (`releaseId`, `exportedAt`, `distHash`,
-`siteHash`, `bordbuchHash`) against the values communicated to you separately.
+`SHA256SUMS.txt` itself is the trust root of the package: it is not covered by its own list. If you received the package over an untrusted channel, compare `notausgang-manifest.yaml` fields (`releaseId`, `exportedAt`, `distHash`, `siteHash`, `bordbuchHash`) against the values communicated to you separately.
 
 ## What is covered
 
@@ -52,5 +46,4 @@ its own list. If you received the package over an untrusted channel, compare
 
 ## If verification fails
 
-A failed check means the package was modified or corrupted after export.
-Do not deploy or rely on a failed package — request a fresh export.
+A failed check means the package was modified or corrupted after export. Do not deploy or rely on a failed package — request a fresh export.

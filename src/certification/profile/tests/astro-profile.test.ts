@@ -19,7 +19,9 @@ describe("astroCertificationProfile", () => {
     expect(astroCertificationProfile.dimensions).toContain("candidate-integrity");
     expect(astroCertificationProfile.dimensions).toContain("business-truth-compliance");
     expect(astroCertificationProfile.dimensions).toContain("editorial-localization");
-    expect(astroCertificationProfile.dimensions).toContain("information-architecture-discoverability");
+    expect(astroCertificationProfile.dimensions).toContain(
+      "information-architecture-discoverability",
+    );
     expect(astroCertificationProfile.dimensions).toContain("ux-conversion");
     expect(astroCertificationProfile.dimensions).toContain("visual-accessibility");
     expect(astroCertificationProfile.dimensions).toContain("performance-runtime");

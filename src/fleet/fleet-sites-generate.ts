@@ -70,7 +70,8 @@ function extractMirrorProtocols(config: SystemConfig): string[] {
 
 async function buildFleetSiteRecord(
   workspaceRoot: string,
-  config: SystemConfig, io: WorkspaceIO = createDefaultIO().io,
+  config: SystemConfig,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<FleetSiteRecord> {
   const cacheClonePath = resolveCacheClonePath(workspaceRoot, config.id);
   const relPath = relative(workspaceRoot, cacheClonePath).replace(/\\/g, "/");
@@ -160,7 +161,8 @@ export async function runFleetSitesGenerate(
 }
 
 export async function validateFleetSitesDrift(
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ drifted: boolean; expected: string; actual: string }> {
   const { systems } = await discoverSystems(workspaceRoot);
 
@@ -173,7 +175,7 @@ export async function validateFleetSitesDrift(
   const expectedContent = yamlStringify({ sites: records });
 
   const filePath = join(workspaceRoot, FLEET_SITES_FILE);
-  if (!await io.exists(filePath)) {
+  if (!(await io.exists(filePath))) {
     return { drifted: true, expected: expectedContent, actual: "" };
   }
 

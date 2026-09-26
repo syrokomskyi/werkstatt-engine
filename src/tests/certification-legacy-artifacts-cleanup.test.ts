@@ -17,15 +17,17 @@ import {
   type PathSafetyCheckV1,
 } from "../certification/cleanup/legacy-artifacts.ts";
 
-const D = "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
-const D1 = "sha256:1111111111111111111111111111111111111111111111111111111111111111" as string as Sha256Digest;
-const D2 = "sha256:2222222222222222222222222222222222222222222222222222222222222222" as string as Sha256Digest;
-const D3 = "sha256:3333333333333333333333333333333333333333333333333333333333333333" as string as Sha256Digest;
+const D =
+  "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
+const D1 =
+  "sha256:1111111111111111111111111111111111111111111111111111111111111111" as string as Sha256Digest;
+const D2 =
+  "sha256:2222222222222222222222222222222222222222222222222222222222222222" as string as Sha256Digest;
+const D3 =
+  "sha256:3333333333333333333333333333333333333333333333333333333333333333" as string as Sha256Digest;
 const TS = "2026-08-15T12:00:00Z";
 
-function mkCutoverMarker(
-  overrides: Partial<CleanCutoverMarkerV1> = {},
-): CleanCutoverMarkerV1 {
+function mkCutoverMarker(overrides: Partial<CleanCutoverMarkerV1> = {}): CleanCutoverMarkerV1 {
   return {
     schema: "werkstatt/clean-cutover-marker@1",
     markerId: "cutover-sys-001-cand-001",
@@ -58,9 +60,7 @@ function mkCutoverMarker(
   };
 }
 
-function mkPrereqs(
-  overrides: Partial<CleanupPrerequisitesV1> = {},
-): CleanupPrerequisitesV1 {
+function mkPrereqs(overrides: Partial<CleanupPrerequisitesV1> = {}): CleanupPrerequisitesV1 {
   return {
     cutoverMarker: mkCutoverMarker(),
     mainCertifiedCandidateId: "cand-001",
@@ -71,9 +71,7 @@ function mkPrereqs(
   };
 }
 
-function mkLegacyArtifact(
-  overrides: Partial<LegacyArtifactEntryV1> = {},
-): LegacyArtifactEntryV1 {
+function mkLegacyArtifact(overrides: Partial<LegacyArtifactEntryV1> = {}): LegacyArtifactEntryV1 {
   return {
     path: "legacy/workpiece-1",
     category: "superseded-workpiece",
@@ -128,9 +126,7 @@ describe("verifyCleanupPrerequisites", () => {
   });
 
   it("rejects missing main-certified candidate", () => {
-    const result = verifyCleanupPrerequisites(
-      mkPrereqs({ mainCertifiedCandidateId: "" }),
-    );
+    const result = verifyCleanupPrerequisites(mkPrereqs({ mainCertifiedCandidateId: "" }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-CLEANUP-03");
@@ -148,9 +144,7 @@ describe("verifyCleanupPrerequisites", () => {
   });
 
   it("rejects unverified durable dossier", () => {
-    const result = verifyCleanupPrerequisites(
-      mkPrereqs({ durableDossierVerified: false }),
-    );
+    const result = verifyCleanupPrerequisites(mkPrereqs({ durableDossierVerified: false }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-CLEANUP-05");
@@ -158,9 +152,7 @@ describe("verifyCleanupPrerequisites", () => {
   });
 
   it("rejects unverified mirrors", () => {
-    const result = verifyCleanupPrerequisites(
-      mkPrereqs({ mirrorsVerified: false }),
-    );
+    const result = verifyCleanupPrerequisites(mkPrereqs({ mirrorsVerified: false }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-CLEANUP-06");
@@ -168,9 +160,7 @@ describe("verifyCleanupPrerequisites", () => {
   });
 
   it("rejects unverified rollback references", () => {
-    const result = verifyCleanupPrerequisites(
-      mkPrereqs({ rollbackReferencesVerified: false }),
-    );
+    const result = verifyCleanupPrerequisites(mkPrereqs({ rollbackReferencesVerified: false }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.ruleId).toBe("CERT-CLEANUP-07");
@@ -184,16 +174,8 @@ describe("buildInventory", () => {
       mkLegacyArtifact({ path: "a", sizeBytes: 100 }),
       mkLegacyArtifact({ path: "b", sizeBytes: 200, digest: D1 }),
     ];
-    const protected_ = [
-      mkProtectedArtifact({ path: "c", sizeBytes: 50 }),
-    ];
-    const inv = buildInventory(
-      "sys-001",
-      mkCutoverMarker(),
-      legacy,
-      protected_,
-      TS,
-    );
+    const protected_ = [mkProtectedArtifact({ path: "c", sizeBytes: 50 })];
+    const inv = buildInventory("sys-001", mkCutoverMarker(), legacy, protected_, TS);
     expect(inv.schema).toBe("werkstatt/legacy-cleanup-inventory@1");
     expect(inv.legacyArtifacts).toHaveLength(2);
     expect(inv.protectedArtifacts).toHaveLength(1);
@@ -212,7 +194,13 @@ describe("buildInventory", () => {
 
   it("produces different hash for different artifacts", () => {
     const i1 = buildInventory("sys-001", mkCutoverMarker(), [mkLegacyArtifact()], [], TS);
-    const i2 = buildInventory("sys-001", mkCutoverMarker(), [mkLegacyArtifact({ path: "different" })], [], TS);
+    const i2 = buildInventory(
+      "sys-001",
+      mkCutoverMarker(),
+      [mkLegacyArtifact({ path: "different" })],
+      [],
+      TS,
+    );
     expect(i1.inventoryHash).not.toBe(i2.inventoryHash);
   });
 });
@@ -283,7 +271,13 @@ describe("validatePlan", () => {
     const legacy = [mkLegacyArtifact({ path: "a" })];
     const inv = buildInventory("sys-001", mkCutoverMarker(), legacy, [], TS);
     const plan = buildPlan(inv, TS);
-    const staleInv = buildInventory("sys-001", mkCutoverMarker(), [mkLegacyArtifact({ path: "b" })], [], TS);
+    const staleInv = buildInventory(
+      "sys-001",
+      mkCutoverMarker(),
+      [mkLegacyArtifact({ path: "b" })],
+      [],
+      TS,
+    );
     const result = validatePlan({
       plan,
       expectedPlanHash: plan.planHash,
@@ -403,10 +397,7 @@ describe("verifyReportIntegrity", () => {
     ];
     const inv = buildInventory("sys-001", mkCutoverMarker(), legacy, [], TS);
     const plan = buildPlan(inv, TS);
-    const tombs = [
-      buildTombstone(legacy[0]!, TS, "r"),
-      buildTombstone(legacy[1]!, TS, "r"),
-    ];
+    const tombs = [buildTombstone(legacy[0]!, TS, "r"), buildTombstone(legacy[1]!, TS, "r")];
     const report = buildReport("sys-001", plan, "apply", tombs, 0, true, true, TS);
     expect(verifyReportIntegrity(report)).toBe(true);
   });

@@ -32,10 +32,7 @@ describe("RFC-1038: composition module", () => {
   it("AC-18: PipelineDeclaration shape (composition module has no pipelines but structure is valid)", () => {
     const pipe: PipelineDeclaration = {
       name: "test.pipeline",
-      steps: [
-        { command: "step.a" },
-        { command: "step.b", dependsOn: ["step.a"] },
-      ],
+      steps: [{ command: "step.a" }, { command: "step.b", dependsOn: ["step.a"] }],
     };
     expect(pipe.name).toBe("test.pipeline");
     expect(pipe.steps).toHaveLength(2);

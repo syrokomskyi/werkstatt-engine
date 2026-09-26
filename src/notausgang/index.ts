@@ -11,7 +11,6 @@
 </CHANGE_SUMMARY>
 */
 
-
 export {
   runNotausgangExport,
   type NotausgangExportData,
@@ -20,4 +19,3 @@ export {
   type CheckStatus,
   type NotausgangViolation,
 } from "./notausgang-commands.ts";
-

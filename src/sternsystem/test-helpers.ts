@@ -49,7 +49,11 @@ export interface MirrorEntry {
   storageType: "non-bare" | "bare" | "bundle";
 }
 
-export async function writeSystemConfig(root: string, mirrors: MirrorEntry[], io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+export async function writeSystemConfig(
+  root: string,
+  mirrors: MirrorEntry[],
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const cacheDir = join(root, "..", "systems-cache", "test-bundle");
   await io.mkdir(cacheDir);
   const config = {
@@ -94,7 +98,10 @@ export const BASE_SETUP = async (root: string, io: WorkspaceIO = createDefaultIO
   await io.mkdir(join(root, "docs", "rfcs"));
   await io.writeFile(join(root, "docs", "rfcs", "RFC-0001-test.md"), "");
   await io.writeFile(join(root, "package.json"), JSON.stringify({ version: "4.5.0" }));
-  await io.writeFile(join(root, "uni.registry.yaml"), JSON.stringify({ entries: [{ id: "test", semanticId: "test", version: "1.0.0", intent: [] }] }));
+  await io.writeFile(
+    join(root, "uni.registry.yaml"),
+    JSON.stringify({ entries: [{ id: "test", semanticId: "test", version: "1.0.0", intent: [] }] }),
+  );
   await io.mkdir(join(root, "packages", "dummy"));
   await io.writeFile(join(root, "packages", "dummy", "index.ts"), "export const x = 1;\n");
 };

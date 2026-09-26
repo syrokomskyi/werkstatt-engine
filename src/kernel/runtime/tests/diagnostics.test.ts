@@ -36,7 +36,9 @@ describe("formatFailureDiagnostics", () => {
 
   test("findings[] (audit shape)", () => {
     const lines = formatFailureDiagnostics({
-      findings: [{ ruleId: "PV-01", severity: "error", file: "dist/missing", message: "not found" }],
+      findings: [
+        { ruleId: "PV-01", severity: "error", file: "dist/missing", message: "not found" },
+      ],
     });
     expect(lines.length).toBeGreaterThan(0);
     expect(lines[0]).toContain("PV-01");

@@ -1,9 +1,5 @@
 import { test, expect, describe } from "vitest";
-import {
-  buildRegistry,
-  buildRegistryForModule,
-  deriveModuleBasePath,
-} from "../registry.ts";
+import { buildRegistry, buildRegistryForModule, deriveModuleBasePath } from "../registry.ts";
 import type { KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 

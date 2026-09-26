@@ -22,7 +22,11 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
-import { createDefaultIO, type FileStat, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type FileStat,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0492_MIGRATOR_ID = "rfc-0492";
 
@@ -47,7 +51,7 @@ async function findIndustryFiles(rootPath: string): Promise<string[]> {
   async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {
-      entries = (await io.readdir(dir)).map(e => e.name);
+      entries = (await io.readdir(dir)).map((e) => e.name);
     } catch {
       return;
     }
@@ -74,7 +78,8 @@ async function findIndustryFiles(rootPath: string): Promise<string[]> {
 
 async function transformIndustryFiles(
   data: SternsystemData,
-  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const files = await findIndustryFiles(data.rootPath);
 

@@ -21,7 +21,4 @@ export type {
   CertificationVerifyOutcomeV1,
 } from "./inspection.ts";
 
-export {
-  getCertificationStatus,
-  verifyCertification,
-} from "./inspection.ts";
+export { getCertificationStatus, verifyCertification } from "./inspection.ts";

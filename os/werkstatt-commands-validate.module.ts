@@ -18,7 +18,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "../src/kernel/types.ts";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "../src/kernel/types.ts";
 import type { ModuleExport } from "../src/runtime/desired-state.ts";
 import {
   runCommandsValidate,
@@ -28,7 +32,7 @@ import {
 export const werkstattCommandsValidateModule: ModuleExport = {
   name: "werkstatt-commands-validate",
   version: "0.1.0",
-    declarations: [],
+  declarations: [],
   commands: [
     {
       name: "werkstatt.commands.validate",
@@ -65,8 +69,7 @@ export const werkstattCommandsValidateModule: ModuleExport = {
         const mode = (input.flags.mode as "error" | "warning") ?? "error";
         return runCommandsValidate(context.workspaceRoot, mode);
       },
-    }
+    },
   ],
-  pipelines: [
-
-  ]};
+  pipelines: [],
+};

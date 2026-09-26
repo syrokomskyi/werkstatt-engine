@@ -61,12 +61,12 @@ export async function runLeitstandServiceDevDeploy(
   }
 
   const serviceDir = path.join(workspaceRoot, "services", serviceId);
-  if (!await context.io.exists(serviceDir)) {
+  if (!(await context.io.exists(serviceDir))) {
     throw new Error(`[leitstand.service.dev-deploy] services/${serviceId}/ does not exist`);
   }
 
   const devConfigPath = path.join(serviceDir, "wrangler.dev.jsonc");
-  if (!await context.io.exists(devConfigPath)) {
+  if (!(await context.io.exists(devConfigPath))) {
     throw new Error(
       `[leitstand.service.dev-deploy] services/${serviceId}/wrangler.dev.jsonc not found — cannot dev-deploy without dev config`,
     );
@@ -78,7 +78,11 @@ export async function runLeitstandServiceDevDeploy(
   const envDevPath = path.join(serviceDir, ".env.dev");
   const envPath = path.join(serviceDir, ".env");
   const envDevExamplePath = path.join(serviceDir, ".env.dev.example");
-  if (!await context.io.exists(envDevPath) && await context.io.exists(envPath) && await context.io.exists(envDevExamplePath)) {
+  if (
+    !(await context.io.exists(envDevPath)) &&
+    (await context.io.exists(envPath)) &&
+    (await context.io.exists(envDevExamplePath))
+  ) {
     try {
       await context.io.copyFile(envPath, envDevPath);
       logger.info(`[leitstand.service.dev-deploy] auto-created .env.dev from .env`);

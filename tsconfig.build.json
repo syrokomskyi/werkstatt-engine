@@ -7,5 +7,12 @@
     "emitDeclarationOnly": false,
     "skipLibCheck": true
   },
-  "exclude": ["src/**/*.test.ts", "src/tests/**", "src/tests-handoff/**", "src/**/*.template.*", "dist/**", "node_modules/**"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/tests/**",
+    "src/tests-handoff/**",
+    "src/**/*.template.*",
+    "dist/**",
+    "node_modules/**"
+  ]
 }

@@ -52,10 +52,11 @@ export function referencesMissionId(text: string, missionId: string): boolean {
  */
 export async function findIncompleteOperationsForMission(
   operationsDir: string,
-  missionId: string, io: WorkspaceIO = createDefaultIO().io,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<OperationSweepResult> {
   const result: OperationSweepResult = { incomplete: [], unreadableFiles: [] };
-  if (!await io.exists(operationsDir)) {
+  if (!(await io.exists(operationsDir))) {
     return result;
   }
 

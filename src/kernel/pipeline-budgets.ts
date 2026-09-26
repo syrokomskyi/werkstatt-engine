@@ -36,7 +36,11 @@ import { dirname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
 import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FLEET_SITES_RELATIVE_PATH = join("fleet", "fleet.sites.yaml");
@@ -97,7 +101,8 @@ export function budgetsFilePath(workspaceRoot: string): string {
  */
 export async function appendStepTelemetry(
   workspaceRoot: string,
-  record: StepTelemetryRecord, io: WorkspaceIO = createDefaultIO().io,
+  record: StepTelemetryRecord,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   try {
     const filePath = telemetryPath(workspaceRoot);
@@ -140,7 +145,8 @@ export async function appendStepTelemetry(
  */
 export async function batchAppendStepTelemetry(
   workspaceRoot: string,
-  records: StepTelemetryRecord[], io: WorkspaceIO = createDefaultIO().io,
+  records: StepTelemetryRecord[],
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   if (records.length === 0) return;
   try {
@@ -271,7 +277,8 @@ function historyHash(raw: string): string {
 
 /** Reads the committed budgets file. Returns null when absent or unparseable. */
 export async function loadPipelineBudgets(
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<PipelineBudgetsFile | null> {
   try {
     const raw = await io.readFile(budgetsFilePath(workspaceRoot));
@@ -318,7 +325,10 @@ export interface PipelineBudgetGenerateResult {
  * Returns null when the file is absent or unparseable — in that case, no filtering
  * is applied (backward compatible with pre-RFC-0963 behavior).
  */
-async function loadRegisteredSiteIds(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<Set<string> | null> {
+async function loadRegisteredSiteIds(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Set<string> | null> {
   try {
     const raw = await io.readFile(join(workspaceRoot, FLEET_SITES_RELATIVE_PATH));
     const parsed = yamlParse(raw) as { sites?: Array<{ id: string }> };
@@ -448,7 +458,10 @@ export async function runPipelineBudgetGenerate(
 }
 
 // Re-exported for tests that want to assert against the real fs stat of the history file.
-export async function telemetryFileSizeBytes(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<number> {
+export async function telemetryFileSizeBytes(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<number> {
   try {
     const s = await io.stat(telemetryPath(workspaceRoot));
     return s.size;

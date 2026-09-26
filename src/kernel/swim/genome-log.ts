@@ -63,7 +63,8 @@ export async function verifyGenomeEntry(
 
 export async function appendGenomeEntry(
   workspaceRoot: string,
-  entry: GenomeLogEntry, io: WorkspaceIO = createDefaultIO().io,
+  entry: GenomeLogEntry,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const logPath = join(workspaceRoot, GENOME_LOG_FILENAME);
   const line = JSON.stringify(entry) + "\n";
@@ -72,7 +73,8 @@ export async function appendGenomeEntry(
 
 export async function readGenomeLog(
   workspaceRoot: string,
-  publicKeyMultibase?: string, io: WorkspaceIO = createDefaultIO().io,
+  publicKeyMultibase?: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ entries: GenomeLogEntry[]; skipped: number }> {
   const logPath = join(workspaceRoot, GENOME_LOG_FILENAME);
   let raw: string;
@@ -157,7 +159,10 @@ export function deriveMembershipView(entries: GenomeLogEntry[]): SwimMembershipV
   return { members, total, alive, suspect, dead };
 }
 
-export async function getGenomeLogSize(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<number> {
+export async function getGenomeLogSize(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<number> {
   const logPath = join(workspaceRoot, GENOME_LOG_FILENAME);
   try {
     const stats = await io.stat(logPath);

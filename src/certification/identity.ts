@@ -50,9 +50,7 @@ export type IdentityBuildResultV1<TPayload> =
     }
   | { readonly ok: false; readonly diagnostic: CertificationIdentityDiagnosticV1 };
 
-function snapshotAndHash(
-  payload: unknown,
-): IdentityBuildResultV1<unknown> {
+function snapshotAndHash(payload: unknown): IdentityBuildResultV1<unknown> {
   const result = snapshotCanonicalJsonObjectV1(payload);
   if (!result.ok) {
     return {

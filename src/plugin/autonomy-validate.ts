@@ -39,7 +39,11 @@ import { scanDirectoryForImports } from "./import-scan-util.ts";
  * The engine now imports from @warpgogol/werkstatt-shared/* for shared schemas
  * and through plugin hooks for stack logic.
  */
-const EXEMPT_PREFIXES = ["@warpgogol/werkstatt-engine", "@warpgogol/werkstatt-shared", "@warpgogol/forge"];
+const EXEMPT_PREFIXES = [
+  "@warpgogol/werkstatt-engine",
+  "@warpgogol/werkstatt-shared",
+  "@warpgogol/forge",
+];
 
 export interface AutonomyViolation {
   file: string;

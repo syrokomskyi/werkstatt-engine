@@ -20,13 +20,13 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createBehaviorSnapshotModule(): Promise<ModuleExport> {
   const { runBehaviorSnapshotCapture, runBehaviorSnapshotDiff } =
-        await import("./behavior-snapshot-commands.ts");
+    await import("./behavior-snapshot-commands.ts");
   return {
     name: "behavior-snapshot",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "behavior.snapshot.capture",
         modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
@@ -47,7 +47,7 @@ export async function createBehaviorSnapshotModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runBehaviorSnapshotCapture,
       },
-    {
+      {
         name: "behavior.snapshot.diff",
         modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
@@ -63,9 +63,8 @@ export async function createBehaviorSnapshotModule(): Promise<ModuleExport> {
           "missions/*/evidence/behavior-snapshot*.json",
         ],
         execute: runBehaviorSnapshotDiff,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

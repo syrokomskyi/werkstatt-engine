@@ -135,7 +135,8 @@ async function getCachedEntryForFile(
   cache: CacheLayer,
   rfcDirPath: string,
   fileName: string,
-  forceRefresh: boolean, io: WorkspaceIO = createDefaultIO().io,
+  forceRefresh: boolean,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<RfcCacheEntry | undefined> {
   if (!forceRefresh && cache.available) {
     const cached = await cache.get(RFC_CACHE_NAMESPACE, fileName);

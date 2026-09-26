@@ -28,7 +28,11 @@ export type DeploymentOperationState =
   | "rolled-back";
 
 export type TransitionResultV1 =
-  | { ok: true; from: ReleaseArtifactState | DeploymentOperationState; to: ReleaseArtifactState | DeploymentOperationState }
+  | {
+      ok: true;
+      from: ReleaseArtifactState | DeploymentOperationState;
+      to: ReleaseArtifactState | DeploymentOperationState;
+    }
   | { ok: false; code: "CERT-STATE-01"; from: string; to: string; message: string };
 
 const ARTIFACT_TRANSITIONS: Record<ReleaseArtifactState, ReleaseArtifactState[]> = {

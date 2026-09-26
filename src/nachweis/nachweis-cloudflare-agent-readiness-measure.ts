@@ -667,7 +667,10 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
       );
     }
 
-    await context.io.writeFile(path.join(workDir, "cloudflare-result.json"), pollResult.rawResponse);
+    await context.io.writeFile(
+      path.join(workDir, "cloudflare-result.json"),
+      pollResult.rawResponse,
+    );
 
     let parsedDimensions: ReturnType<typeof parseAgentReadiness>;
     try {
@@ -695,7 +698,10 @@ export async function runNachweisCloudflareAgentReadinessMeasure(
       },
       parsedAt: new Date().toISOString(),
     };
-    await context.io.writeFile(path.join(workDir, "provider-parser-metadata.json"), JSON.stringify(parserMetadata, null, 2));
+    await context.io.writeFile(
+      path.join(workDir, "provider-parser-metadata.json"),
+      JSON.stringify(parserMetadata, null, 2),
+    );
 
     const bundle = buildAssessmentBundle(options, scanId, pollResult.parsed, parsedDimensions);
 

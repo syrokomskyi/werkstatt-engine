@@ -19,18 +19,14 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createArtifactStoreModule(): Promise<ModuleExport> {
-  const {
-        runArtifactStorePut,
-        runArtifactStoreGet,
-        runArtifactStoreValidate,
-        runArtifactStoreGc,
-      } = await import("./artifact-store-commands.ts");
+  const { runArtifactStorePut, runArtifactStoreGet, runArtifactStoreValidate, runArtifactStoreGc } =
+    await import("./artifact-store-commands.ts");
   return {
     name: "artifact-store",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "artifact.store.put",
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
@@ -49,7 +45,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runArtifactStorePut,
       },
-    {
+      {
         name: "artifact.store.get",
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
@@ -67,7 +63,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runArtifactStoreGet,
       },
-    {
+      {
         name: "artifact.store.validate",
         contract: "artifact",
         rules: [],
@@ -81,7 +77,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         reads: [".werkstatt/artifacts/releases/{release}/**"],
         execute: runArtifactStoreValidate,
       },
-    {
+      {
         name: "artifact.store.gc",
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
@@ -97,9 +93,8 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         reads: [".werkstatt/artifacts/releases/**", "releases/*/release.yaml"],
         cacheable: false,
         execute: runArtifactStoreGc,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

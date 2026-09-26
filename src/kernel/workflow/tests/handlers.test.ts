@@ -29,7 +29,11 @@ function makeContext(): KernelRuntimeContext {
     dryRun: false,
     outputFormat: "json",
     io: createDefaultIO().io,
-    actualState: { commands: new Map(), pipelines: new Map(), components: new Map() } as unknown as ActualState,
+    actualState: {
+      commands: new Map(),
+      pipelines: new Map(),
+      components: new Map(),
+    } as unknown as ActualState,
   };
 }
 

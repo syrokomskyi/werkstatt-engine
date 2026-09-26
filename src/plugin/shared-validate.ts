@@ -46,7 +46,10 @@ export interface SharedValidateResult {
   checks: SharedCheckResult[];
 }
 
-async function checkSharedDependency(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SharedCheckResult> {
+async function checkSharedDependency(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SharedCheckResult> {
   const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt-engine", "package.json");
   try {
     const content = await io.readFile(pkgJsonPath);
@@ -69,7 +72,10 @@ async function checkSharedDependency(workspaceRoot: string, io: WorkspaceIO = cr
   }
 }
 
-async function checkExemptionHygiene(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SharedCheckResult> {
+async function checkExemptionHygiene(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SharedCheckResult> {
   const autonomyPath = join(
     workspaceRoot,
     "packages",
@@ -146,7 +152,8 @@ async function checkNoEngineImportsInShared(workspaceRoot: string): Promise<{
 }
 
 async function checkSharedPackageDeclaresNoEngineDep(
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SharedCheckResult> {
   const pkgJsonPath = join(workspaceRoot, "packages", "werkstatt-shared", "package.json");
   try {

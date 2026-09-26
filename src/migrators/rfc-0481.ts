@@ -90,7 +90,10 @@ function mapCompanyToBusiness(
   return business;
 }
 
-async function isPbpBusinessFile(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
+async function isPbpBusinessFile(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   try {
     const raw = await io.readFile(filePath);
     return raw.includes("schema: pbp/business@1") || raw.includes('schema: "pbp/business@1"');
@@ -101,7 +104,8 @@ async function isPbpBusinessFile(filePath: string, io: WorkspaceIO = createDefau
 
 async function transformBusinessSingleton(
   data: SternsystemData,
-  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const locales = await readLocalesSafe(data.rootPath, ctx);
 
@@ -148,7 +152,11 @@ async function transformBusinessSingleton(
   return data;
 }
 
-export async function readLocalesSafe(rootPath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+export async function readLocalesSafe(
+  rootPath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const systemMdPath = path.join(rootPath, "src", "content", "system.md");
   try {
     const raw = await io.readFile(systemMdPath);

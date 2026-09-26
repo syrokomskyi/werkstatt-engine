@@ -24,11 +24,7 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function writeMissionManifest(
-  workspaceRoot: string,
-  missionId: string,
-  state: string,
-): void {
+function writeMissionManifest(workspaceRoot: string, missionId: string, state: string): void {
   const missionDir = join(workspaceRoot, "missions", missionId);
   mkdirSync(missionDir, { recursive: true });
   writeFileSync(
@@ -39,9 +35,8 @@ function writeMissionManifest(
 
 describe("RFC-0796: validateNoStaleMissionEntries", () => {
   test("stale symlink in missions/ root produces warning", async () => {
-    const { validateNoStaleMissionEntries } = await import(
-      "../mission/mission-materialization-commands.ts"
-    );
+    const { validateNoStaleMissionEntries } =
+      await import("../mission/mission-materialization-commands.ts");
     const missionsDir = join(tmpDir, "missions");
     mkdirSync(missionsDir, { recursive: true });
     const targetDir = join(missionsDir, "archived-mission");
@@ -56,9 +51,8 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
   });
 
   test("terminal-state directory in missions/ root produces warning", async () => {
-    const { validateNoStaleMissionEntries } = await import(
-      "../mission/mission-materialization-commands.ts"
-    );
+    const { validateNoStaleMissionEntries } =
+      await import("../mission/mission-materialization-commands.ts");
     writeMissionManifest(tmpDir, "test-system-m000001", "closed");
 
     const warnings = await validateNoStaleMissionEntries(tmpDir);
@@ -69,9 +63,8 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
   });
 
   test("open mission in missions/ root produces no warning", async () => {
-    const { validateNoStaleMissionEntries } = await import(
-      "../mission/mission-materialization-commands.ts"
-    );
+    const { validateNoStaleMissionEntries } =
+      await import("../mission/mission-materialization-commands.ts");
     writeMissionManifest(tmpDir, "test-system-m000001", "open");
 
     const warnings = await validateNoStaleMissionEntries(tmpDir);
@@ -80,9 +73,8 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
   });
 
   test("archive/ directory produces no warning (excluded)", async () => {
-    const { validateNoStaleMissionEntries } = await import(
-      "../mission/mission-materialization-commands.ts"
-    );
+    const { validateNoStaleMissionEntries } =
+      await import("../mission/mission-materialization-commands.ts");
     const archiveDir = join(tmpDir, "missions", "archive");
     mkdirSync(archiveDir, { recursive: true });
     mkdirSync(join(archiveDir, "closed"), { recursive: true });
@@ -93,9 +85,8 @@ describe("RFC-0796: validateNoStaleMissionEntries", () => {
   });
 
   test("no missions/ directory returns empty warnings", async () => {
-    const { validateNoStaleMissionEntries } = await import(
-      "../mission/mission-materialization-commands.ts"
-    );
+    const { validateNoStaleMissionEntries } =
+      await import("../mission/mission-materialization-commands.ts");
 
     const warnings = await validateNoStaleMissionEntries(tmpDir);
 

@@ -72,7 +72,10 @@ function makeContext(workspaceRoot: string) {
     getEvents: vi.fn(() => []),
   };
   return {
-  io: createDefaultIO().io, workspaceRoot, logger } as never;
+    io: createDefaultIO().io,
+    workspaceRoot,
+    logger,
+  } as never;
 }
 
 function makePipelineReport(
@@ -232,8 +235,16 @@ test("--mission resolves workpiece via readMissionManifest", async () => {
 
   expect(result.exitCode).toBe(0);
   expect(result.data?.status).toBe("pass");
-  expect(mockReadMissionManifest).toHaveBeenCalledWith(tmpDir, "test-bundle-m000001", expect.anything());
-  expect(mockResolveMissionDir).toHaveBeenCalledWith(tmpDir, "test-bundle-m000001", expect.anything());
+  expect(mockReadMissionManifest).toHaveBeenCalledWith(
+    tmpDir,
+    "test-bundle-m000001",
+    expect.anything(),
+  );
+  expect(mockResolveMissionDir).toHaveBeenCalledWith(
+    tmpDir,
+    "test-bundle-m000001",
+    expect.anything(),
+  );
   const pipelineCall = mockExecuteKernelPipeline.mock.calls[0]![0] as {
     siteWorkspace: { directory: string };
     siteName: string;

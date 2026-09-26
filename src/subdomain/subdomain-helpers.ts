@@ -13,7 +13,11 @@ account subdomain derivation, and environment variable resolution.
 </CHANGE_SUMMARY>
 */
 
-import type { SystemConfig, ServiceEntry, ServicesRegistry } from "@warpgogol/werkstatt-engine/schemas";
+import type {
+  SystemConfig,
+  ServiceEntry,
+  ServicesRegistry,
+} from "@warpgogol/werkstatt-engine/schemas";
 import { filterEnv, sourceDotenv } from "../leitstand/adapters/cloudflare-workers.ts";
 
 export function flagString(

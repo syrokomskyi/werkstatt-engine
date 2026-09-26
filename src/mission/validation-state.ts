@@ -47,7 +47,8 @@ export function resolveValidationStatePath(workspaceRoot: string, missionId: str
 
 export async function readValidationState(
   workspaceRoot: string,
-  missionId: string, io: WorkspaceIO = createDefaultIO().io,
+  missionId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ValidationState | null> {
   const path = resolveValidationStatePath(workspaceRoot, missionId);
   try {
@@ -60,7 +61,8 @@ export async function readValidationState(
 
 export async function writeValidationState(
   workspaceRoot: string,
-  state: ValidationState, io: WorkspaceIO = createDefaultIO().io,
+  state: ValidationState,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const path = resolveValidationStatePath(workspaceRoot, state.missionId);
   await io.mkdir(join(path, ".."));

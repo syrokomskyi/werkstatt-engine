@@ -61,33 +61,29 @@ describe("summarizeLogs", () => {
 
 describe("assertKnownOptionKeys", () => {
   test("does not throw when all keys are known", () => {
-    expect(() =>
-      assertKnownOptionKeys({ a: 1, b: 2 }, ["a", "b", "c"], "test"),
-    ).not.toThrow();
+    expect(() => assertKnownOptionKeys({ a: 1, b: 2 }, ["a", "b", "c"], "test")).not.toThrow();
   });
 
   test("throws on unknown key", () => {
-    expect(() =>
-      assertKnownOptionKeys({ a: 1, z: 2 }, ["a", "b"], "test"),
-    ).toThrow(/unknown key.*z/);
+    expect(() => assertKnownOptionKeys({ a: 1, z: 2 }, ["a", "b"], "test")).toThrow(
+      /unknown key.*z/,
+    );
   });
 
   test("includes label in error message", () => {
-    expect(() =>
-      assertKnownOptionKeys({ z: 1 }, ["a"], "myLabel"),
-    ).toThrow(/myLabel/);
+    expect(() => assertKnownOptionKeys({ z: 1 }, ["a"], "myLabel")).toThrow(/myLabel/);
   });
 
   test("provides nearest-key hint for typos", () => {
-    expect(() =>
-      assertKnownOptionKeys({ argx: 1 }, ["argv"], "test"),
-    ).toThrow(/did you mean.*argv/);
+    expect(() => assertKnownOptionKeys({ argx: 1 }, ["argv"], "test")).toThrow(
+      /did you mean.*argv/,
+    );
   });
 
   test("does not provide hint when distance > 3", () => {
-    expect(() =>
-      assertKnownOptionKeys({ completelyDifferent: 1 }, ["argv"], "test"),
-    ).toThrow(/"completelyDifferent"/);
+    expect(() => assertKnownOptionKeys({ completelyDifferent: 1 }, ["argv"], "test")).toThrow(
+      /"completelyDifferent"/,
+    );
   });
 
   test("handles empty options object", () => {

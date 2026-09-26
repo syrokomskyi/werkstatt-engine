@@ -378,9 +378,7 @@ test("unknown method returns -32601 method-not-found", async () => {
 
 test("batch requests are rejected with -32600 invalid-request", async () => {
   const gate = createAgentGate(makeManifest(), [LEAD_SUBMIT], makeFakePorts());
-  const res = await gate.handleA2a(
-    rawRpc([{ jsonrpc: "2.0", id: 1, method: "SendMessage" }]),
-  );
+  const res = await gate.handleA2a(rawRpc([{ jsonrpc: "2.0", id: 1, method: "SendMessage" }]));
   const body = (await res.json()) as A2aTaskBody;
   expect(body.error!.code).toBe(-32600);
 });

@@ -127,7 +127,10 @@ export function createEvaluatorRegistry(): EvaluatorRegistryV1 {
   const evaluators = new Map<string, RegisteredEvaluatorV1>();
 
   return {
-    register(identity: EvaluatorIdentityV1, handler: EvaluatorHandlerV1): EvaluatorRegisterOutcomeV1 {
+    register(
+      identity: EvaluatorIdentityV1,
+      handler: EvaluatorHandlerV1,
+    ): EvaluatorRegisterOutcomeV1 {
       if (evaluators.has(identity.evaluatorId)) {
         return {
           ok: false,
@@ -302,7 +305,8 @@ export interface EvaluatorValidationFailureV1 {
   message: string;
 }
 
-export type EvaluatorValidationOutcomeV1 = EvaluatorValidationResultV1 | EvaluatorValidationFailureV1;
+export type EvaluatorValidationOutcomeV1 =
+  EvaluatorValidationResultV1 | EvaluatorValidationFailureV1;
 
 export function validateEvaluatorPayload(
   payload: QualitativeEvaluationPayloadV1,

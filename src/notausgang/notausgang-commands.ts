@@ -82,8 +82,12 @@ function shouldSkipForSecretScan(relPath: string): boolean {
   );
 }
 
-async function copyDir(src: string, dest: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
-  if (!await io.exists(src)) return;
+async function copyDir(
+  src: string,
+  dest: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
+  if (!(await io.exists(src))) return;
   await io.mkdir(dest);
   const entries = await io.readdir(src);
   for (const entry of entries) {
@@ -101,7 +105,10 @@ function isRuntimeFile(fileName: string): boolean {
   return RUNTIME_FILE_PATTERNS.some((p) => fileName.startsWith(p) || fileName === p);
 }
 
-async function scanForSecrets(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<Array<{ file: string; pattern: string }>> {
+async function scanForSecrets(
+  dir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Array<{ file: string; pattern: string }>> {
   const findings: Array<{ file: string; pattern: string }> = [];
 
   for (const fullPath of await collectFiles(dir)) {
@@ -188,7 +195,7 @@ export async function runNotausgangExport(
   // Read release manifest
   const releaseDir = path.join(workspaceRoot, "releases", releaseId);
   const releaseManifestPath = path.join(releaseDir, "release.yaml");
-  if (!await context.io.exists(releaseManifestPath)) {
+  if (!(await context.io.exists(releaseManifestPath))) {
     throw new Error(`[notausgang.export] release '${releaseId}' not found`);
   }
 
@@ -307,7 +314,7 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
     const behaviorSnapshotHash = (
       await fingerprintTree(path.join(stagingDir, "behavior-snapshots"), { mode: "semantic" })
     ).value;
-    const artifactManifestHash = await context.io.exists(artifactManifestDestPath)
+    const artifactManifestHash = (await context.io.exists(artifactManifestDestPath))
       ? (await fingerprintFile(artifactManifestDestPath, { mode: "byte" })).hash
       : "sha256:absent";
 
@@ -345,8 +352,14 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
     );
 
     // RFC-1120: offline verifier + verification guide (copied verbatim)
-    await context.io.copyFile(path.join(resolveTemplatesDir(), "verify.py"), path.join(stagingDir, "verify.py"));
-    await context.io.copyFile(path.join(resolveTemplatesDir(), "verification.md"), path.join(stagingDir, "verification.md"));
+    await context.io.copyFile(
+      path.join(resolveTemplatesDir(), "verify.py"),
+      path.join(stagingDir, "verify.py"),
+    );
+    await context.io.copyFile(
+      path.join(resolveTemplatesDir(), "verification.md"),
+      path.join(stagingDir, "verification.md"),
+    );
 
     // Write manifest as YAML (RFC-0376) + JSON twin for the stdlib verifier (RFC-1120)
     const manifest = {
@@ -453,7 +466,8 @@ const BORDBUCH_REQUIRED_FIELDS = ["id", "kind", "occurredAt", "systemId"] as con
 
 async function validateBordbuch(
   bordbuchPath: string,
-  expectedSystemId: string, io: WorkspaceIO = createDefaultIO().io,
+  expectedSystemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NotausgangViolation[]> {
   const violations: NotausgangViolation[] = [];
   const content = await io.readFile(bordbuchPath);
@@ -520,7 +534,7 @@ export async function runNotausgangValidate(
   if (!exportPath) throw new Error("[notausgang.validate] --path is required");
 
   const exportDir = path.resolve(workspaceRoot, exportPath);
-  if (!await context.io.exists(exportDir)) {
+  if (!(await context.io.exists(exportDir))) {
     throw new Error(`[notausgang.validate] export path '${exportPath}' not found`);
   }
 
@@ -848,7 +862,7 @@ export async function runNotausgangValidate(
   for (const [sourceId] of bundledSources) {
     const sourceDir = path.join(evidenceDir, sourceId);
     const integrityPath = path.join(sourceDir, "integrity.txt");
-    if (!await context.io.exists(integrityPath)) {
+    if (!(await context.io.exists(integrityPath))) {
       violations.push({
         rule: "NA-EVIDENCE-01",
         message: `manifest records evidence '${sourceId}' as bundled but evidence/${sourceId}/integrity.txt is missing`,
@@ -862,7 +876,7 @@ export async function runNotausgangValidate(
     for (const entry of await context.io.readdir(evidenceDir)) {
       if (!entry.isDirectory) continue;
       const integrityPath = path.join(evidenceDir, entry.name, "integrity.txt");
-      if (!await context.io.exists(integrityPath)) continue;
+      if (!(await context.io.exists(integrityPath))) continue;
       const lines = (await context.io.readFile(integrityPath))
         .split("\n")
         .filter((l) => l.trim().length > 0);
@@ -879,7 +893,7 @@ export async function runNotausgangValidate(
         const expected = line.slice(0, sep).trim();
         const rel = line.slice(sep + 2).trim();
         const artifactPath = path.join(evidenceDir, entry.name, rel);
-        if (!await context.io.exists(artifactPath)) {
+        if (!(await context.io.exists(artifactPath))) {
           violations.push({
             rule: "NA-EVIDENCE-02",
             message: `artifact '${rel}' listed in integrity.txt is missing`,
@@ -901,7 +915,7 @@ export async function runNotausgangValidate(
 
   // NA-FEATURES-01: feature-notes.md present and non-empty
   const featureNotesPath = path.join(exportDir, "feature-notes.md");
-  if (!await context.io.exists(featureNotesPath)) {
+  if (!(await context.io.exists(featureNotesPath))) {
     violations.push({
       rule: "NA-FEATURES-01",
       message: "feature-notes.md not found — export must be re-generated (RFC-1120)",
@@ -920,7 +934,7 @@ export async function runNotausgangValidate(
 
   // NA-VERIFIER-01: verifier files present
   for (const rel of ["verify.py", "verification.md", "SHA256SUMS.txt"]) {
-    if (!await context.io.exists(path.join(exportDir, rel))) {
+    if (!(await context.io.exists(path.join(exportDir, rel)))) {
       violations.push({
         rule: "NA-VERIFIER-01",
         message: `${rel} not found — export must be re-generated (RFC-1120)`,

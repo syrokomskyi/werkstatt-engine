@@ -52,9 +52,7 @@ export function createFakeSandboxAdapter(): IsolationAdapterV1 {
       return {
         workloadId: input.workloadId,
 
-        async invoke(
-          request: CapabilityBridgeRequestV1,
-        ): Promise<CapabilityBridgeResponseV1> {
+        async invoke(request: CapabilityBridgeRequestV1): Promise<CapabilityBridgeResponseV1> {
           if (terminated) {
             return {
               schema: "werkstatt/capability-bridge-response@1",
@@ -67,9 +65,7 @@ export function createFakeSandboxAdapter(): IsolationAdapterV1 {
 
           invocations.push(request);
 
-          const responsePayload = new TextEncoder().encode(
-            `fake-response:${request.requestId}`,
-          );
+          const responsePayload = new TextEncoder().encode(`fake-response:${request.requestId}`);
 
           return {
             schema: "werkstatt/capability-bridge-response@1",

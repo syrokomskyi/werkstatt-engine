@@ -25,9 +25,9 @@ export async function createSichtpassModule(): Promise<ModuleExport> {
   return {
     name: "sichtpass",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "sichtpass.generate",
         modulePath: "packages/werkstatt-engine/src/sichtpass/sichtpass.module.ts",
         description:
@@ -44,9 +44,8 @@ export async function createSichtpassModule(): Promise<ModuleExport> {
         writes: [],
         generates: [],
         execute: runSichtpassGenerate,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

@@ -28,12 +28,23 @@ const baseInput: KernelCommandInput = {
   flags: {},
 };
 
-const TELEMETRY_RELATIVE_PATH = join("node_modules", ".cache", "werkstatt", "telemetry", "steps.ndjson");
+const TELEMETRY_RELATIVE_PATH = join(
+  "node_modules",
+  ".cache",
+  "werkstatt",
+  "telemetry",
+  "steps.ndjson",
+);
 const BUDGETS_RELATIVE_PATH = join("docs", "pipeline-budgets.generated.yaml");
 
 async function writeBudgetsFile(
   dir: string,
-  budgets: Array<{ pipeline: string; command: string; app: string | null; expectedDurationMs: number }>,
+  budgets: Array<{
+    pipeline: string;
+    command: string;
+    app: string | null;
+    expectedDurationMs: number;
+  }>,
 ): Promise<void> {
   const filePath = join(dir, BUDGETS_RELATIVE_PATH);
   await mkdir(join(dir, "docs"), { recursive: true });
@@ -48,7 +59,13 @@ async function writeBudgetsFile(
 
 async function writeTelemetryFile(
   dir: string,
-  records: Array<{ pipeline: string; command: string; app: string | null; durationMs: number; recordedAt: string }>,
+  records: Array<{
+    pipeline: string;
+    command: string;
+    app: string | null;
+    durationMs: number;
+    recordedAt: string;
+  }>,
 ): Promise<void> {
   const filePath = join(dir, TELEMETRY_RELATIVE_PATH);
   await mkdir(join(dir, "node_modules", ".cache", "werkstatt", "telemetry"), { recursive: true });
@@ -60,7 +77,12 @@ test("BUDGET-01: p95 exceeds budget × tolerance", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pbv-test-"));
   try {
     await writeBudgetsFile(dir, [
-      { pipeline: "sites-check.author", command: "content.links.validate", app: null, expectedDurationMs: 100 },
+      {
+        pipeline: "sites-check.author",
+        command: "content.links.validate",
+        app: null,
+        expectedDurationMs: 100,
+      },
     ]);
     await writeTelemetryFile(
       dir,
@@ -85,7 +107,12 @@ test("BUDGET-02: no telemetry for a budgeted step", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pbv-test-"));
   try {
     await writeBudgetsFile(dir, [
-      { pipeline: "sites-check.author", command: "content.links.validate", app: null, expectedDurationMs: 100 },
+      {
+        pipeline: "sites-check.author",
+        command: "content.links.validate",
+        app: null,
+        expectedDurationMs: 100,
+      },
     ]);
     // No telemetry file written
     const result = await runPipelineBudgetValidate(baseInput, makeContext(dir));
@@ -124,8 +151,18 @@ test("--site flag filters by site", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pbv-test-"));
   try {
     await writeBudgetsFile(dir, [
-      { pipeline: "sites-check.author", command: "content.links.validate", app: "warpgogol-com", expectedDurationMs: 100 },
-      { pipeline: "sites-check.author", command: "content.links.validate", app: "other-site", expectedDurationMs: 100 },
+      {
+        pipeline: "sites-check.author",
+        command: "content.links.validate",
+        app: "warpgogol-com",
+        expectedDurationMs: 100,
+      },
+      {
+        pipeline: "sites-check.author",
+        command: "content.links.validate",
+        app: "other-site",
+        expectedDurationMs: 100,
+      },
     ]);
     await writeTelemetryFile(
       dir,
@@ -159,7 +196,12 @@ test("--tolerance flag adjusts threshold", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pbv-test-"));
   try {
     await writeBudgetsFile(dir, [
-      { pipeline: "sites-check.author", command: "content.links.validate", app: null, expectedDurationMs: 100 },
+      {
+        pipeline: "sites-check.author",
+        command: "content.links.validate",
+        app: null,
+        expectedDurationMs: 100,
+      },
     ]);
     // p95 = 200ms, budget = 100ms, default tolerance 1.5 → threshold 150ms → breach
     await writeTelemetryFile(

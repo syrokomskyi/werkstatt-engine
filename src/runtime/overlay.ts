@@ -15,10 +15,7 @@ when two overlays with the same priority modify the same componentId.
 </CHANGE_SUMMARY>
 */
 
-import type {
-  DesiredState,
-  DesiredStateOverlay,
-} from "@warpgogol/werkstatt-shared/kernel";
+import type { DesiredState, DesiredStateOverlay } from "@warpgogol/werkstatt-shared/kernel";
 
 /**
  * Overlay conflict error — thrown when two overlays with the same priority
@@ -61,10 +58,7 @@ const SCOPE_ORDER: Record<string, number> = {
  * @throws {OverlayConflictError} when two overlays with the same priority
  *   have addOrReplace entries for the same componentId (COMPOSITION-01).
  */
-export function resolveOverlays(
-  base: DesiredState,
-  overlays: DesiredStateOverlay[],
-): DesiredState {
+export function resolveOverlays(base: DesiredState, overlays: DesiredStateOverlay[]): DesiredState {
   if (overlays.length === 0) return base;
 
   const sorted = [...overlays].sort((a, b) => {
@@ -74,10 +68,7 @@ export function resolveOverlays(
   });
 
   const merged = new Map(base.components);
-  const seenPriorities = new Map<
-    number,
-    Map<string, string>
-  >();
+  const seenPriorities = new Map<number, Map<string, string>>();
 
   for (const overlay of sorted) {
     for (const [componentId, declaration] of overlay.addOrReplace) {
@@ -113,9 +104,7 @@ export function resolveOverlays(
 /**
  * Inspect overlays — returns a summary of each overlay's effects.
  */
-export function inspectOverlays(
-  overlays: DesiredStateOverlay[],
-): Array<{
+export function inspectOverlays(overlays: DesiredStateOverlay[]): Array<{
   id: string;
   scope: string;
   priority: number;

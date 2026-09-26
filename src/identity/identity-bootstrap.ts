@@ -18,7 +18,10 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { generateKeypair } from "@warpgogol/werkstatt-shared/passport/sign";
 import { signIdentityCredential } from "@warpgogol/werkstatt-shared/passport/identity-sign";
-import type { WerkstattIdentityConfig, SiteOwnershipCredentialSubject } from "@warpgogol/werkstatt-shared/passport";
+import type {
+  WerkstattIdentityConfig,
+  SiteOwnershipCredentialSubject,
+} from "@warpgogol/werkstatt-shared/passport";
 import { writeIdentityConfig, generateCredentialId } from "./identity-io.ts";
 
 export interface IdentityBootstrapData {

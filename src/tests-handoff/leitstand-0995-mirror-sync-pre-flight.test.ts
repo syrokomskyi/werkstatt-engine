@@ -52,10 +52,15 @@ function commitToBare(barePath: string, msg: string): string {
   return sha;
 }
 
-function writeSystemConfig(systemId: string, mirrors: Array<{ path: string; storageType: string }>): void {
+function writeSystemConfig(
+  systemId: string,
+  mirrors: Array<{ path: string; storageType: string }>,
+): void {
   const cacheDir = join(testRoot, "systems-cache", systemId);
   mkdirSync(cacheDir, { recursive: true });
-  const mirrorsYaml = mirrors.map((m) => `  - path: "${m.path}"\n    storageType: ${m.storageType}`).join("\n");
+  const mirrorsYaml = mirrors
+    .map((m) => `  - path: "${m.path}"\n    storageType: ${m.storageType}`)
+    .join("\n");
   const configContent = `schemaVersion: system-config/v1
 id: ${systemId}
 cosmicStar: Vega

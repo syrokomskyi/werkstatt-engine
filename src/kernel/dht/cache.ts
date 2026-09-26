@@ -35,7 +35,10 @@ interface CacheFile {
   entries: Record<string, DHTCacheEntry>;
 }
 
-export async function loadCache(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<CacheFile> {
+export async function loadCache(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<CacheFile> {
   const cachePath = join(workspaceRoot, CACHE_FILENAME);
   try {
     const raw = await io.readFile(cachePath);
@@ -49,7 +52,11 @@ export async function loadCache(workspaceRoot: string, io: WorkspaceIO = createD
   }
 }
 
-export async function saveCache(workspaceRoot: string, cache: CacheFile, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+export async function saveCache(
+  workspaceRoot: string,
+  cache: CacheFile,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const cachePath = join(workspaceRoot, CACHE_FILENAME);
   await io.writeFile(cachePath, JSON.stringify(cache, null, 2) + "\n");
 }

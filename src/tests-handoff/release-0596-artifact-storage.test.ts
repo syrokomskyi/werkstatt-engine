@@ -138,7 +138,13 @@ test("storeArtifactCore stores artifact manifest and returns correct fields", as
   mkdirSync(distDir, { recursive: true });
   writeFileSync(join(distDir, "index.html"), "<html></html>");
 
-  const result = await storeArtifactCore(tmpDir, releaseId, distDir, "test-sys", createDefaultIO().io);
+  const result = await storeArtifactCore(
+    tmpDir,
+    releaseId,
+    distDir,
+    "test-sys",
+    createDefaultIO().io,
+  );
 
   expect(result.distArtifactHash).toMatch(/^sha256:/);
   expect(result.uri).toMatch(/^local:\/\//);
@@ -179,7 +185,13 @@ test("storeArtifactCore uses provided systemId, not releaseId.split", async () =
   writeFileSync(join(distDir, "index.html"), "<html></html>");
 
   // Pass a systemId that differs from what releaseId.split("-r")[0] would produce
-  const result = await storeArtifactCore(tmpDir, releaseId, distDir, "custom-sys-id", createDefaultIO().io);
+  const result = await storeArtifactCore(
+    tmpDir,
+    releaseId,
+    distDir,
+    "custom-sys-id",
+    createDefaultIO().io,
+  );
 
   const manifestUri = result.uri.replace("local://", "");
   const manifest = JSON.parse(readFileSync(manifestUri, "utf8"));
@@ -193,10 +205,22 @@ test("storeArtifactCore is idempotent — re-running overwrites manifest", async
   mkdirSync(distDir, { recursive: true });
   writeFileSync(join(distDir, "index.html"), "<html>v1</html>");
 
-  const result1 = await storeArtifactCore(tmpDir, releaseId, distDir, "test-sys", createDefaultIO().io);
+  const result1 = await storeArtifactCore(
+    tmpDir,
+    releaseId,
+    distDir,
+    "test-sys",
+    createDefaultIO().io,
+  );
 
   // Run again with same content — should overwrite, not duplicate
-  const result2 = await storeArtifactCore(tmpDir, releaseId, distDir, "test-sys", createDefaultIO().io);
+  const result2 = await storeArtifactCore(
+    tmpDir,
+    releaseId,
+    distDir,
+    "test-sys",
+    createDefaultIO().io,
+  );
 
   expect(result2.distArtifactHash).toBe(result1.distArtifactHash);
   expect(result2.uri).toBe(result1.uri);

@@ -7,7 +7,10 @@ import {
   createEffectHandler,
   buildUnwindReport,
 } from "../effects.ts";
-import type { EffectDeclarationV1, CompensationAction } from "@warpgogol/werkstatt-shared/component";
+import type {
+  EffectDeclarationV1,
+  CompensationAction,
+} from "@warpgogol/werkstatt-shared/component";
 
 const _VALID_SHA = "sha256:" + "a".repeat(64);
 

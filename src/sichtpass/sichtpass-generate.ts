@@ -90,10 +90,11 @@ interface CoverageLedgerData {
 
 async function readContentRegressionSnapshot(
   cachePath: string,
-  _systemId: string, io: WorkspaceIO = createDefaultIO().io,
+  _systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<ContentRegressionSnapshotData> {
   const snapshotDir = path.join(cachePath, ".cache", "content-regression");
-  if (!await io.exists(snapshotDir)) {
+  if (!(await io.exists(snapshotDir))) {
     return { contentHash: null, routeCount: 0 };
   }
   try {
@@ -116,9 +117,12 @@ async function readContentRegressionSnapshot(
   }
 }
 
-async function readBehaviorSnapshot(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<BehaviorSnapshotData> {
+async function readBehaviorSnapshot(
+  cachePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<BehaviorSnapshotData> {
   const filePath = path.join(cachePath, "behavior.snapshot.generated.yaml");
-  if (!await io.exists(filePath)) {
+  if (!(await io.exists(filePath))) {
     return { routeCount: 0 };
   }
   try {
@@ -134,12 +138,13 @@ async function readBehaviorSnapshot(cachePath: string, io: WorkspaceIO = createD
 
 async function readNachweisManifest(
   workspaceRoot: string,
-  systemId: string, io: WorkspaceIO = createDefaultIO().io,
+  systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NachweisManifestData> {
   try {
     const cachePath = await resolveNachweisCachePath(workspaceRoot, systemId);
     const manifestPath = path.join(cachePath, "public", "nachweise", "manifest.json");
-    if (!await io.exists(manifestPath)) {
+    if (!(await io.exists(manifestPath))) {
       return { count: 0, slugs: [] };
     }
     const raw = await io.readFile(manifestPath);
@@ -191,9 +196,12 @@ async function readSystemStateData(
   }
 }
 
-async function readPseoModules(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<PseoModulesData> {
+async function readPseoModules(
+  cachePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<PseoModulesData> {
   const statusPath = path.join(cachePath, "bordbuch", "status.generated.yaml");
-  if (!await io.exists(statusPath)) {
+  if (!(await io.exists(statusPath))) {
     return { modules: [] };
   }
   try {
@@ -220,9 +228,12 @@ async function readPseoModules(cachePath: string, io: WorkspaceIO = createDefaul
   }
 }
 
-async function readCoverageLedger(cachePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<CoverageLedgerData> {
+async function readCoverageLedger(
+  cachePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<CoverageLedgerData> {
   const ledgerPath = path.join(cachePath, "provenance", "coverage-ledger.yaml");
-  if (!await io.exists(ledgerPath)) {
+  if (!(await io.exists(ledgerPath))) {
     return { atoms: 0, pages: [] };
   }
   try {

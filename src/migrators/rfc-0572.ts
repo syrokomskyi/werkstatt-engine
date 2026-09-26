@@ -17,11 +17,20 @@ produces the same result. No-op on blocks that never had structured fields.</pur
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
-import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type DirEntry,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0572_MIGRATOR_ID = "rfc-0572";
 
-async function scanDir(dir: string, lang: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+async function scanDir(
+  dir: string,
+  lang: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   let entries: DirEntry[];
   try {
     entries = await io.readdir(dir);
@@ -39,7 +48,12 @@ async function scanDir(dir: string, lang: string, ctx: MigrationContext, io: Wor
   }
 }
 
-async function migrateFile(filePath: string, lang: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+async function migrateFile(
+  filePath: string,
+  lang: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   let content: string;
   try {
     content = await io.readFile(filePath);
@@ -114,12 +128,16 @@ export const rfc0572Migrator: Migrator = {
   toVersion: "4.20.0",
   description:
     "Remove emailField/phoneField from send-message page blocks and re-add contactRequirementMessage. Advances migratorCursor for RFC-0572 (revert to single-textarea contact form).",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const pagesBaseDir = path.join(data.rootPath, "src", "content", "pages");
 
     let langDirs: string[];
     try {
-      langDirs = (await io.readdir(pagesBaseDir)).map(e => e.name);
+      langDirs = (await io.readdir(pagesBaseDir)).map((e) => e.name);
     } catch {
       ctx.logger.info(`[rfc-0572] no pages directory at ${pagesBaseDir} — skipping`);
       langDirs = [];

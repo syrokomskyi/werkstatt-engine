@@ -30,7 +30,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join } from "node:path";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import type { GitMeshVerifyResult } from "./types.ts";
 import { loadGitMeshConfig } from "./config.ts";
 import { gitLogSignatureStatus, gitRevParseHead } from "./git-ops.ts";
@@ -44,7 +48,10 @@ interface IdentityFile {
   publicKeys?: string[];
 }
 
-async function loadIdentityPublicKeys(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+async function loadIdentityPublicKeys(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   // RFC-0560 dependency: git's %G? signature status checks git's keyring, not the
   // operator's specific public key. The publicKeys loaded here will be used to
   // compare against signing keys once RFC-0560's trailer format is implemented.

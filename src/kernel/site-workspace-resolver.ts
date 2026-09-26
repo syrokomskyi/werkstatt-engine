@@ -34,7 +34,11 @@ import {
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
 import type { DiscoveredSiteWorkspace } from "@warpgogol/werkstatt-shared/kernel";
-import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type DirEntry,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 // @ai-invariant: The resolver must refuse dual representation — a site existing as both apps/<id> and a mission workpiece is an error, not a fallback.
 
 export type SiteWorkspaceSource = "apps" | "mission" | "cache-clone";
@@ -55,7 +59,10 @@ function shouldIgnoreName(name: string): boolean {
   return name.startsWith("-") || name.startsWith("old-");
 }
 
-async function readPackageName(packageJsonPath: string, io: WorkspaceIO = createDefaultIO().io): Promise<string | undefined> {
+async function readPackageName(
+  packageJsonPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | undefined> {
   try {
     const raw = await io.readFile(packageJsonPath);
     const data = JSON.parse(raw) as { name?: unknown };
@@ -181,7 +188,10 @@ export async function resolveSiteWorkspace(
   throw new Error(`Unknown site id "${siteId}". Resolvable sites: ${known || "(none)"}`);
 }
 
-export async function discoverSiteWorkspaces(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SiteWorkspace[]> {
+export async function discoverSiteWorkspaces(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SiteWorkspace[]> {
   const infos = await discoverSystemInfos(workspaceRoot);
   const results: SiteWorkspace[] = [];
   const seen = new Set<string>();

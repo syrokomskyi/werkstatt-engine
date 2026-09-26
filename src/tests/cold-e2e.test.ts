@@ -129,8 +129,12 @@ describe("werkstatt.e2e.cold", () => {
   beforeEach(() => {
     mockExecFileSync = vi.fn();
     mockMkdtemp = vi.fn(async () => join(tmpDir, "cold-root"));
-    mockMkdir = vi.fn(async (p: string) => { await realFsPromises.mkdir(p, { recursive: true }); });
-    mockWriteFile = vi.fn(async (p: string, c: string | Uint8Array) => { await realFsPromises.writeFile(p, c); });
+    mockMkdir = vi.fn(async (p: string) => {
+      await realFsPromises.mkdir(p, { recursive: true });
+    });
+    mockWriteFile = vi.fn(async (p: string, c: string | Uint8Array) => {
+      await realFsPromises.writeFile(p, c);
+    });
     mockReadFile = vi.fn(async () => "");
     mockReaddir = vi.fn(async () => [] as never);
     mockRm = vi.fn(async () => undefined);
@@ -160,7 +164,9 @@ describe("werkstatt.e2e.cold", () => {
 
   it("returns interventions=0 and exit 0 when all steps succeed", async () => {
     mockExecFileSync.mockReturnValue("");
-    mockReaddir = vi.fn(async () => [{ name: "m000001", isFile: () => false, isDirectory: () => true }] as never);
+    mockReaddir = vi.fn(
+      async () => [{ name: "m000001", isFile: () => false, isDirectory: () => true }] as never,
+    );
     mockReadFile = vi.fn(async () => "" as never);
 
     mockedExec.mockImplementation((cmdInput: { commandName?: string }) => {

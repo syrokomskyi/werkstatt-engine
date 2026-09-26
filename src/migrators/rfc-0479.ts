@@ -20,7 +20,8 @@ export const RFC_0479_MIGRATOR_ID = "rfc-0479";
 
 async function transformPinCursor(
   data: SternsystemData,
-  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const pinPath = path.join(data.rootPath, "system.pin.json");
   let raw: string;

@@ -43,9 +43,12 @@ interface LoadedEntity {
 }
 
 /** List language directories under src/content/business-profile, default lang first. */
-async function listProfileLangs(siteDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+async function listProfileLangs(
+  siteDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const profileRoot = path.join(siteDir, "src", "content", "business-profile");
-  if (!await io.exists(profileRoot)) return [];
+  if (!(await io.exists(profileRoot))) return [];
   const entries = await io.readdir(profileRoot);
   const langs = entries.filter((e) => e.isDirectory).map((e) => e.name);
   let defaultLang: string | null = null;
@@ -60,13 +63,14 @@ async function listProfileLangs(siteDir: string, io: WorkspaceIO = createDefault
 async function loadEntities(
   siteDir: string,
   langs: string[],
-  entityType: string, io: WorkspaceIO = createDefaultIO().io,
+  entityType: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<LoadedEntity[]> {
   const out: LoadedEntity[] = [];
   const seen = new Set<string>();
   for (const lang of langs) {
     const dir = resolvePbpEntityDir(siteDir, lang, entityType);
-    if (!await io.exists(dir)) continue;
+    if (!(await io.exists(dir))) continue;
     for (const file of await io.readdir(dir)) {
       if (!file.name.endsWith(".md")) continue;
       const slug = file.name.slice(0, -3);
@@ -198,13 +202,16 @@ function hasExternalOnlyItems(source: LoadedEntity): boolean {
  * Bundle eligible evidence artifacts into `<stagingDir>/evidence/<source-id>/`.
  * Fail-closed: a hash mismatch or an unreachable R2 artifact aborts the export.
  */
-export async function bundleEvidenceArtifacts(params: {
-  siteDir: string;
-  stagingDir: string;
-  systemId: string;
-  download: EvidenceDownloadFn;
-  logger?: { info(msg: string): void; warn(msg: string): void };
-}, io: WorkspaceIO = createDefaultIO().io): Promise<EvidenceBundleResult> {
+export async function bundleEvidenceArtifacts(
+  params: {
+    siteDir: string;
+    stagingDir: string;
+    systemId: string;
+    download: EvidenceDownloadFn;
+    logger?: { info(msg: string): void; warn(msg: string): void };
+  },
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<EvidenceBundleResult> {
   const { siteDir, stagingDir, systemId, download, logger } = params;
   const evidenceRoot = path.join(stagingDir, "evidence");
   await io.mkdir(evidenceRoot); // AC-4: emitted even when empty

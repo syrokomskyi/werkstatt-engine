@@ -5,7 +5,9 @@ import { RevertibleEffectHandler } from "../effects.ts";
 
 const VALID_SHA = "sha256:" + "a".repeat(64);
 
-function makeIdentity(overrides: Partial<ResolvedComponentIdentityV1> = {}): ResolvedComponentIdentityV1 {
+function makeIdentity(
+  overrides: Partial<ResolvedComponentIdentityV1> = {},
+): ResolvedComponentIdentityV1 {
   return {
     componentId: "werkstatt/engine",
     version: "1.0.0",
@@ -38,9 +40,9 @@ describe("ComponentFiber", () => {
 
   it("rejects new calls when not active", async () => {
     const fiber = new ComponentFiber(makeIdentity());
-    await expect(
-      fiber.run({ id: "op-1", execute: async () => 1 }),
-    ).rejects.toThrow(/cannot accept new calls/);
+    await expect(fiber.run({ id: "op-1", execute: async () => 1 })).rejects.toThrow(
+      /cannot accept new calls/,
+    );
   });
 
   it("drains in-flight operations", async () => {
@@ -50,7 +52,9 @@ describe("ComponentFiber", () => {
     fiber.transitionTo("active");
 
     let resolveOp: (v: number) => void;
-    const opPromise = new Promise<number>((resolve) => { resolveOp = resolve; });
+    const opPromise = new Promise<number>((resolve) => {
+      resolveOp = resolve;
+    });
 
     const runPromise = fiber.run({
       id: "op-1",
@@ -89,8 +93,18 @@ describe("ComponentFiber", () => {
     fiber.transitionTo("loading");
     fiber.transitionTo("active");
 
-    fiber.registerEffect("eff-1", new RevertibleEffectHandler(async () => { order.push("eff-1"); }));
-    fiber.registerEffect("eff-2", new RevertibleEffectHandler(async () => { order.push("eff-2"); }));
+    fiber.registerEffect(
+      "eff-1",
+      new RevertibleEffectHandler(async () => {
+        order.push("eff-1");
+      }),
+    );
+    fiber.registerEffect(
+      "eff-2",
+      new RevertibleEffectHandler(async () => {
+        order.push("eff-2");
+      }),
+    );
 
     await fiber.dispose();
     expect(order).toEqual(["eff-2", "eff-1"]);
@@ -102,7 +116,12 @@ describe("ComponentFiber", () => {
     fiber.transitionTo("loading");
     fiber.transitionTo("active");
 
-    fiber.registerEffect("eff-1", new RevertibleEffectHandler(async () => { throw new Error("fail"); }));
+    fiber.registerEffect(
+      "eff-1",
+      new RevertibleEffectHandler(async () => {
+        throw new Error("fail");
+      }),
+    );
 
     const report = await fiber.dispose();
     expect(report.quarantined).toBe(true);

@@ -94,7 +94,7 @@ export async function runMissionPreflight(
   }
 
   const cacheClonePath = resolveCacheClonePath(context.workspaceRoot, systemId);
-  if (!await context.io.exists(cacheClonePath)) {
+  if (!(await context.io.exists(cacheClonePath))) {
     return {
       data: {
         command: "mission.preflight",

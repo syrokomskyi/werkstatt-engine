@@ -83,8 +83,7 @@ export interface CutoverVerificationFailureV1 {
 }
 
 export type CutoverVerificationOutcomeV1 =
-  | CutoverVerificationResultV1
-  | CutoverVerificationFailureV1;
+  CutoverVerificationResultV1 | CutoverVerificationFailureV1;
 
 export function verifyCutover(
   input: CutoverVerificationInputV1,
@@ -141,7 +140,8 @@ export function verifyCutover(
     return {
       ok: false,
       ruleId: "CERT-CUTOVER-06",
-      message: "at least one continuous health schedule window must complete successfully before cutover",
+      message:
+        "at least one continuous health schedule window must complete successfully before cutover",
     };
   }
 
@@ -230,9 +230,7 @@ export interface CutoverMarkerBuilderInputV1 {
   committedAt: string;
 }
 
-export function buildCutoverMarker(
-  input: CutoverMarkerBuilderInputV1,
-): CleanCutoverMarkerV1 {
+export function buildCutoverMarker(input: CutoverMarkerBuilderInputV1): CleanCutoverMarkerV1 {
   const markerId = `cutover-${input.systemId}-${input.candidateId}`;
   const markerData = {
     systemId: input.systemId,
@@ -274,13 +272,9 @@ export interface LegacyProhibitionFailureV1 {
   violations: LegacyStateRead[];
 }
 
-export type LegacyProhibitionOutcomeV1 =
-  | LegacyProhibitionResultV1
-  | LegacyProhibitionFailureV1;
+export type LegacyProhibitionOutcomeV1 = LegacyProhibitionResultV1 | LegacyProhibitionFailureV1;
 
-export function checkLegacyStateProhibition(
-  reads: LegacyStateRead[],
-): LegacyProhibitionOutcomeV1 {
+export function checkLegacyStateProhibition(reads: LegacyStateRead[]): LegacyProhibitionOutcomeV1 {
   const successReads = reads.filter((r) => r.usedForSuccess);
 
   if (successReads.length === 0) {
@@ -299,23 +293,17 @@ export function checkLegacyStateProhibition(
   };
 }
 
-export function isBootstrapExceptionClosed(
-  marker: CleanCutoverMarkerV1,
-): boolean {
+export function isBootstrapExceptionClosed(marker: CleanCutoverMarkerV1): boolean {
   return marker.bootstrapExceptionClosed;
 }
 
-export function isRollbackTargetProtected(
-  marker: CleanCutoverMarkerV1,
-): boolean {
+export function isRollbackTargetProtected(marker: CleanCutoverMarkerV1): boolean {
   return marker.rollbackTarget.protectedReason === "bootstrap"
     ? !marker.bootstrapExceptionClosed
     : true;
 }
 
-export function verifyMarkerIntegrity(
-  marker: CleanCutoverMarkerV1,
-): boolean {
+export function verifyMarkerIntegrity(marker: CleanCutoverMarkerV1): boolean {
   const markerData = {
     systemId: marker.systemId,
     releaseId: marker.releaseId,

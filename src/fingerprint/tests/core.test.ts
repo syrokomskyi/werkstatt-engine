@@ -8,7 +8,12 @@
 */
 
 import { test, expect } from "vitest";
-import { byteHash, stableStringify, stableJsonHash, isSha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
+import {
+  byteHash,
+  stableStringify,
+  stableJsonHash,
+  isSha256Digest,
+} from "@warpgogol/werkstatt-shared/fingerprint";
 import { normalizePathSep, shouldIgnore } from "../path-matcher.ts";
 import {
   snapshotCanonicalJsonObjectV1,

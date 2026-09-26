@@ -18,10 +18,11 @@ import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/k
 
 export async function checkBreaksCDeclaration(
   workspaceRoot: string,
-  rfcId: string, io: WorkspaceIO = createDefaultIO().io,
+  rfcId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<boolean> {
   const rfcPath = path.join(workspaceRoot, "docs", "rfcs", `rfc-${rfcId}.md`);
-  if (!await io.exists(rfcPath)) {
+  if (!(await io.exists(rfcPath))) {
     return false;
   }
   const rfcRaw = await io.readFile(rfcPath);

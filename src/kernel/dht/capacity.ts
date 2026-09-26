@@ -26,7 +26,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join } from "node:path";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import type { WorkshopCapacity } from "./types.ts";
 import { workshopCapacitySchema } from "./types.ts";
 import { loadDhtConfig } from "./config.ts";
@@ -49,7 +53,10 @@ interface DhtCapacityPublishResult {
   diagnostics?: string[];
 }
 
-async function loadIdentityConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<WerkstattIdentityConfig> {
+async function loadIdentityConfig(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<WerkstattIdentityConfig> {
   const identityPath = join(workspaceRoot, IDENTITY_FILENAME);
   const raw = await io.readFile(identityPath);
   const parsed = JSON.parse(raw);

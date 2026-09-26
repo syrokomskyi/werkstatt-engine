@@ -21,15 +21,15 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createHandoffModule(): Promise<ModuleExport> {
   const { runHandoffAbsorb } = await import("./handoff-absorb.ts");
-      const { runHandoffPack } = await import("./handoff-pack.ts");
-      const { runHandoffValidate } = await import("./handoff-validate.ts");
-      const { runMigratorRegistryValidate } = await import("./migrator-registry-validate.ts");
+  const { runHandoffPack } = await import("./handoff-pack.ts");
+  const { runHandoffValidate } = await import("./handoff-validate.ts");
+  const { runMigratorRegistryValidate } = await import("./migrator-registry-validate.ts");
   return {
     name: "handoff",
     version: "0.2.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "handoff.validate",
         contract: "handoff",
         rules: [],
@@ -44,7 +44,7 @@ export async function createHandoffModule(): Promise<ModuleExport> {
         reads: ["handoff/**/*"],
         execute: runHandoffValidate,
       },
-    {
+      {
         name: "migrator.registry.validate",
         contract: "migrator",
         rules: [],
@@ -57,7 +57,7 @@ export async function createHandoffModule(): Promise<ModuleExport> {
         reads: ["docs/rfcs/**/*.md"],
         execute: runMigratorRegistryValidate,
       },
-    {
+      {
         name: "handoff.pack",
         modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         generates: [],
@@ -73,7 +73,7 @@ export async function createHandoffModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runHandoffPack,
       },
-    {
+      {
         name: "handoff.absorb",
         modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         generates: [],
@@ -94,9 +94,8 @@ export async function createHandoffModule(): Promise<ModuleExport> {
         writes: ["apps/{targetApp}/**"],
         cacheable: false,
         execute: runHandoffAbsorb,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

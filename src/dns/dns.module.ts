@@ -18,16 +18,16 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createDnsModule(): Promise<ModuleExport> {
   const { runDnsRecordUpsert } = await import("./dns-record-upsert.ts");
-      const { runDnsRecordValidate } = await import("./dns-record-validate.ts");
-      const { runDnsRecordList } = await import("./dns-record-list.ts");
-      const { runDnsRecordDelete } = await import("./dns-record-delete.ts");
-      const { runDnsRecordsSchemaValidate } = await import("./dns-records-schema-validate.ts");
+  const { runDnsRecordValidate } = await import("./dns-record-validate.ts");
+  const { runDnsRecordList } = await import("./dns-record-list.ts");
+  const { runDnsRecordDelete } = await import("./dns-record-delete.ts");
+  const { runDnsRecordsSchemaValidate } = await import("./dns-records-schema-validate.ts");
   return {
     name: "dns",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "dns.record.upsert",
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
@@ -54,7 +54,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDnsRecordUpsert,
       },
-    {
+      {
         name: "dns.record.validate",
         contract: "dns",
         rules: [],
@@ -77,7 +77,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDnsRecordValidate,
       },
-    {
+      {
         name: "dns.record.list",
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
@@ -99,7 +99,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDnsRecordList,
       },
-    {
+      {
         name: "dns.record.delete",
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
@@ -134,7 +134,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runDnsRecordDelete,
       },
-    {
+      {
         name: "dns.records.schema.validate",
         contract: "dns",
         rules: [],
@@ -152,9 +152,8 @@ export async function createDnsModule(): Promise<ModuleExport> {
         reads: ["systems-cache/{system}/dns-records.yaml"],
         cacheable: true,
         execute: runDnsRecordsSchemaValidate,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

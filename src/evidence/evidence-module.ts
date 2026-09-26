@@ -23,13 +23,13 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createEvidenceModule(): Promise<ModuleExport> {
   const { runEvidenceSync } = await import("./evidence-sync.ts");
-      const { runEvidenceFetch } = await import("./evidence-fetch.ts");
+  const { runEvidenceFetch } = await import("./evidence-fetch.ts");
   return {
     name: "evidence",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "evidence.sync",
         modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
         generates: [],
@@ -67,7 +67,7 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
         writes: [],
         execute: runEvidenceSync,
       },
-    {
+      {
         name: "evidence.fetch",
         modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
         generates: [],
@@ -108,9 +108,8 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
         reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system-state.yaml"],
         writes: ["{--output-dir}/**"],
         execute: runEvidenceFetch,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

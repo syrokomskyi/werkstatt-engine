@@ -83,17 +83,23 @@ function signalForFeatureId(featureId: string): FeatureSignal {
   };
 }
 
-async function readSystemMdFrontmatter(siteDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<Record<string, unknown>> {
+async function readSystemMdFrontmatter(
+  siteDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Record<string, unknown>> {
   const systemMd = path.join(siteDir, "src", "content", "system.md");
-  if (!await io.exists(systemMd)) return {};
+  if (!(await io.exists(systemMd))) return {};
   const raw = await io.readFile(systemMd);
   return parseMarkdownFrontmatter(raw).data;
 }
 
-async function readEntitlements(siteDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+async function readEntitlements(
+  siteDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   // Opportunistic only: entitlements.generated.yaml is gitignored in cache clones.
   const p = path.join(siteDir, "src", "entitlements.generated.yaml");
-  if (!await io.exists(p)) return [];
+  if (!(await io.exists(p))) return [];
   try {
     const parsed = parseYaml(await io.readFile(p)) as { features?: unknown };
     return Array.isArray(parsed.features) ? parsed.features.map(String) : [];
@@ -107,7 +113,8 @@ async function readEntitlements(siteDir: string, io: WorkspaceIO = createDefault
  * Any disagreement between declared and detected signals resolves to needs-backend.
  */
 export async function buildFeatureInventory(
-  input: FeatureInventoryInput, io: WorkspaceIO = createDefaultIO().io,
+  input: FeatureInventoryInput,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NotausgangFeatureNote[]> {
   const detected = new Map<string, FeatureSignal>();
 

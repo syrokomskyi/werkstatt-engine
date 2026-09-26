@@ -22,38 +22,36 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createChangeImpactModule(): Promise<ModuleExport> {
-const { runChangeImpactDerive } = await import("./change-impact.ts");
+  const { runChangeImpactDerive } = await import("./change-impact.ts");
   return {
-  name: "change-impact",
-  version: "0.1.0",
+    name: "change-impact",
+    version: "0.1.0",
 
     declarations: [],
-  commands: [
-    {
-      name: "change.impact.derive",
-      modulePath: "packages/werkstatt-engine/src/kernel/change-impact.module.ts",
-      description:
-        "RFC-0332: classify changed paths into none/low/medium/high impact, derive impacted " +
-        "apps, and recommend a proportionate check profile. Advisory only — DNA-35 remains " +
-        "the readiness signal.",
-      scope: "workspace",
-      mutatesState: false,
-      cacheable: false,
-      flags: {
-        paths: {
-          kind: "string",
-          description: "Comma-separated explicit paths to classify (bypasses git).",
+    commands: [
+      {
+        name: "change.impact.derive",
+        modulePath: "packages/werkstatt-engine/src/kernel/change-impact.module.ts",
+        description:
+          "RFC-0332: classify changed paths into none/low/medium/high impact, derive impacted " +
+          "apps, and recommend a proportionate check profile. Advisory only — DNA-35 remains " +
+          "the readiness signal.",
+        scope: "workspace",
+        mutatesState: false,
+        cacheable: false,
+        flags: {
+          paths: {
+            kind: "string",
+            description: "Comma-separated explicit paths to classify (bypasses git).",
+          },
+          "git-base": {
+            kind: "string",
+            description: "Git ref to diff against (e.g. origin/main). Uses git diff --name-only.",
+          },
         },
-        "git-base": {
-          kind: "string",
-          description: "Git ref to diff against (e.g. origin/main). Uses git diff --name-only.",
-        },
+        execute: runChangeImpactDerive,
       },
-      execute: runChangeImpactDerive,
-    }
-  ],
-  pipelines: [
-
-  ]};
+    ],
+    pipelines: [],
+  };
 }
-;

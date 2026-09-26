@@ -54,7 +54,10 @@ async function walkFiles(root: string): Promise<string[]> {
   return out;
 }
 
-async function highestRfcId(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<string> {
+async function highestRfcId(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
   try {
     const files = await io.readdir(path.join(workspaceRoot, "docs", "rfcs"));
     let max = 0;
@@ -73,7 +76,10 @@ async function highestRfcId(workspaceRoot: string, io: WorkspaceIO = createDefau
  * uni.registry component surface (over-inclusion is safe for the diff — unused entries
  * stay green). Narrowing to the app's resolved component graph is a follow-up.
  */
-async function snapshotCapabilities(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<HandoffCapability[]> {
+async function snapshotCapabilities(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<HandoffCapability[]> {
   try {
     const raw = await io.readFile(path.join(workspaceRoot, "uni.registry.yaml"));
     const parsed = JSON.parse(raw) as {
@@ -136,7 +142,9 @@ export async function runHandoffPack(
   let systemHash = ZERO_HASH;
   let buildCommit = commit === "unknown" ? "0000000" : commit;
   try {
-    const passportRaw = await context.io.readFile(path.join(sourceSiteDir, "dist", ".well-known", "cosmic-passport.json"));
+    const passportRaw = await context.io.readFile(
+      path.join(sourceSiteDir, "dist", ".well-known", "cosmic-passport.json"),
+    );
     const passport = JSON.parse(passportRaw) as {
       composition?: { systemHash?: string };
       provenance?: { commitSha?: string };
@@ -221,12 +229,19 @@ export async function runHandoffPack(
   const validationDir = path.join(bundleDir, "validation");
   await context.io.mkdir(validationDir);
   const golden = await buildValidationPack(sourceSiteDir);
-  await context.io.writeFile(path.join(validationDir, "pack.json"), `${JSON.stringify(golden, null, 2)}\n`);
+  await context.io.writeFile(
+    path.join(validationDir, "pack.json"),
+    `${JSON.stringify(golden, null, 2)}\n`,
+  );
   try {
-    const outDir = await context.io.stat(path.join(sourceSiteDir, "dist", "client"))
+    const outDir = await context.io
+      .stat(path.join(sourceSiteDir, "dist", "client"))
       .then(() => "dist/client")
       .catch(() => "dist");
-    await context.io.copyFile(path.join(sourceSiteDir, outDir, "sitemap.xml"), path.join(validationDir, "sitemap.snapshot.xml"));
+    await context.io.copyFile(
+      path.join(sourceSiteDir, outDir, "sitemap.xml"),
+      path.join(validationDir, "sitemap.snapshot.xml"),
+    );
   } catch {
     /* no sitemap — skip snapshot */
   }
@@ -251,8 +266,14 @@ export async function runHandoffPack(
     entries,
   });
 
-  await context.io.writeFile(path.join(bundleDir, "handoff-lock.json"), `${JSON.stringify(lock, null, 2)}\n`);
-  await context.io.writeFile(path.join(bundleDir, "handoff-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  await context.io.writeFile(
+    path.join(bundleDir, "handoff-lock.json"),
+    `${JSON.stringify(lock, null, 2)}\n`,
+  );
+  await context.io.writeFile(
+    path.join(bundleDir, "handoff-manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
 
   logger.success(`[handoff.pack] packed ${entries.length} authored file(s) → ${bundleDir}`);
   return {

@@ -19,11 +19,15 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import path from "node:path";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function atomicWriteFile(targetPath: string, content: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+export async function atomicWriteFile(
+  targetPath: string,
+  content: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const dir = path.dirname(targetPath);
   const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
 
-  if (!await io.exists(dir)) {
+  if (!(await io.exists(dir))) {
     await io.mkdir(dir);
   }
 
@@ -42,7 +46,12 @@ export async function atomicWriteFile(targetPath: string, content: string, io: W
 
 const RENAME_RETRYABLE_CODES = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
 
-async function renameWithRetry(src: string, dest: string, maxRetries = 5, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+async function renameWithRetry(
+  src: string,
+  dest: string,
+  maxRetries = 5,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -64,7 +73,8 @@ async function renameWithRetry(src: string, dest: string, maxRetries = 5, io: Wo
 export async function atomicMoveDir(
   stagingDir: string,
   targetDir: string,
-  options?: { replace?: boolean }, io: WorkspaceIO = createDefaultIO().io,
+  options?: { replace?: boolean },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   let trashDir: string | undefined;
 
@@ -86,14 +96,14 @@ export async function atomicMoveDir(
   }
 
   const parentDir = path.dirname(targetDir);
-  if (!await io.exists(parentDir)) {
+  if (!(await io.exists(parentDir))) {
     await io.mkdir(parentDir);
   }
 
   await renameWithRetry(stagingDir, targetDir);
 
   // Best-effort cleanup of the old directory
-  if (trashDir && await io.exists(trashDir)) {
+  if (trashDir && (await io.exists(trashDir))) {
     await io.rm(trashDir, { recursive: true }).catch(() => {
       // Ignore — trash will be cleaned up on next run or manually.
     });

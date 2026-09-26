@@ -25,7 +25,8 @@ export interface RevisionByPathResult {
 
 export async function getRevisionByPath(
   cwd: string,
-  repoPath: string, io: WorkspaceIO = createDefaultIO().io,
+  repoPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<RevisionByPathResult> {
   const paths = await loadPathsCurrent(cwd);
   const entityId = paths[repoPath];

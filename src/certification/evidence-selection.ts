@@ -25,12 +25,7 @@ export type CertificationLimitFailureV1 = {
   readonly message: string;
 };
 
-export type RequirementStatus =
-  | "pass"
-  | "fail"
-  | "stale"
-  | "incomplete"
-  | "not-applicable";
+export type RequirementStatus = "pass" | "fail" | "stale" | "incomplete" | "not-applicable";
 
 export type EvidenceIndexInputV1 = {
   readonly candidateId: string;
@@ -63,11 +58,7 @@ export type RequirementEvidenceSelectionV1 = {
   readonly selectedEvidenceHash: Sha256Digest | null;
   readonly selectedAtSequence: number | null;
   readonly reasonCode:
-    | "CERT-EVIDENCE-01"
-    | "CERT-EVIDENCE-02"
-    | "CERT-GATE-01"
-    | "CERT-OK"
-    | "CERT-NA";
+    "CERT-EVIDENCE-01" | "CERT-EVIDENCE-02" | "CERT-GATE-01" | "CERT-OK" | "CERT-NA";
   readonly reasonMessage: string;
 };
 

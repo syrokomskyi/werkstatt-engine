@@ -45,10 +45,7 @@ export function assertNoUnknownFlags(
   commandName: string,
   compositeName: string,
 ): void {
-  const validFlags = new Set([
-    ...Object.keys(KERNEL_UNIVERSAL_FLAGS),
-    ...commandSpecificFlags,
-  ]);
+  const validFlags = new Set([...Object.keys(KERNEL_UNIVERSAL_FLAGS), ...commandSpecificFlags]);
   const flags = extractFlagNames(argv);
   const unknown = flags.filter((f) => !validFlags.has(f));
   if (unknown.length > 0) {

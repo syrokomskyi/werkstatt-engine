@@ -66,12 +66,16 @@ export const rfc0508Migrator: Migrator = {
   toVersion: "4.16.0",
   description:
     "Add participantType: human, status, visibility, relationshipType, and consent placeholder to Person records in people/<lang>/*.md. Advances migratorCursor for RFC-0508 (Participant data model).",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const peopleBaseDir = path.join(data.rootPath, "src", "content", "people");
 
     let langDirs: string[];
     try {
-      langDirs = (await io.readdir(peopleBaseDir)).map(e => e.name);
+      langDirs = (await io.readdir(peopleBaseDir)).map((e) => e.name);
     } catch {
       ctx.logger.info(`[rfc-0508] no people directory at ${peopleBaseDir} — skipping`);
       langDirs = [];

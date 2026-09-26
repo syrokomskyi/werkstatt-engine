@@ -58,7 +58,10 @@ function toPosixPath(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
-async function pathExists(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
+async function pathExists(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   try {
     await io.readFile(filePath);
     return true;
@@ -99,7 +102,11 @@ function isSupportedWorkspacePattern(pattern: string): boolean {
     .every((segment) => segment === "*" || /^[a-zA-Z0-9._-]+$/.test(segment));
 }
 
-async function expandWorkspacePattern(workspaceRoot: string, pattern: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
+async function expandWorkspacePattern(
+  workspaceRoot: string,
+  pattern: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
   const segments = pattern.split("/").filter(Boolean);
   let candidates = [workspaceRoot];
 
@@ -143,7 +150,8 @@ export function workspacePackageKind(directory: string): WorkspacePackageInfo["k
 }
 
 export async function discoverWorkspacePackages(
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WorkspaceDiscoveryResult> {
   const diagnostics: Diagnostic[] = [];
   const workspaceSource = await io.readFile(join(workspaceRoot, PNPM_WORKSPACE_PATH));

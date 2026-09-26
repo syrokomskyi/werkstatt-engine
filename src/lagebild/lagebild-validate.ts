@@ -20,7 +20,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import { join } from "node:path";
 import type {
   KernelCommandInput,
@@ -59,7 +58,9 @@ async function runWranglerSecretList(
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   try {
-    const envFiltered = Object.fromEntries(Object.entries(env).filter((e): e is [string, string] => e[1] !== undefined));
+    const envFiltered = Object.fromEntries(
+      Object.entries(env).filter((e): e is [string, string] => e[1] !== undefined),
+    );
     const result = await io.exec(
       "npx",
       ["--yes", "wrangler", "secret", "list", "--name", workerName],
@@ -108,7 +109,7 @@ export async function runLagebildValidate(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = (await context.io.exists(envPath)) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
@@ -194,7 +195,10 @@ export async function runLagebildValidate(
         },
       },
       exitCode: 1,
-      summary: `Missing secrets: ${secretChecks.filter((s) => !s.present).map((s) => s.name).join(", ")}`,
+      summary: `Missing secrets: ${secretChecks
+        .filter((s) => !s.present)
+        .map((s) => s.name)
+        .join(", ")}`,
     };
   }
 

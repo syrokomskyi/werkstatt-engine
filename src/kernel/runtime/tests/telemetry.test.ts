@@ -47,11 +47,7 @@ describe("recordCommandTelemetry", () => {
   test("handles report with diagnostics data", () => {
     const report = makeReport({
       data: {
-        diagnostics: [
-          { severity: "error" },
-          { severity: "error" },
-          { severity: "warning" },
-        ],
+        diagnostics: [{ severity: "error" }, { severity: "error" }, { severity: "warning" }],
       } as never,
     });
     expect(() => recordCommandTelemetry(mockPusher(), report)).not.toThrow();

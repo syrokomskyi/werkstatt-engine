@@ -56,12 +56,7 @@ describe("werkstatt.e2e.cold confinement (RFC-0965)", () => {
   it("mission workpiece path is inside coldRoot", () => {
     const coldRoot = path.join(os.tmpdir(), "werkstatt-e2e-cold-test");
     const workspaceClone = path.join(coldRoot, "werkstatt");
-    const workpieceDir = path.join(
-      workspaceClone,
-      "missions",
-      "e2e-cold-m001",
-      "workpiece",
-    );
+    const workpieceDir = path.join(workspaceClone, "missions", "e2e-cold-m001", "workpiece");
     expect(workpieceDir.startsWith(coldRoot)).toBe(true);
   });
 
@@ -69,11 +64,7 @@ describe("werkstatt.e2e.cold confinement (RFC-0965)", () => {
     const coldRoot = path.join(os.tmpdir(), "werkstatt-e2e-cold-test");
     const cachePath = path.join(coldRoot, "systems-cache", "e2e-cold");
     const lighthouseFile = path.join(cachePath, ".lighthouse-budget-ignore");
-    const imageDeliveryFile = path.join(
-      cachePath,
-      "src",
-      "image-delivery.config.yaml",
-    );
+    const imageDeliveryFile = path.join(cachePath, "src", "image-delivery.config.yaml");
 
     expect(lighthouseFile.startsWith(coldRoot)).toBe(true);
     expect(imageDeliveryFile.startsWith(coldRoot)).toBe(true);

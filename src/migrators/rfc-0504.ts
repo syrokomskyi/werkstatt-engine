@@ -102,14 +102,18 @@ export const rfc0504Migrator: Migrator = {
   toVersion: "4.15.0",
   description:
     "Add empty articleSections and changelog frontmatter fields to article records if absent. Strip H1 headings from prose bodies (remove duplicates of article title, convert unique H1 to H2 unless duplicate H2 exists). Advances migratorCursor for RFC-0504 (12-section ratgeber article layout).",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const articlesBaseDir = path.join(data.rootPath, "src", "content", "surface", "articles");
     const proseBaseDir = path.join(data.rootPath, "src", "content", "prose");
 
     // Process article records
     let langDirs: string[];
     try {
-      langDirs = (await io.readdir(articlesBaseDir)).map(e => e.name);
+      langDirs = (await io.readdir(articlesBaseDir)).map((e) => e.name);
     } catch {
       ctx.logger.info(`[rfc-0504] no articles directory at ${articlesBaseDir} — skipping`);
       langDirs = [];
@@ -167,7 +171,8 @@ export const rfc0504Migrator: Migrator = {
         const slug = articleFile.name.replace(/\.md$/, "");
         const proseFileName = `ratgeber-${slug}.md`;
         const prosePath = path.join(proseBaseDir, lang, proseFileName);
-        const proseExists = await io.stat(prosePath)
+        const proseExists = await io
+          .stat(prosePath)
           .then(() => true)
           .catch(() => false);
 

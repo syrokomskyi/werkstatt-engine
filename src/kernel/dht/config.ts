@@ -40,7 +40,10 @@ export function validateDhtConfig(config: unknown): DHTConfig {
   return dhtConfigSchema.parse(config);
 }
 
-export async function loadDhtConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<DHTConfig> {
+export async function loadDhtConfig(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<DHTConfig> {
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
   const raw = await io.readFile(configPath);
   const parsed: unknown = JSON.parse(raw);
@@ -49,7 +52,8 @@ export async function loadDhtConfig(workspaceRoot: string, io: WorkspaceIO = cre
 
 export async function createDhtConfig(
   workspaceRoot: string,
-  options: { bind?: string; bootstrap?: string[] }, io: WorkspaceIO = createDefaultIO().io,
+  options: { bind?: string; bootstrap?: string[] },
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DHTConfig> {
   const config: DHTConfig = {
     bindAddr: options.bind ?? DEFAULT_BIND_ADDR,

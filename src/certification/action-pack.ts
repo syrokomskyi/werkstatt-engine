@@ -45,9 +45,7 @@ export type RemediationMetadataV1 = {
 
 const MAX_TASKS = 1000;
 
-function topologicalSort(
-  tasks: readonly ActionTaskV1[],
-): ActionTaskV1[] | { cycle: true } {
+function topologicalSort(tasks: readonly ActionTaskV1[]): ActionTaskV1[] | { cycle: true } {
   const taskMap = new Map<string, ActionTaskV1>();
   for (const t of tasks) taskMap.set(t.taskId, t);
 

@@ -21,7 +21,11 @@ const manifest = buildAgentSurfaceManifest({
   baseUrl: "https://test.example",
   languages: { default: "de", supported: ["de"] },
   knowledge: [
-    { domain: "offer", url: "/.well-known/knowledge/offer.json", schema: "gogol.agent.knowledge/offer@1" },
+    {
+      domain: "offer",
+      url: "/.well-known/knowledge/offer.json",
+      schema: "gogol.agent.knowledge/offer@1",
+    },
   ],
   search: { url: "/api/agent/search", model: "@cf/baai/bge-m3", dimensions: 1024 },
 });
@@ -121,7 +125,11 @@ describe("RFC-1116: degraded edges", () => {
       baseUrl: "https://test.example",
       languages: { default: "de", supported: ["de"] },
       knowledge: [
-        { domain: "offer", url: "/.well-known/knowledge/offer.json", schema: "gogol.agent.knowledge/offer@1" },
+        {
+          domain: "offer",
+          url: "/.well-known/knowledge/offer.json",
+          schema: "gogol.agent.knowledge/offer@1",
+        },
       ],
     });
     const res = await runAgentHealth(

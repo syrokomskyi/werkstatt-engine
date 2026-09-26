@@ -33,9 +33,12 @@ export function createDefaultCommandRunner(io: WorkspaceIO = createDefaultIO().i
   };
 }
 
-export async function sourceDotenv(filePath: string, io: WorkspaceIO = createDefaultIO().io): Promise<Record<string, string>> {
+export async function sourceDotenv(
+  filePath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
-  if (!await io.exists(filePath)) return env;
+  if (!(await io.exists(filePath))) return env;
   const content = await io.readFile(filePath);
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
@@ -59,10 +62,11 @@ export interface BehaviorSnapshot {
 
 export async function readBehaviorSnapshot(
   workspaceRoot: string,
-  releaseId: string, io: WorkspaceIO = createDefaultIO().io,
+  releaseId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<BehaviorSnapshot | null> {
   const snapshotPath = path.join(workspaceRoot, "releases", releaseId, "behavior-snapshot.json");
-  if (!await io.exists(snapshotPath)) return null;
+  if (!(await io.exists(snapshotPath))) return null;
   const content = await io.readFile(snapshotPath);
   const parsed = JSON.parse(content) as { behaviorSnapshot?: BehaviorSnapshot } & BehaviorSnapshot;
   return parsed.behaviorSnapshot ?? parsed;

@@ -32,7 +32,8 @@ export const OPERATOR_CONFIG_FILES = [
 
 export async function persistOperatorConfigFiles(
   workpieceDir: string,
-  cacheCloneDir: string, io: WorkspaceIO = createDefaultIO().io,
+  cacheCloneDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<OperatorConfigPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -40,7 +41,7 @@ export async function persistOperatorConfigFiles(
   for (const entry of OPERATOR_CONFIG_FILES) {
     const src = path.join(workpieceDir, entry);
     const dest = path.join(cacheCloneDir, entry);
-    if (!await io.exists(src)) continue;
+    if (!(await io.exists(src))) continue;
     try {
       await io.mkdir(path.dirname(dest));
       await io.copyFile(src, dest);
@@ -55,7 +56,8 @@ export async function persistOperatorConfigFiles(
 
 export async function restoreOperatorConfigFiles(
   cacheCloneDir: string,
-  workpieceDir: string, io: WorkspaceIO = createDefaultIO().io,
+  workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<OperatorConfigPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -63,7 +65,7 @@ export async function restoreOperatorConfigFiles(
   for (const entry of OPERATOR_CONFIG_FILES) {
     const src = path.join(cacheCloneDir, entry);
     const dest = path.join(workpieceDir, entry);
-    if (!await io.exists(src)) continue;
+    if (!(await io.exists(src))) continue;
     try {
       await io.mkdir(path.dirname(dest));
       await io.copyFile(src, dest);

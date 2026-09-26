@@ -17,14 +17,14 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createSubdomainModule(): Promise<ModuleExport> {
   const { runSubdomainRegister } = await import("./subdomain-register.ts");
-      const { runSubdomainValidate } = await import("./subdomain-validate.ts");
-      const { runSubdomainList } = await import("./subdomain-list.ts");
+  const { runSubdomainValidate } = await import("./subdomain-validate.ts");
+  const { runSubdomainList } = await import("./subdomain-list.ts");
   return {
     name: "subdomain",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "subdomain.register",
         modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
@@ -43,7 +43,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSubdomainRegister,
       },
-    {
+      {
         name: "subdomain.validate",
         contract: "subdomain",
         rules: [],
@@ -63,7 +63,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runSubdomainValidate,
       },
-    {
+      {
         name: "subdomain.list",
         modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:
@@ -80,9 +80,8 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
         reads: ["systems-cache/*/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainList,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

@@ -21,7 +21,13 @@ produces an empty budgets file.
 </MODULE_CONTRACT>
 */
 
-const TELEMETRY_RELATIVE_PATH = join("node_modules", ".cache", "werkstatt", "telemetry", "steps.ndjson");
+const TELEMETRY_RELATIVE_PATH = join(
+  "node_modules",
+  ".cache",
+  "werkstatt",
+  "telemetry",
+  "steps.ndjson",
+);
 const FLEET_SITES_RELATIVE_PATH = join("fleet", "fleet.sites.yaml");
 
 function makeContext(workspaceRoot: string): KernelRuntimeContext {
@@ -120,9 +126,7 @@ test("all records filtered out → empty budgets file written", async () => {
 test("no fleet.sites.yaml → no filtering (backward compatible)", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pbg-filter-"));
   try {
-    await writeTelemetry(dir, [
-      record({ app: "any-app", durationMs: 100 }),
-    ]);
+    await writeTelemetry(dir, [record({ app: "any-app", durationMs: 100 })]);
     // No fleet.sites.yaml written
     const result = await runPipelineBudgetGenerate(baseInput, makeContext(dir));
     expect(result.exitCode).toBe(0);

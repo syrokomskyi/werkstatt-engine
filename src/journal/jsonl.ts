@@ -18,9 +18,13 @@ import path from "node:path";
 import type { JournalRecord } from "./types.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function appendRecord(journalPath: string, record: JournalRecord, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+export async function appendRecord(
+  journalPath: string,
+  record: JournalRecord,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   const dir = path.dirname(journalPath);
-  if (!await io.exists(dir)) {
+  if (!(await io.exists(dir))) {
     await io.mkdir(dir);
   }
   const line = JSON.stringify(record) + "\n";
@@ -38,8 +42,11 @@ export class TornLineError extends Error {
   }
 }
 
-export async function readJournal(journalPath: string, io: WorkspaceIO = createDefaultIO().io): Promise<JournalRecord[]> {
-  if (!await io.exists(journalPath)) {
+export async function readJournal(
+  journalPath: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<JournalRecord[]> {
+  if (!(await io.exists(journalPath))) {
     return [];
   }
   const content = await io.readFile(journalPath);
@@ -62,7 +69,8 @@ export async function readJournal(journalPath: string, io: WorkspaceIO = createD
       const parsed = JSON.parse(line) as JournalRecord;
       records.push(parsed);
     } catch {
-      const isLastNonEmpty = i === lines.length - 1 || (i === lines.length - 2 && lines[lines.length - 1].length === 0);
+      const isLastNonEmpty =
+        i === lines.length - 1 || (i === lines.length - 2 && lines[lines.length - 1].length === 0);
       if (isLastNonEmpty) {
         throw new TornLineError(
           `Torn final line at journal line ${i + 1} — discard or inspect manually: ${line.slice(0, 80)}`,
@@ -91,8 +99,7 @@ export function findIncompleteOperation(
 
   const lastStarted = opStarted[opStarted.length - 1];
   const terminalForOp = records.filter(
-    (r) =>
-      (r.kind === "op-done" || r.kind === "op-abandoned") && r.opId === lastStarted.opId,
+    (r) => (r.kind === "op-done" || r.kind === "op-abandoned") && r.opId === lastStarted.opId,
   );
 
   if (terminalForOp.length > 0) {
@@ -101,7 +108,10 @@ export function findIncompleteOperation(
 
   const stepRecords = records.filter(
     (r) =>
-      r.kind === "step-started" || r.kind === "step-done" || r.kind === "step-failed" || r.kind === "step-skipped",
+      r.kind === "step-started" ||
+      r.kind === "step-done" ||
+      r.kind === "step-failed" ||
+      r.kind === "step-skipped",
   );
   const opStepRecords = stepRecords.filter((r) => r.opId === lastStarted.opId);
 

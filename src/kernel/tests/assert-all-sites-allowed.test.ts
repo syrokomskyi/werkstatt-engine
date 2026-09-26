@@ -32,9 +32,7 @@ test("supportsAllSites: true + allSites: true → does not throw", () => {
 });
 
 test("supportsAllSites: false + allSites: true → throws", () => {
-  expect(() => assertAllSitesAllowed(makeCmd(false), true)).toThrow(
-    /does not support --all/,
-  );
+  expect(() => assertAllSitesAllowed(makeCmd(false), true)).toThrow(/does not support --all/);
 });
 
 test("supportsAllSites: undefined + allSites: true → throws", () => {

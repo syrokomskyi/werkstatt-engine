@@ -65,7 +65,10 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
   return {
     name: "github-pages",
 
-    async propagate(input: PropagateInput, io: WorkspaceIO = createDefaultIO().io): Promise<PropagationResult> {
+    async propagate(
+      input: PropagateInput,
+      io: WorkspaceIO = createDefaultIO().io,
+    ): Promise<PropagationResult> {
       const now = new Date().toISOString();
 
       const secretsEnv = input.secretsFilePath ? await sourceDotenv(input.secretsFilePath) : {};

@@ -11,7 +11,6 @@
 </CHANGE_SUMMARY>
 */
 
-
 export {
   runReleasePrepare,
   type ReleasePrepareData,
@@ -39,4 +38,3 @@ export {
   type WranglerResolution,
   simulateBindings,
 } from "./boot-smoke.ts";
-

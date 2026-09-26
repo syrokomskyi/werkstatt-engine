@@ -148,10 +148,11 @@ export function resolveAuthorizationPath(workspaceRoot: string, systemId: string
 
 export async function readAuthorization(
   workspaceRoot: string,
-  systemId: string, io: WorkspaceIO = createDefaultIO().io,
+  systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SignedHandoverAuthorization | null> {
   const filePath = resolveAuthorizationPath(workspaceRoot, systemId);
-  if (!await io.exists(filePath)) return null;
+  if (!(await io.exists(filePath))) return null;
   const raw = await io.readFile(filePath);
   return JSON.parse(raw) as SignedHandoverAuthorization;
 }
@@ -169,10 +170,11 @@ export async function writeAuthorization(
 
 export async function removeAuthorization(
   workspaceRoot: string,
-  systemId: string, io: WorkspaceIO = createDefaultIO().io,
+  systemId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<boolean> {
   const filePath = resolveAuthorizationPath(workspaceRoot, systemId);
-  if (!await io.exists(filePath)) return false;
+  if (!(await io.exists(filePath))) return false;
   await io.rm(filePath);
   return true;
 }

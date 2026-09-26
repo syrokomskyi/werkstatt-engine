@@ -12,7 +12,6 @@
 </CHANGE_SUMMARY>
 */
 
-
 export { diffCapabilities, intentMatches, worstTier } from "./capability-diff.ts";
 export {
   hashFile,

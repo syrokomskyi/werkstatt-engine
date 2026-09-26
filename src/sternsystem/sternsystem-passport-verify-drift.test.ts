@@ -18,11 +18,7 @@ import { tmpdir } from "node:os";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
-import {
-  buildPassportPayload,
-  signPassport,
-  type SignedSitePassport,
-} from "./passport.ts";
+import { buildPassportPayload, signPassport, type SignedSitePassport } from "./passport.ts";
 import { writePassport } from "./registry-io.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
 import { runSternsystemPassportVerify } from "./sternsystem-passport-verify.ts";
@@ -109,10 +105,7 @@ async function issuePassport(): Promise<SignedSitePassport> {
 }
 
 async function verify() {
-  return runSternsystemPassportVerify(
-    makeInput({ id: systemId }),
-    makeContext(werkstattRoot),
-  );
+  return runSternsystemPassportVerify(makeInput({ id: systemId }), makeContext(werkstattRoot));
 }
 
 describe("ADR-0094: passport.verify bordbuchHead drift tolerance", () => {

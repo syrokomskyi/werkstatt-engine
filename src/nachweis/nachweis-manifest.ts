@@ -22,7 +22,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type {
@@ -186,7 +185,7 @@ export async function runNachweisManifestGenerate(
   };
 
   const outputDir = path.join(cachePath, MANIFEST_OUTPUT_DIR);
-  if (!await context.io.exists(outputDir)) {
+  if (!(await context.io.exists(outputDir))) {
     await context.io.mkdir(outputDir);
   }
   const outputPath = path.join(outputDir, MANIFEST_OUTPUT_FILE);

@@ -21,7 +21,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -82,7 +81,7 @@ export async function runNachweisPublish(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!await context.io.exists(evidenceFile)) {
+  if (!(await context.io.exists(evidenceFile))) {
     throw new Error(
       `[nachweis.publish] NOT_FOUND: evidence-source '${slug}' not found at ${evidenceFile}`,
     );

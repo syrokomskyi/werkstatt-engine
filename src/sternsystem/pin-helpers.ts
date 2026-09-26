@@ -15,7 +15,10 @@ import { parse as parseYaml } from "yaml";
 import type { SystemPin } from "@warpgogol/werkstatt-engine/schemas";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
-export async function highestRfcId(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<string> {
+export async function highestRfcId(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string> {
   try {
     const files = await io.readdir(path.join(workspaceRoot, "docs", "rfcs"));
     let max = 0;
@@ -30,7 +33,8 @@ export async function highestRfcId(workspaceRoot: string, io: WorkspaceIO = crea
 }
 
 export async function snapshotCapabilities(
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SystemPin["capabilities"]> {
   try {
     const raw = await io.readFile(path.join(workspaceRoot, "uni.registry.yaml"));

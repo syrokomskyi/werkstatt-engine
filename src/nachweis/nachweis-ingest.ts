@@ -19,7 +19,6 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 </CHANGE_SUMMARY>
 */
 
-
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -79,7 +78,7 @@ export async function runNachweisIngest(
     ) as unknown as KernelCommandResult<NachweisIngestResult>;
   }
 
-  if (!await context.io.exists(filePath)) {
+  if (!(await context.io.exists(filePath))) {
     throw new Error(`[nachweis.ingest] NOT_FOUND: file '${filePath}' does not exist`);
   }
   if (!filePath.toLowerCase().endsWith(".pdf")) {

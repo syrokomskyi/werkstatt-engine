@@ -130,7 +130,7 @@ export async function runEvidenceSync(
   const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const evidenceDir = path.join(missionDir, "evidence", "axiom");
 
-  if (!await context.io.exists(evidenceDir)) {
+  if (!(await context.io.exists(evidenceDir))) {
     throw new Error(
       `[evidence.sync] NOT_FOUND: evidence/axiom/ directory not found for mission '${missionId}'`,
     );

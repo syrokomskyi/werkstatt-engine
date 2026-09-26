@@ -18,7 +18,11 @@ src/content/. Idempotent: running twice produces the same result.</purpose>
 import path from "node:path";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
-import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type DirEntry,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0529_MIGRATOR_ID = "rfc-0529";
 
@@ -121,7 +125,8 @@ function migrateYamlFile(content: string): string {
 async function scanDir(
   dir: string,
   ctx: MigrationContext,
-  isGenerated: (name: string) => boolean, io: WorkspaceIO = createDefaultIO().io,
+  isGenerated: (name: string) => boolean,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   let entries: DirEntry[];
   try {
@@ -155,7 +160,11 @@ function isGeneratedFile(name: string): boolean {
   );
 }
 
-async function migrateMarkdownFileOnDisk(filePath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+async function migrateMarkdownFileOnDisk(
+  filePath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   let content: string;
   try {
     content = await io.readFile(filePath);
@@ -181,7 +190,11 @@ async function migrateMarkdownFileOnDisk(filePath: string, ctx: MigrationContext
   }
 }
 
-async function migrateYamlFileOnDisk(filePath: string, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
+async function migrateYamlFileOnDisk(
+  filePath: string,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<void> {
   let content: string;
   try {
     content = await io.readFile(filePath);
@@ -213,7 +226,11 @@ export const rfc0529Migrator: Migrator = {
   toVersion: "4.20.0",
   description:
     "Convert brace-delimited {collection.file.field} content references to braceless collection.file.field syntax in all .md and .yaml files under src/content/. Idempotent. Advances migratorCursor for RFC-0529 (braceless content reference migration).",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const contentDir = path.join(data.rootPath, "src", "content");
 
     try {

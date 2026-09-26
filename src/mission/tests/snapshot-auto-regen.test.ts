@@ -31,8 +31,8 @@ describe("detectSnap01", () => {
   });
 
   test("returns true when SNAP-01 is among multiple diagnostics", () => {
-    expect(
-      detectSnap01({ diagnostics: [{ ruleId: "OTHER-01" }, { ruleId: "SNAP-01" }] }),
-    ).toBe(true);
+    expect(detectSnap01({ diagnostics: [{ ruleId: "OTHER-01" }, { ruleId: "SNAP-01" }] })).toBe(
+      true,
+    );
   });
 });

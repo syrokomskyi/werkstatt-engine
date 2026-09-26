@@ -60,10 +60,11 @@ export async function startOperation(
   operationId: string,
   command: string,
   scopes: string[],
-  inputHash: string, io: WorkspaceIO = createDefaultIO().io,
+  inputHash: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord> {
   const opsDir = resolveOperationsDir(workspaceRoot);
-  if (!await io.exists(opsDir)) {
+  if (!(await io.exists(opsDir))) {
     await io.mkdir(opsDir);
   }
 
@@ -82,7 +83,10 @@ export async function startOperation(
   };
 
   werkstattOperationRecordSchema.parse(record);
-  await io.writeFile(resolveOperationPath(workspaceRoot, operationId), JSON.stringify(record, null, 2) + "\n");
+  await io.writeFile(
+    resolveOperationPath(workspaceRoot, operationId),
+    JSON.stringify(record, null, 2) + "\n",
+  );
   return record;
 }
 
@@ -90,7 +94,8 @@ export async function completeOperation(
   workspaceRoot: string,
   operationId: string,
   resultHash: string | null,
-  artifacts: string[], io: WorkspaceIO = createDefaultIO().io,
+  artifacts: string[],
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord> {
   const opPath = resolveOperationPath(workspaceRoot, operationId);
   const raw = await io.readFile(opPath);
@@ -109,7 +114,8 @@ export async function completeOperation(
 export async function failOperation(
   workspaceRoot: string,
   operationId: string,
-  error: string, io: WorkspaceIO = createDefaultIO().io,
+  error: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord> {
   const opPath = resolveOperationPath(workspaceRoot, operationId);
   const raw = await io.readFile(opPath);
@@ -126,10 +132,11 @@ export async function failOperation(
 
 export async function readOperation(
   workspaceRoot: string,
-  operationId: string, io: WorkspaceIO = createDefaultIO().io,
+  operationId: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<WerkstattOperationRecord | null> {
   const opPath = resolveOperationPath(workspaceRoot, operationId);
-  if (!await io.exists(opPath)) return null;
+  if (!(await io.exists(opPath))) return null;
   const raw = await io.readFile(opPath);
   try {
     return werkstattOperationRecordSchema.parse(JSON.parse(raw));

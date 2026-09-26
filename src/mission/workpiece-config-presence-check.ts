@@ -70,7 +70,7 @@ export async function runWorkpieceConfigPresenceCheck(
   const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
   const workpieceDir = path.join(missionDir, "workpiece");
 
-  if (!await context.io.exists(workpieceDir)) {
+  if (!(await context.io.exists(workpieceDir))) {
     return {
       data: {
         command: "workpiece.config.presence.check",
@@ -100,8 +100,7 @@ export async function runWorkpieceConfigPresenceCheck(
     }
   }
 
-  const status: WorkpieceConfigPresenceResult["status"] =
-    missing.length > 0 ? "fail" : "pass";
+  const status: WorkpieceConfigPresenceResult["status"] = missing.length > 0 ? "fail" : "pass";
 
   return {
     data: {

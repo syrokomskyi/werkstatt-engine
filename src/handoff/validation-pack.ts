@@ -83,7 +83,10 @@ async function walkHtml(root: string): Promise<string[]> {
   return out.sort();
 }
 
-async function hashIfExists(p: string, io: WorkspaceIO = createDefaultIO().io): Promise<string | null> {
+async function hashIfExists(
+  p: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | null> {
   try {
     return sha256OfBytes(await io.readFile(p));
   } catch {
@@ -91,7 +94,11 @@ async function hashIfExists(p: string, io: WorkspaceIO = createDefaultIO().io): 
   }
 }
 
-async function readScores(outDir: string, appDir: string, io: WorkspaceIO = createDefaultIO().io): Promise<ValidationPack["scores"]> {
+async function readScores(
+  outDir: string,
+  appDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<ValidationPack["scores"]> {
   for (const candidate of [
     path.join(outDir, ".well-known", "cosmic-passport.json"),
     path.join(appDir, "dist", ".well-known", "cosmic-passport.json"),

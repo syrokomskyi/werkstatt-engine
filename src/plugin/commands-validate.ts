@@ -21,7 +21,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join, relative } from "node:path";
-import type { Diagnostic, KernelCommandResult, KernelNextStep } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  Diagnostic,
+  KernelCommandResult,
+  KernelNextStep,
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface CommandsValidateResult {
@@ -232,7 +236,11 @@ function inferCommandName(filePath: string, workspaceRoot: string): string {
   return fileName.replace(/-/g, ".");
 }
 
-async function scanFile(filePath: string, workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<Diagnostic[]> {
+async function scanFile(
+  filePath: string,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<Diagnostic[]> {
   const content = await io.readFile(filePath).catch(() => "");
   if (!content || !isHandlerFile(content)) return [];
 
@@ -297,7 +305,8 @@ async function scanFile(filePath: string, workspaceRoot: string, io: WorkspaceIO
 
 async function scanDirectory(
   dir: string,
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ diagnostics: Diagnostic[]; scannedFiles: number }> {
   let scannedFiles = 0;
   const allDiagnostics: Diagnostic[] = [];

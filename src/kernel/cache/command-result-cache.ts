@@ -43,7 +43,11 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import type { WorkspaceTreeIndex } from "./workspace-tree-index.ts";
 import { filterTreeIndex } from "./workspace-tree-index.ts";
-import { createDefaultIO, type DirEntry, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type DirEntry,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const COMMAND_RESULT_CACHE_NAMESPACE = "command_results";
 export const COMMAND_RESULT_CACHE_SCHEMA_VERSION = 2;
@@ -214,7 +218,8 @@ export async function computeInputsHash(
   reads: string[],
   baseDir: string,
   workspaceRoot: string,
-  treeIndex?: WorkspaceTreeIndex, io: WorkspaceIO = createDefaultIO().io,
+  treeIndex?: WorkspaceTreeIndex,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<{ hash: string; metadata: InputsMetadataEntry[] }> {
   if (reads.length === 0) {
     return { hash: stableJsonHash({ reads: [] }), metadata: [] };
@@ -253,13 +258,14 @@ export async function computeInputsHash(
  */
 export async function computeModuleHash(
   moduleSrcDir: string,
-  modulePaths?: string[], io: WorkspaceIO = createDefaultIO().io,
+  modulePaths?: string[],
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   if (modulePaths && modulePaths.length > 0) {
     const hashes: string[] = [];
     for (const p of modulePaths) {
       const abs = join(moduleSrcDir, p);
-      if (!await io.exists(abs)) continue;
+      if (!(await io.exists(abs))) continue;
       const s = await io.stat(abs);
       if (s.isDirectory) {
         const result = await fingerprintTree(abs, {

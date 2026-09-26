@@ -16,11 +16,7 @@ import { runSternsystemValidate } from "./sternsystem-validate.ts";
 import { makeInput, makeContext, writeSystemConfig, BASE_SETUP } from "./test-helpers.ts";
 import { writeAuthorization } from "./handover.ts";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
-import {
-  buildPassportPayload,
-  signPassport,
-  type SignedSitePassport,
-} from "./passport.ts";
+import { buildPassportPayload, signPassport, type SignedSitePassport } from "./passport.ts";
 import { writePassport } from "./registry-io.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
 import type { HandoverAuthorizationV1 } from "./handover.ts";

@@ -12,10 +12,14 @@ import {
   type LegacyStateRead,
 } from "../certification/cutover/marker.ts";
 
-const D = "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
-const D1 = "sha256:1111111111111111111111111111111111111111111111111111111111111111" as string as Sha256Digest;
-const D2 = "sha256:2222222222222222222222222222222222222222222222222222222222222222" as string as Sha256Digest;
-const D3 = "sha256:3333333333333333333333333333333333333333333333333333333333333333" as string as Sha256Digest;
+const D =
+  "sha256:0000000000000000000000000000000000000000000000000000000000000000" as string as Sha256Digest;
+const D1 =
+  "sha256:1111111111111111111111111111111111111111111111111111111111111111" as string as Sha256Digest;
+const D2 =
+  "sha256:2222222222222222222222222222222222222222222222222222222222222222" as string as Sha256Digest;
+const D3 =
+  "sha256:3333333333333333333333333333333333333333333333333333333333333333" as string as Sha256Digest;
 const TS = "2026-08-15T12:00:00Z";
 
 function mkComponentSet(): ResolvedComponentSetV1 {
@@ -57,13 +61,7 @@ function mkCutoverInput(
 
 describe("verifyCutover", () => {
   it("verifies a complete cutover with all decisions and health", () => {
-    const result = verifyCutover(
-      mkCutoverInput(),
-      "sys-001",
-      "rel-001",
-      TS,
-      "https://example.com",
-    );
+    const result = verifyCutover(mkCutoverInput(), "sys-001", "rel-001", TS, "https://example.com");
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.verified).toBe(true);

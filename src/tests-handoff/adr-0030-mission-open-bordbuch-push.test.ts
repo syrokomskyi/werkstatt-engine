@@ -94,7 +94,10 @@ test("mission.open throws when bordbuch push fails (no git origin configured)", 
   const input = {
     flags: { system: "test-system", brief: "Test mission", actor: "test-agent" },
   } as unknown as KernelCommandInput;
-  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
 
   await expect(runMissionOpen(input, context)).rejects.toThrow(
     /bordbuch push failed for system 'test-system'/,
@@ -112,7 +115,10 @@ test("mission.open throws with distinct commit-failure message when git add fail
   const input = {
     flags: { system: "test-system", brief: "Test mission", actor: "test-agent" },
   } as unknown as KernelCommandInput;
-  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
 
   await expect(runMissionOpen(input, context)).rejects.toThrow(
     /bordbuch commit failed for system 'test-system'/,
@@ -138,7 +144,10 @@ test("mission.open succeeds when commitAndPushBordbuch pushes successfully", asy
   const input = {
     flags: { system: "test-system", brief: "Test mission", actor: "test-agent" },
   } as unknown as KernelCommandInput;
-  const context = { io: createDefaultIO().io, workspaceRoot: tmpWorkspace } as unknown as KernelRuntimeContext;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
 
   const result = await runMissionOpen(input, context);
   expect(result.data?.state).toBe("open");

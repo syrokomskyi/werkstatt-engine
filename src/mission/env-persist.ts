@@ -37,8 +37,11 @@ function shouldExclude(filename: string): boolean {
   return false;
 }
 
-export async function collectEnvFiles(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<string[]> {
-  if (!await io.exists(dir)) return [];
+export async function collectEnvFiles(
+  dir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
+  if (!(await io.exists(dir))) return [];
   const entries = await io.readdir(dir);
   const envFiles: string[] = [];
   for (const entry of entries) {
@@ -52,7 +55,8 @@ export async function collectEnvFiles(dir: string, io: WorkspaceIO = createDefau
 
 export async function persistEnvFilesToCacheClone(
   workpieceDir: string,
-  cacheCloneDir: string, io: WorkspaceIO = createDefaultIO().io,
+  cacheCloneDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<EnvPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];
@@ -74,7 +78,8 @@ export async function persistEnvFilesToCacheClone(
 
 export async function restoreEnvFilesFromCacheClone(
   cacheCloneDir: string,
-  workpieceDir: string, io: WorkspaceIO = createDefaultIO().io,
+  workpieceDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<EnvPersistResult> {
   const copied: string[] = [];
   const skipped: string[] = [];

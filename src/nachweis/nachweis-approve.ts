@@ -95,7 +95,7 @@ export async function runNachweisApprove(
   const evidenceDir = resolvePbpEntityDir(cachePath, lang, "evidence-source");
   const evidenceFile = path.join(evidenceDir, `${slug}.md`);
 
-  if (!await context.io.exists(evidenceFile)) {
+  if (!(await context.io.exists(evidenceFile))) {
     logger.warn(
       `[nachweis.approve] no evidence-source file found for slug '${slug}' — Bordbuch entry will still be written`,
     );

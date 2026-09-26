@@ -23,60 +23,58 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createPipelineBudgetModule(): Promise<ModuleExport> {
-const { runPipelineBudgetGenerate } = await import("./pipeline-budgets.ts");
-    const { runPipelineBudgetValidate } = await import("./pipeline-budget-validate.ts");
+  const { runPipelineBudgetGenerate } = await import("./pipeline-budgets.ts");
+  const { runPipelineBudgetValidate } = await import("./pipeline-budget-validate.ts");
   return {
-  name: "pipeline-budget",
-  version: "0.1.0",
+    name: "pipeline-budget",
+    version: "0.1.0",
 
     declarations: [],
-  commands: [
-    {
-      name: "pipeline.budget.generate",
-      modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
-      description:
-        "Aggregate the local pipeline step telemetry history into docs/pipeline-budgets.generated.yaml " +
-        "(p50/p95/expectedDurationMs per pipeline+command+app). Use --dry-run to preview without writing (RFC-0270).",
-      scope: "workspace",
-      mutatesState: true,
-      writes: ["docs/pipeline-budgets.generated.yaml"],
-      generates: [{ path: "docs/pipeline-budgets.generated.yaml", phase: "build.prepare" }],
-      cacheable: false,
-      flags: {
-        "dry-run": {
-          kind: "boolean",
-          description: "Preview the aggregation without writing the budgets file.",
+    commands: [
+      {
+        name: "pipeline.budget.generate",
+        modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
+        description:
+          "Aggregate the local pipeline step telemetry history into docs/pipeline-budgets.generated.yaml " +
+          "(p50/p95/expectedDurationMs per pipeline+command+app). Use --dry-run to preview without writing (RFC-0270).",
+        scope: "workspace",
+        mutatesState: true,
+        writes: ["docs/pipeline-budgets.generated.yaml"],
+        generates: [{ path: "docs/pipeline-budgets.generated.yaml", phase: "build.prepare" }],
+        cacheable: false,
+        flags: {
+          "dry-run": {
+            kind: "boolean",
+            description: "Preview the aggregation without writing the budgets file.",
+          },
         },
+        execute: runPipelineBudgetGenerate,
       },
-      execute: runPipelineBudgetGenerate,
-    },
-    {
-      name: "pipeline.budget.validate",
-      contract: "pipeline",
-      rules: [],
-      modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
-      description:
-        "Compare fresh telemetry p95 against committed budgets in docs/pipeline-budgets.generated.yaml (RFC-0963). " +
-        "Returns BUDGET-01 for breaches, BUDGET-02 for steps with no telemetry. Supports --site and --tolerance flags.",
-      scope: "workspace",
-      mutatesState: false,
-      cacheable: false,
-      flags: {
-        site: {
-          kind: "string",
-          description: "Filter validation to a specific site id.",
+      {
+        name: "pipeline.budget.validate",
+        contract: "pipeline",
+        rules: [],
+        modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
+        description:
+          "Compare fresh telemetry p95 against committed budgets in docs/pipeline-budgets.generated.yaml (RFC-0963). " +
+          "Returns BUDGET-01 for breaches, BUDGET-02 for steps with no telemetry. Supports --site and --tolerance flags.",
+        scope: "workspace",
+        mutatesState: false,
+        cacheable: false,
+        flags: {
+          site: {
+            kind: "string",
+            description: "Filter validation to a specific site id.",
+          },
+          tolerance: {
+            kind: "string",
+            description:
+              "Multiplier applied to expectedDurationMs to compute the breach threshold (default: 1.5).",
+          },
         },
-        tolerance: {
-          kind: "string",
-          description:
-            "Multiplier applied to expectedDurationMs to compute the breach threshold (default: 1.5).",
-        },
+        execute: runPipelineBudgetValidate,
       },
-      execute: runPipelineBudgetValidate,
-    }
-  ],
-  pipelines: [
-
-  ]};
+    ],
+    pipelines: [],
+  };
 }
-;

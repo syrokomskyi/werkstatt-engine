@@ -22,7 +22,11 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { Migrator, SternsystemData, MigrationContext } from "./types.ts";
 import { MigrationError } from "./types.ts";
-import { createDefaultIO, type FileStat, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  type FileStat,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export const RFC_0500_MIGRATOR_ID = "rfc-0500";
 
@@ -77,7 +81,7 @@ async function findMarkdownFiles(dir: string): Promise<string[]> {
   async function walk(d: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {
-      entries = (await io.readdir(d)).map(e => e.name);
+      entries = (await io.readdir(d)).map((e) => e.name);
     } catch {
       return;
     }
@@ -145,7 +149,8 @@ Artikel rund um lokale Online-Sichtbarkeit, Google Business Profile und Auffindb
 
 async function transformTopicsToArticles(
   data: SternsystemData,
-  ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io,
+  ctx: MigrationContext,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SternsystemData> {
   const topicsDir = path.join(data.rootPath, "src", "content", "surface", "topics");
   const articlesDir = path.join(data.rootPath, "src", "content", "surface", "articles");

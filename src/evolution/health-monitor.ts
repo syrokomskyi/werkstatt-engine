@@ -21,9 +21,7 @@ export interface HealthMonitor {
   reset(candidateId: string): void;
 }
 
-export function createHealthMonitor(
-  quarantineThreshold: number = 3,
-): HealthMonitor {
+export function createHealthMonitor(quarantineThreshold: number = 3): HealthMonitor {
   const consecutiveFailures = new Map<string, number>();
 
   return {

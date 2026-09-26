@@ -76,13 +76,17 @@ export const rfc0505Migrator: Migrator = {
   toVersion: "4.16.0",
   description:
     "Transform ratgeber article claim sidecars (surface/articles/{lang}/*.claims.yaml) into structured claim records (surface/claims/{lang}/{claimId}.md) and delete sidecars. Sets reviewStatus to 'unverified' — editorial review required. Advances migratorCursor for RFC-0505.",
-  transform: async (data: SternsystemData, ctx: MigrationContext, io: WorkspaceIO = createDefaultIO().io) => {
+  transform: async (
+    data: SternsystemData,
+    ctx: MigrationContext,
+    io: WorkspaceIO = createDefaultIO().io,
+  ) => {
     const articlesBaseDir = path.join(data.rootPath, "src", "content", "surface", "articles");
     const claimsBaseDir = path.join(data.rootPath, "src", "content", "surface", "claims");
 
     let langDirs: string[];
     try {
-      langDirs = (await io.readdir(articlesBaseDir)).map(e => e.name);
+      langDirs = (await io.readdir(articlesBaseDir)).map((e) => e.name);
     } catch {
       ctx.logger.info(`[rfc-0505] no articles directory at ${articlesBaseDir} — skipping`);
       return data;
@@ -135,7 +139,8 @@ export const rfc0505Migrator: Migrator = {
 
         for (const [claimId, claim] of Object.entries(parsed)) {
           const claimRecordPath = path.join(claimsLangDir, `${claimId}.md`);
-          const exists = await io.stat(claimRecordPath)
+          const exists = await io
+            .stat(claimRecordPath)
             .then(() => true)
             .catch(() => false);
 

@@ -27,12 +27,7 @@ import {
   derivePublicKey,
   type SignedSitePassport,
 } from "./passport.ts";
-import {
-  readPassport,
-  writePassport,
-  readSystemState,
-  writeSystemState,
-} from "./registry-io.ts";
+import { readPassport, writePassport, readSystemState, writeSystemState } from "./registry-io.ts";
 
 export interface SternsystemPassportGenerateData {
   command: "sternsystem.passport.generate";

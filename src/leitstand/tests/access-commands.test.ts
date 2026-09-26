@@ -24,9 +24,12 @@ function makeInput(flags: Record<string, unknown>) {
 }
 
 function makeContext(workspaceRoot: string) {
-  return { io: createDefaultIO().io, workspaceRoot, dryRun: false, site: undefined } as unknown as Parameters<
-    typeof runLeitstandAccessStatus
-  >[1];
+  return {
+    io: createDefaultIO().io,
+    workspaceRoot,
+    dryRun: false,
+    site: undefined,
+  } as unknown as Parameters<typeof runLeitstandAccessStatus>[1];
 }
 
 describe("RFC-0899: leitstand.access.status", () => {

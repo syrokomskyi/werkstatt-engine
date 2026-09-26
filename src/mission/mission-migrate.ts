@@ -16,7 +16,6 @@ the cursor, and writes a migration report to evidence/.</purpose>
 </CHANGE_SUMMARY>
 */
 
-
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -93,12 +92,12 @@ export async function runMissionMigrate(
     const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
     const workpieceDir = path.join(missionDir, "workpiece");
 
-    if (!await context.io.exists(workpieceDir)) {
+    if (!(await context.io.exists(workpieceDir))) {
       throw new Error("[mission.migrate] workpiece not found — run mission.materialize first");
     }
 
     const pinPath = path.join(workpieceDir, "system.pin.json");
-    if (!await context.io.exists(pinPath)) {
+    if (!(await context.io.exists(pinPath))) {
       throw new Error("[mission.migrate] system.pin.json not found in workpiece");
     }
 

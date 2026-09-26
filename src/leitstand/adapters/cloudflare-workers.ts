@@ -114,7 +114,10 @@ export function createCloudflareWorkersAdapter(exec?: CommandRunner): Deployment
   return {
     name: "cloudflare-workers",
 
-    async propagate(input: PropagateInput, io: WorkspaceIO = createDefaultIO().io): Promise<PropagationResult> {
+    async propagate(
+      input: PropagateInput,
+      io: WorkspaceIO = createDefaultIO().io,
+    ): Promise<PropagationResult> {
       const now = new Date().toISOString();
 
       const secretsEnv = input.secretsFilePath ? await sourceDotenv(input.secretsFilePath) : {};
@@ -125,7 +128,7 @@ export function createCloudflareWorkersAdapter(exec?: CommandRunner): Deployment
       }
 
       const serverDir = path.join(input.distPath, "server");
-      const wranglerConfigDir = await io.exists(path.join(serverDir, "wrangler.json"))
+      const wranglerConfigDir = (await io.exists(path.join(serverDir, "wrangler.json")))
         ? serverDir
         : input.distPath;
 

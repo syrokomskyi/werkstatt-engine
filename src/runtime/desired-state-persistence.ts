@@ -40,7 +40,8 @@ interface PersistedDesiredState {
  */
 export async function persistDesiredState(
   desired: DesiredState,
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
   const dir = join(workspaceRoot, ".werkstatt");
   const filePath = join(dir, "desired-state.json");
@@ -63,7 +64,8 @@ export async function persistDesiredState(
  * Returns null if the file does not exist or is corrupt (logs warning).
  */
 export async function loadPersistedDesiredState(
-  workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<DesiredState | null> {
   const filePath = join(workspaceRoot, ".werkstatt", "desired-state.json");
 

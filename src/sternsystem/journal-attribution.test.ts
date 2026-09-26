@@ -33,10 +33,7 @@ afterEach(async () => {
   await rm(testRoot, { recursive: true, force: true });
 });
 
-async function writeJournal(
-  name: string,
-  records: Array<Record<string, unknown>>,
-): Promise<void> {
+async function writeJournal(name: string, records: Array<Record<string, unknown>>): Promise<void> {
   const operationsDir = join(cacheDir, "operations");
   await mkdir(operationsDir, { recursive: true });
   const lines = records.map((r) => JSON.stringify(r)).join("\n") + "\n";

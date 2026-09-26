@@ -87,7 +87,7 @@ export async function runLeitstandAccessProtect(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = (await context.io.exists(envPath)) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
@@ -150,7 +150,7 @@ export async function runLeitstandAccessUnprotect(
 
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = await context.io.exists(envPath) ? await sourceDotenv(envPath) : {};
+  const secretsEnv = (await context.io.exists(envPath)) ? await sourceDotenv(envPath) : {};
   const env: Record<string, string | undefined> = {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,

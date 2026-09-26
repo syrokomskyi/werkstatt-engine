@@ -125,7 +125,8 @@ async function walkAppFiles(appDir: string): Promise<string[]> {
 export async function resolveAuthoredFiles(
   workspaceRoot: string,
   siteId: string,
-  input: KernelCommandInput, io: WorkspaceIO = createDefaultIO().io,
+  input: KernelCommandInput,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<AuthoredPartition> {
   const appDir = path.resolve(workspaceRoot, "apps", siteId);
   const appPrefix = `apps/${siteId}/`;

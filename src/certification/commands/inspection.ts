@@ -44,8 +44,7 @@ export interface CertificationStatusFailureV1 {
 }
 
 export type CertificationStatusOutcomeV1 =
-  | CertificationStatusResultV1
-  | CertificationStatusFailureV1;
+  CertificationStatusResultV1 | CertificationStatusFailureV1;
 
 export function getCertificationStatus(
   candidate: ReleaseCandidateV1,
@@ -131,8 +130,7 @@ export interface CertificationVerifyFailureV1 {
 }
 
 export type CertificationVerifyOutcomeV1 =
-  | CertificationVerifyResultV1
-  | CertificationVerifyFailureV1;
+  CertificationVerifyResultV1 | CertificationVerifyFailureV1;
 
 export function verifyCertification(
   candidate: ReleaseCandidateV1,

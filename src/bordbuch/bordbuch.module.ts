@@ -22,17 +22,17 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createBordbuchModule(): Promise<ModuleExport> {
   const { runBordbuchAppend } = await import("./bordbuch-append.ts");
-      const { runBordbuchValidate } = await import("./bordbuch-validate.ts");
-      const { runBordbuchStatus } = await import("./bordbuch-status.ts");
-      const { runBordbuchGenerate } = await import("./bordbuch-generate.ts");
-      const { runBordbuchRepair } = await import("./bordbuch-repair.ts");
-      const { runBordbuchCommit } = await import("./bordbuch-commit.ts");
+  const { runBordbuchValidate } = await import("./bordbuch-validate.ts");
+  const { runBordbuchStatus } = await import("./bordbuch-status.ts");
+  const { runBordbuchGenerate } = await import("./bordbuch-generate.ts");
+  const { runBordbuchRepair } = await import("./bordbuch-repair.ts");
+  const { runBordbuchCommit } = await import("./bordbuch-commit.ts");
   return {
     name: "bordbuch",
     version: "0.1.0",
-      declarations: [],
-  commands: [
-    {
+    declarations: [],
+    commands: [
+      {
         name: "bordbuch.append",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         generates: [],
@@ -60,7 +60,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runBordbuchAppend,
       },
-    {
+      {
         name: "bordbuch.validate",
         contract: "bordbuch",
         rules: [],
@@ -79,7 +79,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         reads: ["systems/{system}/bordbuch/events.ndjson"],
         execute: runBordbuchValidate,
       },
-    {
+      {
         name: "bordbuch.status",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
@@ -96,7 +96,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         reads: ["systems/{system}/bordbuch/events.ndjson"],
         execute: runBordbuchStatus,
       },
-    {
+      {
         name: "bordbuch.generate",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
@@ -148,7 +148,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runBordbuchGenerate,
       },
-    {
+      {
         name: "bordbuch.repair",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         generates: [],
@@ -172,7 +172,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         cacheable: false,
         execute: runBordbuchRepair,
       },
-    {
+      {
         name: "bordbuch.commit",
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:
@@ -194,9 +194,8 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         ],
         cacheable: false,
         execute: runBordbuchCommit,
-      }
-  ],
-  pipelines: [
-
-  ]};
+      },
+    ],
+    pipelines: [],
+  };
 }

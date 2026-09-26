@@ -112,7 +112,14 @@ test("findIncompleteOperation returns null for empty records", () => {
 
 test("findIncompleteOperation returns null when op-done exists", () => {
   const records: JournalRecord[] = [
-    { kind: "op-started", opId: "op-1", op: "mission.close", missionId: "m-001", at: "t0", platformVersion: "1.0.0" },
+    {
+      kind: "op-started",
+      opId: "op-1",
+      op: "mission.close",
+      missionId: "m-001",
+      at: "t0",
+      platformVersion: "1.0.0",
+    },
     { kind: "step-started", opId: "op-1", step: "s0", seq: 0, at: "t1" },
     { kind: "step-done", opId: "op-1", step: "s0", seq: 0, at: "t2" },
     { kind: "op-done", opId: "op-1", at: "t3" },
@@ -122,7 +129,14 @@ test("findIncompleteOperation returns null when op-done exists", () => {
 
 test("findIncompleteOperation returns null when op-abandoned exists", () => {
   const records: JournalRecord[] = [
-    { kind: "op-started", opId: "op-1", op: "mission.close", missionId: "m-001", at: "t0", platformVersion: "1.0.0" },
+    {
+      kind: "op-started",
+      opId: "op-1",
+      op: "mission.close",
+      missionId: "m-001",
+      at: "t0",
+      platformVersion: "1.0.0",
+    },
     { kind: "op-abandoned", opId: "op-1", at: "t1", reason: "manual" },
   ];
   expect(findIncompleteOperation(records)).toBeNull();
@@ -130,7 +144,14 @@ test("findIncompleteOperation returns null when op-abandoned exists", () => {
 
 test("findIncompleteOperation detects incomplete op with crash step", () => {
   const records: JournalRecord[] = [
-    { kind: "op-started", opId: "op-1", op: "mission.close", missionId: "m-001", at: "t0", platformVersion: "1.0.0" },
+    {
+      kind: "op-started",
+      opId: "op-1",
+      op: "mission.close",
+      missionId: "m-001",
+      at: "t0",
+      platformVersion: "1.0.0",
+    },
     { kind: "step-started", opId: "op-1", step: "s0", seq: 0, at: "t1" },
     { kind: "step-done", opId: "op-1", step: "s0", seq: 0, at: "t2" },
     { kind: "step-started", opId: "op-1", step: "s1", seq: 1, at: "t3" },
@@ -141,9 +162,23 @@ test("findIncompleteOperation detects incomplete op with crash step", () => {
 
 test("findIncompleteOperation uses last op-started when multiple exist", () => {
   const records: JournalRecord[] = [
-    { kind: "op-started", opId: "op-1", op: "mission.close", missionId: "m-001", at: "t0", platformVersion: "1.0.0" },
+    {
+      kind: "op-started",
+      opId: "op-1",
+      op: "mission.close",
+      missionId: "m-001",
+      at: "t0",
+      platformVersion: "1.0.0",
+    },
     { kind: "op-done", opId: "op-1", at: "t1" },
-    { kind: "op-started", opId: "op-2", op: "mission.reconcile", missionId: "m-001", at: "t2", platformVersion: "1.0.0" },
+    {
+      kind: "op-started",
+      opId: "op-2",
+      op: "mission.reconcile",
+      missionId: "m-001",
+      at: "t2",
+      platformVersion: "1.0.0",
+    },
     { kind: "step-started", opId: "op-2", step: "s0", seq: 0, at: "t3" },
   ];
   const result = findIncompleteOperation(records);

@@ -61,8 +61,11 @@ export async function runWorkpieceWrite(
 
   const { workspaceRoot, logger } = context;
 
-  const manifestPath = path.join(await resolveMissionDir(workspaceRoot, missionId, context.io), "mission.yaml");
-  if (!await context.io.exists(manifestPath)) {
+  const manifestPath = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "mission.yaml",
+  );
+  if (!(await context.io.exists(manifestPath))) {
     throw new Error(`[workpiece.write] Mission '${missionId}' is not open or does not exist`);
   }
 
@@ -73,8 +76,11 @@ export async function runWorkpieceWrite(
     );
   }
 
-  const workpieceDir = path.join(await resolveMissionDir(workspaceRoot, missionId, context.io), "workpiece");
-  if (!await context.io.exists(workpieceDir)) {
+  const workpieceDir = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, context.io),
+    "workpiece",
+  );
+  if (!(await context.io.exists(workpieceDir))) {
     throw new Error(
       `[workpiece.write] Workpiece for mission '${missionId}' not found. Run mission.materialize first.`,
     );
@@ -94,7 +100,7 @@ export async function runWorkpieceWrite(
   const content = await readStdin();
 
   const parentDir = path.dirname(resolvedPath);
-  if (!await context.io.exists(parentDir)) {
+  if (!(await context.io.exists(parentDir))) {
     await context.io.mkdir(parentDir);
   }
 

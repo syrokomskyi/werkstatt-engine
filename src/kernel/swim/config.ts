@@ -72,7 +72,10 @@ export function validateConfig(config: unknown): asserts config is SwimConfig {
   }
 }
 
-export async function loadSwimConfig(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io): Promise<SwimConfig> {
+export async function loadSwimConfig(
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SwimConfig> {
   const configPath = join(workspaceRoot, CONFIG_FILENAME);
   const raw = await io.readFile(configPath);
   const parsed: unknown = JSON.parse(raw);
@@ -80,7 +83,11 @@ export async function loadSwimConfig(workspaceRoot: string, io: WorkspaceIO = cr
   return parsed;
 }
 
-export async function createSwimConfig(workspaceRoot: string, seed: string, io: WorkspaceIO = createDefaultIO().io): Promise<SwimConfig> {
+export async function createSwimConfig(
+  workspaceRoot: string,
+  seed: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<SwimConfig> {
   const config: SwimConfig = {
     workshopId: uuidv7(),
     bindAddr: DEFAULT_BIND_ADDR,

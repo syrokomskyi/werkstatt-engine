@@ -20,7 +20,11 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 import { join, resolve } from "node:path";
-import type { KernelCommandInput, KernelCommandResult, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelRuntimeContext,
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 interface NeedThisMarker {
@@ -37,7 +41,8 @@ const NEED_THIS_REGEX = /NEED_THIS_[A-Z_]+/g;
  */
 async function scanFile(
   filePath: string,
-  logger: KernelRuntimeContext["logger"], io: WorkspaceIO = createDefaultIO().io,
+  logger: KernelRuntimeContext["logger"],
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NeedThisMarker[]> {
   const markers: NeedThisMarker[] = [];
   try {
@@ -70,7 +75,8 @@ async function scanFile(
 async function scanDirectory(
   dirPath: string,
   extensions: string[] = [".md", ".txt", ".astro", ".ts", ".js"],
-  logger: KernelRuntimeContext["logger"], io: WorkspaceIO = createDefaultIO().io,
+  logger: KernelRuntimeContext["logger"],
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<NeedThisMarker[]> {
   const markers: NeedThisMarker[] = [];
 

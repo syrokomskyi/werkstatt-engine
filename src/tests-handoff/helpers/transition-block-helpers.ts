@@ -19,10 +19,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import type { KernelCommandResult } from "@warpgogol/werkstatt-engine/kernel";
 
-export function expectTransitionBlock<T>(
-  result: KernelCommandResult<T>,
-  command: string,
-): void {
+export function expectTransitionBlock<T>(result: KernelCommandResult<T>, command: string): void {
   if (result.exitCode !== 1) {
     throw new Error(
       `expected exitCode 1 for ${command} (transition block), got ${result.exitCode} (summary: ${result.summary ?? "<none>"})`,

@@ -115,7 +115,10 @@ export class LifecycleMachine {
   private _state: ComponentLifecycleState;
   readonly component: ResolvedComponentIdentityV1;
 
-  constructor(component: ResolvedComponentIdentityV1, initial: ComponentLifecycleState = "declared") {
+  constructor(
+    component: ResolvedComponentIdentityV1,
+    initial: ComponentLifecycleState = "declared",
+  ) {
     this.component = component;
     this._state = initial;
   }

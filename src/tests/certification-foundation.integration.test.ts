@@ -5,7 +5,10 @@ import {
 } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { diagnosticSchema } from "@warpgogol/werkstatt-shared/kernel";
-import { releaseManifestSchema, legacyReleaseStateSchema } from "@warpgogol/werkstatt-shared/ontology/operations";
+import {
+  releaseManifestSchema,
+  legacyReleaseStateSchema,
+} from "@warpgogol/werkstatt-shared/ontology/operations";
 import {
   buildReleaseCandidateIdentityV1,
   buildEvidenceIdentityV1,
