@@ -131,7 +131,7 @@ function buildPreflightStep(): OperationStep<ShipContext> {
       try {
         const siteChecksModule = "@warpgogol/werkstatt-site/checks";
         const { ensureChromium } = await import(siteChecksModule);
-        await ensureChromium(ctx.workspaceRoot, ctx.logger);
+        await ensureChromium(ctx.workspaceRoot, ctx.logger, ctx.io);
         ctx.logger.info("  [ship] preflight: Chromium ensure ok");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

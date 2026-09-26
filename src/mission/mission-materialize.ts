@@ -1623,7 +1623,7 @@ export async function buildMaterializeSteps(
         try {
           const siteChecksModule = "@warpgogol/werkstatt-site/checks";
           const { ensureChromium } = await import(siteChecksModule);
-          await ensureChromium(cc.workspaceRoot, cc.logger);
+          await ensureChromium(cc.workspaceRoot, cc.logger, cc.context.io);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           cc.logger.warn(
