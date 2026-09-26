@@ -11,6 +11,7 @@ resource inventory against live state.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0966: initial passport verify command handler.</item>
+  <item>ADR-0094: apply the post-handover drift tolerance from passport-staleness.ts — a recorded bordbuchHead pointing at the entry just before the latest handover event is legitimate, trailing bookkeeping entries stripped. Verify now agrees with PASSPORT-03 on freshness verdicts.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -20,7 +21,10 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
-import { isBordbuchDriftBookkeepingOnly } from "./passport-staleness.ts";
+import {
+  isBordbuchDriftBookkeepingOnly,
+  dropTrailingBookkeepingEntries,
+} from "./passport-staleness.ts";
 import { readPassport } from "./registry-io.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 
@@ -102,8 +106,25 @@ export async function runSternsystemPassportVerify(
         // stale the passport; any other new entry does.
         try {
           const entries = await readBordbuch(workspaceRoot, systemId);
-          if (!isBordbuchDriftBookkeepingOnly(entries, doc.payload.provenance.bordbuchHead)) {
-            bordbuchHeadMatches = false;
+          const recordedHead = doc.payload.provenance.bordbuchHead;
+          if (!isBordbuchDriftBookkeepingOnly(entries, recordedHead)) {
+            // ADR-0094: post-handover tolerance, identical to PASSPORT-03 —
+            // the passport is regenerated before the handover bordbuch entry
+            // is appended, so a recorded head pointing at the entry just
+            // before the latest handover event is legitimate. Trailing
+            // bookkeeping entries (mirror-sync) are stripped before locating
+            // the handover, so a sync after handover still counts.
+            const significant = dropTrailingBookkeepingEntries(entries);
+            const lastSignificant = significant[significant.length - 1];
+            const prevEntry = significant[significant.length - 2];
+            const expectedHead = prevEntry ? prevEntry.hash : "";
+            const handoverTolerated =
+              significant.length > 0 &&
+              lastSignificant?.kind === "handover" &&
+              recordedHead === expectedHead;
+            if (!handoverTolerated) {
+              bordbuchHeadMatches = false;
+            }
           }
         } catch {
           // Bordbuch unreadable — fail safe: treat the drift as real
