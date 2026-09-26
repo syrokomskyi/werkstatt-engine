@@ -5,7 +5,7 @@
   commands for VC-based actor identity and site ownership.</purpose>
   <non-goals>
     <item>Do not register mission, sternsystem, or handoff commands — those have their own modules.</item>
-    <item>Do not handle key storage — private keys arrive via PASSPORT_SIGNING_KEY env var.</item>
+    <item>Do not handle key storage — private keys arrive via WERKSTATT_OPERATOR_SIGNING_KEY env var.</item>
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>

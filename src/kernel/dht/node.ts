@@ -115,9 +115,9 @@ export async function generateSybilResistantNodeId(
 
   if (powDifficultyBits === 0) {
     // Pilot mode: use identity keypair directly (permissioned membership)
-    const privateKeyHex = process.env["PASSPORT_SIGNING_KEY"];
+    const privateKeyHex = process.env["WERKSTATT_OPERATOR_SIGNING_KEY"];
     if (!privateKeyHex) {
-      throw new Error("PASSPORT_SIGNING_KEY environment variable is not set");
+      throw new Error("WERKSTATT_OPERATOR_SIGNING_KEY environment variable is not set");
     }
     return { privateKeyHex, publicKeyMultibase };
   }

@@ -33,7 +33,7 @@ describe("identity commands", () => {
   let privateKeyHex: string;
 
   afterEach(async () => {
-    delete process.env["PASSPORT_SIGNING_KEY"];
+    delete process.env["WERKSTATT_OPERATOR_SIGNING_KEY"];
     if (tempDir) await rm(tempDir, { recursive: true, force: true });
   });
 
@@ -56,7 +56,7 @@ describe("identity commands", () => {
       expect(expectData(result).privateKeyHex).toBeTruthy();
 
       privateKeyHex = expectData(result).privateKeyHex;
-      process.env["PASSPORT_SIGNING_KEY"] = privateKeyHex;
+      process.env["WERKSTATT_OPERATOR_SIGNING_KEY"] = privateKeyHex;
 
       const config = await readIdentityConfig(tempDir);
       expect(config.schemaVersion).toBe("1.0");
@@ -77,7 +77,7 @@ describe("identity commands", () => {
         makeContext(tempDir),
       );
       privateKeyHex = expectData(bootstrapResult).privateKeyHex;
-      process.env["PASSPORT_SIGNING_KEY"] = privateKeyHex;
+      process.env["WERKSTATT_OPERATOR_SIGNING_KEY"] = privateKeyHex;
     });
 
     it("issues and verifies an ActorDelegationCredential", async () => {

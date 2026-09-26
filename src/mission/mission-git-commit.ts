@@ -564,7 +564,7 @@ export async function runMissionGitCommit(
     };
   }
 
-  const signingKey = process.env["PASSPORT_SIGNING_KEY"];
+  const signingKey = process.env["WERKSTATT_OPERATOR_SIGNING_KEY"];
   const actorId = manifest.openedBy ?? "unknown";
 
   if (signingKey) {
@@ -590,7 +590,9 @@ export async function runMissionGitCommit(
   }
 
   // No signing key — produce unsigned commit
-  process.stderr.write(`[warn] PASSPORT_SIGNING_KEY not set — producing unsigned commit.\n`);
+  process.stderr.write(
+    `[warn] WERKSTATT_OPERATOR_SIGNING_KEY not set — producing unsigned commit.\n`,
+  );
 
   const commitSha = await git(workpieceDir, ["commit", "-m", commitMessage], context.io);
 

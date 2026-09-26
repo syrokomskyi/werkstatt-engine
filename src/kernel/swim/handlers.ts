@@ -52,7 +52,7 @@ import {
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const IDENTITY_FILENAME = "werkstatt.identity.json";
-const PASSPORT_SIGNING_KEY_ENV = "PASSPORT_SIGNING_KEY";
+const WERKSTATT_OPERATOR_SIGNING_KEY_ENV = "WERKSTATT_OPERATOR_SIGNING_KEY";
 const PROBE_TIMEOUT_MS = 2000;
 
 interface SwimJoinResult {
@@ -90,9 +90,9 @@ async function loadIdentityConfig(
 }
 
 function getSigningKey(): string {
-  const key = process.env[PASSPORT_SIGNING_KEY_ENV];
+  const key = process.env[WERKSTATT_OPERATOR_SIGNING_KEY_ENV];
   if (!key || key.length === 0) {
-    throw new Error(`${PASSPORT_SIGNING_KEY_ENV} environment variable is not set`);
+    throw new Error(`${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable is not set`);
   }
   return key;
 }
@@ -200,13 +200,15 @@ export async function runSwimJoin(
         workshopId: "",
         seedNode: seed,
         members: { members: [], total: 0, alive: 0, suspect: 0, dead: 0 },
-        diagnostics: [`swim.join: ${PASSPORT_SIGNING_KEY_ENV} environment variable is not set`],
+        diagnostics: [
+          `swim.join: ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable is not set`,
+        ],
       },
       exitCode: 1,
-      summary: `[swim.join] ${PASSPORT_SIGNING_KEY_ENV} not set`,
+      summary: `[swim.join] ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} not set`,
       nextSteps: [
         {
-          action: `Set the ${PASSPORT_SIGNING_KEY_ENV} environment variable and re-run swim.join`,
+          action: `Set the ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable and re-run swim.join`,
           kind: "required",
         },
       ],
@@ -301,13 +303,15 @@ export async function runSwimLeave(
       data: {
         left: false,
         workshopId: config.workshopId,
-        diagnostics: [`swim.leave: ${PASSPORT_SIGNING_KEY_ENV} environment variable is not set`],
+        diagnostics: [
+          `swim.leave: ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable is not set`,
+        ],
       },
       exitCode: 1,
-      summary: `[swim.leave] ${PASSPORT_SIGNING_KEY_ENV} not set`,
+      summary: `[swim.leave] ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} not set`,
       nextSteps: [
         {
-          action: `Set the ${PASSPORT_SIGNING_KEY_ENV} environment variable and re-run swim.leave`,
+          action: `Set the ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable and re-run swim.leave`,
           kind: "required",
         },
       ],

@@ -53,9 +53,11 @@ export async function runIdentityCredentialIssue(
   if (!subjectId) throw new Error("[identity.credential.issue] --subject is required");
   if (!siteId) throw new Error("[identity.credential.issue] --site is required");
 
-  const privateKeyHex = process.env["PASSPORT_SIGNING_KEY"];
+  const privateKeyHex = process.env["WERKSTATT_OPERATOR_SIGNING_KEY"];
   if (!privateKeyHex) {
-    throw new Error("[identity.credential.issue] PASSPORT_SIGNING_KEY env var is required");
+    throw new Error(
+      "[identity.credential.issue] WERKSTATT_OPERATOR_SIGNING_KEY env var is required",
+    );
   }
 
   const config = await readIdentityConfig(workspaceRoot);

@@ -44,7 +44,7 @@ import {
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const IDENTITY_FILENAME = "werkstatt.identity.json";
-const PASSPORT_SIGNING_KEY_ENV = "PASSPORT_SIGNING_KEY";
+const WERKSTATT_OPERATOR_SIGNING_KEY_ENV = "WERKSTATT_OPERATOR_SIGNING_KEY";
 
 interface DhtRegisterResult {
   registered: boolean;
@@ -65,9 +65,9 @@ async function loadIdentityConfig(
 }
 
 function getSigningKey(): string {
-  const key = process.env[PASSPORT_SIGNING_KEY_ENV];
+  const key = process.env[WERKSTATT_OPERATOR_SIGNING_KEY_ENV];
   if (!key || key.length === 0) {
-    throw new Error(`${PASSPORT_SIGNING_KEY_ENV} environment variable is not set`);
+    throw new Error(`${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable is not set`);
   }
   return key;
 }
@@ -198,13 +198,15 @@ export async function runDhtRegister(
         siteId,
         key: "",
         conflictResolved: false,
-        diagnostics: [`dht.register: ${PASSPORT_SIGNING_KEY_ENV} environment variable is not set`],
+        diagnostics: [
+          `dht.register: ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable is not set`,
+        ],
       },
       exitCode: 1,
-      summary: `[dht.register] ${PASSPORT_SIGNING_KEY_ENV} not set`,
+      summary: `[dht.register] ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} not set`,
       nextSteps: [
         {
-          action: `Set the ${PASSPORT_SIGNING_KEY_ENV} environment variable and re-run dht.register`,
+          action: `Set the ${WERKSTATT_OPERATOR_SIGNING_KEY_ENV} environment variable and re-run dht.register`,
           kind: "required",
         },
       ],
@@ -262,7 +264,8 @@ export async function runDhtRegister(
       summary: `[dht.register] signing failed`,
       nextSteps: [
         {
-          action: "Check the PASSPORT_SIGNING_KEY environment variable and re-run dht.register",
+          action:
+            "Check the WERKSTATT_OPERATOR_SIGNING_KEY environment variable and re-run dht.register",
           kind: "required",
         },
       ],
