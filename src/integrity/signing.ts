@@ -83,15 +83,11 @@ function normalizePemLikeValue(value: string, label: "PRIVATE KEY" | "PUBLIC KEY
   return pemFromBase64(label, trimmed);
 }
 
-async function loadDotEnv(cwd: string): Promise<void> {
-  if (dotEnvLoadedForCwd === cwd) {
-    return;
-  }
-
+async function parseDotEnvFile(cwd: string): Promise<Map<string, string>> {
+  const entries = new Map<string, string>();
   const envPath = path.join(cwd, ".env");
   if (!(await pathExists(envPath))) {
-    dotEnvLoadedForCwd = cwd;
-    return;
+    return entries;
   }
 
   const envText = await readText(envPath);
@@ -107,7 +103,7 @@ async function loadDotEnv(cwd: string): Promise<void> {
     }
 
     const key = line.slice(0, separatorIndex).trim();
-    if (!key || process.env[key] !== undefined) {
+    if (!key) {
       continue;
     }
 
@@ -120,10 +116,38 @@ async function loadDotEnv(cwd: string): Promise<void> {
     }
 
     value = value.replace(/\\n/g, "\n");
+    entries.set(key, value);
+  }
+  return entries;
+}
+
+async function loadDotEnv(cwd: string): Promise<void> {
+  if (dotEnvLoadedForCwd === cwd) {
+    return;
+  }
+
+  for (const [key, value] of await parseDotEnvFile(cwd)) {
+    if (process.env[key] !== undefined) {
+      continue;
+    }
     process.env[key] = value;
   }
 
   dotEnvLoadedForCwd = cwd;
+}
+
+/**
+ * File-authoritative env read: returns the value from `<cwd>/.env` without
+ * consulting ambient `process.env`. Use for site-scoped secrets where the
+ * site `.env` is the authoritative store (e.g. PASSPORT_SIGNING_KEY) — an
+ * ambient workspace-level var must not shadow it (dotenv env-wins semantics
+ * would otherwise let the workshop root `.env` corrupt site signing).
+ */
+export async function readEnvFileValue(
+  name: string,
+  cwd = process.cwd(),
+): Promise<string | undefined> {
+  return (await parseDotEnvFile(cwd)).get(name);
 }
 
 export async function requireEnv(name: string, cwd = process.cwd()): Promise<string> {

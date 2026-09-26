@@ -58,6 +58,7 @@ export {
   compareManifestWithLocalArtifacts,
   requireEnv,
   optionalEnv,
+  readEnvFileValue,
 } from "./signing.ts";
 
 export { buildLatestDir, signedManifestPath } from "./paths.ts";
