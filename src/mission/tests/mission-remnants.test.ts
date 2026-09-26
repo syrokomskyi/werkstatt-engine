@@ -60,6 +60,34 @@ describe("mission.open — RFC-1139 stale remnant detection", () => {
     expect(warn).not.toContain("Stale mission remnant");
   });
 
+  it("RFC-1157: cache-only husk (no mission.yaml, only workpiece cache dirs) is trashed", async () => {
+    const husk = join(root, "missions", "acme-m000151", "workpiece", ".astro");
+    await mkdir(husk, { recursive: true });
+    await writeFile(join(husk, "data-store.json"), "{}\n", "utf8");
+    await mkdir(join(root, "missions", "acme-m000151", "workpiece", "node_modules"), {
+      recursive: true,
+    });
+
+    const result = await cleanupStaleMissionEntries(root, logger);
+
+    expect(result.removedPaths).toContain("missions/acme-m000151");
+    expect(result.skipped).not.toContain("missions/acme-m000151");
+    expect(warns.some((w) => w.includes("Stale mission remnant"))).toBe(false);
+  });
+
+  it("RFC-1157: dir without mission.yaml but with real content still warns and skips", async () => {
+    const remnant = join(root, "missions", "acme-m000152", "workpiece");
+    await mkdir(remnant, { recursive: true });
+    await writeFile(join(remnant, "package.json"), "{}\n", "utf8");
+
+    const result = await cleanupStaleMissionEntries(root, logger);
+
+    expect(result.skipped).toContain("missions/acme-m000152");
+    expect(result.removedPaths).not.toContain("missions/acme-m000152");
+    const warn = warns.find((w) => w.includes("acme-m000152"));
+    expect(warn).toContain("Stale mission remnant");
+  });
+
   it("empty dirs are still cleaned without remnant reporting", async () => {
     await mkdir(join(root, "missions", "acme-m000150"), { recursive: true });
 

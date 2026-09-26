@@ -32,7 +32,9 @@ import type {
   KernelRuntimeContext,
   DiscoveredSiteWorkspace,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { executeRegisteredCommand } from "@warpgogol/werkstatt-engine/kernel";
+import { executeRegisteredCommand, siteModuleLoaders } from "@warpgogol/werkstatt-engine/kernel";
+import { computeOwnershipMap } from "../kernel/runtime/execute-command.ts";
+import { getOrBuildSiteModuleStates } from "../kernel/runtime/registry-cache.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
@@ -120,16 +122,53 @@ export async function runMissionPreflight(
     toolsDirectory: join(cacheClonePath, "tools"),
   };
 
+  // RFC-1157: after RFC-1147 the check commands AND their `generates:`
+  // declarations live in site-module ActualStates, not the workspace one.
+  // Materialize the canonical site module set once (memoized per
+  // workspaceRoot) — it resolves the commands AND feeds buildGeneratorOwnership
+  // so context.ownershipMap covers site generators, not just workspace ones.
+  let siteStates: Awaited<ReturnType<typeof getOrBuildSiteModuleStates>> = new Map();
+  try {
+    siteStates = await getOrBuildSiteModuleStates(context.workspaceRoot, siteModuleLoaders());
+  } catch (err) {
+    context.logger.warn(
+      `[mission.preflight] site-module states unavailable: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const ownershipMap = [...(context.ownershipMap ?? [])];
+  // RFC-1157: same-execute commands may be registered by several site modules
+  // (RFC-0816) — dedup merged entries so each (command, artifact path) pair
+  // counts once instead of tripping OWN-DUP-01.
+  const seenOwnership = new Set(ownershipMap.map((e) => `${e.command}:${e.artifact.path}`));
+  for (const state of siteStates.values()) {
+    const siteMap = await computeOwnershipMap(state);
+    if (!siteMap) continue;
+    for (const entry of siteMap) {
+      const key = `${entry.command}:${entry.artifact.path}`;
+      if (seenOwnership.has(key)) continue;
+      seenOwnership.add(key);
+      ownershipMap.push(entry);
+    }
+  }
+
   const cacheCloneContext: KernelRuntimeContext = {
     ...context,
     site: cacheCloneSite,
+    ownershipMap,
   };
 
   const checks: PreflightCheckResult[] = [];
   let totalViolations = 0;
 
   for (const checkName of PREFLIGHT_CHECKS) {
-    const command = context.actualState.commands.get(checkName);
+    let command = context.actualState.commands.get(checkName);
+    if (!command) {
+      for (const state of siteStates.values()) {
+        command = state.commands.get(checkName);
+        if (command) break;
+      }
+    }
     if (!command) {
       checks.push({ command: checkName, status: "fail", violations: 0 });
       totalViolations += 1;

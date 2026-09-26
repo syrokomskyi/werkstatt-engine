@@ -77,6 +77,37 @@ export interface MissionOpenData {
 
 const REPAIRABLE_RULES = new Set(["orphan-mission-close", "unmatched-mission-open"]);
 
+// RFC-0982 parity with mission.archive: cache entries are dotfiles/dotdirs
+// (.astro, .cache, .turbo, .wrangler, .closed), node_modules and dist —
+// transient artifacts that never constitute recoverable mission content.
+function isMissionCacheEntry(name: string): boolean {
+  return name.startsWith(".") || name === "node_modules" || name === "dist";
+}
+
+/**
+ * RFC-1157: a mission dir without mission.yaml is auto-trashable only when
+ * every entry — at the root and inside workpiece/ — is a cache artifact
+ * (husks left behind by mission.archive's post-rename cleanup or watchers).
+ * Any real file makes it a manual-inspection remnant (RFC-1139 warn path).
+ */
+async function isCacheOnlyMissionRemnant(missionDir: string, io: WorkspaceIO): Promise<boolean> {
+  try {
+    for (const entry of await io.readdir(missionDir)) {
+      if (entry.name === "workpiece") continue;
+      if (!isMissionCacheEntry(entry.name)) return false;
+    }
+    const workpieceDir = path.join(missionDir, "workpiece");
+    if (await io.exists(workpieceDir)) {
+      for (const wp of await io.readdir(workpieceDir)) {
+        if (!isMissionCacheEntry(wp.name)) return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function cleanupStaleMissionEntries(
   workspaceRoot: string,
   logger: { info: (msg: string) => void; warn: (msg: string) => void },
@@ -114,12 +145,21 @@ export async function cleanupStaleMissionEntries(
         result.removedPaths.push(sourceRel);
         logger.info(`  Cleaned empty directory: ${sourceRel}`);
       } else if (!(await io.exists(path.join(entryPath, "mission.yaml")))) {
-        // RFC-1139: non-empty dir without mission.yaml is a stale remnant
-        // (crashed materialization) — report it with the cleanup path.
-        result.skipped.push(sourceRel);
-        logger.warn(
-          `  Stale mission remnant: ${sourceRel} (no mission.yaml) — clean via \`pnpm exec werkstatt run mission.archive --clean-orphans\``,
-        );
+        if (await isCacheOnlyMissionRemnant(entryPath, io)) {
+          // RFC-1157: cache-only husks (post-archive workpiece/ shells with
+          // only .astro/node_modules/dist) carry no recoverable content —
+          // trash them here instead of re-warning on every mission.open.
+          await trashPath(entryPath);
+          result.removedPaths.push(sourceRel);
+          logger.info(`  Cleaned cache-only mission remnant: ${sourceRel}`);
+        } else {
+          // RFC-1139: non-empty dir without mission.yaml that holds real
+          // content is a stale remnant — report it with the cleanup path.
+          result.skipped.push(sourceRel);
+          logger.warn(
+            `  Stale mission remnant: ${sourceRel} (no mission.yaml) — clean via \`pnpm exec werkstatt run mission.archive --clean-orphans\``,
+          );
+        }
       } else {
         result.skipped.push(sourceRel);
         logger.warn(`  Skipping non-empty real directory: ${sourceRel}`);
