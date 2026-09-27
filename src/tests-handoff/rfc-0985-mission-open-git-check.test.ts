@@ -18,14 +18,20 @@ import type { OperationStep } from "../journal/index.ts";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 let tmpDir: string;
+let workspaceDir: string;
 let cacheCloneDir: string;
 let systemId: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), "tmp-rfc0985-open-"));
+  // workspaceDir is nested so `../systems-cache` resolves to tmpDir/systems-cache
+  // — per-test isolation instead of the shared /tmp/systems-cache pool that
+  // races with parallel test files doing their own git init/rm cycles there.
+  workspaceDir = join(tmpDir, "werkstatt");
+  mkdirSync(workspaceDir, { recursive: true });
   systemId = `test-sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   // resolveCacheClonePath uses ../systems-cache/<id> relative to workspaceRoot
-  cacheCloneDir = join(tmpDir, "..", "systems-cache", systemId);
+  cacheCloneDir = join(workspaceDir, "..", "systems-cache", systemId);
 });
 
 afterEach(() => {
@@ -35,7 +41,7 @@ afterEach(() => {
 
 function makeOpenCtx(overrides?: Partial<OpenStepCtx>): OpenStepCtx {
   return {
-    workspaceRoot: tmpDir,
+    workspaceRoot: workspaceDir,
     systemId,
     missionId: `${systemId}-m000001`,
     manifest: {
@@ -63,7 +69,7 @@ function makeOpenCtx(overrides?: Partial<OpenStepCtx>): OpenStepCtx {
     staleEntries: { hasStaleEntries: false, staleEntries: [] } as any,
     context: {
       io: createDefaultIO().io,
-      workspaceRoot: tmpDir,
+      workspaceRoot: workspaceDir,
       logger: {
         info: () => {},
         warn: () => {},
@@ -87,14 +93,14 @@ function makeCacheCloneDir(): string {
 
 test("Measure 4: cache-clone-git-check step exists in buildOpenSteps", async () => {
   const ctx = makeOpenCtx();
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "cache-clone-git-check");
   expect(step, "cache-clone-git-check step must exist").toBeDefined();
 });
 
 test("Measure 4: cache-clone-git-check passes when no cache clone .git exists", async () => {
   const ctx = makeOpenCtx();
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "cache-clone-git-check")!;
 
   // No cache clone directory at all — step should not throw
@@ -107,7 +113,7 @@ test("Measure 4: cache-clone-git-check throws on stale rebase-merge directory", 
   // Create stale rebase-merge directory on top of valid git repo
   mkdirSync(join(cacheDir, ".git", "rebase-merge"), { recursive: true });
 
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "cache-clone-git-check")!;
 
   await expect(step.run(ctx)).rejects.toThrow(/stale rebase-merge/);
@@ -118,7 +124,7 @@ test("Measure 4: cache-clone-git-check error message includes actionable hint", 
   const cacheDir = makeCacheCloneDir();
   mkdirSync(join(cacheDir, ".git", "rebase-merge"), { recursive: true });
 
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "cache-clone-git-check")!;
 
   try {
@@ -132,14 +138,14 @@ test("Measure 4: cache-clone-git-check error message includes actionable hint", 
 
 test("Measure 7: rollback-marker-check step exists in buildOpenSteps", async () => {
   const ctx = makeOpenCtx();
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "rollback-marker-check");
   expect(step, "rollback-marker-check step must exist").toBeDefined();
 });
 
 test("Measure 7: rollback-marker-check passes when no missions directory exists", async () => {
   const ctx = makeOpenCtx();
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "rollback-marker-check")!;
 
   await expect(step.run(ctx)).resolves.not.toThrow();
@@ -147,13 +153,13 @@ test("Measure 7: rollback-marker-check passes when no missions directory exists"
 
 test("Measure 7: rollback-marker-check removes stale mission dir when marker found", async () => {
   const ctx = makeOpenCtx();
-  const missionsDir = join(tmpDir, "missions");
+  const missionsDir = join(workspaceDir, "missions");
   const staleMissionDir = join(missionsDir, "test-sys-m000099");
   mkdirSync(staleMissionDir, { recursive: true });
   // Write the rollback-pending marker
   writeFileSync(join(staleMissionDir, ".rollback-pending"), "");
 
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "rollback-marker-check")!;
 
   await step.run(ctx);
@@ -166,12 +172,12 @@ test("Measure 7: rollback-marker-check removes stale mission dir when marker fou
 
 test("Measure 7: rollback-marker-check does not remove mission dir without marker", async () => {
   const ctx = makeOpenCtx();
-  const missionsDir = join(tmpDir, "missions");
+  const missionsDir = join(workspaceDir, "missions");
   const normalMissionDir = join(missionsDir, "test-sys-m000050");
   mkdirSync(normalMissionDir, { recursive: true });
   // No .rollback-pending marker
 
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "rollback-marker-check")!;
 
   await step.run(ctx);
@@ -183,13 +189,13 @@ test("Measure 7: rollback-marker-check does not remove mission dir without marke
 
 test("Measure 7: rollback-marker-check skips archive directory", async () => {
   const ctx = makeOpenCtx();
-  const missionsDir = join(tmpDir, "missions");
+  const missionsDir = join(workspaceDir, "missions");
   const archiveDir = join(missionsDir, "archive", "aborted", "test-sys-m000099");
   mkdirSync(archiveDir, { recursive: true });
   // Put a marker in archive — should NOT be touched
   writeFileSync(join(archiveDir, ".rollback-pending"), "");
 
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const step = steps.find((s: OperationStep<unknown>) => s.name === "rollback-marker-check")!;
 
   await step.run(ctx);
@@ -202,7 +208,7 @@ test("Measure 7: rollback-marker-check skips archive directory", async () => {
 
 test("Measure 4+7: cache-clone-git-check runs before rollback-marker-check", async () => {
   const ctx = makeOpenCtx();
-  const steps = await buildOpenSteps(tmpDir, ctx.missionId, ctx);
+  const steps = await buildOpenSteps(workspaceDir, ctx.missionId, ctx);
   const gitCheckIdx = steps.findIndex(
     (s: OperationStep<unknown>) => s.name === "cache-clone-git-check",
   );
