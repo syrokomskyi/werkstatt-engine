@@ -90,10 +90,14 @@ function isMissionCacheEntry(name: string): boolean {
  * (husks left behind by mission.archive's post-rename cleanup or watchers).
  * Any real file makes it a manual-inspection remnant (RFC-1139 warn path).
  */
-async function isCacheOnlyMissionRemnant(missionDir: string, io: WorkspaceIO): Promise<boolean> {
+async function isCacheOnlyMissionRemnant(
+  missionDir: string,
+  io: WorkspaceIO,
+  logger: { warn: (msg: string) => void },
+): Promise<boolean> {
   try {
     for (const entry of await io.readdir(missionDir)) {
-      if (entry.name === "workpiece") continue;
+      if (entry.name === "workpiece" && entry.isDirectory) continue;
       if (!isMissionCacheEntry(entry.name)) return false;
     }
     const workpieceDir = path.join(missionDir, "workpiece");
@@ -103,7 +107,11 @@ async function isCacheOnlyMissionRemnant(missionDir: string, io: WorkspaceIO): P
       }
     }
     return true;
-  } catch {
+  } catch (err) {
+    // Fail-safe: never auto-trash on inspection failure, but keep the reason.
+    logger.warn(
+      `  Could not inspect ${missionDir} for cache-only content: ${err instanceof Error ? err.message : String(err)} — treating as manual-inspection remnant`,
+    );
     return false;
   }
 }
@@ -145,7 +153,7 @@ export async function cleanupStaleMissionEntries(
         result.removedPaths.push(sourceRel);
         logger.info(`  Cleaned empty directory: ${sourceRel}`);
       } else if (!(await io.exists(path.join(entryPath, "mission.yaml")))) {
-        if (await isCacheOnlyMissionRemnant(entryPath, io)) {
+        if (await isCacheOnlyMissionRemnant(entryPath, io, logger)) {
           // RFC-1157: cache-only husks (post-archive workpiece/ shells with
           // only .astro/node_modules/dist) carry no recoverable content —
           // trash them here instead of re-warning on every mission.open.
