@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0958: rewire runMissionMaterializeInternal onto runOperation with granular journaled steps for crash-safe resumable materialization.</item>
   <item>RFC-1093 (fo-fix): replace inline WG_ADAPTER_BLOCK IIFE with resolveAdapterBlock(stagingDir) from adapter-config.ts.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954</history>
+  <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
+  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958</history>
 </CHANGE_SUMMARY>
 */
 
@@ -54,7 +54,11 @@ import { rescueWorkpieceEdits } from "./workpiece-rescue.ts";
 import { resolveCurrentEcosystem, resolvePlatformSemanticHash } from "../handoff/bundle-io.ts";
 import { byteHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import { compareSemver } from "@warpgogol/werkstatt-engine/kernel";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  execOrThrow,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { KernelPipelineStep } from "@warpgogol/werkstatt-engine/kernel";
 import { runOperation, checkDifferentKindOperation, type OperationStep } from "../journal/index.ts";
 
@@ -526,7 +530,7 @@ async function syncCacheClone(
           `  ⚠ Cache clone has uncommitted changes — they will be lost on reset. Push to bare repo before materializing.`,
         );
       }
-      await io.exec("git", ["fetch", "origin"], { cwd: cachePath, timeoutMs: 30_000 });
+      await execOrThrow(io, "git", ["fetch", "origin"], { cwd: cachePath, timeoutMs: 30_000 });
       // RFC-0987 Fix 4: resolve branch via symbolic-ref instead of rev-parse --abbrev-ref.
       // In detached HEAD, rev-parse returns "HEAD" which produces invalid refspec for reset.
       // Try symbolic-ref --short HEAD first (current branch when not detached),
@@ -549,7 +553,7 @@ async function syncCacheClone(
           branch = originRef.stdout.trim().replace("origin/", "") || "main";
         }
       }
-      await io.exec("git", ["reset", "--hard", `origin/${branch}`], {
+      await execOrThrow(io, "git", ["reset", "--hard", `origin/${branch}`], {
         cwd: cachePath,
         timeoutMs: 30_000,
       });
@@ -1325,7 +1329,7 @@ export async function buildMaterializeSteps(
           if (await cc.context.io.exists(tempCloneDir)) {
             await cc.context.io.rm(tempCloneDir, { recursive: true });
           }
-          await cc.context.io.exec("git", ["clone", cc.systemDir, tempCloneDir]);
+          await execOrThrow(cc.context.io, "git", ["clone", cc.systemDir, tempCloneDir]);
           cc.clonedGitDir = path.join(cc.stagingDir, ".git");
           await cc.context.io.rename(path.join(tempCloneDir, ".git"), cc.clonedGitDir);
           await cc.context.io.rm(tempCloneDir, { recursive: true });
@@ -1724,8 +1728,9 @@ export async function buildMaterializeSteps(
           // Stage all files — data, generated, and custom composition files.
           // git add -A ensures custom files (src/pages/portal/[token].astro,
           // src/components/*, etc.) are included in the materialize commit.
-          await cc.context.io.exec("git", ["add", "-A"], { cwd: cc.workpieceDir });
-          await cc.context.io.exec(
+          await execOrThrow(cc.context.io, "git", ["add", "-A"], { cwd: cc.workpieceDir });
+          await execOrThrow(
+            cc.context.io,
             "git",
             ["commit", "-m", `materialize from pin ${cc.pinVersion}`],
             { cwd: cc.workpieceDir, env: { MISSION_GIT_COMMIT: "1" } },
@@ -1735,9 +1740,12 @@ export async function buildMaterializeSteps(
             `  Git commit created in workpiece (full working tree, on top of cloned history)`,
           );
         } else {
-          await cc.context.io.exec("git", ["init", "-b", "main"], { cwd: cc.workpieceDir });
-          await cc.context.io.exec("git", ["add", "-A"], { cwd: cc.workpieceDir });
-          await cc.context.io.exec(
+          await execOrThrow(cc.context.io, "git", ["init", "-b", "main"], {
+            cwd: cc.workpieceDir,
+          });
+          await execOrThrow(cc.context.io, "git", ["add", "-A"], { cwd: cc.workpieceDir });
+          await execOrThrow(
+            cc.context.io,
             "git",
             ["commit", "-m", `materialize from pin ${cc.pinVersion}`],
             { cwd: cc.workpieceDir, env: { MISSION_GIT_COMMIT: "1" } },

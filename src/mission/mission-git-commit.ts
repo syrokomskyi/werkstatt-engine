@@ -7,16 +7,20 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0820: add noChanges field to MissionGitCommitData and prominent stderr warning when no changes to commit.</item>
   <item>RFC-0878: add .closed sentinel check to commitWorkpieceIfDirty — refuse to commit closed workpieces (defence-in-depth, since --no-verify bypasses the hook).</item>
   <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
   <item>RFC-1095: review findings: execFileSync git add, drop speculative barrel exports</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797</history>
+  <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
+  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820</history>
 </CHANGE_SUMMARY>
 */
 
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  execOrThrow,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
 import type {
   KernelCommandInput,
@@ -299,11 +303,11 @@ async function commitDirIfDirty(
     return { committed: false, commitSha: null };
   }
 
-  await io.exec("git", ["add", "-A"], { cwd: dir });
+  await execOrThrow(io, "git", ["add", "-A"], { cwd: dir });
 
-  await io.exec("git", ["commit", "--no-verify", "-m", commitMessage], { cwd: dir });
+  await execOrThrow(io, "git", ["commit", "--no-verify", "-m", commitMessage], { cwd: dir });
 
-  const shaResult = await io.exec("git", ["rev-parse", "HEAD"], { cwd: dir });
+  const shaResult = await execOrThrow(io, "git", ["rev-parse", "HEAD"], { cwd: dir });
   const commitSha = shaResult.stdout.trim();
 
   return { committed: true, commitSha };
@@ -509,7 +513,7 @@ export async function runMissionGitCommit(
       const recorded = recordResult.data?.recorded ?? [];
       if (recorded.length > 0) {
         // Array form — no shell: filenames with $(...) or quotes cannot inject.
-        await context.io.exec("git", ["add", ...recorded], {
+        await execOrThrow(context.io, "git", ["add", ...recorded], {
           cwd: workpieceDir,
           env: { MISSION_GIT_COMMIT: "1" },
         });

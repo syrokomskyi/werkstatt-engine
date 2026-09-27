@@ -17,11 +17,16 @@ precedence ported from kernel/dht/register.ts, and syncs with git remotes.
 <CHANGE_SUMMARY>
   <item>RFC-1124: initial claims repository — config, clone management, build/publish/verify/sync/status, transfer-claim legitimacy via bordbuch handover events.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  execOrThrow,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 import {
   signClaim,
@@ -159,7 +164,7 @@ export async function ensureClaimsClone(
 
   if (!cloned) {
     await io.mkdir(clonePath);
-    await io.exec("git", ["-C", clonePath, "init"]);
+    await execOrThrow(io, "git", ["-C", clonePath, "init"]);
   }
 
   await syncGitRemotes(clonePath, config.remotes, io);
@@ -182,11 +187,11 @@ async function syncGitRemotes(
     : [];
   for (const name of existing) {
     if (!managed.has(name) && name !== "origin" && !/^remote\d+$/.test(name)) continue;
-    await io.exec("git", ["-C", clonePath, "remote", "remove", name]);
+    await execOrThrow(io, "git", ["-C", clonePath, "remote", "remove", name]);
   }
   for (const [i, url] of remotes.entries()) {
     const name = remoteName(i);
-    await io.exec("git", ["-C", clonePath, "remote", "add", name, url]);
+    await execOrThrow(io, "git", ["-C", clonePath, "remote", "add", name, url]);
   }
 }
 
