@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0992: behavior-snapshot-refresh now updates workpieceHeadAtReconcile in reconciliation-report.json after commit, preventing false unreconciled-commit freshness-check failure.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>ADR-0084: abandon-incomplete-operations step before transition-state — sweeps systems-cache operations/*.jsonl for incomplete ops referencing the closing mission and appends op-abandoned, then commits the journal updates to the cache clone.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991</history>
+  <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
+  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992</history>
 </CHANGE_SUMMARY>
 */
 
@@ -49,7 +49,7 @@ import {
 } from "./mission-materialization-commands.ts";
 import { acquireLock, releaseLock, commitWerkstattSideEffects } from "../werkstatt/index.ts";
 import { gitExec } from "../werkstatt/git-exec.ts";
-import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { execOrThrow, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { resolveActor } from "./actor-identity.ts";
 import { persistEnvFilesToCacheClone } from "./env-persist.ts";
@@ -444,7 +444,10 @@ export async function buildCloseSteps(
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
         if (await cc.context.io.exists(cc.workpieceDir)) {
-          await cc.context.io.exec("pnpm", ["run", "stop"], { cwd: cc.workpieceDir });
+          // Best-effort — a non-zero exit just means no server was running.
+          await execOrThrow(cc.context.io, "pnpm", ["run", "stop"], {
+            cwd: cc.workpieceDir,
+          }).catch(() => {});
         }
       },
       verify: async () => true,
@@ -911,7 +914,7 @@ export async function buildCloseSteps(
           });
           // Stage passport.json so subsequent commit steps include it
           const cacheClonePath = resolveCacheClonePath(cc.workspaceRoot, cc.manifest.systemId);
-          await cc.context.io.exec("git", ["-C", cacheClonePath, "add", "passport.json"]);
+          await execOrThrow(cc.context.io, "git", ["-C", cacheClonePath, "add", "passport.json"]);
           logger.success(`  [passport-refresh] Passport refreshed (hash: ${passportHash})`);
         } catch (err) {
           logger.warn(

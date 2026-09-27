@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0478: initial platform.consistency.validate command handler.</item>
   <item>RFC-0533: add PC-04 rule — CI-side check for X-Platform-Bump trailers on platform-scope commits.</item>
+  <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
 </CHANGE_SUMMARY>
 */
 
@@ -24,7 +25,11 @@ import type {
 import { resolvePlatformSemanticHash } from "./bundle-io.ts";
 import { hasPlatformScopeFiles, hasTrailer } from "./platform-scope.ts";
 import { compareSemver } from "./semver.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import {
+  createDefaultIO,
+  execOrThrow,
+  type WorkspaceIO,
+} from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface PlatformConsistencyData {
   currentHash: string;
@@ -144,7 +149,8 @@ async function getGitLogSince(
         }
       }
     }
-    const { stdout } = await io.exec(
+    const { stdout } = await execOrThrow(
+      io,
       "git",
       ["log", `${effectiveSince}..HEAD`, "--format=__COMMIT__%H%n%P%n%B%n__FILES__", "--name-only"],
       { cwd: workspaceRoot },
