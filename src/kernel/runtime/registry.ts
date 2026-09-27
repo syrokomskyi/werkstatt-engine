@@ -208,6 +208,12 @@ export interface StaticCommandSurface {
   pipelines: Record<string, string[]>;
 }
 
+// @ai-invariant The static surface MUST be fail-fast: a throwing module
+// loader kills the whole call (a partially-enumerated surface silently
+// hides commands — route tolerant scans through loadSurfaceDeclarations
+// instead). The surface is a union of the workspace registry AND the
+// canonical site-module set — post RFC-1147, consumers resolving commands
+// by name must check both (RFC-1157).
 export async function listStaticCommandSurface(
   workspaceRoot: string,
   siteModules?: Record<string, () => Promise<ModuleExport>>,

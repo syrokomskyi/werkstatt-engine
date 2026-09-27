@@ -91,6 +91,10 @@ function selectFingerprintMode(absPath: string): "byte" | "semantic" {
  * stableJsonHash approach — the composite key is human-readable and enables
  * SQL LIKE filtering by commandName in list().
  */
+// @ai-invariant The cache key MUST cover BOTH declared `reads` content
+// (inputsHash) and the command module source (moduleHash) — a key missing
+// either silently serves stale results after code or input changes.
+// siteName may be empty and flagsHash is appended last (schema v2).
 export function buildCommandResultCacheKey(key: CommandResultCacheKey): string {
   return [
     key.schemaVersion,

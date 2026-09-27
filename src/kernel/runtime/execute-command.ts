@@ -126,6 +126,11 @@ function intentsToFilesModified(intents: WriteIntent[], workspaceRoot: string): 
   return result;
 }
 
+// @ai-invariant This executor is the single choke point for ALL command
+// invocation — pipeline steps and direct executeKernelCommand calls alike.
+// Callers MUST NOT invoke command.execute() directly: doing so bypasses the
+// closed-workpiece guard (ADR-0085/ADR-0087), flag resolution, timing
+// telemetry, and timeout racing.
 export async function executeRegisteredCommand(
   command: KernelCommandDefinition,
   context: KernelRuntimeContext,
