@@ -19,6 +19,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0971: initial implementation.</item>
   <item>RFC-0972: removed handler-local isJson exit code workaround — CLI layer now handles --json exit code globally.</item>
+  <item>RFC-1157: resolve check commands from site-module ActualStates; merge computeOwnershipMap output deduped by (command, artifact.path).</item>
 </CHANGE_SUMMARY>
 */
 
