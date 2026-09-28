@@ -51,4 +51,35 @@ describe("mission-git-commit", () => {
     expect(validators).toContain("pbp.content.validate");
     expect(validators).toContain("typography.validate");
   });
+
+  // RFC-1160
+  test("VALIDATOR_MAPPINGS maps pages+system.md to page.block.validate with mixed scope", () => {
+    const pages = mod.VALIDATOR_MAPPINGS.find(
+      (m) => m.validator === "page.block.validate" && m.prefix === "src/content/pages/",
+    );
+    const system = mod.VALIDATOR_MAPPINGS.find(
+      (m) => m.validator === "page.block.validate" && m.prefix === "src/content/system.md",
+    );
+    expect(pages?.scoped).toBe(true);
+    expect(system?.scoped).not.toBe(true);
+  });
+
+  test("VALIDATOR_MAPPINGS maps src/content/ to image.variants.validate scoped", () => {
+    const mapping = mod.VALIDATOR_MAPPINGS.find((m) => m.validator === "image.variants.validate");
+    expect(mapping?.prefix).toBe("src/content/");
+    expect(mapping?.scoped).toBe(true);
+  });
+
+  test("selectValidators picks page.block.validate for pages and system.md files", () => {
+    const validators = mod.selectValidators([
+      "src/content/pages/de/agb.md",
+      "src/content/system.md",
+    ]);
+    expect(validators).toContain("page.block.validate");
+  });
+
+  test("selectValidators picks image.variants.validate for content asset files", () => {
+    const validators = mod.selectValidators(["src/content/pages/de/assets/hero.webp"]);
+    expect(validators).toContain("image.variants.validate");
+  });
 });

@@ -7,11 +7,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1095: review findings: execFileSync git add, drop speculative barrel exports</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>ADR-0096: --scope-files flag restricts staging and pre-commit validation to listed paths for bookkeeping commits</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
   <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095</history>
 </CHANGE_SUMMARY>
 */
@@ -64,8 +64,13 @@ export interface PreCommitValidationResult {
 
 export const VALIDATOR_MAPPINGS: ValidatorMapping[] = [
   { prefix: "src/content/business-profile/", validator: "pbp.content.validate" },
+  // RFC-1160: block pinning — pages scoped, system.md unscoped (planets[] is whole-site)
+  { prefix: "src/content/pages/", validator: "page.block.validate", scoped: true },
+  { prefix: "src/content/system.md", validator: "page.block.validate" },
   { prefix: "src/content/pages/", validator: "semantic.drift.validate" },
   { prefix: "src/content/faq/", validator: "faq.validate" },
+  // RFC-1160: source-image budget — scoped to staged content assets
+  { prefix: "src/content/", validator: "image.variants.validate", scoped: true },
   { prefix: "src/content/", validator: "typography.validate", scoped: true },
 ];
 
@@ -99,11 +104,23 @@ export async function runPreCommitValidation(
   const validatorsRun: string[] = [];
 
   for (const validatorName of validatorsToRun) {
-    const mapping = VALIDATOR_MAPPINGS.find((m) => m.validator === validatorName);
-    const scopedFiles = mapping?.scoped
-      ? changedFiles.filter((f) => matchesPrefix(f, mapping.prefix))
-      : [];
-    const argv = scopedFiles.length > 0 ? ["--scope-files", scopedFiles.join(",")] : undefined;
+    // RFC-1160: per-validator scope resolution — any staged file matching a
+    // non-scoped mapping forces an unscoped run (e.g. system.md planets[] must
+    // re-check every page even when page files are also staged). Otherwise the
+    // run is scoped to the union of files matching the validator's scoped prefixes.
+    const mappings = VALIDATOR_MAPPINGS.filter((m) => m.validator === validatorName);
+    const unscopedMatch = mappings.some(
+      (m) => m.scoped !== true && changedFiles.some((f) => matchesPrefix(f, m.prefix)),
+    );
+    const scopedFiles = unscopedMatch
+      ? []
+      : changedFiles.filter((f) =>
+          mappings.some((m) => m.scoped === true && matchesPrefix(f, m.prefix)),
+        );
+    const argv =
+      !unscopedMatch && scopedFiles.length > 0
+        ? ["--scope-files", scopedFiles.join(",")]
+        : undefined;
     try {
       const execResult = await executeKernelCommand({
         workspaceRoot,

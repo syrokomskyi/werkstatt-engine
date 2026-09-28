@@ -7,6 +7,7 @@
   <item>RFC-0594: initial unit and integration tests for runPreCommitValidation and mission.git.commit gate.</item>
   <item>RFC-1095: summary-record unit tests, commit integration tests, CS rules into compass.validate</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -20,6 +21,7 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io
 
 const mockState = vi.hoisted(() => ({
   validatorResults: {} as Record<string, { ok: boolean; exitCode: number; summary: string }>,
+  validatorArgv: {} as Record<string, string[] | undefined>,
   throwOnValidator: null as string | null,
   throwNotRegistered: null as string | null,
 }));
@@ -28,8 +30,9 @@ vi.mock("@warpgogol/werkstatt-engine/kernel", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@warpgogol/werkstatt-engine/kernel")>();
   return {
     ...actual,
-    executeKernelCommand: vi.fn(async (options: { commandName: string }) => {
+    executeKernelCommand: vi.fn(async (options: { commandName: string; argv?: string[] }) => {
       const name = options.commandName;
+      mockState.validatorArgv[name] = options.argv;
       if (mockState.throwNotRegistered === name) {
         throw new Error(`Command '${name}' is not registered`);
       }
@@ -61,6 +64,7 @@ let tmpWorkspace: string;
 beforeEach(() => {
   tmpWorkspace = mkdtempSync(join(tmpdir(), "tmp-git-commit-validation-"));
   mockState.validatorResults = {};
+  mockState.validatorArgv = {};
   mockState.throwOnValidator = null;
   mockState.throwNotRegistered = null;
 });
@@ -89,7 +93,9 @@ test("prefix matching — business-profile and pages trigger correct validators"
   const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
   mockState.validatorResults = {
     "pbp.content.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "page.block.validate": { ok: true, exitCode: 0, summary: "pass" },
     "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
     "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
   };
   const result = await runPreCommitValidation(
@@ -99,9 +105,11 @@ test("prefix matching — business-profile and pages trigger correct validators"
   );
   expect(result.passed).toBe(true);
   expect(result.validatorsRun).toContain("pbp.content.validate");
+  expect(result.validatorsRun).toContain("page.block.validate");
   expect(result.validatorsRun).toContain("semantic.drift.validate");
+  expect(result.validatorsRun).toContain("image.variants.validate");
   expect(result.validatorsRun).toContain("typography.validate");
-  expect(result.validatorsRun).toHaveLength(3);
+  expect(result.validatorsRun).toHaveLength(5);
 });
 
 test("unregistered validator — skipped with warning, commit proceeds", async () => {
@@ -109,6 +117,7 @@ test("unregistered validator — skipped with warning, commit proceeds", async (
   mockState.throwNotRegistered = "faq.validate";
   mockState.validatorResults = {
     "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
   };
   const result = await runPreCommitValidation(
     ["src/content/faq/de/general.md"],
@@ -116,8 +125,115 @@ test("unregistered validator — skipped with warning, commit proceeds", async (
     tmpWorkspace,
   );
   expect(result.passed).toBe(true);
-  expect(result.validatorsRun).toEqual(["typography.validate"]);
+  expect(result.validatorsRun).toEqual(["image.variants.validate", "typography.validate"]);
   expect(result.failures).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
+// RFC-1160 — commit-gate validators: block pinning + source-budget scoping
+// ---------------------------------------------------------------------------
+
+test("page.block.validate runs scoped when only pages files are staged (AC-1 path)", async () => {
+  const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
+  mockState.validatorResults = {
+    "page.block.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
+  const result = await runPreCommitValidation(
+    ["src/content/pages/de/agb.md"],
+    "test-system",
+    tmpWorkspace,
+  );
+  expect(result.passed).toBe(true);
+  expect(result.validatorsRun).toContain("page.block.validate");
+  expect(mockState.validatorArgv["page.block.validate"]).toEqual([
+    "--scope-files",
+    "src/content/pages/de/agb.md",
+  ]);
+});
+
+test("page.block.validate failure is reported through preCommitValidation.failures (AC-1)", async () => {
+  const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
+  mockState.validatorResults = {
+    "page.block.validate": {
+      ok: false,
+      exitCode: 1,
+      summary: "B-02: block hero on page de/agb is not pinned in system.md planets[]",
+    },
+    "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
+  const result = await runPreCommitValidation(
+    ["src/content/pages/de/agb.md"],
+    "test-system",
+    tmpWorkspace,
+  );
+  expect(result.passed).toBe(false);
+  const failure = result.failures.find((f) => f.validator === "page.block.validate");
+  expect(failure, "B-02 failure must surface in preCommitValidation.failures").toBeTruthy();
+  expect(failure?.files).toEqual(["src/content/pages/de/agb.md"]);
+});
+
+test("system.md alone runs page.block.validate UNSCOPED (AC-2)", async () => {
+  const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
+  mockState.validatorResults = {
+    "page.block.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
+  const result = await runPreCommitValidation(
+    ["src/content/system.md"],
+    "test-system",
+    tmpWorkspace,
+  );
+  expect(result.passed).toBe(true);
+  expect(result.validatorsRun).toContain("page.block.validate");
+  expect(
+    mockState.validatorArgv["page.block.validate"],
+    "system.md planets[] mapping is unscoped — argv must omit --scope-files",
+  ).toBeUndefined();
+});
+
+test("mixed system.md + pages commit runs page.block.validate UNSCOPED (AC-9, any-unscoped-wins)", async () => {
+  const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
+  mockState.validatorResults = {
+    "page.block.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
+  const result = await runPreCommitValidation(
+    ["src/content/system.md", "src/content/pages/de/agb.md"],
+    "test-system",
+    tmpWorkspace,
+  );
+  expect(result.passed).toBe(true);
+  expect(
+    mockState.validatorArgv["page.block.validate"],
+    "mixed commit with system.md must force an unscoped page.block.validate",
+  ).toBeUndefined();
+});
+
+test("content asset triggers image.variants.validate scoped to the staged files", async () => {
+  const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
+  mockState.validatorResults = {
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
+  const result = await runPreCommitValidation(
+    ["src/content/pages/de/assets/hero.webp"],
+    "test-system",
+    tmpWorkspace,
+  );
+  expect(result.passed).toBe(true);
+  expect(result.validatorsRun).toContain("image.variants.validate");
+  expect(mockState.validatorArgv["image.variants.validate"]).toEqual([
+    "--scope-files",
+    "src/content/pages/de/assets/hero.webp",
+  ]);
 });
 
 test("validator fails — passed is false, failure recorded with files", async () => {
