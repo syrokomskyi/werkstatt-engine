@@ -46,6 +46,7 @@ import { createAgentGate, type AgentGatePorts } from "./index.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 import { runAgentSearch } from "./search-route.ts";
 import { runAgentHealth } from "./health-route.ts";
+import { runNlwebAsk } from "./nlweb-ask.ts";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -418,6 +419,94 @@ export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
           },
         ),
       );
+    },
+
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RFC-1165: NLWeb /ask route
+// ---------------------------------------------------------------------------
+
+/**
+ * Factory the generated apps/<site>/src/pages/ask.ts calls.
+ * Core lives in nlweb-ask.ts (vitest-loadable, deterministic extractive —
+ * ADR-0097); this adapter only resolves env bindings, the search manifest,
+ * and the RFC-1164 .jsonld mirror fetch, then maps { status, body } to HTTP.
+ */
+export function createAgentNlwebRoute(manifest: AgentSurfaceManifest): {
+  POST: APIRoute;
+  OPTIONS: APIRoute;
+} {
+  return {
+    POST: async ({ request }) => {
+      const env = await resolveSearchEnv();
+      if (!env.AI || !env.SEARCH_INDEX) {
+        return withCors(
+          new Response(
+            JSON.stringify({
+              error: "Search index not available — AI or SEARCH_INDEX binding missing",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      const searchManifest = await fetchSearchManifest(request, env);
+      if (!searchManifest) {
+        return withCors(
+          new Response(JSON.stringify({ error: "Search manifest not found" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return withCors(
+          new Response(JSON.stringify({ error: "Request body must be JSON" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      // RFC-1164: schema_object per result is sourced from the route's .jsonld
+      // mirror — served sibling of the search manifest, fetched via ASSETS.
+      const fetchMirror = async (mirrorPath: string): Promise<unknown | null> => {
+        try {
+          const url = new URL(`/${mirrorPath}`, request.url);
+          const res = env.ASSETS ? await env.ASSETS.fetch(new Request(url)) : await fetch(url);
+          return res.ok ? await res.json() : null;
+        } catch {
+          return null;
+        }
+      };
+
+      try {
+        const { status, body: responseBody } = await runNlwebAsk(body, manifest, searchManifest, {
+          ai: env.AI,
+          searchIndex: env.SEARCH_INDEX,
+          fetchMirror,
+        });
+        return withCors(
+          new Response(JSON.stringify(responseBody), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      } catch (err) {
+        return withCors(
+          new Response(JSON.stringify({ error: `Ask failed: ${(err as Error).message}` }), {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
     },
 
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),

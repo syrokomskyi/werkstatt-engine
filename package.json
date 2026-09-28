@@ -318,6 +318,10 @@
       "types": "./src/agent-gate/astro.ts",
       "default": "./src/agent-gate/astro.ts"
     },
+    "./agent-gate/nlweb-ask": {
+      "types": "./src/agent-gate/nlweb-ask.ts",
+      "default": "./src/agent-gate/nlweb-ask.ts"
+    },
     "./agent-gate/reflect-route": {
       "types": "./src/agent-gate/reflect-route.ts",
       "default": "./src/agent-gate/reflect-route.ts"
