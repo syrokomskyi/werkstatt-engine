@@ -32,6 +32,7 @@ This is a **package** workspace. Expose stable typed APIs. Do not import from ap
 | `@warpgogol/werkstatt-engine/fingerprint/semantic` | `./src/fingerprint/semantic.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate` | `./src/agent-gate/index.ts` |
 | `@warpgogol/werkstatt-engine/agent-gate/reflect-route` | `./src/agent-gate/reflect-route.ts` |
+| `@warpgogol/werkstatt-engine/agent-gate/nlweb-ask` | `./src/agent-gate/nlweb-ask.ts` (RFC-1165: NLWeb /ask core — deterministic extractive answers per ADR-0097; adapter `createAgentNlwebRoute` lives in `agent-gate/astro.ts`) |
 | `@warpgogol/werkstatt-engine/component-runtime-module` | `./src/component-runtime/component-runtime.module.ts` |
 | `@warpgogol/werkstatt-engine/effects-module` | `./src/component-runtime/effects.module.ts` |
 | `@warpgogol/werkstatt-engine/isolation-module` | `./src/isolation/isolation.module.ts` |
