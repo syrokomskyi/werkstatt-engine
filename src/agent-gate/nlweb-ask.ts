@@ -95,6 +95,8 @@ export interface NlwebAskResponse {
     version: string;
     query_id: string;
     response_type: "answer" | "failure";
+    /** Echoed negotiated format — RFC-1165 _meta contract. */
+    response_format: "conversational_search";
     site: string;
     lang: string;
     mode: string;
@@ -169,11 +171,7 @@ export function resolveAcceptLanguage(
 }
 
 /** Parse + validate the NLWeb request body — failures carry the HTTP status. */
-export function parseNlwebRequest(
-  body: unknown,
-  manifestSite: string,
-  supportedLangs: string[],
-): NlwebParseResult {
+export function parseNlwebRequest(body: unknown, manifestSite: string): NlwebParseResult {
   if (!body || typeof body !== "object") {
     return { ok: false, status: 400, reason: "invalid-request" };
   }
@@ -199,20 +197,22 @@ export function parseNlwebRequest(
     return { ok: false, status: 400, reason: "unsupported-mode" };
   }
   // accept-language tokens outside the supported set are ignored, not errors —
-  // they resolve to the default language (RFC-1165 AC-9 fallback).
-  void supportedLangs;
+  // they resolve to the default language in resolveAcceptLanguage (AC-9 fallback).
   return { ok: true, request: { ...req, query: { ...req.query, text } } };
 }
 
-/** Deterministic localized no-answer sentences — fixed table, no lookup layers. */
-const NO_ANSWER: Record<string, string> = {
-  de: "Es wurde keine passende Antwort im veröffentlichten Inhalt gefunden.",
-  uk: "У опублікованому вмісті відповіді не знайдено.",
-  en: "No matching answer was found in the published content.",
-};
+/** Deterministic localized no-answer sentences — fixed table, no lookup layers.
+ *  Map (not an object literal): a lang token like "toString" would resolve an
+ *  inherited Object.prototype method on a plain record — a non-string answer. */
+const NO_ANSWER_EN = "No matching answer was found in the published content.";
+const NO_ANSWER = new Map<string, string>([
+  ["de", "Es wurde keine passende Antwort im veröffentlichten Inhalt gefunden."],
+  ["uk", "У опублікованому вмісті відповіді не знайдено."],
+  ["en", NO_ANSWER_EN],
+]);
 
 export function noAnswerSentence(lang: string): string {
-  return NO_ANSWER[lang] ?? NO_ANSWER.en;
+  return NO_ANSWER.get(lang) ?? NO_ANSWER_EN;
 }
 
 /** Word-boundary excerpt — deterministic slice, no semantic rewriting. */
@@ -224,7 +224,11 @@ function excerptOf(text: string): string {
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : NLWEB_EXCERPT_MAX)}…`;
 }
 
-/** Derived mirror path for a route — mirrors index.html naming (RFC-1164). */
+/** Derived mirror path for a route — mirrors index.html naming (RFC-1164).
+ *  Canonical twin: mirrorUrlForRoute in
+ *  packages/werkstatt-site/src/domain/share/astro/jsonld-mirror.ts — engine
+ *  cannot import the site plugin, so the transform is duplicated here; keep
+ *  both in lockstep if the .jsonld naming convention changes. */
 export function nlwebMirrorPath(route: string): string {
   const stripped = route.replace(/\/+$/, "");
   return stripped === "" ? "index.jsonld" : `${stripped.replace(/^\//, "")}.jsonld`;
@@ -265,10 +269,11 @@ export async function runNlwebAsk(
   const defaultLang = manifest.languages.default;
   const supportedLangs = manifest.languages.supported;
 
-  const parsed = parseNlwebRequest(body, site, supportedLangs);
+  const parsed = parseNlwebRequest(body, site);
   const meta = {
     version: NLWEB_VERSION,
     query_id: "",
+    response_format: NLWEB_SUPPORTED.responseFormat,
     site,
     lang: defaultLang,
     mode: NLWEB_SUPPORTED.mode,

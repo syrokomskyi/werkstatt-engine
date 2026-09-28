@@ -12,7 +12,11 @@ sourcing — all with stubbed ports; no astro/cloudflare imports.
 */
 
 import { describe, expect, it } from "vitest";
-import type { AgentSurfaceManifest, SearchChunk, SearchManifest } from "@warpgogol/werkstatt-shared/agent";
+import type {
+  AgentSurfaceManifest,
+  SearchChunk,
+  SearchManifest,
+} from "@warpgogol/werkstatt-shared/agent";
 import {
   NLWEB_MIN_SCORE,
   NLWEB_VERSION,
@@ -61,7 +65,10 @@ const searchManifest = { chunks } as SearchManifest;
 
 const mirrorDoc = { "@graph": [{ "@type": "WebPage", name: "Leistungen" }] };
 
-function ports(matches: Array<{ id: string; score: number }>, mirrors: Record<string, unknown> = {}): NlwebAskPorts {
+function ports(
+  matches: Array<{ id: string; score: number }>,
+  mirrors: Record<string, unknown> = {},
+): NlwebAskPorts {
   return {
     ai: { run: async () => ({ data: [[0.1, 0.2, 0.3]] }) },
     searchIndex: { query: async () => ({ matches }) },
@@ -113,7 +120,7 @@ describe("parseNlwebRequest honest failures (AC-3)", () => {
     [{ query: { text: "Was?", site: "other-site" } }, "site-mismatch"],
   ])("rejects %j with reason %s", (patch, reason) => {
     const body = { query: { text: "Was baut ihr?" }, ...patch };
-    const r = parseNlwebRequest(body, "warpgogol", ["de", "uk"]);
+    const r = parseNlwebRequest(body, "warpgogol");
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.status).toBe(400);
@@ -141,7 +148,12 @@ describe("parseNlwebRequest honest failures (AC-3)", () => {
 
 describe("no-answer contract (AC-4)", () => {
   it("below-threshold retrieval returns the deterministic no-answer", async () => {
-    const r = await runNlwebAsk(goodBody, manifest, searchManifest, ports([{ id: "de:/leistungen/:b1", score: NLWEB_MIN_SCORE - 0.01 }]));
+    const r = await runNlwebAsk(
+      goodBody,
+      manifest,
+      searchManifest,
+      ports([{ id: "de:/leistungen/:b1", score: NLWEB_MIN_SCORE - 0.01 }]),
+    );
     expect(r.status).toBe(200);
     expect(r.body.total_results).toBe(0);
     expect(r.body.results).toEqual([]);
@@ -218,7 +230,12 @@ describe("schema_object mirror grounding", () => {
   });
 
   it("omits schema_object when the mirror is absent", async () => {
-    const r = await runNlwebAsk(goodBody, manifest, searchManifest, ports([{ id: "de:/leistungen/:b1", score: 0.9 }]));
+    const r = await runNlwebAsk(
+      goodBody,
+      manifest,
+      searchManifest,
+      ports([{ id: "de:/leistungen/:b1", score: 0.9 }]),
+    );
     expect(r.body.results[0].schema_object).toBeUndefined();
     expect(r.body.results[0]["@type"]).toBe("WebPage");
   });
