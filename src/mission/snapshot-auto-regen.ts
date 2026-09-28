@@ -6,11 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0689: extract shared autoRegenerateSnapshotOnSnap01 helper from mission-materialization-commands.ts (RFC-0615) for reuse by leitstand.dev-deploy.</item>
-  <item>RFC-0697: add orchestrateSnap01Recovery shared helper encapsulating detect → regenerate → (optional) rebuild orchestration, replacing duplicated inline logic in leitstand.dev-deploy and mission.validate.</item>
   <item>ADR-0085: guard autoRegenerateSnapshotOnSnap01 against closed workpieces — the direct executeKernelCommand path bypasses the pipeline-level .closed skip, so regeneration would write a tracked file that RFC-0878 can never commit.</item>
   <item>ADR-0087: replace hand-rolled .closed sentinel check with isClosedWorkpiece from kernel/runtime/closed-workpiece.ts — the executor now enforces the same guard, this early-exit remains for a clear orchestrator result.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>ADR-0096: bootstrapCommittedSnapshot — committed-presence pre-check + scoped bookkeeping commit before build.post to prevent SNAP-02 deadlock</item>
+  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <history>RFC-0689, RFC-0697</history>
 </CHANGE_SUMMARY>
 */
 
@@ -32,6 +33,8 @@ export interface AutoRegenerateOptions {
   logger: { info: (msg: string) => void; warn?: (msg: string) => void };
   context?: KernelRuntimeContext;
 }
+
+export const SNAPSHOT_FILENAME = "behavior.snapshot.generated.yaml";
 
 export interface AutoRegenerateResult {
   regenerated: boolean;
@@ -143,5 +146,77 @@ export async function orchestrateSnap01Recovery(
     const error = `SNAP-01 validation check failed: ${validateErr instanceof Error ? validateErr.message : String(validateErr)}`;
     logger.info(`  ${error}`);
     return { regenerated: false, error };
+  }
+}
+
+export interface SnapshotBootstrapResult {
+  /** True when a bookkeeping commit created the committed snapshot baseline. */
+  committed: boolean;
+  /** True when the snapshot was already committed — no action taken. */
+  alreadyCommitted?: boolean;
+  error?: string;
+}
+
+/**
+ * ADR-0096: ensure a git-committed `behavior.snapshot.generated.yaml` exists in
+ * the workpiece before `build.post` runs — `behavior.snapshot.validate` diffs
+ * against the committed baseline and emits SNAP-02 when none exists, deadlocking
+ * first-time sites. The bookkeeping commit is scoped via `mission.git.commit
+ * --scope-files` so it stages only the snapshot file and cannot be blocked by
+ * unrelated dirty content.
+ */
+export async function bootstrapCommittedSnapshot(
+  opts: AutoRegenerateOptions,
+): Promise<SnapshotBootstrapResult> {
+  const { workspaceRoot, systemId, missionId, logger } = opts;
+  const io = opts.context?.io ?? createDefaultIO().io;
+  const workpieceDir = path.join(
+    await resolveMissionDir(workspaceRoot, missionId, io),
+    "workpiece",
+  );
+
+  // ADR-0085/0087: closed workpieces are immutable — bootstrap is only
+  // meaningful while the mission is open and can accept commits.
+  if (await isClosedWorkpiece(workpieceDir, io)) {
+    return { committed: false };
+  }
+
+  const lsResult = await io.exec("git", ["ls-files", "--error-unmatch", SNAPSHOT_FILENAME], {
+    cwd: workpieceDir,
+  });
+  if (lsResult.exitCode === 0) {
+    return { committed: false, alreadyCommitted: true };
+  }
+
+  logger.info(`  No committed ${SNAPSHOT_FILENAME} — bootstrapping committed baseline (ADR-0096)…`);
+  try {
+    await executeKernelCommand({
+      workspaceRoot,
+      commandName: "behavior.snapshot.generate",
+      siteName: systemId,
+    });
+
+    const commitResult = await executeKernelCommand({
+      workspaceRoot,
+      commandName: "mission.git.commit",
+      argv: [
+        `--mission=${missionId}`,
+        "--message=chore: bootstrap committed behavior snapshot (ADR-0096)",
+        `--scope-files=${SNAPSHOT_FILENAME}`,
+      ],
+    });
+    const commitSingle = Array.isArray(commitResult) ? commitResult[0] : commitResult;
+    if (commitSingle && commitSingle.ok === false) {
+      const error = `snapshot bootstrap commit failed: ${commitSingle.summary ?? "unknown error"}`;
+      logger.info(`  ${error}`);
+      return { committed: false, error };
+    }
+
+    logger.info(`  Committed ${SNAPSHOT_FILENAME} baseline`);
+    return { committed: true };
+  } catch (err) {
+    const error = `snapshot bootstrap failed: ${err instanceof Error ? err.message : String(err)}`;
+    logger.info(`  ${error}`);
+    return { committed: false, error };
   }
 }

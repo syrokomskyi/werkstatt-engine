@@ -7,12 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0878: add .closed sentinel check to commitWorkpieceIfDirty — refuse to commit closed workpieces (defence-in-depth, since --no-verify bypasses the hook).</item>
-  <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
   <item>RFC-1095: review findings: execFileSync git add, drop speculative barrel exports</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
-  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820</history>
+  <item>ADR-0096: --scope-files flag restricts staging and pre-commit validation to listed paths for bookkeeping commits</item>
+  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095</history>
 </CHANGE_SUMMARY>
 */
 
@@ -427,6 +427,16 @@ export async function runMissionGitCommit(
   const message = flagString(input, "message");
   const rfcId = flagString(input, "rfc");
   const adrId = flagString(input, "adr");
+  // ADR-0096: --scope-files restricts staging and validation to the listed
+  // workpiece-relative paths — bookkeeping commits (e.g. snapshot bootstrap)
+  // must not sweep or be blocked by unrelated dirty content.
+  const scopeFilesCsv = flagString(input, "scope-files");
+  const scopeFiles = scopeFilesCsv
+    ? scopeFilesCsv
+        .split(",")
+        .map((f) => f.trim())
+        .filter(Boolean)
+    : undefined;
 
   if (!missionId) throw new Error("[mission.git.commit] --mission is required");
   if (!message) throw new Error("[mission.git.commit] --message is required");
@@ -454,8 +464,12 @@ export async function runMissionGitCommit(
     );
   }
 
-  // Stage all changes
-  await git(workpieceDir, ["add", "-A"], context.io);
+  // Stage changes: all when unscoped, only listed paths when --scope-files.
+  if (scopeFiles && scopeFiles.length > 0) {
+    await git(workpieceDir, ["add", "--", ...scopeFiles], context.io);
+  } else {
+    await git(workpieceDir, ["add", "-A"], context.io);
+  }
 
   // Check if there are changes to commit
   let hasChanges: boolean;
@@ -492,18 +506,19 @@ export async function runMissionGitCommit(
   // RFC-1095: record CHANGE_SUMMARY items when the commit carries a governance
   // ID. Runs after staging, before validation and commit; non-fatal — a header
   // miss never blocks a commit, the next compass.validate surfaces the gap.
+  const stagedFiles = (await git(workpieceDir, ["diff", "--cached", "--name-only"], context.io))
+    .split("\n")
+    .filter(Boolean);
+
   const governanceId = rfcId ?? adrId;
   if (governanceId) {
     try {
-      const staged = (await git(workpieceDir, ["diff", "--cached", "--name-only"], context.io))
-        .split("\n")
-        .filter(Boolean);
       const recordResult = await runCompassSummaryRecord(
         {
           argv: [],
           flags: {
             id: governanceId,
-            files: staged,
+            files: stagedFiles,
             text: stripConventionalPrefix(message),
             workpiece: workpieceDir,
           },
@@ -533,10 +548,11 @@ export async function runMissionGitCommit(
     ? `${message}\n\n${rfcId ? `X-RFC: ${rfcId}` : `X-ADR: ${adrId}`}`
     : message;
 
-  // RFC-0594: run targeted content validators based on changed file paths
-  const dirtyResult = await isWorkpieceDirty(workpieceDir, context.io);
+  // RFC-0594 + ADR-0096: run targeted content validators on the staged file
+  // set — scoped commits validate only what they actually commit, so unrelated
+  // dirty files can neither be swept in nor block a bookkeeping commit.
   const preCommitValidation = await runPreCommitValidation(
-    dirtyResult.files,
+    stagedFiles,
     manifest.systemId,
     workspaceRoot,
   );

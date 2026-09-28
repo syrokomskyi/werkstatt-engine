@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1028: add validation.state.inspect command for read-only validation cache state inspection.</item>
   <item>RFC-1095: compass.summary.record, trim repair rewrite, commit integration</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -16,7 +15,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1146: auto-discover flag-reading helpers in kernel.flags.lint</item>
-  <history>ADR-0041, RFC-0560</history>
+  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <history>ADR-0041, RFC-0560, RFC-1028</history>
 </CHANGE_SUMMARY>
 */
 
@@ -427,6 +427,11 @@ export async function createMissionModule(): Promise<ModuleExport> {
             kind: "string",
             description:
               "ADR id to reference — records CHANGE_SUMMARY items and writes X-ADR trailer (RFC-1095).",
+          },
+          "scope-files": {
+            kind: "string",
+            description:
+              "Comma-separated workpiece-relative paths — restrict staging and pre-commit validation to these files (ADR-0096 bookkeeping commits).",
           },
         },
         writes: ["missions/{mission}/workpiece/**"],

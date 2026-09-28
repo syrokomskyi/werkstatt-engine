@@ -6,6 +6,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0594: initial unit and integration tests for runPreCommitValidation and mission.git.commit gate.</item>
   <item>RFC-1095: summary-record unit tests, commit integration tests, CS rules into compass.validate</item>
+  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
 </CHANGE_SUMMARY>
 */
 
@@ -283,6 +284,79 @@ test("no content files — no validators run, commit succeeds", async () => {
     stdio: ["pipe", "pipe", "pipe"],
   }).trim();
   expect(logOutput).toContain("update config");
+});
+
+test("ADR-0096: --scope-files stages only listed paths, unstaged content cannot block the commit", async () => {
+  const workpieceDir = setupWorkpiece();
+
+  // Bookkeeping target plus an unrelated dirty content file that maps to
+  // validators — those validators are configured to fail to prove the scoped
+  // commit is not blocked by unrelated dirty content.
+  writeFileSync(join(workpieceDir, "behavior.snapshot.generated.yaml"), "generated: true\n");
+  mkdirSync(join(workpieceDir, "src", "content", "pages", "de"), { recursive: true });
+  writeFileSync(join(workpieceDir, "src", "content", "pages", "de", "broken.md"), "bad\n");
+
+  mockState.validatorResults = {
+    "semantic.drift.validate": { ok: false, exitCode: 1, summary: "drift" },
+    "typography.validate": { ok: false, exitCode: 1, summary: "typo" },
+  };
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: {
+      mission: "test-system-m000001",
+      message: "chore: bootstrap committed behavior snapshot",
+      "scope-files": "behavior.snapshot.generated.yaml",
+    },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode ?? 0).toBe(0);
+  expect(
+    result.data?.preCommitValidation?.validatorsRun,
+    "Scoped commit must not run validators for files it does not commit",
+  ).toEqual([]);
+
+  // Only the snapshot file entered the commit; the dirty content file stays
+  // untracked.
+  const committedFiles = execSync("git show --name-only --format= HEAD", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  expect(committedFiles).toBe("behavior.snapshot.generated.yaml");
+
+  const status = execSync("git status --porcelain", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  // git collapses a fully-untracked directory — the whole src/ tree stays
+  // unstaged, proving the scoped commit did not sweep unrelated content.
+  expect(status).toContain("?? src/");
+});
+
+test("ADR-0096: --scope-files fails loudly when a listed path does not exist", async () => {
+  setupWorkpiece();
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: {
+      mission: "test-system-m000001",
+      message: "scoped",
+      "scope-files": "does/not/exist.yaml",
+    },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  await expect(runMissionGitCommit(input, context)).rejects.toThrow(/git add/);
 });
 
 test("staged changes preserved on validation failure", async () => {
