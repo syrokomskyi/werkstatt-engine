@@ -10,7 +10,7 @@
   <item>ADR-0087: replace hand-rolled .closed sentinel check with isClosedWorkpiece from kernel/runtime/closed-workpiece.ts — the executor now enforces the same guard, this early-exit remains for a clear orchestrator result.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>ADR-0096: bootstrapCommittedSnapshot — committed-presence pre-check + scoped bookkeeping commit before build.post to prevent SNAP-02 deadlock</item>
-  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <item>ADR-0096: dedupe CHANGE_SUMMARY item, use SNAPSHOT_FILENAME in CACHE_CLONE_ONLY_PATHS</item>
   <history>RFC-0689, RFC-0697</history>
 </CHANGE_SUMMARY>
 */

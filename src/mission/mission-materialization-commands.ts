@@ -6,13 +6,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>ADR-0093: emit mission-reconcile bordbuch entry in reconcile steps — metadata.commitSha (merge head) plus mergedShas[] (every merged workpiece commit) so the external-edit guard traces all pipeline-authored commits regardless of subject.</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
+  <item>ADR-0096: dedupe CHANGE_SUMMARY item, use SNAPSHOT_FILENAME in CACHE_CLONE_ONLY_PATHS</item>
   <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -55,7 +53,11 @@ import { acquireLock, releaseLock, commitWerkstattSideEffects } from "../werksta
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { resolveActor } from "./actor-identity.ts";
 import { resolveCacheClonePath, readSystemConfig } from "../sternsystem/registry-io.ts";
-import { orchestrateSnap01Recovery, bootstrapCommittedSnapshot } from "./snapshot-auto-regen.ts";
+import {
+  orchestrateSnap01Recovery,
+  bootstrapCommittedSnapshot,
+  SNAPSHOT_FILENAME,
+} from "./snapshot-auto-regen.ts";
 import { commitBordbuchProjections } from "../bordbuch/bordbuch-commit.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import type { WorkpieceConfigPresenceResult } from "./workpiece-config-presence-check.ts";
@@ -89,7 +91,7 @@ const CACHE_CLONE_ONLY_PATHS: readonly string[] = [
   "public/.well-known/bordbuch",
   "dns-records.yaml",
   ".materialization-state.json",
-  "behavior.snapshot.generated.yaml",
+  SNAPSHOT_FILENAME,
   ".gitignore",
 ];
 
