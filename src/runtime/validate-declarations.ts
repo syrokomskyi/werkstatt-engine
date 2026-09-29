@@ -51,6 +51,18 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     module: "check",
   },
   {
+    command: "rfc.index.generate",
+    reason:
+      "Workspace doc index (RFC-0260): docs/rfcs/index.yaml is written only under --write and carries no GENERATED marker — not a marker-tracked artifact.",
+    module: "rfc",
+  },
+  {
+    command: "forge.agents.generate",
+    reason:
+      "AGENTS.md instruction files are marker-merge documents (RFC-1150 skips hand-written files) — workspace docs, not app-scoped generated artifacts.",
+    module: "forge-core",
+  },
+  {
     command: "funnel.statechart.generate",
     reason:
       "Workspace-scoped documentation generator (RFC-0219): writes docs/specs/visitor-funnel/state-chart.generated.md, not an app-scoped generated artifact.",
