@@ -12,6 +12,7 @@ handed to the delivery substrate on success.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial action interpreter.</item>
+  <item>RFC-1169: ValidationFieldError gains closed code union (NOT_OBJECT, UNKNOWN_PROPERTY, REQUIRED, TYPE, MIN_LENGTH, MAX_LENGTH, FORMAT) emitted at the source — preview envelopes project it verbatim as problems[].code.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -28,9 +29,19 @@ import type {
 import type { IntegrationEvent } from "@warpgogol/werkstatt-shared/integration/port";
 import { deriveActionEventId } from "@warpgogol/werkstatt-shared/agent";
 
+/**
+ * RFC-1169: closed machine-readable violation vocabulary. Emitted at the
+ * validator source — `problems[].code` on the preview envelope projects it
+ * verbatim; never derive codes from `message` text downstream. Extending the
+ * union widens the agent-visible vocabulary and requires an RFC.
+ */
+export type ValidationErrorCode =
+  "NOT_OBJECT" | "UNKNOWN_PROPERTY" | "REQUIRED" | "TYPE" | "MIN_LENGTH" | "MAX_LENGTH" | "FORMAT";
+
 export interface ValidationFieldError {
   path: string;
   message: string;
+  code: ValidationErrorCode;
 }
 
 export type ValidationOutcome =
@@ -75,18 +86,21 @@ export function validateAgainstCapabilitySchema(
   const errors: ValidationFieldError[] = [];
 
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { ok: false, errors: [{ path: "", message: "must be a JSON object" }] };
+    return {
+      ok: false,
+      errors: [{ path: "", message: "must be a JSON object", code: "NOT_OBJECT" }],
+    };
   }
   const obj = value as Record<string, unknown>;
 
   for (const key of Object.keys(obj)) {
     if (!hasOwn(schema.properties, key)) {
-      errors.push({ path: key, message: `unknown property "${key}"` });
+      errors.push({ path: key, message: `unknown property "${key}"`, code: "UNKNOWN_PROPERTY" });
     }
   }
   for (const key of schema.required ?? []) {
     if (!hasOwn(obj, key) || obj[key] === undefined) {
-      errors.push({ path: key, message: "required" });
+      errors.push({ path: key, message: "required", code: "REQUIRED" });
     }
   }
   for (const [key, propSchema] of Object.entries(schema.properties)) {
@@ -95,23 +109,32 @@ export function validateAgainstCapabilitySchema(
     const path = key;
     if (propSchema.type === "string") {
       if (typeof fieldValue !== "string") {
-        errors.push({ path, message: "must be a string" });
+        errors.push({ path, message: "must be a string", code: "TYPE" });
         continue;
       }
       if (propSchema.minLength !== undefined && fieldValue.length < propSchema.minLength) {
-        errors.push({ path, message: `must be at least ${propSchema.minLength} characters` });
+        errors.push({
+          path,
+          message: `must be at least ${propSchema.minLength} characters`,
+          code: "MIN_LENGTH",
+        });
       }
       if (propSchema.maxLength !== undefined && fieldValue.length > propSchema.maxLength) {
-        errors.push({ path, message: `must be at most ${propSchema.maxLength} characters` });
+        errors.push({
+          path,
+          message: `must be at most ${propSchema.maxLength} characters`,
+          code: "MAX_LENGTH",
+        });
       }
       if (propSchema.format && !validateFormat(fieldValue, propSchema.format)) {
-        errors.push({ path, message: `must match format "${propSchema.format}"` });
+        errors.push({ path, message: `must match format "${propSchema.format}"`, code: "FORMAT" });
       }
     } else if (propSchema.type === "boolean") {
-      if (typeof fieldValue !== "boolean") errors.push({ path, message: "must be a boolean" });
+      if (typeof fieldValue !== "boolean")
+        errors.push({ path, message: "must be a boolean", code: "TYPE" });
     } else if (propSchema.type === "integer") {
       if (typeof fieldValue !== "number" || !Number.isInteger(fieldValue)) {
-        errors.push({ path, message: "must be an integer" });
+        errors.push({ path, message: "must be an integer", code: "TYPE" });
       }
     }
   }

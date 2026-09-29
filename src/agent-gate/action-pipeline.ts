@@ -10,6 +10,7 @@ returns either a Response (short-circuit) or void (continue to next step).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1169: preview envelope — sideEffect "none" schema violations answer ready:false/missing/problems (200, never 422); the preview branch returns draftId + summary + nextAction linkage via buildPreviewReady/buildPreviewFailure, shared by HTTP, MCP, and A2A.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -33,7 +34,12 @@ import {
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "./ports.ts";
 import type { RateLimiter } from "./limits.ts";
-import { validateAgainstCapabilitySchema, buildIntegrationEventFromAction } from "./actions.ts";
+import {
+  validateAgainstCapabilitySchema,
+  buildIntegrationEventFromAction,
+  type ValidationErrorCode,
+  type ValidationFieldError,
+} from "./actions.ts";
 
 /** RFC-1112: receipt-store TTL — 24h covers client retry windows without accumulating keys. */
 export const IDEMPOTENCY_TTL_SECONDS = 86400;
@@ -199,6 +205,12 @@ export function parseJsonBody(ctx: ActionContext): StepResult {
 export function validateSchema(ctx: ActionContext): StepResult {
   const validated = validateAgainstCapabilitySchema(ctx.capability!.input, ctx.parsed!);
   if (!validated.ok) {
+    // RFC-1169: preview capabilities answer validation failures with the
+    // readiness envelope (200), not a 422 problem — "incomplete, ask the user"
+    // must be distinguishable from "malformed".
+    if (ctx.capability!.sideEffect === "none") {
+      return jsonResponse(buildPreviewFailure(validated.errors), 200);
+    }
     return problemResponse(
       buildAgentProblem("schema-violation", {
         schemaRef: `/.well-known/agent.openapi.json#/components/schemas/${ctx.capabilityId}-input`,
@@ -226,14 +238,73 @@ export interface ActionExecutionInput {
 
 export type ActionExecution =
   | { kind: "receipt"; receipt: ActionReceipt }
-  | { kind: "preview"; draftId: string }
+  | { kind: "preview"; envelope: ActionPreviewResult }
   | { kind: "problem"; problem: AgentProblemDetails };
+
+/** RFC-1169: one machine-readable field violation on the preview failure branch. */
+export interface ActionPreviewProblem {
+  field: string;
+  code: ValidationErrorCode;
+  detail: string;
+}
+
+/**
+ * RFC-1169: the preview-path answer shape. `ready` is the only unconditional
+ * field; everything else is present only in its branch — the closed capability
+ * output subset cannot express conditional presence, so the shape is enforced
+ * by agent.surface.contract.check, not by the schema.
+ */
+export interface ActionPreviewResult {
+  ready: boolean;
+  /** Present when ready — deterministic canonical hash of the validated input. */
+  draftId?: string;
+  /** Present when !ready — absent required field names. */
+  missing?: string[];
+  /** Present when !ready — non-missing violations; unmappable errors keep field "". */
+  problems?: ActionPreviewProblem[];
+  /** Present when ready — the validated input echoed for user confirmation. */
+  summary?: Record<string, unknown>;
+  /** Present when ready — the submit-sibling capability id from the catalog. */
+  nextAction?: string;
+  /** Present when ready — human+model readable consequence of nextAction. */
+  sideEffect?: string;
+}
+
+/**
+ * RFC-1169: build the ready:false branch from validator errors. REQUIRED-coded
+ * errors populate `missing`; everything else lands in `problems` so no
+ * violation is ever dropped.
+ */
+export function buildPreviewFailure(errors: ValidationFieldError[]): ActionPreviewResult {
+  return {
+    ready: false,
+    missing: errors.filter((e) => e.code === "REQUIRED").map((e) => e.path),
+    problems: errors
+      .filter((e) => e.code !== "REQUIRED")
+      .map((e) => ({ field: e.path, code: e.code, detail: e.message })),
+  };
+}
+
+/** RFC-1169: build the ready:true branch — draftId, echoed summary, optional nextAction linkage. */
+export function buildPreviewReady(
+  capability: CapabilityRecord,
+  draftId: string,
+  summary: Record<string, unknown>,
+): ActionPreviewResult {
+  const envelope: ActionPreviewResult = { ready: true, draftId, summary };
+  if (capability.nextAction) {
+    envelope.nextAction = capability.nextAction.capability;
+    envelope.sideEffect = capability.nextAction.sideEffect;
+  }
+  return envelope;
+}
 
 /**
  * Execute a validated action: sideEffect "none" returns a deterministic
- * draftId (canonical hash of the validated input); "write" dispatches the
- * IntegrationEvent and stores the receipt under the Idempotency-Key when a
- * store is configured. A failed receipt-store write is non-fatal (the dispatch
+ * preview envelope (draftId = canonical hash of the validated input, plus
+ * summary/nextAction per RFC-1169); "write" dispatches the IntegrationEvent
+ * and stores the receipt under the Idempotency-Key when a store is
+ * configured. A failed receipt-store write is non-fatal (the dispatch
  * already succeeded — the receipt is still returned).
  */
 export async function executeAction(input: ActionExecutionInput): Promise<ActionExecution> {
@@ -250,7 +321,10 @@ export async function executeAction(input: ActionExecutionInput): Promise<Action
         }),
       };
     }
-    return { kind: "preview", draftId: canonicalJsonHashV1(snapshot.value) };
+    return {
+      kind: "preview",
+      envelope: buildPreviewReady(capability, canonicalJsonHashV1(snapshot.value), validatedValue),
+    };
   }
 
   const locale =
@@ -305,7 +379,7 @@ export async function dispatchOrPreview(ctx: ActionContext): Promise<StepResult>
     case "receipt":
       return jsonResponse(result.receipt, 200);
     case "preview":
-      return jsonResponse({ valid: true, draftId: result.draftId }, 200);
+      return jsonResponse(result.envelope, 200);
     case "problem":
       return problemResponse(result.problem);
   }

@@ -28,7 +28,12 @@ import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "../ports.ts";
 import type { RateLimiter } from "../limits.ts";
 import { validateAgainstCapabilitySchema } from "../actions.ts";
-import { checkIdempotencyReplay, executeAction, mcpBodyHash } from "../action-pipeline.ts";
+import {
+  buildPreviewFailure,
+  checkIdempotencyReplay,
+  executeAction,
+  mcpBodyHash,
+} from "../action-pipeline.ts";
 import {
   A2A_METHOD_SEND_MESSAGE,
   buildA2aTask,
@@ -180,6 +185,27 @@ async function handleSendMessage(
 
   const validated = validateAgainstCapabilitySchema(capability.input, invocation.input);
   if (!validated.ok) {
+    // RFC-1169: preview capabilities answer validation failures with the
+    // readiness envelope — the dry-run itself completed, so the task is
+    // "completed" with a ready:false preview artifact (identical fields to
+    // the HTTP path), not a rejected task.
+    if (capability.sideEffect === "none") {
+      return taskResult(
+        id,
+        buildA2aTask({
+          id: crypto.randomUUID(),
+          contextId: message.contextId,
+          state: "completed",
+          timestamp,
+          artifacts: [
+            {
+              name: "preview",
+              parts: [{ kind: "data", data: buildPreviewFailure(validated.errors) }],
+            },
+          ],
+        }),
+      );
+    }
     // The message was understood; the task is refused before dispatch —
     // a rejected task carries the problem details in its artifact.
     const problem = buildAgentProblem("schema-violation", {
@@ -232,7 +258,7 @@ async function handleSendMessage(
           artifacts: [
             {
               name: "preview",
-              parts: [{ kind: "data", data: { valid: true, draftId: result.draftId } }],
+              parts: [{ kind: "data", data: result.envelope }],
             },
           ],
         }),

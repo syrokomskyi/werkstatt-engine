@@ -49,9 +49,10 @@ const LEAD_SUBMIT: CapabilityRecord = {
   limits: { perMinutePerIp: 10, maxPayloadBytes: 16384 },
 };
 
+/** RFC-1169: v2 readiness envelope + nextAction linkage. */
 const LEAD_PREPARE: CapabilityRecord = {
   id: "lead.prepare",
-  version: 1,
+  version: 2,
   kind: "action",
   sideEffect: "none",
   title: { de: "Anfrage prüfen", en: "Preview an inquiry" },
@@ -64,12 +65,16 @@ const LEAD_PREPARE: CapabilityRecord = {
   },
   output: {
     type: "object",
-    required: ["valid", "draftId"],
+    required: ["ready"],
     additionalProperties: false,
     properties: {
-      valid: { type: "boolean" },
+      ready: { type: "boolean" },
       draftId: { type: "string" },
     },
+  },
+  nextAction: {
+    capability: "lead.submit",
+    sideEffect: "Creates a project inquiry and dispatches it to the site owner.",
   },
   requires: { entitlements: [], sections: [] },
   limits: { perMinutePerIp: 10, maxPayloadBytes: 16384 },
@@ -271,7 +276,7 @@ test("SendMessage: dispatch failure returns a failed task with the problem artif
   expect(problem.retryable).toBe(true);
 });
 
-test("SendMessage: sideEffect none capability returns a completed task with a preview artifact", async () => {
+test("SendMessage: sideEffect none capability returns a completed task with the preview envelope", async () => {
   const gate = createAgentGate(makeManifest(["lead.prepare"]), [LEAD_PREPARE], makeFakePorts());
   const res = await gate.handleA2a(
     sendMessage(capabilityPart("lead.prepare", { message: "hello world!" })),
@@ -280,9 +285,38 @@ test("SendMessage: sideEffect none capability returns a completed task with a pr
   const task = body.result!;
   expect(task.status.state).toBe("completed");
   expect(task.artifacts![0]!.name).toBe("preview");
-  const preview = task.artifacts![0]!.parts[0]!.data as { valid: boolean; draftId: string };
-  expect(preview.valid).toBe(true);
-  expect(preview.draftId).toBeTruthy();
+  const preview = task.artifacts![0]!.parts[0]!.data as {
+    ready: boolean;
+    draftId: string;
+    summary: Record<string, unknown>;
+    nextAction: string;
+    sideEffect: string;
+  };
+  // RFC-1169 AC-9: identical envelope fields on A2A — parity test pins the shape.
+  expect(preview.ready).toBe(true);
+  expect(preview.draftId).toMatch(/^sha256:[0-9a-f]{64}$/);
+  expect(preview.summary).toEqual({ message: "hello world!" });
+  expect(preview.nextAction).toBe("lead.submit");
+  expect(preview.sideEffect).toBe("Creates a project inquiry and dispatches it to the site owner.");
+});
+
+test("SendMessage: preview with missing fields completes with a ready:false artifact (not rejected)", async () => {
+  const gate = createAgentGate(makeManifest(["lead.prepare"]), [LEAD_PREPARE], makeFakePorts());
+  const res = await gate.handleA2a(sendMessage(capabilityPart("lead.prepare", {})));
+  const body = (await res.json()) as A2aTaskBody;
+  const task = body.result!;
+  // RFC-1169: incomplete input is a normal preview answer, not a refusal —
+  // "completed" task carrying the readiness envelope.
+  expect(task.status.state).toBe("completed");
+  expect(task.artifacts![0]!.name).toBe("preview");
+  const preview = task.artifacts![0]!.parts[0]!.data as {
+    ready: boolean;
+    missing: string[];
+    problems: Array<{ field: string; code: string; detail: string }>;
+  };
+  expect(preview.ready).toBe(false);
+  expect(preview.missing).toEqual(["message"]);
+  expect(preview.problems).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------

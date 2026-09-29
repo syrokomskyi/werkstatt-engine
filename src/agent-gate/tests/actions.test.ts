@@ -55,7 +55,8 @@ test("validateAgainstCapabilitySchema: treats prototype property names as unknow
 test("validateAgainstCapabilitySchema: reports missing required fields", () => {
   const result = validateAgainstCapabilitySchema(schema, {});
   expect(result.ok).toBe(false);
-  if (!result.ok) expect(result.errors).toEqual([{ path: "message", message: "required" }]);
+  if (!result.ok)
+    expect(result.errors).toEqual([{ path: "message", message: "required", code: "REQUIRED" }]);
 });
 
 test("validateAgainstCapabilitySchema: enforces minLength/maxLength", () => {

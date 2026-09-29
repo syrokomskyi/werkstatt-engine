@@ -30,6 +30,7 @@ import type { AgentGatePorts } from "../ports.ts";
 import type { RateLimiter } from "../limits.ts";
 import { validateAgainstCapabilitySchema } from "../actions.ts";
 import {
+  buildPreviewFailure,
   checkIdempotencyReplay,
   executeAction,
   mcpBodyHash,
@@ -186,6 +187,13 @@ async function handleToolsCall(
 
     const validated = validateAgainstCapabilitySchema(capability.input, params.arguments ?? {});
     if (!validated.ok) {
+      // RFC-1169: preview capabilities answer validation failures with the
+      // readiness envelope — identical fields to the HTTP path.
+      if (capability.sideEffect === "none") {
+        return jsonRpcSuccess(req.id ?? null, {
+          content: [{ type: "text", text: JSON.stringify(buildPreviewFailure(validated.errors)) }],
+        });
+      }
       const problem = buildAgentProblem("schema-violation", {
         schemaRef: `/.well-known/agent.openapi.json#/components/schemas/${capabilityId}-input`,
         errors: validated.errors,
@@ -211,9 +219,7 @@ async function handleToolsCall(
         });
       case "preview":
         return jsonRpcSuccess(req.id ?? null, {
-          content: [
-            { type: "text", text: JSON.stringify({ valid: true, draftId: result.draftId }) },
-          ],
+          content: [{ type: "text", text: JSON.stringify(result.envelope) }],
         });
       case "problem":
         return jsonRpcError(

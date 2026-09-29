@@ -51,10 +51,13 @@ const LEAD_SUBMIT: CapabilityRecord = {
   limits: { perMinutePerIp: 10, maxPayloadBytes: 16384 },
 };
 
-/** RFC-1112: side-effect-free preview capability (no integration, no humanEquivalent). */
+/**
+ * RFC-1112/RFC-1169: side-effect-free preview capability (no integration, no
+ * humanEquivalent) with the v2 readiness envelope and a nextAction linkage.
+ */
 const LEAD_PREPARE: CapabilityRecord = {
   id: "lead.prepare",
-  version: 1,
+  version: 2,
   kind: "action",
   sideEffect: "none",
   title: { de: "Anfrage prüfen", en: "Preview an inquiry" },
@@ -67,16 +70,40 @@ const LEAD_PREPARE: CapabilityRecord = {
   },
   output: {
     type: "object",
-    required: ["valid", "draftId"],
+    required: ["ready"],
     additionalProperties: false,
     properties: {
-      valid: { type: "boolean" },
+      ready: { type: "boolean" },
       draftId: { type: "string" },
     },
+  },
+  nextAction: {
+    capability: "lead.submit",
+    sideEffect: "Creates a project inquiry and dispatches it to the site owner.",
   },
   requires: { entitlements: [], sections: [] },
   limits: { perMinutePerIp: 10, maxPayloadBytes: 16384 },
 };
+
+/** Manifest exposing only the preview capability — used by all readiness tests. */
+function makePreviewManifest() {
+  return buildAgentSurfaceManifest({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    site: "test-bundle",
+    baseUrl: "https://test.example",
+    languages: { default: "de", supported: ["de", "en"] },
+    knowledge: [],
+    actions: [
+      {
+        id: "lead.prepare",
+        url: "/api/agent/actions/lead.prepare",
+        title: LEAD_PREPARE.title,
+        inputSchemaRef: "#/components/schemas/lead.prepare-input",
+        entitlement: "agent.actions",
+      },
+    ],
+  });
+}
 
 function makeManifest(withAction: boolean) {
   return buildAgentSurfaceManifest({
@@ -845,27 +872,11 @@ test("handleAction: no idempotency port → X-Agent-Idempotency: disabled", asyn
   expect(res.headers.get("X-Agent-Idempotency")).toBe("disabled");
 });
 
-test("handleAction: sideEffect none capability returns a preview draftId without dispatching", async () => {
+test("handleAction: sideEffect none capability returns the preview envelope without dispatching", async () => {
   __resetLimiterCache();
   let dispatched = false;
-  const manifest = buildAgentSurfaceManifest({
-    generatedAt: "2026-01-01T00:00:00.000Z",
-    site: "test-bundle",
-    baseUrl: "https://test.example",
-    languages: { default: "de", supported: ["de", "en"] },
-    knowledge: [],
-    actions: [
-      {
-        id: "lead.prepare",
-        url: "/api/agent/actions/lead.prepare",
-        title: LEAD_PREPARE.title,
-        inputSchemaRef: "#/components/schemas/lead.prepare-input",
-        entitlement: "agent.actions",
-      },
-    ],
-  });
   const gate = createAgentGate(
-    manifest,
+    makePreviewManifest(),
     [LEAD_PREPARE],
     makeFakePorts({
       dispatch: {
@@ -884,10 +895,119 @@ test("handleAction: sideEffect none capability returns a preview draftId without
     }),
   );
   expect(res.status).toBe(200);
-  const body = (await res.json()) as { valid: boolean; draftId: string };
-  expect(body.valid).toBe(true);
+  const body = (await res.json()) as {
+    ready: boolean;
+    draftId: string;
+    summary: Record<string, unknown>;
+    nextAction: string;
+    sideEffect: string;
+  };
+  // RFC-1169 AC-2/AC-6: ready envelope — draftId hash, echoed summary, catalog linkage.
+  expect(body.ready).toBe(true);
   expect(body.draftId).toMatch(/^sha256:[0-9a-f]{64}$/);
+  expect(body.summary).toEqual({ message: "hello world!" });
+  expect(body.nextAction).toBe("lead.submit");
+  expect(body.sideEffect).toBe("Creates a project inquiry and dispatches it to the site owner.");
   expect(dispatched).toBe(false);
+});
+
+test("handleAction: preview with missing required fields returns 200 ready:false (never 422, no dispatch, no receipt)", async () => {
+  __resetLimiterCache();
+  const store = makeMemoryStore();
+  let dispatched = false;
+  const gate = createAgentGate(
+    makePreviewManifest(),
+    [LEAD_PREPARE],
+    makeFakePorts({
+      idempotency: store,
+      dispatch: {
+        send: async () => {
+          dispatched = true;
+          throw new Error("must not be called");
+        },
+      },
+    }),
+  );
+  const res = await gate.handleAction(
+    "lead.prepare",
+    new Request("https://test.example/api/agent/actions/lead.prepare", {
+      method: "POST",
+      headers: { "Idempotency-Key": "prev-1" },
+      body: JSON.stringify({}),
+    }),
+  );
+  // RFC-1169 AC-1/AC-5/AC-6: validation failure on the preview path is a
+  // readiness answer, not a problem — and produces no receipt or dispatch.
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    ready: boolean;
+    missing: string[];
+    problems: Array<{ field: string; code: string; detail: string }>;
+  };
+  expect(body.ready).toBe(false);
+  expect(body.missing).toEqual(["message"]);
+  expect(body.problems).toEqual([]);
+  expect(dispatched).toBe(false);
+  expect(await store.get("prev-1")).toBeNull();
+});
+
+test("handleAction: preview with a non-required violation reports it in problems, not missing", async () => {
+  __resetLimiterCache();
+  const gate = createAgentGate(makePreviewManifest(), [LEAD_PREPARE], makeFakePorts());
+  const res = await gate.handleAction(
+    "lead.prepare",
+    new Request("https://test.example/api/agent/actions/lead.prepare", {
+      method: "POST",
+      body: JSON.stringify({ message: "short" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    ready: boolean;
+    missing: string[];
+    problems: Array<{ field: string; code: string; detail: string }>;
+  };
+  expect(body.ready).toBe(false);
+  expect(body.missing).toEqual([]);
+  expect(body.problems).toEqual([
+    { field: "message", code: "MIN_LENGTH", detail: "must be at least 10 characters" },
+  ]);
+});
+
+test("tools/call action: preview capability returns the readiness envelope (transport parity)", async () => {
+  __resetMcpLimiterCache();
+  __resetLimiterCache();
+  const gate = createAgentGate(makePreviewManifest(), [LEAD_PREPARE], makeFakePorts());
+  const body = await rpcResult(
+    await gate.handleMcp(
+      rpc("tools/call", { name: "action.lead.prepare", arguments: { message: "hello world!" } }),
+    ),
+  );
+  const content = (body.result as { content: Array<{ type: string; text: string }> }).content;
+  const parsed = JSON.parse(content[0]!.text) as {
+    ready: boolean;
+    draftId: string;
+    summary: Record<string, unknown>;
+    nextAction: string;
+  };
+  // RFC-1169 AC-9: identical envelope fields on MCP — parity test pins the whole shape.
+  expect(parsed.ready).toBe(true);
+  expect(parsed.draftId).toMatch(/^sha256:[0-9a-f]{64}$/);
+  expect(parsed.summary).toEqual({ message: "hello world!" });
+  expect(parsed.nextAction).toBe("lead.submit");
+});
+
+test("tools/call action: preview with missing fields returns the ready:false envelope (not -32602)", async () => {
+  __resetMcpLimiterCache();
+  __resetLimiterCache();
+  const gate = createAgentGate(makePreviewManifest(), [LEAD_PREPARE], makeFakePorts());
+  const body = await rpcResult(
+    await gate.handleMcp(rpc("tools/call", { name: "action.lead.prepare", arguments: {} })),
+  );
+  const content = (body.result as { content: Array<{ type: string; text: string }> }).content;
+  const parsed = JSON.parse(content[0]!.text) as { ready: boolean; missing: string[] };
+  expect(parsed.ready).toBe(false);
+  expect(parsed.missing).toEqual(["message"]);
 });
 
 test("tools/call action: _meta idempotency key replays via MCP", async () => {
