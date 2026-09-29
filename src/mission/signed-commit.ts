@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0560: initial signed commit helper using Ed25519 via @warpgogol/werkstatt-shared/passport.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>ADR-0104: scopeFiles parameter — path-limited commits via git commit --only on both the initial and amended commit</item>
 </CHANGE_SUMMARY>
 */
 
@@ -52,10 +53,10 @@ export async function createSignedCommit(
     );
   }
 
-  const scoped = Boolean(scopeFiles && scopeFiles.length > 0);
+  const scope = scopeFiles?.length ? scopeFiles : undefined;
 
-  if (scoped) {
-    await git(workpieceDir, ["add", "--", ...scopeFiles!], io);
+  if (scope) {
+    await git(workpieceDir, ["add", "--", ...scope], io);
   } else {
     await git(workpieceDir, ["add", "-A"], io);
   }
@@ -66,7 +67,7 @@ export async function createSignedCommit(
   try {
     await git(
       workpieceDir,
-      scoped ? ["diff", "--quiet", "HEAD", "--", ...scopeFiles!] : ["diff", "--cached", "--quiet"],
+      scope ? ["diff", "--quiet", "HEAD", "--", ...scope] : ["diff", "--cached", "--quiet"],
       io,
     );
     hasChanges = false;
@@ -85,7 +86,7 @@ export async function createSignedCommit(
 
   await git(
     workpieceDir,
-    scoped ? ["commit", "--only", "-m", message, "--", ...scopeFiles!] : ["commit", "-m", message],
+    scope ? ["commit", "--only", "-m", message, "--", ...scope] : ["commit", "-m", message],
     io,
   );
   const preAmendSha = await git(workpieceDir, ["rev-parse", "HEAD"], io);
@@ -95,8 +96,8 @@ export async function createSignedCommit(
   const amendedMessage = `${message}\n\nWerkstatt-Actor: ${actorId}\nWerkstatt-Signature: ${signature}`;
   await git(
     workpieceDir,
-    scoped
-      ? ["commit", "--amend", "--only", "-m", amendedMessage, "--", ...scopeFiles!]
+    scope
+      ? ["commit", "--amend", "--only", "-m", amendedMessage, "--", ...scope]
       : ["commit", "--amend", "-m", amendedMessage],
     io,
   );

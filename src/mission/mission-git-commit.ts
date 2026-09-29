@@ -7,12 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>ADR-0096: --scope-files flag restricts staging and pre-commit validation to listed paths for bookkeeping commits</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
-  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095</history>
+  <item>ADR-0104: scoped commits use git commit --only + scoped stagedFiles so index residue is neither committed nor validated</item>
+  <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
