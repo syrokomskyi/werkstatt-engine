@@ -12,12 +12,12 @@ astro-aware caller.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1113: MCP-Protocol-Version header ↔ _meta consistency check; UnsupportedProtocolVersionError → HTTP 400.</item>
   <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
   <item>RFC-1114: handleA2a transport boundary — A2A-Version header gate, SendMessage routing.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1114: review findings — schema-violation for malformed message, drop unreachable fallback</item>
-  <history>RFC-0290, RFC-0291, RFC-1112</history>
+  <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
+  <history>RFC-0290, RFC-0291, RFC-1112, RFC-1113</history>
 </CHANGE_SUMMARY>
 */
 
@@ -28,6 +28,7 @@ import type { RateLimiter } from "./limits.ts";
 import { handleJsonRpcRequest } from "./mcp/handler.ts";
 import { handleA2aRequest } from "./a2a/handler.ts";
 import {
+  A2A_METHOD_SEND_MESSAGE,
   A2A_VERSION_HEADER,
   a2aVersionNotSupported,
   isSupportedA2aVersionHeader,
@@ -38,8 +39,10 @@ import {
   readRequestProtocolVersion,
   JSON_RPC_ERROR,
   MCP_PROTOCOL_VERSION_HEADER,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
   type JsonRpcResponse,
 } from "./mcp/protocol.ts";
+import type { TrafficRecorder } from "./telemetry.ts";
 import {
   type ActionContext,
   resolveCapability,
@@ -131,9 +134,13 @@ function jsonResponse(
 }
 
 export interface AgentGate {
-  handleMcp(request: Request): Promise<Response>;
-  handleAction(capabilityId: string, request: Request): Promise<Response>;
-  handleA2a(request: Request): Promise<Response>;
+  handleMcp(request: Request, traffic?: TrafficRecorder): Promise<Response>;
+  handleAction(
+    capabilityId: string,
+    request: Request,
+    traffic?: TrafficRecorder,
+  ): Promise<Response>;
+  handleA2a(request: Request, traffic?: TrafficRecorder): Promise<Response>;
 }
 
 /** Construct the gate for one site from its manifest + active capability records + ports. */
@@ -143,25 +150,55 @@ export function createAgentGate(
   ports: AgentGatePorts,
 ): AgentGate {
   return {
-    async handleMcp(request: Request): Promise<Response> {
+    async handleMcp(request: Request, traffic?: TrafficRecorder): Promise<Response> {
       if (request.method !== "POST") {
+        if (traffic) traffic.operation = "other";
         return new Response(null, { status: 405, headers: { Allow: "POST" } });
       }
       let body: unknown;
       try {
         body = await request.json();
       } catch {
+        if (traffic) {
+          traffic.operation = "other";
+          traffic.statusOverride = "rejected";
+        }
         return jsonResponse(jsonRpcError(null, JSON_RPC_ERROR.PARSE_ERROR, "Invalid JSON."));
       }
       if (Array.isArray(body)) {
+        if (traffic) {
+          traffic.operation = "other";
+          traffic.statusOverride = "rejected";
+        }
         return jsonResponse(
           jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Batch requests are not supported."),
         );
       }
       if (!isJsonRpcRequest(body)) {
+        if (traffic) {
+          traffic.operation = "other";
+          traffic.statusOverride = "rejected";
+        }
         return jsonResponse(
           jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Invalid JSON-RPC 2.0 request."),
         );
+      }
+      // RFC-1172: request-shaped fields — method picks the operation, capability
+      // carries the raw method (tool name for tools/call).
+      if (traffic) {
+        traffic.observedIdentity = extractAgentIdentity(request);
+        traffic.mcpProtocolVersion =
+          request.headers.get(MCP_PROTOCOL_VERSION_HEADER) ??
+          readRequestProtocolVersion(body) ??
+          SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
+        const method = body.method;
+        const toolName =
+          method === "tools/call" && typeof body.params === "object" && body.params !== null
+            ? (body.params as { name?: unknown }).name
+            : undefined;
+        traffic.operation = method === "tools/list" || method === "tools/call" ? method : "other";
+        traffic.capability =
+          method === "tools/call" && typeof toolName === "string" ? toolName : method;
       }
       // RFC-1113 / MCP 2026-07-28: on Streamable HTTP the MCP-Protocol-Version
       // header MUST match _meta["io.modelcontextprotocol/protocolVersion"];
@@ -169,6 +206,7 @@ export function createAgentGate(
       const headerVersion = request.headers.get(MCP_PROTOCOL_VERSION_HEADER);
       const metaVersion = readRequestProtocolVersion(body);
       if (headerVersion !== null && metaVersion !== undefined && headerVersion !== metaVersion) {
+        if (traffic) traffic.statusOverride = "failure";
         return jsonResponse(
           jsonRpcError(
             body.id ?? null,
@@ -185,6 +223,13 @@ export function createAgentGate(
         agentIdentity: extractAgentIdentity(request),
         clientIp: extractClientIp(request),
       });
+      // RFC-1172: JSON-RPC errors ride HTTP 200 — the status code cannot
+      // express them, so record the semantic outcome + problem token.
+      if (traffic && "error" in result) {
+        traffic.statusOverride =
+          result.error.code === JSON_RPC_ERROR.METHOD_NOT_FOUND ? "rejected" : "failure";
+        traffic.problemKind = `json-rpc:${result.error.code}`;
+      }
       // RFC-1113: the 2026-07-28 schema requires UnsupportedProtocolVersionError
       // to be served with HTTP 400 on the HTTP transport.
       const status =
@@ -194,10 +239,19 @@ export function createAgentGate(
       return jsonResponse(result, status);
     },
 
-    async handleAction(capabilityId: string, request: Request): Promise<Response> {
+    async handleAction(
+      capabilityId: string,
+      request: Request,
+      traffic?: TrafficRecorder,
+    ): Promise<Response> {
       const raw = await request.text();
       const clientIp = extractClientIp(request);
       const agentIdentity = extractAgentIdentity(request);
+      if (traffic) {
+        traffic.operation = "action.call";
+        traffic.capability = capabilityId;
+        traffic.observedIdentity = agentIdentity;
+      }
       // RFC-1112: the idempotency key + body hash are extracted before the
       // pipeline so the replay check can run ahead of rate limiting.
       const idempotencyKey = extractIdempotencyKey(request);
@@ -214,6 +268,7 @@ export function createAgentGate(
         agentIdentity,
         idempotencyKey,
         bodyHash,
+        ...(traffic ? { traffic } : {}),
       };
 
       const steps: (() => Response | Promise<Response | void> | void)[] = [
@@ -255,25 +310,45 @@ export function createAgentGate(
       return response;
     },
 
-    async handleA2a(request: Request): Promise<Response> {
+    async handleA2a(request: Request, traffic?: TrafficRecorder): Promise<Response> {
       if (request.method !== "POST") {
+        if (traffic) traffic.operation = "other";
         return new Response(null, { status: 405, headers: { Allow: "POST" } });
       }
       let body: unknown;
       try {
         body = await request.json();
       } catch {
+        if (traffic) {
+          traffic.operation = "other";
+          traffic.statusOverride = "rejected";
+        }
         return jsonResponse(jsonRpcError(null, JSON_RPC_ERROR.PARSE_ERROR, "Invalid JSON."));
       }
       if (Array.isArray(body)) {
+        if (traffic) {
+          traffic.operation = "other";
+          traffic.statusOverride = "rejected";
+        }
         return jsonResponse(
           jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Batch requests are not supported."),
         );
       }
       if (!isJsonRpcRequest(body)) {
+        if (traffic) {
+          traffic.operation = "other";
+          traffic.statusOverride = "rejected";
+        }
         return jsonResponse(
           jsonRpcError(null, JSON_RPC_ERROR.INVALID_REQUEST, "Invalid JSON-RPC 2.0 request."),
         );
+      }
+      // RFC-1172: SendMessage dispatches an action; anything else is `other`
+      // with the raw method in capability.
+      if (traffic) {
+        traffic.observedIdentity = extractAgentIdentity(request);
+        traffic.operation = body.method === A2A_METHOD_SEND_MESSAGE ? "action.call" : "other";
+        traffic.capability = body.method;
       }
       // RFC-1114: A2A-Version header gate — a present header must match 1.x;
       // absent is served as 1.0 (documented deviation: no 0.3 semantics exist).
@@ -290,6 +365,12 @@ export function createAgentGate(
         clientIp: extractClientIp(request),
         idempotencyKey: extractIdempotencyKey(request),
       });
+      // RFC-1172: JSON-RPC errors ride HTTP 200 — record the semantic outcome.
+      if (traffic && "error" in result) {
+        traffic.statusOverride =
+          result.error.code === JSON_RPC_ERROR.METHOD_NOT_FOUND ? "rejected" : "failure";
+        traffic.problemKind = `json-rpc:${result.error.code}`;
+      }
       const response = jsonResponse(result);
       // RFC-1112: mark responses when no receipt store is configured.
       if (!ports.idempotency) response.headers.set("X-Agent-Idempotency", "disabled");

@@ -14,12 +14,12 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1112: dispatch returns ActionReceipt; wire restRedisReceiptStore when UPSTASH_REDIS_* are configured.</item>
   <item>RFC-1114: add createAgentA2aRoute for the A2A endpoint.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
   <item>RFC-1112/1113/1114 gap fix: CORS Allow-Headers gains Idempotency-Key, MCP-Protocol-Version, A2A-Version; Expose-Headers gains X-Agent-Idempotency.</item>
-  <history>RFC-0290, RFC-0954</history>
+  <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
+  <history>RFC-0290, RFC-0954, RFC-1112</history>
 </CHANGE_SUMMARY>
 */
 
@@ -43,6 +43,7 @@ import {
 } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, type AgentGatePorts } from "./index.ts";
+import { emitAgentTraffic, workerLogTelemetry, type TrafficRecorder } from "./telemetry.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 import { runAgentSearch } from "./search-route.ts";
 import { runAgentHealth } from "./health-route.ts";
@@ -96,6 +97,8 @@ function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGate
       },
     },
     now: () => new Date(),
+    // RFC-1172: one structured JSON line per gate request → Workers logs.
+    telemetry: workerLogTelemetry,
     // RFC-0291: 60-second fixed window per capability per IP.
     createRateLimiter: (maxPerWindow) => createFixedWindowLimiter(60, maxPerWindow),
     // RFC-1112: receipt store over the same EU Redis as the delivery ledger.
@@ -112,17 +115,48 @@ function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGate
   };
 }
 
+/**
+ * RFC-1172: boundary emit — build ports, run the handler with a fresh
+ * TrafficRecorder, emit exactly one closed event after the response resolves.
+ */
+async function withTrafficEmit(
+  manifest: AgentSurfaceManifest,
+  request: Request,
+  protocol: "http" | "mcp" | "a2a" | "nlweb",
+  run: (traffic: TrafficRecorder, ports: AgentGatePorts) => Promise<Response>,
+): Promise<Response> {
+  const ports = buildPorts(manifest, request);
+  const traffic: TrafficRecorder = {};
+  const started = Date.now();
+  const response = await run(traffic, ports);
+  await emitAgentTraffic(ports, {
+    systemId: manifest.site,
+    protocol,
+    response,
+    traffic,
+    durationMs: Date.now() - started,
+  });
+  return response;
+}
+
 /** Factory the generated apps/<site>/src/pages/api/agent/mcp.ts calls with its manifest + capabilities. */
 export function createAgentMcpRoute(
   manifest: AgentSurfaceManifest,
   catalog: CapabilityRecord[],
 ): { GET: APIRoute; POST: APIRoute; OPTIONS: APIRoute } {
   return {
-    GET: async () => withCors(new Response(null, { status: 405, headers: { Allow: "POST" } })),
-    POST: async ({ request }) => {
-      const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
-      return withCors(await gate.handleMcp(request));
-    },
+    GET: async ({ request }) =>
+      withCors(
+        await withTrafficEmit(manifest, request, "mcp", (traffic, ports) =>
+          createAgentGate(manifest, catalog, ports).handleMcp(request, traffic),
+        ),
+      ),
+    POST: async ({ request }) =>
+      withCors(
+        await withTrafficEmit(manifest, request, "mcp", (traffic, ports) =>
+          createAgentGate(manifest, catalog, ports).handleMcp(request, traffic),
+        ),
+      ),
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }
@@ -133,11 +167,18 @@ export function createAgentA2aRoute(
   catalog: CapabilityRecord[],
 ): { GET: APIRoute; POST: APIRoute; OPTIONS: APIRoute } {
   return {
-    GET: async () => withCors(new Response(null, { status: 405, headers: { Allow: "POST" } })),
-    POST: async ({ request }) => {
-      const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
-      return withCors(await gate.handleA2a(request));
-    },
+    GET: async ({ request }) =>
+      withCors(
+        await withTrafficEmit(manifest, request, "a2a", (traffic, ports) =>
+          createAgentGate(manifest, catalog, ports).handleA2a(request, traffic),
+        ),
+      ),
+    POST: async ({ request }) =>
+      withCors(
+        await withTrafficEmit(manifest, request, "a2a", (traffic, ports) =>
+          createAgentGate(manifest, catalog, ports).handleA2a(request, traffic),
+        ),
+      ),
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }
@@ -148,10 +189,16 @@ export function createAgentActionRoute(
   catalog: CapabilityRecord[],
 ): { POST: APIRoute; OPTIONS: APIRoute } {
   return {
-    POST: async ({ request, params }) => {
-      const gate = createAgentGate(manifest, catalog, buildPorts(manifest, request));
-      return withCors(await gate.handleAction(String(params.id ?? ""), request));
-    },
+    POST: async ({ request, params }) =>
+      withCors(
+        await withTrafficEmit(manifest, request, "http", (traffic, ports) =>
+          createAgentGate(manifest, catalog, ports).handleAction(
+            String(params.id ?? ""),
+            request,
+            traffic,
+          ),
+        ),
+      ),
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }
@@ -248,90 +295,209 @@ async function fetchSearchManifest(
 }
 
 /** Factory the generated apps/<site>/src/pages/api/agent/search.ts calls. */
-export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
+export function createAgentSearchRoute(manifest: AgentSurfaceManifest): {
   GET: APIRoute;
   POST: APIRoute;
   OPTIONS: APIRoute;
 } {
   return {
-    GET: async ({ request }) => {
-      const env = await resolveSearchEnv();
-      if (!env.AI || !env.SEARCH_INDEX) {
-        return withCors(
-          new Response(
-            JSON.stringify({
-              error: "Search index not available — AI or SEARCH_INDEX binding missing",
+    GET: async ({ request }) =>
+      await withTrafficEmit(manifest, request, "http", async (traffic) => {
+        traffic.operation = "search";
+        const env = await resolveSearchEnv();
+        if (!env.AI || !env.SEARCH_INDEX) {
+          return withCors(
+            new Response(
+              JSON.stringify({
+                error: "Search index not available — AI or SEARCH_INDEX binding missing",
+              }),
+              { status: 503, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+
+        let query: SearchQuery;
+        try {
+          query = parseSearchQuery(new URL(request.url));
+        } catch (err) {
+          return withCors(
+            new Response(JSON.stringify({ error: (err as Error).message }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
             }),
-            { status: 503, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
+          );
+        }
 
-      let query: SearchQuery;
-      try {
-        query = parseSearchQuery(new URL(request.url));
-      } catch (err) {
-        return withCors(
-          new Response(JSON.stringify({ error: (err as Error).message }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
+        const searchManifest = await fetchSearchManifest(request, env);
+        if (!searchManifest) {
+          return withCors(
+            new Response(JSON.stringify({ error: "Search manifest not found" }), {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
 
-      const searchManifest = await fetchSearchManifest(request, env);
-      if (!searchManifest) {
-        return withCors(
-          new Response(JSON.stringify({ error: "Search manifest not found" }), {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
+        try {
+          // RFC-1115: core lives in search-route.ts — flattened citation shape,
+          // measured tookMs, no astro imports (vitest-loadable).
+          const response = await runAgentSearch(query, searchManifest, {
+            ai: env.AI,
+            searchIndex: env.SEARCH_INDEX,
+          });
 
-      try {
-        // RFC-1115: core lives in search-route.ts — flattened citation shape,
-        // measured tookMs, no astro imports (vitest-loadable).
-        const response = await runAgentSearch(query, searchManifest, {
-          ai: env.AI,
-          searchIndex: env.SEARCH_INDEX,
-        });
+          return withCors(
+            new Response(JSON.stringify(response), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        } catch (err) {
+          return withCors(
+            new Response(JSON.stringify({ error: `Search failed: ${(err as Error).message}` }), {
+              status: 502,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+      }),
 
-        return withCors(
-          new Response(JSON.stringify(response), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      } catch (err) {
-        return withCors(
-          new Response(JSON.stringify({ error: `Search failed: ${(err as Error).message}` }), {
-            status: 502,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-    },
+    POST: async ({ request }) =>
+      await withTrafficEmit(manifest, request, "http", async (traffic) => {
+        const env = await resolveSearchEnv();
+        const url = new URL(request.url);
 
-    POST: async ({ request }) => {
-      const env = await resolveSearchEnv();
-      const url = new URL(request.url);
+        // RFC-1172: reindex is operator maintenance, not a query — `other`.
+        traffic.operation = url.pathname.endsWith("/reindex") ? "other" : "search";
+        if (traffic.operation === "other") traffic.capability = "search.reindex";
 
-      // Reindex endpoint — requires x-search-reindex-token header when configured
-      if (url.pathname.endsWith("/reindex")) {
-        const reindexToken = process.env.SEARCH_REINDEX_TOKEN;
-        if (reindexToken) {
-          const provided = request.headers.get("x-search-reindex-token");
-          if (provided !== reindexToken) {
+        // Reindex endpoint — requires x-search-reindex-token header when configured
+        if (url.pathname.endsWith("/reindex")) {
+          const reindexToken = process.env.SEARCH_REINDEX_TOKEN;
+          if (reindexToken) {
+            const provided = request.headers.get("x-search-reindex-token");
+            if (provided !== reindexToken) {
+              return withCors(
+                new Response(JSON.stringify({ error: "Invalid reindex token" }), {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" },
+                }),
+              );
+            }
+          }
+
+          if (!env.AI || !env.SEARCH_INDEX) {
             return withCors(
-              new Response(JSON.stringify({ error: "Invalid reindex token" }), {
-                status: 403,
+              new Response(
+                JSON.stringify({
+                  error: "Search index not available — AI or SEARCH_INDEX binding missing",
+                }),
+                { status: 503, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+
+          const searchManifest = await fetchSearchManifest(request, env);
+          if (!searchManifest) {
+            return withCors(
+              new Response(JSON.stringify({ error: "Search manifest not found" }), {
+                status: 503,
+                headers: { "Content-Type": "application/json" },
+              }),
+            );
+          }
+
+          try {
+            const chunks = searchManifest.chunks;
+            let upserted = 0;
+
+            for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
+              const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
+              const texts = batch.map((c) => c.text.slice(0, SEARCH_CHUNK_TEXT_MAX_LENGTH));
+
+              const embedResult = await env.AI.run(SEARCH_EMBEDDING_MODEL, { text: texts });
+              const vectors = embedResult.data;
+
+              for (let j = 0; j < batch.length; j += UPSERT_BATCH_SIZE) {
+                const upsertBatch: Array<{
+                  id: string;
+                  values: number[];
+                  metadata: Record<string, unknown>;
+                }> = [];
+                for (let k = j; k < Math.min(j + UPSERT_BATCH_SIZE, batch.length); k++) {
+                  upsertBatch.push({
+                    id: batch[k].id,
+                    values: vectors[k],
+                    metadata: {
+                      lang: batch[k].lang,
+                      type: batch[k].type,
+                      url: batch[k].url,
+                      heading: batch[k].heading ?? "",
+                    },
+                  });
+                }
+                await env.SEARCH_INDEX.upsert(upsertBatch);
+                upserted += upsertBatch.length;
+              }
+            }
+
+            return withCors(
+              new Response(
+                JSON.stringify({
+                  status: "ok",
+                  mutationId: `reindex-${Date.now()}`,
+                  chunks: upserted,
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          } catch (err) {
+            return withCors(
+              new Response(JSON.stringify({ error: `Reindex failed: ${(err as Error).message}` }), {
+                status: 500,
                 headers: { "Content-Type": "application/json" },
               }),
             );
           }
         }
 
+        // Non-reindex POST — direct users to GET for queries
+        return withCors(
+          new Response(
+            JSON.stringify({
+              error: "Use GET for search queries, POST /reindex for reindexing",
+            }),
+            {
+              status: 405,
+              headers: { "Content-Type": "application/json", Allow: "GET, OPTIONS" },
+            },
+          ),
+        );
+      }),
+
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RFC-1165: NLWeb /ask route
+// ---------------------------------------------------------------------------
+
+/**
+ * Factory the generated apps/<site>/src/pages/ask.ts calls.
+ * Core lives in nlweb-ask.ts (vitest-loadable, deterministic extractive —
+ * ADR-0097); this adapter only resolves env bindings, the search manifest,
+ * and the RFC-1164 .jsonld mirror fetch, then maps { status, body } to HTTP.
+ */
+export function createAgentNlwebRoute(manifest: AgentSurfaceManifest): {
+  POST: APIRoute;
+  OPTIONS: APIRoute;
+} {
+  return {
+    POST: async ({ request }) =>
+      await withTrafficEmit(manifest, request, "nlweb", async (traffic) => {
+        traffic.operation = "ask";
+        const env = await resolveSearchEnv();
         if (!env.AI || !env.SEARCH_INDEX) {
           return withCors(
             new Response(
@@ -353,161 +519,51 @@ export function createAgentSearchRoute(_manifest: AgentSurfaceManifest): {
           );
         }
 
+        let body: unknown;
         try {
-          const chunks = searchManifest.chunks;
-          let upserted = 0;
-
-          for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
-            const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
-            const texts = batch.map((c) => c.text.slice(0, SEARCH_CHUNK_TEXT_MAX_LENGTH));
-
-            const embedResult = await env.AI.run(SEARCH_EMBEDDING_MODEL, { text: texts });
-            const vectors = embedResult.data;
-
-            for (let j = 0; j < batch.length; j += UPSERT_BATCH_SIZE) {
-              const upsertBatch: Array<{
-                id: string;
-                values: number[];
-                metadata: Record<string, unknown>;
-              }> = [];
-              for (let k = j; k < Math.min(j + UPSERT_BATCH_SIZE, batch.length); k++) {
-                upsertBatch.push({
-                  id: batch[k].id,
-                  values: vectors[k],
-                  metadata: {
-                    lang: batch[k].lang,
-                    type: batch[k].type,
-                    url: batch[k].url,
-                    heading: batch[k].heading ?? "",
-                  },
-                });
-              }
-              await env.SEARCH_INDEX.upsert(upsertBatch);
-              upserted += upsertBatch.length;
-            }
-          }
-
+          body = await request.json();
+        } catch {
           return withCors(
-            new Response(
-              JSON.stringify({
-                status: "ok",
-                mutationId: `reindex-${Date.now()}`,
-                chunks: upserted,
-              }),
-              { status: 200, headers: { "Content-Type": "application/json" } },
-            ),
-          );
-        } catch (err) {
-          return withCors(
-            new Response(JSON.stringify({ error: `Reindex failed: ${(err as Error).message}` }), {
-              status: 500,
+            new Response(JSON.stringify({ error: "Request body must be JSON" }), {
+              status: 400,
               headers: { "Content-Type": "application/json" },
             }),
           );
         }
-      }
 
-      // Non-reindex POST — direct users to GET for queries
-      return withCors(
-        new Response(
-          JSON.stringify({
-            error: "Use GET for search queries, POST /reindex for reindexing",
-          }),
-          {
-            status: 405,
-            headers: { "Content-Type": "application/json", Allow: "GET, OPTIONS" },
-          },
-        ),
-      );
-    },
+        // RFC-1164: schema_object per result is sourced from the route's .jsonld
+        // mirror — served sibling of the search manifest, fetched via ASSETS.
+        const fetchMirror = async (mirrorPath: string): Promise<unknown | null> => {
+          try {
+            const url = new URL(`/${mirrorPath}`, request.url);
+            const res = env.ASSETS ? await env.ASSETS.fetch(new Request(url)) : await fetch(url);
+            return res.ok ? await res.json() : null;
+          } catch {
+            return null;
+          }
+        };
 
-    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// RFC-1165: NLWeb /ask route
-// ---------------------------------------------------------------------------
-
-/**
- * Factory the generated apps/<site>/src/pages/ask.ts calls.
- * Core lives in nlweb-ask.ts (vitest-loadable, deterministic extractive —
- * ADR-0097); this adapter only resolves env bindings, the search manifest,
- * and the RFC-1164 .jsonld mirror fetch, then maps { status, body } to HTTP.
- */
-export function createAgentNlwebRoute(manifest: AgentSurfaceManifest): {
-  POST: APIRoute;
-  OPTIONS: APIRoute;
-} {
-  return {
-    POST: async ({ request }) => {
-      const env = await resolveSearchEnv();
-      if (!env.AI || !env.SEARCH_INDEX) {
-        return withCors(
-          new Response(
-            JSON.stringify({
-              error: "Search index not available — AI or SEARCH_INDEX binding missing",
-            }),
-            { status: 503, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
-
-      const searchManifest = await fetchSearchManifest(request, env);
-      if (!searchManifest) {
-        return withCors(
-          new Response(JSON.stringify({ error: "Search manifest not found" }), {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await request.json();
-      } catch {
-        return withCors(
-          new Response(JSON.stringify({ error: "Request body must be JSON" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-
-      // RFC-1164: schema_object per result is sourced from the route's .jsonld
-      // mirror — served sibling of the search manifest, fetched via ASSETS.
-      const fetchMirror = async (mirrorPath: string): Promise<unknown | null> => {
         try {
-          const url = new URL(`/${mirrorPath}`, request.url);
-          const res = env.ASSETS ? await env.ASSETS.fetch(new Request(url)) : await fetch(url);
-          return res.ok ? await res.json() : null;
-        } catch {
-          return null;
+          const { status, body: responseBody } = await runNlwebAsk(body, manifest, searchManifest, {
+            ai: env.AI,
+            searchIndex: env.SEARCH_INDEX,
+            fetchMirror,
+          });
+          return withCors(
+            new Response(JSON.stringify(responseBody), {
+              status,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        } catch (err) {
+          return withCors(
+            new Response(JSON.stringify({ error: `Ask failed: ${(err as Error).message}` }), {
+              status: 502,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
         }
-      };
-
-      try {
-        const { status, body: responseBody } = await runNlwebAsk(body, manifest, searchManifest, {
-          ai: env.AI,
-          searchIndex: env.SEARCH_INDEX,
-          fetchMirror,
-        });
-        return withCors(
-          new Response(JSON.stringify(responseBody), {
-            status,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      } catch (err) {
-        return withCors(
-          new Response(JSON.stringify({ error: `Ask failed: ${(err as Error).message}` }), {
-            status: 502,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-    },
+      }),
 
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
@@ -527,21 +583,23 @@ export function createAgentHealthRoute(manifest: AgentSurfaceManifest): {
   OPTIONS: APIRoute;
 } {
   return {
-    GET: async ({ request }) => {
-      const env = await resolveSearchEnv();
-      const { status, body } = await runAgentHealth(manifest, {
-        requestUrl: request.url,
-        fetchFn: fetch,
-        env,
-        qstashToken: UPSTASH_QSTASH_TOKEN,
-      });
-      return withCors(
-        new Response(JSON.stringify(body), {
-          status,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    },
+    GET: async ({ request }) =>
+      await withTrafficEmit(manifest, request, "http", async (traffic) => {
+        traffic.operation = "health";
+        const env = await resolveSearchEnv();
+        const { status, body } = await runAgentHealth(manifest, {
+          requestUrl: request.url,
+          fetchFn: fetch,
+          env,
+          qstashToken: UPSTASH_QSTASH_TOKEN,
+        });
+        return withCors(
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
 }

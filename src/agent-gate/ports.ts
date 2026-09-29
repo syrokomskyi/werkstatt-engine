@@ -13,11 +13,12 @@ concrete port implementations (fetch-based knowledge reads, QStash dispatch).
   <item>RFC-0290: initial ports contract.</item>
   <item>RFC-0291: add optional createRateLimiter port.</item>
   <item>RFC-1112: dispatch.send returns ActionReceipt; add optional idempotency port.</item>
+  <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
 </CHANGE_SUMMARY>
 */
 
 import type { IntegrationEvent } from "@warpgogol/werkstatt-shared/integration/port";
-import type { ActionReceipt } from "@warpgogol/werkstatt-shared/agent";
+import type { ActionReceipt, AgentTrafficEvent } from "@warpgogol/werkstatt-shared/agent";
 import type { RateLimiter } from "./limits.ts";
 
 /**
@@ -48,4 +49,12 @@ export interface AgentGatePorts {
    * requests proceed without dedup and responses carry `X-Agent-Idempotency: disabled`.
    */
   idempotency?: IdempotencyPort;
+  /**
+   * RFC-1172: optional sink for the closed `werkstatt.agent.traffic` event.
+   * Called exactly once per request at the response boundary; the emit helper
+   * swallows sink errors, so implementations may be fire-and-forget.
+   * Production adapters wire `console.log(JSON.stringify(event))` (Workers
+   * captures structured stdout); absent port = telemetry disabled.
+   */
+  telemetry?: (event: AgentTrafficEvent) => void;
 }

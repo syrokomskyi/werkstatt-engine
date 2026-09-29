@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
 </CHANGE_SUMMARY>
 */
 
@@ -67,6 +68,8 @@ export interface ActionContext {
   capability?: CapabilityRecord;
   parsed?: unknown;
   validatedValue?: Record<string, unknown>;
+  /** RFC-1172: optional per-request telemetry recorder — steps record what only they know (duplicate replay). */
+  traffic?: import("./telemetry.ts").TrafficRecorder;
 }
 
 export type StepResult = Response | void;
@@ -179,7 +182,11 @@ export async function checkIdempotency(ctx: ActionContext): Promise<StepResult> 
     bodyHash: ctx.bodyHash,
   });
   if (replay === null) return;
-  if ("receiptId" in replay) return jsonResponse(replay, 200);
+  if ("receiptId" in replay) {
+    // RFC-1172: replayed from a stored receipt — mark the traffic event.
+    if (ctx.traffic) ctx.traffic.duplicate = true;
+    return jsonResponse(replay, 200);
+  }
   return problemResponse(replay);
 }
 
