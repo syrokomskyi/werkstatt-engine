@@ -488,10 +488,18 @@ export async function runMissionGitCommit(
     await git(workpieceDir, ["add", "-A"], context.io);
   }
 
-  // Check if there are changes to commit
+  // Check if there are changes to commit. ADR-0104: scoped commits use
+  // `git commit --only`, which takes the named paths' worktree state — so
+  // "changes" means worktree-vs-HEAD inside the scope, not the whole index.
   let hasChanges: boolean;
   try {
-    await git(workpieceDir, ["diff", "--cached", "--quiet"], context.io);
+    await git(
+      workpieceDir,
+      scopeFiles?.length
+        ? ["diff", "--quiet", "HEAD", "--", ...scopeFiles]
+        : ["diff", "--cached", "--quiet"],
+      context.io,
+    );
     hasChanges = false;
   } catch {
     hasChanges = true;
@@ -523,7 +531,17 @@ export async function runMissionGitCommit(
   // RFC-1095: record CHANGE_SUMMARY items when the commit carries a governance
   // ID. Runs after staging, before validation and commit; non-fatal — a header
   // miss never blocks a commit, the next compass.validate surfaces the gap.
-  const stagedFiles = (await git(workpieceDir, ["diff", "--cached", "--name-only"], context.io))
+  // ADR-0104: a scoped commit validates exactly the files it will commit —
+  // index residue outside the scope can neither be swept in nor block it.
+  const stagedFiles = (
+    await git(
+      workpieceDir,
+      scopeFiles?.length
+        ? ["diff", "--cached", "--name-only", "--", ...scopeFiles]
+        : ["diff", "--cached", "--name-only"],
+      context.io,
+    )
+  )
     .split("\n")
     .filter(Boolean);
 
@@ -605,7 +623,13 @@ export async function runMissionGitCommit(
   const actorId = manifest.openedBy ?? "unknown";
 
   if (signingKey) {
-    const result = await createSignedCommit(workpieceDir, commitMessage, actorId, signingKey);
+    const result = await createSignedCommit(
+      workpieceDir,
+      commitMessage,
+      actorId,
+      signingKey,
+      scopeFiles,
+    );
 
     const data: MissionGitCommitData = {
       missionId,
@@ -631,7 +655,13 @@ export async function runMissionGitCommit(
     `[warn] WERKSTATT_OPERATOR_SIGNING_KEY not set — producing unsigned commit.\n`,
   );
 
-  const commitSha = await git(workpieceDir, ["commit", "-m", commitMessage], context.io);
+  const commitSha = await git(
+    workpieceDir,
+    scopeFiles?.length
+      ? ["commit", "--only", "-m", commitMessage, "--", ...scopeFiles]
+      : ["commit", "-m", commitMessage],
+    context.io,
+  );
 
   const data: MissionGitCommitData = {
     missionId,

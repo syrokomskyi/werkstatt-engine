@@ -41,6 +41,9 @@ export async function createSignedCommit(
   message: string,
   actorId: string,
   privateKeyHex: string,
+  // ADR-0104: when set, the commit is path-limited — only the named paths are
+  // staged and `git commit --only` ignores the rest of the index.
+  scopeFiles?: string[],
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<SignedCommitResult> {
   if (!(await io.exists(path.join(workpieceDir, ".git")))) {
@@ -49,11 +52,23 @@ export async function createSignedCommit(
     );
   }
 
-  await git(workpieceDir, ["add", "-A"], io);
+  const scoped = Boolean(scopeFiles && scopeFiles.length > 0);
 
+  if (scoped) {
+    await git(workpieceDir, ["add", "--", ...scopeFiles!], io);
+  } else {
+    await git(workpieceDir, ["add", "-A"], io);
+  }
+
+  // ADR-0104: `commit --only` takes the named paths' worktree state — check
+  // worktree-vs-HEAD inside the scope, not the whole index.
   let hasChanges: boolean;
   try {
-    await git(workpieceDir, ["diff", "--cached", "--quiet"], io);
+    await git(
+      workpieceDir,
+      scoped ? ["diff", "--quiet", "HEAD", "--", ...scopeFiles!] : ["diff", "--cached", "--quiet"],
+      io,
+    );
     hasChanges = false;
   } catch {
     hasChanges = true;
@@ -68,13 +83,23 @@ export async function createSignedCommit(
     };
   }
 
-  await git(workpieceDir, ["commit", "-m", message], io);
+  await git(
+    workpieceDir,
+    scoped ? ["commit", "--only", "-m", message, "--", ...scopeFiles!] : ["commit", "-m", message],
+    io,
+  );
   const preAmendSha = await git(workpieceDir, ["rev-parse", "HEAD"], io);
 
   const signature = await signBytes(privateKeyHex, new TextEncoder().encode(preAmendSha));
 
   const amendedMessage = `${message}\n\nWerkstatt-Actor: ${actorId}\nWerkstatt-Signature: ${signature}`;
-  await git(workpieceDir, ["commit", "--amend", "-m", amendedMessage], io);
+  await git(
+    workpieceDir,
+    scoped
+      ? ["commit", "--amend", "--only", "-m", amendedMessage, "--", ...scopeFiles!]
+      : ["commit", "--amend", "-m", amendedMessage],
+    io,
+  );
 
   const postAmendSha = await git(workpieceDir, ["rev-parse", "HEAD"], io);
 

@@ -456,6 +456,97 @@ test("ADR-0096: --scope-files stages only listed paths, unstaged content cannot 
   expect(status).toContain("?? src/");
 });
 
+test("ADR-0104: --scope-files commits only named paths — staged residue is neither swept nor validated", async () => {
+  const workpieceDir = setupWorkpiece();
+
+  // Reproduce m000164: bookkeeping target + STAGED operator content whose
+  // validators are configured to fail — under the old index-wide diff the
+  // residue both blocked validation and rode into the commit object.
+  writeFileSync(join(workpieceDir, "behavior.snapshot.generated.yaml"), "generated: true\n");
+  mkdirSync(join(workpieceDir, "src", "content", "pages", "de"), { recursive: true });
+  writeFileSync(join(workpieceDir, "src", "content", "pages", "de", "broken.md"), "bad\n");
+  execSync("git add src/content/pages/de/broken.md", { cwd: workpieceDir, stdio: "pipe" });
+
+  mockState.validatorResults = {
+    "page.block.validate": { ok: false, exitCode: 1, summary: "B-02" },
+    "semantic.drift.validate": { ok: false, exitCode: 1, summary: "drift" },
+    "image.variants.validate": { ok: false, exitCode: 1, summary: "variants" },
+    "typography.validate": { ok: false, exitCode: 1, summary: "typo" },
+  };
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: {
+      mission: "test-system-m000001",
+      message: "chore: bootstrap committed behavior snapshot",
+      "scope-files": "behavior.snapshot.generated.yaml",
+    },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode ?? 0).toBe(0);
+  expect(
+    result.data?.preCommitValidation?.validatorsRun,
+    "Scoped stagedFiles must exclude residue — no validators may run",
+  ).toEqual([]);
+
+  const committedFiles = execSync("git show --name-only --format= HEAD", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  expect(committedFiles, "Scoped commit object must contain exactly the named path").toBe(
+    "behavior.snapshot.generated.yaml",
+  );
+
+  // Residue stays staged, untouched.
+  const status = execSync("git status --porcelain", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  expect(status).toBe("A  src/content/pages/de/broken.md");
+});
+
+test("ADR-0104: --scope-files with only residue staged reports noChanges instead of committing residue", async () => {
+  const workpieceDir = setupWorkpiece();
+
+  // Stage residue outside the scope; README.md (scoped) is unchanged.
+  writeFileSync(join(workpieceDir, "residue.md"), "x\n");
+  execSync("git add residue.md", { cwd: workpieceDir, stdio: "pipe" });
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: {
+      mission: "test-system-m000001",
+      message: "chore: re-bootstrap snapshot",
+      "scope-files": "README.md",
+    },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode ?? 0).toBe(0);
+  expect(
+    result.data?.noChanges,
+    "Scoped commit must detect worktree-vs-HEAD inside the scope — staged residue alone is not a change",
+  ).toBe(true);
+
+  const logOutput = execSync("git log --oneline", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  expect(logOutput.split("\n")).toHaveLength(1);
+});
+
 test("ADR-0096: --scope-files fails loudly when a listed path does not exist", async () => {
   setupWorkpiece();
 

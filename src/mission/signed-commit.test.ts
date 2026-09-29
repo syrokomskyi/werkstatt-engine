@@ -80,6 +80,52 @@ test("createSignedCommit returns signed=false when there are no changes", async 
   expect(result.commitSha).toBe(headBefore);
 });
 
+test("ADR-0104: scopeFiles commits only named paths — staged residue stays staged, never committed", async () => {
+  const keyPair = await generateKeypair();
+  // The bookkeeping target plus unrelated staged residue (the m000164 sweep
+  // scenario: an earlier `git add -A` left operator content in the index).
+  await fs.writeFile(path.join(workpieceDir, "snapshot.yaml"), "generated: true\n");
+  await fs.writeFile(path.join(workpieceDir, "residue.md"), "operator content\n");
+  git(workpieceDir, "add residue.md"); // residue staged BEFORE the scoped commit
+
+  const result = await createSignedCommit(
+    workpieceDir,
+    "chore: bootstrap snapshot",
+    "did:key:z6Mktest",
+    keyPair.privateKeyHex,
+    ["snapshot.yaml"],
+  );
+
+  expect(result.signed).toBe(true);
+  // The commit contains exactly the scoped file — including after --amend.
+  expect(git(workpieceDir, "show --name-only --format= HEAD")).toBe("snapshot.yaml");
+  // Residue remains staged for the operator to deal with.
+  expect(git(workpieceDir, "status --porcelain")).toBe("A  residue.md");
+  const body = git(workpieceDir, "log -1 --format=%B");
+  expect(body).toContain("Werkstatt-Actor: did:key:z6Mktest");
+});
+
+test("ADR-0104: scopeFiles with only residue staged returns no-changes (signed=false)", async () => {
+  const keyPair = await generateKeypair();
+  const headBefore = git(workpieceDir, "rev-parse HEAD");
+  // Stage residue outside the scope; the scoped path itself is clean.
+  await fs.writeFile(path.join(workpieceDir, "residue.md"), "x\n");
+  git(workpieceDir, "add residue.md");
+
+  const result = await createSignedCommit(
+    workpieceDir,
+    "noop",
+    "did:key:z6Mktest",
+    keyPair.privateKeyHex,
+    ["README.md"], // unchanged file that exists
+  );
+
+  expect(result.signed).toBe(false);
+  expect(result.commitSha).toBe(headBefore);
+  // Residue must still be staged — never swept, never unstaged.
+  expect(git(workpieceDir, "status --porcelain")).toBe("A  residue.md");
+});
+
 test("createSignedCommit: post-amend SHA differs from pre-amend SHA", async () => {
   const keyPair = await generateKeypair();
   await fs.writeFile(path.join(workpieceDir, "file2.txt"), "content2\n");
