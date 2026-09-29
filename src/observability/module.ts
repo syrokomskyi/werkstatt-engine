@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0337: initial implementation — registers observability.conventions.validate.</item>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -33,6 +34,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "observability.conventions.validate",
+        mutatesState: false,
         contract: "observability",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -49,6 +51,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.stack.validate",
+        mutatesState: false,
         contract: "observability",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -61,6 +64,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.stack.health",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
           "On-demand network round-trip check for the SigNoz stack: UI reachable, ingest rejects tokenless, smoke metric round-trip. Never in offline pipelines (RFC-0338).",
@@ -73,6 +77,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.workers.validate",
+        mutatesState: false,
         contract: "observability",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -89,6 +94,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.factory.smoke",
+        mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
           "Send a test metric (warpgogol_factory_smoke_total) through the OTLP pipe to verify end-to-end delivery. Network, manual-only — never in pipelines (RFC-0340).",
@@ -117,6 +123,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.probe.validate",
+        mutatesState: false,
         contract: "fleet",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -148,6 +155,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.alerts.validate",
+        mutatesState: false,
         contract: "observability",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -163,6 +171,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.alerts.apply",
+        mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
           "Converge SigNoz backend to the declared alert rules and channels. Network, ops-only — never in pipelines. Use --dry-run first (RFC-0342).",
@@ -175,6 +184,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.delivery.validate",
+        mutatesState: false,
         contract: "observability",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -190,6 +200,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.mcp.validate",
+        mutatesState: false,
         contract: "observability",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",

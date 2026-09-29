@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0655: add release.state.validate command for release pipeline consistency checks.</item>
   <item>RFC-0656: add dist.determinism.validate command for non-deterministic build artifact detection.</item>
   <item>RFC-0931: add release.sign command for Ed25519 signing of build-identity.json and signed-manifest.json.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -16,6 +15,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <history>RFC-0655</history>
 </CHANGE_SUMMARY>
 */
 
@@ -82,6 +83,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.validate",
+        mutatesState: false,
         contract: "release",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
@@ -96,6 +98,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.list",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "List releases, optionally filtered by site (RFC-0357). Flags: [--site].",
         scope: "workspace",
@@ -108,6 +111,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.state.validate",
+        mutatesState: false,
         contract: "release",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",

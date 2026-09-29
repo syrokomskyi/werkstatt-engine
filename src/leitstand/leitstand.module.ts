@@ -7,9 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -18,7 +15,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962</history>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -217,6 +215,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.status",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Print deployment state for all channels (RFC-0627). Flags: --site, [--channel dev|alt|main].",
@@ -283,6 +282,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.health",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Run health checks against a deployed channel (RFC-0379, RFC-1136). Flags: --site, [--channel dev|alt|main], [--release <id>].",
@@ -306,6 +306,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.verify",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Verify live deployment across channels by fetching build-identity.json (RFC-0930, RFC-0931). Flags: --site, [--channel dev|alt|main], [--no-compare-local], [--timeout-ms N], [--verify-signature].",
@@ -343,6 +344,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.pipeline.check",
+        mutatesState: false,
         contract: "leitstand",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",

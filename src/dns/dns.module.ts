@@ -11,6 +11,7 @@ dns.records.schema.validate.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial DNS module with upsert, validate, list, delete, schema.validate commands.</item>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -56,6 +57,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
       },
       {
         name: "dns.record.validate",
+        mutatesState: false,
         contract: "dns",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
@@ -79,6 +81,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
       },
       {
         name: "dns.record.list",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "List all live DNS records in a zone from Cloudflare (RFC-0753). Flags: --system, --name.",
@@ -136,6 +139,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
       },
       {
         name: "dns.records.schema.validate",
+        mutatesState: false,
         contract: "dns",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",

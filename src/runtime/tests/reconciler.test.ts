@@ -445,6 +445,7 @@ describe("RFC-1038: validateDeclarations (AC-20)", () => {
         "test.generate",
         {
           name: "test.generate",
+          mutatesState: true,
           modulePath: "test",
           description: "generate",
           scope: "workspace",

@@ -10,6 +10,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0558: initial identity module with 4 commands.</item>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -91,6 +92,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
       },
       {
         name: "identity.credential.verify",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         description:
           "Verify a credential's signature, revocation status, and expiry (RFC-0558). Required flags: `--credential-id`.",

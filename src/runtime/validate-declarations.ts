@@ -13,6 +13,7 @@
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1138: scope all remaining exempt entries — 15 site-plugin commands to check (ALL_COMMANDS), nachweis.manifest.generate to nachweis, sichtpass.generate to sichtpass; stops stale-entry warnings in registries without those modules.</item>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -166,33 +167,62 @@ function isGlobPath(path: string): boolean {
 }
 
 /**
- * RFC-1038: Validate command declarations after all modules are loaded.
- * Collects all violations and logs them as warnings (same behavior as
- * validateRegistration — warn-only, does not throw).
+ * RFC-1173: structured declaration diagnostic — machine-consumable form of
+ * the checks below. `severity: "error"` entries are blocking where a
+ * consumer chooses to block (command.manifest.validate); "warn" entries keep
+ * the historical warn-only behavior.
+ */
+export interface DeclarationDiagnostic {
+  ruleId: string;
+  severity: "error" | "warn";
+  command: string;
+  message: string;
+}
+
+/**
+ * RFC-1173: collect declaration diagnostics for all registered commands.
+ * Structured replacement for the former plain-string collection — callers
+ * decide how to surface each entry (registry build logs them as warnings;
+ * command.manifest.validate blocks on severity "error").
  *
  * Checks:
- * 1. Every command with a modulePath MUST have non-empty value.
+ * 1. Every command with a modulePath MUST have non-empty value. (warn)
  * 2. Every command with `writes` OR name ending `.generate` MUST have `generates`
- *    (>=1 entry OR `generates: []` for non-generating writes).
+ *    (>=1 entry OR `generates: []` for non-generating writes). (warn)
  *    `.generate` commands with `generates: []` must appear in GENERATOR_OWNERSHIP_EXEMPT.
- * 3. Non-glob path uniqueness across all `generates` entries.
+ * 3. Non-glob path uniqueness across all `generates` entries. (warn)
  * 4. RFC-0963: Validator commands (name matching *.validate|*.check|*.lint) SHOULD
- *    declare `contract` and `rules`. Warn-only.
+ *    declare `contract` and `rules`. (warn)
+ * 5. RFC-1173: Every command MUST declare `mutatesState` explicitly —
+ *    undeclared ⇒ conservatively treated as mutating by the scheduler.
+ *    (error — consumed as blocking by command.manifest.validate)
  */
-export function validateDeclarations(
+export function collectDeclarationDiagnostics(
   commands: ReadonlyMap<string, CommandDeclaration>,
   opts?: { loadedModules?: ReadonlySet<string> },
-): void {
-  const errors: string[] = [];
+): DeclarationDiagnostic[] {
+  const diagnostics: DeclarationDiagnostic[] = [];
   const seenNonGlobPaths = new Map<string, string>();
 
   for (const [commandName, command] of commands) {
     if (command.modulePath === undefined) continue;
 
     if (command.modulePath.trim().length === 0) {
-      errors.push(
-        `Command \`${commandName}\` is missing required \`modulePath\` (repo-relative path to implementation source file).`,
-      );
+      diagnostics.push({
+        ruleId: "MODULE-PATH-MISSING",
+        severity: "warn",
+        command: commandName,
+        message: `Command \`${commandName}\` is missing required \`modulePath\` (repo-relative path to implementation source file).`,
+      });
+    }
+
+    if (command.mutatesState === undefined) {
+      diagnostics.push({
+        ruleId: "MUTATES-STATE-DECLARED",
+        severity: "error",
+        command: commandName,
+        message: `Command \`${commandName}\` does not declare \`mutatesState\` (RFC-1173). Add \`mutatesState: false\` for read-only commands or \`mutatesState: true\` for mutating ones.`,
+      });
     }
 
     const isGenerateCommand = commandName.endsWith(".generate");
@@ -200,14 +230,20 @@ export function validateDeclarations(
 
     if (isGenerateCommand || hasWrites) {
       if (command.generates === undefined) {
-        errors.push(
-          `Command \`${commandName}\` must declare \`generates\` (it ${isGenerateCommand ? "has a .generate suffix" : "has writes"}. Add generates: [...] or generates: [] for non-generating writes${isGenerateCommand ? " (and list in GENERATOR_OWNERSHIP_EXEMPT with a reason if generates: [])" : ""}).`,
-        );
+        diagnostics.push({
+          ruleId: "GENERATES-MISSING",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` must declare \`generates\` (it ${isGenerateCommand ? "has a .generate suffix" : "has writes"}. Add generates: [...] or generates: [] for non-generating writes${isGenerateCommand ? " (and list in GENERATOR_OWNERSHIP_EXEMPT with a reason if generates: [])" : ""}).`,
+        });
       } else if (isGenerateCommand && command.generates.length === 0) {
         if (!EXEMPT_COMMANDS.has(commandName)) {
-          errors.push(
-            `Command \`${commandName}\` has \`.generate\` suffix and \`generates: []\` but is not in GENERATOR_OWNERSHIP_EXEMPT. Add it with a reason or declare actual generates entries.`,
-          );
+          diagnostics.push({
+            ruleId: "GENERATOR-EXEMPT-MISSING",
+            severity: "warn",
+            command: commandName,
+            message: `Command \`${commandName}\` has \`.generate\` suffix and \`generates: []\` but is not in GENERATOR_OWNERSHIP_EXEMPT. Add it with a reason or declare actual generates entries.`,
+          });
         }
       }
     }
@@ -219,14 +255,20 @@ export function validateDeclarations(
 
     if (isValidatorCommand) {
       if (command.contract === undefined) {
-        errors.push(
-          `Command \`${commandName}\` is a validator but does not declare \`contract\` (RFC-0963). Add a contract tag to group this validator with others enforcing the same surface.`,
-        );
+        diagnostics.push({
+          ruleId: "VALIDATOR-CONTRACT-MISSING",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` is a validator but does not declare \`contract\` (RFC-0963). Add a contract tag to group this validator with others enforcing the same surface.`,
+        });
       }
       if (command.rules === undefined) {
-        errors.push(
-          `Command \`${commandName}\` is a validator but does not declare \`rules\` (RFC-0963). Add the rule IDs this validator enforces.`,
-        );
+        diagnostics.push({
+          ruleId: "VALIDATOR-RULES-MISSING",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` is a validator but does not declare \`rules\` (RFC-0963). Add the rule IDs this validator enforces.`,
+        });
       }
     }
 
@@ -235,9 +277,12 @@ export function validateDeclarations(
         if (!isGlobPath(spec.path)) {
           const existingOwner = seenNonGlobPaths.get(spec.path);
           if (existingOwner) {
-            errors.push(
-              `Non-glob path \`${spec.path}\` is claimed by both \`${existingOwner}\` and \`${commandName}\`. Generated file ownership must be unique.`,
-            );
+            diagnostics.push({
+              ruleId: "GENERATES-PATH-COLLISION",
+              severity: "warn",
+              command: commandName,
+              message: `Non-glob path \`${spec.path}\` is claimed by both \`${existingOwner}\` and \`${commandName}\`. Generated file ownership must be unique.`,
+            });
           } else {
             seenNonGlobPaths.set(spec.path, commandName);
           }
@@ -254,15 +299,37 @@ export function validateDeclarations(
       continue;
     }
     if (!commands.has(exempt.command)) {
-      errors.push(
-        `GENERATOR_OWNERSHIP_EXEMPT entry \`${exempt.command}\` does not match any registered command.`,
-      );
+      diagnostics.push({
+        ruleId: "GENERATOR-EXEMPT-STALE",
+        severity: "warn",
+        command: exempt.command,
+        message: `GENERATOR_OWNERSHIP_EXEMPT entry \`${exempt.command}\` does not match any registered command.`,
+      });
     }
   }
 
-  if (errors.length > 0) {
+  return diagnostics;
+}
+
+/**
+ * RFC-1038: Validate command declarations after all modules are loaded.
+ * Collects all violations and logs them as warnings (same behavior as
+ * validateRegistration — warn-only, does not throw). RFC-1173: diagnostics
+ * are now produced by collectDeclarationDiagnostics; the error-severity
+ * MUTATES-STATE-DECLARED entries additionally block via
+ * command.manifest.validate (PACKAGES_CHECK_PIPELINE).
+ */
+export function validateDeclarations(
+  commands: ReadonlyMap<string, CommandDeclaration>,
+  opts?: { loadedModules?: ReadonlySet<string> },
+): void {
+  const diagnostics = collectDeclarationDiagnostics(commands, opts);
+
+  if (diagnostics.length > 0) {
     console.warn(
-      `Declaration validation (${errors.length} violation(s)):\n${errors.map((e) => `  - ${e}`).join("\n")}`,
+      `Declaration validation (${diagnostics.length} violation(s)):\n${diagnostics
+        .map((d) => `  - [${d.ruleId}] ${d.message}`)
+        .join("\n")}`,
     );
   }
 }

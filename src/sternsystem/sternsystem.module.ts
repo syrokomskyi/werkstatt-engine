@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0966: add sternsystem.passport.generate and sternsystem.passport.verify command registrations.</item>
   <item>RFC-0968: add sternsystem.handover.prepare/complete/cancel command registrations and HANDOVER-01 rule declaration.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -18,7 +17,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1141: KERNEL-FLAG-07 helper-mediated flag reads in kernel.flags.lint
 
 FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
-  <history>RFC-0477</history>
+  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <history>RFC-0477, RFC-0966</history>
 </CHANGE_SUMMARY>
 */
 
@@ -97,6 +97,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       },
       {
         name: "sternsystem.list",
+        mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "List all registered Sternsystems with their id, cosmicStar, pinned platform, status (RFC-0354).",
@@ -108,6 +109,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       },
       {
         name: "sternsystem.validate",
+        mutatesState: false,
         contract: "sternsystem",
         rules: ["HANDOVER-01", "JRN-01"],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
