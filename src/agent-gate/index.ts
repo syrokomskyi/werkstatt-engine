@@ -12,11 +12,11 @@ astro-aware caller.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
   <item>RFC-1114: handleA2a transport boundary — A2A-Version header gate, SendMessage routing.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1114: review findings — schema-violation for malformed message, drop unreachable fallback</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
+  <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
   <history>RFC-0290, RFC-0291, RFC-1112, RFC-1113</history>
 </CHANGE_SUMMARY>
 */
@@ -39,7 +39,6 @@ import {
   readRequestProtocolVersion,
   JSON_RPC_ERROR,
   MCP_PROTOCOL_VERSION_HEADER,
-  SUPPORTED_MCP_PROTOCOL_VERSIONS,
   type JsonRpcResponse,
 } from "./mcp/protocol.ts";
 import type { TrafficRecorder } from "./telemetry.ts";
@@ -107,7 +106,8 @@ function extractClientIp(request: Request): string {
 const IDENTITY_HEADERS = ["Signature-Agent", "Signature", "User-Agent"] as const;
 const IDENTITY_MAX_BYTES = 1024;
 
-function extractAgentIdentity(request: Request): Record<string, string> {
+/** RFC-0291/1172: observed identity headers (bounded) — exported for adapter routes. */
+export function extractAgentIdentity(request: Request): Record<string, string> {
   const identity: Record<string, string> = {};
   let totalBytes = 0;
   for (const header of IDENTITY_HEADERS) {
@@ -187,10 +187,13 @@ export function createAgentGate(
       // carries the raw method (tool name for tools/call).
       if (traffic) {
         traffic.observedIdentity = extractAgentIdentity(request);
+        // RFC-1172: the declared version — equal to negotiated on success (the
+        // gate enforces header==meta), absent on initialize/no-version paths
+        // where nothing was negotiated.
         traffic.mcpProtocolVersion =
-          request.headers.get(MCP_PROTOCOL_VERSION_HEADER) ??
           readRequestProtocolVersion(body) ??
-          SUPPORTED_MCP_PROTOCOL_VERSIONS[0];
+          request.headers.get(MCP_PROTOCOL_VERSION_HEADER) ??
+          undefined;
         const method = body.method;
         const toolName =
           method === "tools/call" && typeof body.params === "object" && body.params !== null

@@ -14,12 +14,12 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1114: add createAgentA2aRoute for the A2A endpoint.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
   <item>RFC-1112/1113/1114 gap fix: CORS Allow-Headers gains Idempotency-Key, MCP-Protocol-Version, A2A-Version; Expose-Headers gains X-Agent-Idempotency.</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
-  <history>RFC-0290, RFC-0954, RFC-1112</history>
+  <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
+  <history>RFC-0290, RFC-0954, RFC-1112, RFC-1114</history>
 </CHANGE_SUMMARY>
 */
 
@@ -42,7 +42,7 @@ import {
   type SearchManifest,
 } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
-import { createAgentGate, type AgentGatePorts } from "./index.ts";
+import { createAgentGate, extractAgentIdentity, type AgentGatePorts } from "./index.ts";
 import { emitAgentTraffic, workerLogTelemetry, type TrafficRecorder } from "./telemetry.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 import { runAgentSearch } from "./search-route.ts";
@@ -304,6 +304,7 @@ export function createAgentSearchRoute(manifest: AgentSurfaceManifest): {
     GET: async ({ request }) =>
       await withTrafficEmit(manifest, request, "http", async (traffic) => {
         traffic.operation = "search";
+        traffic.observedIdentity = extractAgentIdentity(request);
         const env = await resolveSearchEnv();
         if (!env.AI || !env.SEARCH_INDEX) {
           return withCors(
@@ -367,6 +368,7 @@ export function createAgentSearchRoute(manifest: AgentSurfaceManifest): {
         const env = await resolveSearchEnv();
         const url = new URL(request.url);
 
+        traffic.observedIdentity = extractAgentIdentity(request);
         // RFC-1172: reindex is operator maintenance, not a query — `other`.
         traffic.operation = url.pathname.endsWith("/reindex") ? "other" : "search";
         if (traffic.operation === "other") traffic.capability = "search.reindex";
@@ -497,6 +499,7 @@ export function createAgentNlwebRoute(manifest: AgentSurfaceManifest): {
     POST: async ({ request }) =>
       await withTrafficEmit(manifest, request, "nlweb", async (traffic) => {
         traffic.operation = "ask";
+        traffic.observedIdentity = extractAgentIdentity(request);
         const env = await resolveSearchEnv();
         if (!env.AI || !env.SEARCH_INDEX) {
           return withCors(
@@ -586,6 +589,7 @@ export function createAgentHealthRoute(manifest: AgentSurfaceManifest): {
     GET: async ({ request }) =>
       await withTrafficEmit(manifest, request, "http", async (traffic) => {
         traffic.operation = "health";
+        traffic.observedIdentity = extractAgentIdentity(request);
         const env = await resolveSearchEnv();
         const { status, body } = await runAgentHealth(manifest, {
           requestUrl: request.url,
