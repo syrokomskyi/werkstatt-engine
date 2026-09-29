@@ -75,3 +75,45 @@ describe("RFC-1173: collectDeclarationDiagnostics — MUTATES-STATE-DECLARED", (
     }
   });
 });
+
+describe("RFC-1173: collectDeclarationDiagnostics — MUTATES-STATE-WRITES-MISMATCH", () => {
+  it("warns when mutatesState:false but writes are declared", () => {
+    const cmd = baseCommand({ mutatesState: false, writes: ["dist/out.json"] });
+    const commands = new Map<string, CommandDeclaration>([[cmd.name, cmd]]);
+
+    const hit = collectDeclarationDiagnostics(commands).find(
+      (d) => d.ruleId === "MUTATES-STATE-WRITES-MISMATCH" && d.command === "sample.validate",
+    );
+    expect(hit).toBeDefined();
+    expect(hit?.severity).toBe("warn");
+  });
+
+  it("warns when mutatesState:false but generates are declared", () => {
+    const cmd = baseCommand({
+      mutatesState: false,
+      generates: [{ path: "dist/x.js", phase: "build.post" }],
+    });
+    const commands = new Map<string, CommandDeclaration>([[cmd.name, cmd]]);
+
+    const hit = collectDeclarationDiagnostics(commands).find(
+      (d) => d.ruleId === "MUTATES-STATE-WRITES-MISMATCH" && d.command === "sample.validate",
+    );
+    expect(hit).toBeDefined();
+  });
+
+  it("is silent when mutatesState matches declared outputs", () => {
+    const commands = new Map<string, CommandDeclaration>([
+      [
+        "a.generate",
+        baseCommand({
+          name: "a.generate",
+          mutatesState: true,
+          generates: [{ path: "dist/x.js", phase: "build.post" }],
+        }),
+      ],
+      ["b.validate", baseCommand({ name: "b.validate", mutatesState: false })],
+    ]);
+    const diagnostics = collectDeclarationDiagnostics(commands);
+    expect(diagnostics.filter((d) => d.ruleId === "MUTATES-STATE-WRITES-MISMATCH")).toHaveLength(0);
+  });
+});

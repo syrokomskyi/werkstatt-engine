@@ -55,16 +55,21 @@ function writeSystemConfig(
 describe("fleet.sites.generate", () => {
   let workspaceRoot: string;
   let cacheRoot: string;
+  // workspaceRoot sits inside a unique sandbox so "../systems-cache" resolves
+  // per-test — a sibling directly under tmpdir() would be the shared
+  // /tmp/systems-cache pool whose parallel afterEach deletions race writes.
+  let sandbox: string;
 
   beforeEach(() => {
-    workspaceRoot = mkdtempSync(join(tmpdir(), "fleet-gen-"));
-    cacheRoot = join(workspaceRoot, "..", "systems-cache");
+    sandbox = mkdtempSync(join(tmpdir(), "fleet-gen-"));
+    workspaceRoot = join(sandbox, "werkstatt");
+    mkdirSync(workspaceRoot, { recursive: true });
+    cacheRoot = join(sandbox, "systems-cache");
     mkdirSync(cacheRoot, { recursive: true });
   });
 
   afterEach(() => {
-    rmSync(workspaceRoot, { recursive: true, force: true });
-    rmSync(cacheRoot, { recursive: true, force: true });
+    rmSync(sandbox, { recursive: true, force: true });
   });
 
   it("generates fleet.sites.yaml from discovered systems", async () => {
@@ -154,16 +159,21 @@ describe("fleet.sites.generate", () => {
 describe("validateFleetSitesDrift", () => {
   let workspaceRoot: string;
   let cacheRoot: string;
+  // workspaceRoot sits inside a unique sandbox so "../systems-cache" resolves
+  // per-test — a sibling directly under tmpdir() would be the shared
+  // /tmp/systems-cache pool whose parallel afterEach deletions race writes.
+  let sandbox: string;
 
   beforeEach(() => {
-    workspaceRoot = mkdtempSync(join(tmpdir(), "fleet-drift-"));
-    cacheRoot = join(workspaceRoot, "..", "systems-cache");
+    sandbox = mkdtempSync(join(tmpdir(), "fleet-drift-"));
+    workspaceRoot = join(sandbox, "werkstatt");
+    mkdirSync(workspaceRoot, { recursive: true });
+    cacheRoot = join(sandbox, "systems-cache");
     mkdirSync(cacheRoot, { recursive: true });
   });
 
   afterEach(() => {
-    rmSync(workspaceRoot, { recursive: true, force: true });
-    rmSync(cacheRoot, { recursive: true, force: true });
+    rmSync(sandbox, { recursive: true, force: true });
   });
 
   it("reports drift when fleet.sites.yaml does not exist", async () => {

@@ -59,6 +59,21 @@ const basePropagateInput = {
   expectedBehaviorSnapshotHash: "",
 };
 
+// Fake-timer drain that tolerates propagate's real-fs awaits (io.exists
+// before the retry delay is queued). Each advanceTimersByTimeAsync yields
+// the REAL event loop once (sinon tickAsync awaits the unfaked setTimeout),
+// letting cold fs resolve and the retry setTimeout get queued; once queued,
+// the next advance fires it. Bounded by real wall-clock time — under pool
+// contention the fs await needs more real-loop yields than a fixed
+// iteration count provides (vi.getRealSystemTime is immune to fake timers).
+async function drainUntilRunnerCalls(runner: CommandRunner, calls: number): Promise<void> {
+  const mock = runner as unknown as ReturnType<typeof vi.fn>;
+  const deadline = vi.getRealSystemTime() + 15_000;
+  while (mock.mock.calls.length < calls && vi.getRealSystemTime() < deadline) {
+    await vi.advanceTimersByTimeAsync(60_000);
+  }
+}
+
 test("adapter: propagate succeeds when wrangler exits 0", async () => {
   const runner = stubRunner(0, "Deployed to https://alt.test.example.com");
   const adapter = createCloudflareWorkersAdapter(runner);
@@ -208,12 +223,7 @@ test("RFC-0623: propagate retries on transient 504 Gateway Timeout then succeeds
   ]);
   const adapter = createCloudflareWorkersAdapter(runner);
   const promise = adapter.propagate(basePropagateInput);
-  // propagate does real-fs awaits (io.exists) before the retry delay is
-  // queued — the first advance lets it reach the setTimeout (queued near the
-  // window edge); runAllTimers then fires every retry delay including ones
-  // scheduled mid-flight.
-  await vi.advanceTimersByTimeAsync(30_000);
-  await vi.runAllTimersAsync();
+  await drainUntilRunnerCalls(runner, 2);
   const result = await promise;
   expect(result.state).toBe("succeeded");
   expect((runner as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2);
@@ -238,12 +248,7 @@ test("RFC-0623: propagate succeeds after retry on 522 error", async () => {
   ]);
   const adapter = createCloudflareWorkersAdapter(runner);
   const promise = adapter.propagate(basePropagateInput);
-  // propagate does real-fs awaits (io.exists) before the retry delay is
-  // queued — the first advance lets it reach the setTimeout (queued near the
-  // window edge); runAllTimers then fires every retry delay including ones
-  // scheduled mid-flight.
-  await vi.advanceTimersByTimeAsync(30_000);
-  await vi.runAllTimersAsync();
+  await drainUntilRunnerCalls(runner, 2);
   const result = await promise;
   expect(result.state).toBe("succeeded");
   expect((runner as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2);
@@ -259,13 +264,7 @@ test("RFC-0623: propagate exhausts all retries on persistent 503 then fails", as
   ]);
   const adapter = createCloudflareWorkersAdapter(runner);
   const promise = adapter.propagate(basePropagateInput);
-  // propagate does real-fs awaits (io.exists) before the retry delay is
-  // queued — the first advance lets it reach the setTimeout (queued near the
-  // window edge); runAllTimers then fires every retry delay including ones
-  // scheduled mid-flight.
-  await vi.advanceTimersByTimeAsync(30_000);
-  await vi.runAllTimersAsync();
-  await vi.advanceTimersByTimeAsync(60_000);
+  await drainUntilRunnerCalls(runner, 3);
   const result = await promise;
   expect(result.state).toBe("failed");
   expect((runner as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(3);

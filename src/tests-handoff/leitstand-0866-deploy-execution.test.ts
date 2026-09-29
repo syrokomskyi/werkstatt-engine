@@ -8,7 +8,7 @@
 </CHANGE_SUMMARY>
 */
 
-import { test, expect, vi } from "vitest";
+import { afterEach, beforeEach, test, expect, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { mkdtempSync } from "node:fs";
@@ -158,6 +158,20 @@ function makeWorkspace(): string {
   mkdirSync(distDir, { recursive: true });
   return tmp;
 }
+
+// Kernel env leaks into vitest under `werkstatt run` (dotenv/config loads
+// .env): SIGNING_PRIVATE_KEY(_PATH) activate the release-sign phase of
+// executeDeployPhases, which fails in tmp fixtures (failingPhase:
+// "release-sign"). Pin them empty so tests always exercise the unsigned path.
+beforeEach(() => {
+  vi.stubEnv("SIGNING_PRIVATE_KEY", "");
+  vi.stubEnv("SIGNING_PRIVATE_KEY_PATH", "");
+  vi.stubEnv("PUBLIC_KEY_URL", "");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 test("executeDeployPhases returns deploymentUrl from channel config for dev", async () => {
   const tmp = makeWorkspace();

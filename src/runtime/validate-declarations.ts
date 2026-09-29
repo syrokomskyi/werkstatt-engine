@@ -196,6 +196,11 @@ export interface DeclarationDiagnostic {
  * 5. RFC-1173: Every command MUST declare `mutatesState` explicitly —
  *    undeclared ⇒ conservatively treated as mutating by the scheduler.
  *    (error — consumed as blocking by command.manifest.validate)
+ * 6. RFC-1173: A command declaring non-empty `writes`/`generates` MUST NOT
+ *    declare `mutatesState: false` — declared outputs imply mutation; `false`
+ *    marks the step safe to run tainted under collect-errors, the unsafe
+ *    direction. (warn — 19 commands misclassified this way in the initial
+ *    sweep, fixed in 6.320.0)
  */
 export function collectDeclarationDiagnostics(
   commands: ReadonlyMap<string, CommandDeclaration>,
@@ -227,6 +232,16 @@ export function collectDeclarationDiagnostics(
 
     const isGenerateCommand = commandName.endsWith(".generate");
     const hasWrites = command.writes && command.writes.length > 0;
+    const hasGenerates = command.generates !== undefined && command.generates.length > 0;
+
+    if (command.mutatesState === false && (hasWrites || hasGenerates)) {
+      diagnostics.push({
+        ruleId: "MUTATES-STATE-WRITES-MISMATCH",
+        severity: "warn",
+        command: commandName,
+        message: `Command \`${commandName}\` declares ${hasWrites ? "writes" : "generates"} but \`mutatesState: false\` (RFC-1173). Declared outputs imply mutation — \`false\` marks the step safe to run tainted under collect-errors. Either set \`mutatesState: true\` or remove the declared outputs if they are stale.`,
+      });
+    }
 
     if (isGenerateCommand || hasWrites) {
       if (command.generates === undefined) {
