@@ -80,6 +80,8 @@ vi.mock("../../handoff/build-pipeline-helpers.ts", () => ({
 
 vi.mock("../snapshot-auto-regen.ts", () => ({
   orchestrateSnap01Recovery: vi.fn(),
+  bootstrapCommittedSnapshot: vi.fn().mockResolvedValue({ committed: true }),
+  SNAPSHOT_FILENAME: "behavior.snapshot.generated.yaml",
 }));
 
 vi.mock("../actor-identity.ts", () => ({

@@ -277,8 +277,11 @@ test("SNAP-01 with dirty workpiece: does NOT auto-regenerate, reports failure", 
   const { runMissionValidate } = await import("../mission/mission-materialization-commands.ts");
   const result = await runMissionValidate(makeInput(), makeContext());
 
-  expect(mockState.commandCalls).not.toContain("behavior.snapshot.generate");
-  expect(mockState.commandCalls).not.toContain("mission.git.commit");
+  // ADR-0096: the unconditional snapshot bootstrap issues exactly one
+  // behavior.snapshot.generate + mission.git.commit pair per validate run —
+  // auto-regeneration is what would add a SECOND pair and re-run build.post.
+  expect(mockState.commandCalls.filter((c) => c === "behavior.snapshot.generate")).toHaveLength(1);
+  expect(mockState.commandCalls.filter((c) => c === "mission.git.commit")).toHaveLength(1);
   const postCalls = mockState.pipelineCalls.filter((p) => p === "build.post");
   expect(postCalls.length).toBe(1);
   expect(result.exitCode).toBe(1);
@@ -292,7 +295,7 @@ test("Non-SNAP-01 failure (STALE-01): does NOT auto-regenerate", async () => {
   const { runMissionValidate } = await import("../mission/mission-materialization-commands.ts");
   const result = await runMissionValidate(makeInput(), makeContext());
 
-  expect(mockState.commandCalls).not.toContain("behavior.snapshot.generate");
+  expect(mockState.commandCalls.filter((c) => c === "behavior.snapshot.generate")).toHaveLength(1);
   expect(result.exitCode).toBe(1);
 });
 
