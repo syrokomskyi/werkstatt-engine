@@ -110,6 +110,11 @@ let testRoot: string;
 let tmpWorkspace: string;
 
 beforeEach(() => {
+  // Deterministic unsigned-commit path: the kernel propagates
+  // WERKSTATT_OPERATOR_SIGNING_KEY into vitest under `werkstatt run`
+  // (e.g. inside ecosystem.commit's scoped test gate), flipping the commit
+  // summary from "committed" to "signed commit:" — pin it off here.
+  vi.stubEnv("WERKSTATT_OPERATOR_SIGNING_KEY", "");
   testRoot = mkdtempSync(join(tmpdir(), "tmp-no-op-guard-"));
   tmpWorkspace = join(testRoot, "workspace");
   mkdirSync(tmpWorkspace, { recursive: true });
