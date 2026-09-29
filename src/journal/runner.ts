@@ -9,6 +9,8 @@
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial step runner — runOperation, readJournal, findIncompleteOperation.</item>
   <item>RFC-0962 fo-fix: step metadata capture (run returns Record), per-step durationMs timing, StepResult[] in RunOperationResult, step-done meta field populated.</item>
+  <item>RFC-1168: onTransition option on runOperation — per-record callback so callers can stream progress (stderr) without waiting for run completion.</item>
+  <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
 </CHANGE_SUMMARY>
 */
 
@@ -73,8 +75,22 @@ export async function runOperation<C>(
     resumeOpId?: string;
     missionId?: string;
     platformVersion?: string;
+    // RFC-1168: invoked after each record append — lets callers stream
+    // progress (e.g. stderr lines) while the operation is still running.
+    onTransition?: (record: JournalRecord) => void;
   },
 ): Promise<RunOperationResult> {
+  const onTransition = opts?.onTransition;
+  const append = async (record: JournalRecord): Promise<void> => {
+    await appendRecord(journalPath, record);
+    try {
+      onTransition?.(record);
+    } catch {
+      // Progress hooks are informational — a failing emitter must not break
+      // the operation being journaled.
+    }
+  };
+
   const existingRecords = await readJournal(journalPath);
   const incomplete = findIncompleteOperation(existingRecords);
 
@@ -92,7 +108,7 @@ export async function runOperation<C>(
     stepState = buildStepState(existingRecords, opId);
   } else {
     opId = generateOpId(def.op);
-    await appendRecord(journalPath, {
+    await append({
       kind: "op-started",
       opId,
       op: def.op,
@@ -119,7 +135,7 @@ export async function runOperation<C>(
       if (step.verify) {
         const verified = await step.verify(ctx);
         if (verified) {
-          await appendRecord(journalPath, {
+          await append({
             kind: "step-skipped",
             opId,
             step: step.name,
@@ -135,7 +151,7 @@ export async function runOperation<C>(
     } else if (!isResume && step.verify) {
       const verified = await step.verify(ctx);
       if (verified) {
-        await appendRecord(journalPath, {
+        await append({
           kind: "step-skipped",
           opId,
           step: step.name,
@@ -149,7 +165,7 @@ export async function runOperation<C>(
       }
     }
 
-    await appendRecord(journalPath, {
+    await append({
       kind: "step-started",
       opId,
       step: step.name,
@@ -167,7 +183,7 @@ export async function runOperation<C>(
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       const durationMs = Date.now() - stepStart;
-      await appendRecord(journalPath, {
+      await append({
         kind: "step-failed",
         opId,
         step: step.name,
@@ -190,7 +206,7 @@ export async function runOperation<C>(
     if (step.verify) {
       const verified = await step.verify(ctx);
       if (!verified) {
-        await appendRecord(journalPath, {
+        await append({
           kind: "step-failed",
           opId,
           step: step.name,
@@ -212,7 +228,7 @@ export async function runOperation<C>(
     }
 
     const durationMs = Date.now() - stepStart;
-    await appendRecord(journalPath, {
+    await append({
       kind: "step-done",
       opId,
       step: step.name,
@@ -229,7 +245,7 @@ export async function runOperation<C>(
     });
   }
 
-  await appendRecord(journalPath, {
+  await append({
     kind: "op-done",
     opId,
     at: nowIso(),

@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0962: add leitstand.ship composite command — resumable full-pipeline deployment via RFC-0958 operation journal.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -18,7 +17,8 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1141: KERNEL-FLAG-07 helper-mediated flag reads in kernel.flags.lint
 
 FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930</history>
+  <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962</history>
 </CHANGE_SUMMARY>
 */
 
@@ -38,6 +38,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
   } = await import("./leitstand-commands.ts");
   const { runLeitstandCertify } = await import("./certify.ts");
   const { runLeitstandShip } = await import("./ship.ts");
+  const { runLeitstandShipStatus } = await import("./ship-status.ts");
   const { runLeitstandServiceDevDeploy } = await import("./service-dev-deploy.ts");
   const { runLeitstandServicePromote } = await import("./service-promote.ts");
   const { runLeitstandAccessProtect, runLeitstandAccessUnprotect, runLeitstandAccessStatus } =
@@ -654,6 +655,41 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         ],
         cacheable: false,
         execute: runLeitstandShip,
+      },
+      {
+        name: "leitstand.ship.status",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
+        description:
+          "Read-only renderer for ship operation journals (RFC-1168). Resolves systems-cache/<site>/operations/ship-<mission>.jsonl — or the site's newest ship journal — and prints the step table with durations and running state. Flags: --site, --mission, [--follow] (mtime poll, exits on op-done/op-abandoned or journal loss), --json. Emits nothing without a journal — missing journal is informational, not an error.",
+        scope: "workspace",
+        supportsAllSites: false,
+        mutatesState: false,
+        flags: {
+          site: {
+            kind: "string",
+            description:
+              "Sternsystem id — resolves systems-cache/<site>/operations/. Optional when --mission is given (all cache clones scanned).",
+          },
+          system: {
+            kind: "string",
+            description: "Alias for --site.",
+          },
+          mission: {
+            kind: "string",
+            description:
+              "Mission id — resolves ship-<mission>.jsonl. Optional when --site is given (newest journal by mtime wins).",
+          },
+          follow: {
+            kind: "boolean",
+            description:
+              "Tail the journal (~1s mtime poll) printing step transitions until a terminal event or journal loss.",
+          },
+        },
+        writes: [],
+        reads: ["systems-cache/{system}/operations/ship-*.jsonl"],
+        cacheable: true,
+        execute: runLeitstandShipStatus,
       },
     ],
     pipelines: [],

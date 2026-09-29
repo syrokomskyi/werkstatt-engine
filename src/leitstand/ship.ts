@@ -8,13 +8,14 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0962: initial leitstand.ship composite command — buildShipPlan, runLeitstandShip, ShipContext/ShipResult types.</item>
   <item>RFC-0962 fo-fix: --until validation, releaseId restoration from journal on resume, step metadata + durationMs tracking via StepResult, removed duplicate ShipStepResult type.</item>
   <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check; auto-sync after release-prepare and certify-* steps; --force-with-lease in cache-to-bare push.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
+  <history>RFC-0962</history>
 </CHANGE_SUMMARY>
 */
 
@@ -35,6 +36,49 @@ import { flagSite } from "./deploy-helpers.ts";
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
   return typeof v === "string" ? v : undefined;
+}
+
+// ─── RFC-1168 progress formatting (pure, exported for tests) ────────────────
+
+/** Preamble lines naming the journal path and the watch invocation. */
+export function shipPreambleLines(
+  journalPath: string,
+  systemId: string,
+  missionId: string,
+): string[] {
+  return [
+    `[ship] journal: ${journalPath}`,
+    `[ship] watch: werkstatt run leitstand.ship.status --site ${systemId} --mission ${missionId} --follow`,
+  ];
+}
+
+/** One `[ship] step N/M: <name> — <event>` line per journal transition. */
+export function formatShipTransition(
+  record: { kind: string; step?: string; seq?: number; error?: string; reason?: string },
+  stepCount: number,
+  durationMs?: number,
+): string | null {
+  if (record.seq === undefined) {
+    if (record.kind === "op-done") return "[ship] done";
+    if (record.kind === "op-abandoned") return `[ship] abandoned — ${record.reason}`;
+    return null;
+  }
+  const n = record.seq + 1;
+  if (record.kind === "step-started") {
+    return `[ship] step ${n}/${stepCount}: ${record.step} — running`;
+  }
+  if (record.kind === "step-done") {
+    const dur = durationMs !== undefined ? ` (${Math.round(durationMs / 1000)}s)` : "";
+    return `[ship] step ${n}/${stepCount}: ${record.step} — done${dur}`;
+  }
+  if (record.kind === "step-failed") {
+    const dur = durationMs !== undefined ? ` (${Math.round(durationMs / 1000)}s)` : "";
+    return `[ship] step ${n}/${stepCount}: ${record.step} — failed — ${record.error}${dur}`;
+  }
+  if (record.kind === "step-skipped") {
+    return `[ship] step ${n}/${stepCount}: ${record.step} — skipped`;
+  }
+  return null;
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -526,6 +570,20 @@ export async function runLeitstandShip(
   const stepCount = plan.steps.length;
   const reachedPhase = phaseFromStepCount(stepCount, missionClosed);
 
+  // RFC-1168: progress goes straight to stderr — context.logger buffers into
+  // the end-of-run envelope, which is exactly the opacity being fixed.
+  const emitProgress = (line: string): void => {
+    try {
+      process.stderr.write(`${line}\n`);
+    } catch {
+      // Closed stderr (detached harness) must not break the operation.
+    }
+  };
+  const stepStartTimes = new Map<number, number>();
+  for (const line of shipPreambleLines(journalPath, systemId, missionId)) {
+    emitProgress(line);
+  }
+
   // Check for incomplete operation
   const existingRecords = await (async () => {
     try {
@@ -576,6 +634,17 @@ export async function runLeitstandShip(
     missionId,
     platformVersion: "",
     resumeOpId: isResume ? incomplete?.opId : undefined,
+    // RFC-1168: one line per journal record — the live progress stream.
+    onTransition: (record) => {
+      if (record.kind === "step-started") {
+        stepStartTimes.set(record.seq, Date.now());
+      }
+      const seq = "seq" in record ? record.seq : undefined;
+      const started = seq !== undefined ? stepStartTimes.get(seq) : undefined;
+      const durationMs = started !== undefined ? Date.now() - started : undefined;
+      const line = formatShipTransition(record, stepCount, durationMs);
+      if (line !== null) emitProgress(line);
+    },
   });
 
   if (opResult.completed) {
