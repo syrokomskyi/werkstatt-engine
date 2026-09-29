@@ -384,3 +384,34 @@ export async function dispatchOrPreview(ctx: ActionContext): Promise<StepResult>
       return problemResponse(result.problem);
   }
 }
+
+/**
+ * RFC-1171: deprecation headers for alias-path responses. The request pathname
+ * is matched against manifest `deprecations[].path` with `{id}` substituted by
+ * the requested capability id. Headers appear only once `deprecateAt` has
+ * passed — the declaration can ship ahead of the signal. Returns undefined for
+ * canonical paths and undated/malformed entries.
+ */
+export function deprecationHeaders(
+  manifest: AgentSurfaceManifest,
+  capabilityId: string,
+  requestPathname: string,
+  now = Date.now(),
+): Record<string, string> | undefined {
+  for (const dep of manifest.deprecations ?? []) {
+    if (dep.path.replaceAll("{id}", capabilityId) !== requestPathname) continue;
+    const deprecateMs = Date.parse(dep.deprecateAt);
+    const sunsetMs = Date.parse(dep.sunsetAt);
+    if (Number.isNaN(deprecateMs) || Number.isNaN(sunsetMs) || now < deprecateMs) {
+      return undefined;
+    }
+    return {
+      // RFC 9745: Deprecation is a unix-seconds structured field.
+      Deprecation: `@${Math.floor(deprecateMs / 1000)}`,
+      // RFC 8594: Sunset is an HTTP-date.
+      Sunset: new Date(sunsetMs).toUTCString(),
+      Link: `<${dep.successor.replaceAll("{id}", capabilityId)}>; rel="successor-version"`,
+    };
+  }
+  return undefined;
+}

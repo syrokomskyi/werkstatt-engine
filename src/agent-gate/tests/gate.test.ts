@@ -18,7 +18,11 @@ import { test, expect } from "vitest";
 import { createAgentGate, type AgentGatePorts, __resetLimiterCache } from "../index.ts";
 import { __resetMcpLimiterCache } from "../mcp/handler.ts";
 import { createFixedWindowLimiter } from "../limits.ts";
-import { buildAgentSurfaceManifest, type ActionReceipt } from "@warpgogol/werkstatt-shared/agent";
+import {
+  buildAgentSurfaceManifest,
+  type ActionReceipt,
+  type ManifestDeprecation,
+} from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 
 const LEAD_SUBMIT: CapabilityRecord = {
@@ -96,7 +100,7 @@ function makePreviewManifest() {
     actions: [
       {
         id: "lead.prepare",
-        url: "/api/agent/actions/lead.prepare",
+        url: "/api/agent/v1/actions/lead.prepare",
         title: LEAD_PREPARE.title,
         inputSchemaRef: "#/components/schemas/lead.prepare-input",
         entitlement: "agent.actions",
@@ -118,7 +122,7 @@ function makeManifest(withAction: boolean) {
       ? [
           {
             id: "lead.submit",
-            url: "/api/agent/actions/lead.submit",
+            url: "/api/agent/v1/actions/lead.submit",
             title: LEAD_SUBMIT.title,
             inputSchemaRef: "#/components/schemas/lead.submit-input",
             entitlement: "agent.actions",
@@ -1050,4 +1054,94 @@ test("tools/call action: _meta idempotency key replays via MCP", async () => {
   expect(second.receiptId).toBe(first.receiptId);
   expect(second.duplicate).toBe(true);
   expect(dispatchCount).toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// RFC-1171: deprecation headers on the unversioned alias path
+// ---------------------------------------------------------------------------
+
+function makeDeprecatedManifest(deprecateAt: string, sunsetAt: string) {
+  return buildAgentSurfaceManifest({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    site: "test-bundle",
+    baseUrl: "https://test.example",
+    languages: { default: "de", supported: ["de", "en"] },
+    actions: [
+      {
+        id: "lead.submit",
+        url: "/api/agent/v1/actions/lead.submit",
+        title: LEAD_SUBMIT.title,
+        inputSchemaRef: "#/components/schemas/lead.submit-input",
+        entitlement: "agent.actions",
+      },
+    ],
+    // Caller-provided entry on the alias path dedupes the injected constant.
+    deprecations: [
+      {
+        path: "/api/agent/actions/{id}",
+        successor: "/api/agent/v1/actions/{id}",
+        reason: "Actions moved into the versioned namespace (RFC-1171).",
+        deprecateAt,
+        sunsetAt,
+      },
+    ] satisfies ManifestDeprecation[],
+  });
+}
+
+test("handleAction: alias path answers with Deprecation + Sunset + successor-version Link once deprecateAt passed", async () => {
+  const gate = createAgentGate(
+    makeDeprecatedManifest("2020-01-01", "2099-01-01"),
+    [LEAD_SUBMIT],
+    makeFakePorts(),
+  );
+  const res = await gate.handleAction(
+    "lead.submit",
+    new Request("https://test.example/api/agent/actions/lead.submit", {
+      method: "POST",
+      body: JSON.stringify({ message: "hello world!" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  expect(res.headers.get("Deprecation")).toBe("@1577836800");
+  expect(res.headers.get("Sunset")).toBe(new Date("2099-01-01").toUTCString());
+  expect(res.headers.get("Link")).toBe(
+    '</api/agent/v1/actions/lead.submit>; rel="successor-version"',
+  );
+});
+
+test("handleAction: canonical v1 path carries no deprecation headers", async () => {
+  const gate = createAgentGate(
+    makeDeprecatedManifest("2020-01-01", "2099-01-01"),
+    [LEAD_SUBMIT],
+    makeFakePorts(),
+  );
+  const res = await gate.handleAction(
+    "lead.submit",
+    new Request("https://test.example/api/agent/v1/actions/lead.submit", {
+      method: "POST",
+      body: JSON.stringify({ message: "hello world!" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  expect(res.headers.get("Deprecation")).toBeNull();
+  expect(res.headers.get("Sunset")).toBeNull();
+  expect(res.headers.get("Link")).toBeNull();
+});
+
+test("handleAction: alias headers are suppressed before deprecateAt", async () => {
+  const gate = createAgentGate(
+    makeDeprecatedManifest("2099-01-01", "2099-06-01"),
+    [LEAD_SUBMIT],
+    makeFakePorts(),
+  );
+  const res = await gate.handleAction(
+    "lead.submit",
+    new Request("https://test.example/api/agent/actions/lead.submit", {
+      method: "POST",
+      body: JSON.stringify({ message: "hello world!" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  expect(res.headers.get("Deprecation")).toBeNull();
+  expect(res.headers.get("Sunset")).toBeNull();
 });

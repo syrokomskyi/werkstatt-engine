@@ -89,7 +89,7 @@ function makeManifest(actionIds: string[] = ["lead.submit"]) {
     knowledge: [],
     actions: actionIds.map((id) => ({
       id,
-      url: `/api/agent/actions/${id}`,
+      url: `/api/agent/v1/actions/${id}`,
       title: { de: id },
       inputSchemaRef: `#/components/schemas/${id}-input`,
       entitlement: "agent.actions",

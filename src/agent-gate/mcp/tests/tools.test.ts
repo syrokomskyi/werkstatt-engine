@@ -39,7 +39,7 @@ function manifestFor(ids: string[]) {
     languages: { default: "en", supported: ["en"] },
     actions: ids.map((id) => ({
       id,
-      url: `/api/agent/actions/${id}`,
+      url: `/api/agent/v1/actions/${id}`,
       title: { en: id },
       inputSchemaRef: `${id}-input`,
       entitlement: "agent.actions" as const,

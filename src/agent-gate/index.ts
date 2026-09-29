@@ -49,6 +49,7 @@ import {
   parseJsonBody,
   validateSchema,
   dispatchOrPreview,
+  deprecationHeaders,
   extractIdempotencyKey,
   httpBodyHash,
   problemResponse,
@@ -243,6 +244,14 @@ export function createAgentGate(
       );
       // RFC-1112: mark responses when no receipt store is configured.
       if (!ports.idempotency) response.headers.set("X-Agent-Idempotency", "disabled");
+      // RFC-1171: deprecated alias paths answer with RFC 9745/8594 headers;
+      // canonical paths stay clean.
+      const depHeaders = deprecationHeaders(manifest, capabilityId, new URL(request.url).pathname);
+      if (depHeaders) {
+        for (const [name, value] of Object.entries(depHeaders)) {
+          response.headers.set(name, value);
+        }
+      }
       return response;
     },
 
