@@ -19,9 +19,12 @@
 Extract pipeline-status derivation into packages/forge/src/pipeline-status.ts, refactor rfc.pipeline.status onto it, add os/queue module with queue.validate command, register in WORKSHOP_MODULE_MAP.forge + bin/cli.ts + package.json exports.</item>
   <item>RFC-1148: SITE_MODULE_MAP + siteModuleLoaders() — canonical 18-loader site module set shared by kernel.config.template.ts and listStaticCommandSurface; materializer refactored into a shared helper.</item>
   <item>RFC-1148: review fix — materializeDescriptors wraps import failure with descriptor key/spec context.</item>
+  <item>Auto-derive default modulePath from the descriptor spec (import.meta.resolve → packages/-relative path) — explicit per-command modulePath wins; commands loaded through descriptor loaders can no longer drift into OWN-XCHECK-03 "missing module" by omission.</item>
 </CHANGE_SUMMARY>
 */
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 // @ai-invariant: SITE_MODULE_MAP is the only enumeration of the site module set — never maintain a parallel list in wire templates or consumers.
@@ -176,6 +179,81 @@ export const SITE_MODULE_MAP: Record<string, WorkshopModuleDescriptor> = {
 };
 
 /**
+ * Derive the declaring source file for a module descriptor: resolves the
+ * descriptor spec to the real .ts file and returns the path relative to the
+ * `packages/` tree. Returns undefined when the specifier resolves outside a
+ * packages/ layout (e.g. an npm-installed node_modules copy — there the
+ * repo-relative modulePath convention has no meaning and explicit values keep
+ * working unchanged).
+ */
+function deriveModuleFile(spec: string): { abs: string; rel: string } | undefined {
+  try {
+    const resolved = import.meta.resolve(spec);
+    const abs = resolved.startsWith("file://") ? fileURLToPath(resolved) : resolved;
+    const anchor = abs.indexOf("/packages/");
+    return anchor >= 0 ? { abs, rel: abs.slice(anchor + 1) } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readSource(path: string): string | undefined {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Locate the file that actually declares a command: the descriptor's module
+ * file, or — when that file is an index.ts barrel that names nothing — the
+ * first `export ... from "..."` target containing the command's name (one hop,
+ * relative specifiers only). Returns undefined when no file names the command.
+ */
+function findDeclaringFile(
+  name: string,
+  file: { abs: string; rel: string },
+): { abs: string; rel: string } | undefined {
+  const content = readSource(file.abs);
+  if (content === undefined) return undefined;
+  if (content.includes(`"${name}"`)) return file;
+  for (const m of content.matchAll(/\bexport\s+(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["']/g)) {
+    const spec = m[1];
+    if (!spec.startsWith("./") && !spec.startsWith("../")) continue;
+    const base = file.abs.slice(0, file.abs.lastIndexOf("/") + 1);
+    const resolved = new URL(spec, `file://${base}`).pathname;
+    const target = resolved.endsWith(".ts") ? resolved : `${resolved.replace(/\/$/, "")}.ts`;
+    if (readSource(target)?.includes(`"${name}"`)) {
+      const anchor = target.indexOf("/packages/");
+      if (anchor >= 0) return { abs: target, rel: target.slice(anchor + 1) };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Stamp a default modulePath onto commands that don't declare one — the file
+ * that actually declares the command (index.ts barrels are followed one hop
+ * through their re-exports). Explicit per-command modulePath always wins.
+ * Prevents OWN-XCHECK-03 drift: generated-artifact ownership can always name
+ * the registering module without hand-maintained paths.
+ */
+function withDerivedModulePath(
+  mod: ModuleExport,
+  file: { abs: string; rel: string },
+): ModuleExport {
+  return {
+    ...mod,
+    commands: (mod.commands ?? []).map((c) => {
+      if (c.modulePath) return c;
+      const declaring = findDeclaringFile(c.name, file);
+      return declaring ? { ...c, modulePath: declaring.rel } : c;
+    }),
+  };
+}
+
+/**
  * Materialize a descriptor map into the `moduleLoaders` record shape that
  * defineKernelConfig expects. Each thunk resolves its specifier lazily via
  * dynamic import — specifiers are resolved from the consumer's node_modules,
@@ -204,7 +282,11 @@ function materializeDescriptors(
             `[module-map] '${desc.spec}' has no export '${desc.export}' — check descriptor entry '${key}'`,
           );
         }
-        return (typeof exported === "function" ? await exported() : exported) as ModuleExport;
+        const moduleExport = (
+          typeof exported === "function" ? await exported() : exported
+        ) as ModuleExport;
+        const moduleFile = deriveModuleFile(desc.spec);
+        return moduleFile ? withDerivedModulePath(moduleExport, moduleFile) : moduleExport;
       };
     }
   }
