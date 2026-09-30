@@ -104,6 +104,7 @@ export async function appendStepTelemetry(
   record: StepTelemetryRecord,
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
+  if (io.readonly) return;
   try {
     const filePath = telemetryPath(workspaceRoot);
     await io.mkdir(dirname(filePath));
@@ -148,7 +149,7 @@ export async function batchAppendStepTelemetry(
   records: StepTelemetryRecord[],
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<void> {
-  if (records.length === 0) return;
+  if (records.length === 0 || io.readonly) return;
   try {
     const filePath = telemetryPath(workspaceRoot);
     await io.mkdir(dirname(filePath));

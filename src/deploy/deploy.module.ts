@@ -121,6 +121,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
       {
         name: "deploy.status",
         mutatesState: false,
+        execOnReadOnly: true,
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description:
           "Report current and previous platform artifact hashes, git SHA, and deployment time (RFC-0566).",

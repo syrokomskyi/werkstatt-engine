@@ -310,8 +310,21 @@ export async function executeRegisteredCommand(
   // adapter's intents are used instead.
   let capturedIntents: WriteIntent[] | undefined;
   let effectiveIo = context.io;
-  if (command.mutatesState === false) {
-    effectiveIo = createReadOnlyIO(context.io, command.name);
+  // RFC-1176: a declared mutating flag in argv upgrades a mutatesState:false
+  // invocation to the mutating path — flag-gated modes like --write-baseline
+  // must write for real (or record intents under --dry-run) instead of
+  // hitting KERNEL-META-01.
+  const flagMutating =
+    command.mutatesState === false &&
+    (command.mutatingFlags ?? []).some((f) => {
+      const v = input.flags[f];
+      return v !== undefined && v !== false && v !== "false";
+    });
+  if (command.mutatesState === false && !flagMutating) {
+    effectiveIo = createReadOnlyIO(context.io, command.name, {
+      allowExec: command.execOnReadOnly === true,
+      workspaceRoot: context.workspaceRoot,
+    });
   } else if (context.dryRun) {
     const recording = createRecordingIO(context.io);
     effectiveIo = recording.io;

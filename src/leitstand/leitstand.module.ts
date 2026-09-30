@@ -281,6 +281,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       {
         name: "leitstand.health",
         mutatesState: false,
+        execOnReadOnly: true,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "Run health checks against a deployed channel (RFC-0379, RFC-1136). Flags: --site, [--channel dev|alt|main], [--release <id>].",

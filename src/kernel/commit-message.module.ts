@@ -33,6 +33,7 @@ export async function createCommitMessageModule(): Promise<ModuleExport> {
       {
         name: "commit.message.lint",
         mutatesState: false,
+        execOnReadOnly: true,
         contract: "commit",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/kernel/commit-message.module.ts",

@@ -164,6 +164,8 @@ function commandInfo(
     description: command.description,
     scope: command.scope,
     mutatesState: command.mutatesState,
+    ...(command.execOnReadOnly ? { execOnReadOnly: command.execOnReadOnly } : {}),
+    ...(command.mutatingFlags ? { mutatingFlags: command.mutatingFlags } : {}),
     requiresNetwork: command.requiresNetwork,
     supportsAllSites: command.supportsAllSites,
     timeoutMs: command.timeoutMs,

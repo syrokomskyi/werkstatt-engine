@@ -274,7 +274,9 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.validate",
-        mutatesState: false,
+        mutatesState: true,
+        writes: ["missions/{mission}/evidence/**"],
+        generates: [],
         contract: "mission",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
@@ -312,6 +314,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
               "RFC-0976: Skip auto-commit of generated artifacts after successful validation.",
           },
         },
+        writes: ["missions/{mission}/evidence/**", "missions/{mission}/distribution/**"],
         reads: ["missions/{mission}/**"],
         cacheable: false,
         execute: runMissionValidate,
@@ -366,7 +369,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.diff",
-        mutatesState: false,
+        mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
           "Compute the data-set diff between Werkstück and pinned state (RFC-0356). Required flags: `--mission`.",
@@ -375,6 +378,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
         },
+        writes: ["missions/{mission}/evidence/authored-diff.json"],
         reads: ["missions/{mission}/workpiece/**", "systems/{system}/system.pin.json"],
         execute: runMissionDiff,
       },
@@ -616,6 +620,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: false,
+        execOnReadOnly: true,
         flags: {
           system: { kind: "string", required: true, description: "Sternsystem id." },
         },

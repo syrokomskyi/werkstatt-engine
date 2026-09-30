@@ -66,6 +66,7 @@ export async function createLagebildModule(): Promise<ModuleExport> {
           channel: { kind: "string", description: "Deployment channel (default: main)." },
         },
         mutatesState: false,
+        execOnReadOnly: true,
         writes: [],
         generates: [],
         reads: [

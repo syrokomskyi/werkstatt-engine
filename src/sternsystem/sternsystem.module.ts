@@ -110,6 +110,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       {
         name: "sternsystem.validate",
         mutatesState: false,
+        execOnReadOnly: true,
         contract: "sternsystem",
         rules: ["HANDOVER-01", "JRN-01"],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
@@ -201,6 +202,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: false,
+        execOnReadOnly: true,
         flags: {
           id: { kind: "string", description: "Sternsystem id (required unless --all is set)." },
           all: { kind: "boolean", description: "Show status for all registered systems." },

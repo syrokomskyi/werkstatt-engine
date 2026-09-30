@@ -233,6 +233,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
           json: { kind: "boolean", description: "Output as JSON." },
         },
         mutatesState: false,
+        execOnReadOnly: true,
         writes: [],
         generates: [],
         reads: [
@@ -253,6 +254,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
           json: { kind: "boolean", description: "Output as JSON." },
         },
         mutatesState: false,
+        execOnReadOnly: true,
         writes: [],
         generates: [],
         reads: ["werkstatt.fleet.json", ".werkstatt/fleet-claims/"],

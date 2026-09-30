@@ -96,6 +96,37 @@ export default {
           return { exitCode: 0 };
         },
       },
+      {
+        name: "fixture.exec-readonly.command",
+        modulePath: "test",
+        description: "RFC-1176: execOnReadOnly command — io.exec passes through, fs writes still throw",
+        scope: "workspace",
+        mutatesState: false,
+        execOnReadOnly: true,
+        async execute(_input, context) {
+          const r = await context.io.exec("echo", ["probe"]);
+          return { exitCode: 0, data: { out: r.stdout.trim(), readonly: context.io.readonly } };
+        },
+      },
+      {
+        name: "fixture.writebaseline.command",
+        modulePath: "test",
+        description: "RFC-1176: mutatingFlags command — writes only under --write-baseline",
+        scope: "workspace",
+        mutatesState: false,
+        mutatingFlags: ["write-baseline"],
+        flags: {
+          "write-baseline": { kind: "boolean", description: "Write the baseline file" },
+        },
+        async execute(input, context) {
+          if (input.flags["write-baseline"] === true) {
+            const target = "${join(root, "baseline.txt").replace(/\\/g, "\\\\")}";
+            await context.io.writeFile(target, "baseline");
+            return { exitCode: 0, data: { wrote: true, readonly: context.io.readonly } };
+          }
+          return { exitCode: 0, data: { wrote: false, readonly: context.io.readonly } };
+        },
+      },
     ],
     pipelines: [],
   }],
@@ -240,6 +271,57 @@ test("executor: command-emitted renderedFiles win over the auto-collected map", 
     // Manual emission overrides the same key and keeps its extra entries.
     expect(rendered?.["docs/generated.txt"]).toBe("manual");
     expect(rendered?.["docs/virtual.txt"]).toBe("never written");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// RFC-1176: execOnReadOnly lets a declared mutatesState:false command shell
+// out for read-only probes while fs mutations still throw KERNEL-META-01.
+test("executor: execOnReadOnly command runs io.exec under the read-only adapter", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const report = await executeKernelCommand({
+      workspaceRoot: root,
+      commandName: "fixture.exec-readonly.command",
+      outputFormat: "json",
+    });
+    const single = Array.isArray(report) ? report[0]! : report;
+    expect(single.ok).toBe(true);
+    const data = single.data as { out: string; readonly: boolean };
+    expect(data.out).toBe("probe");
+    expect(data.readonly).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// RFC-1176: mutatingFlags — the declaration stays read-only for scheduling;
+// a declared flag in argv upgrades the invocation to the real adapter.
+test("executor: mutatingFlags command stays read-only without the flag, writes with it", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const plain = await executeKernelCommand({
+      workspaceRoot: root,
+      commandName: "fixture.writebaseline.command",
+      outputFormat: "json",
+    });
+    const single = Array.isArray(plain) ? plain[0]! : plain;
+    expect(single.ok).toBe(true);
+    expect((single.data as { readonly: boolean }).readonly).toBe(true);
+
+    const flagged = await executeKernelCommand({
+      workspaceRoot: root,
+      commandName: "fixture.writebaseline.command",
+      outputFormat: "json",
+      argv: ["--write-baseline"],
+    });
+    const flaggedSingle = Array.isArray(flagged) ? flagged[0]! : flagged;
+    expect(flaggedSingle.ok).toBe(true);
+    expect((flaggedSingle.data as { wrote: boolean }).wrote).toBe(true);
+    await expect(
+      import("node:fs/promises").then((fs) => fs.readFile(join(root, "baseline.txt"), "utf8")),
+    ).resolves.toBe("baseline");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

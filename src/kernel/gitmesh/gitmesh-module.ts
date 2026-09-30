@@ -59,6 +59,7 @@ export async function createGitmeshModule(): Promise<ModuleExport> {
       {
         name: "gitmesh.status",
         mutatesState: false,
+        execOnReadOnly: true,
         modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
         description:
           "RFC-0563: check sync status (am I up-to-date?). Local-only query — no network " +
