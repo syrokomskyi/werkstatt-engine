@@ -7,13 +7,11 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1146: auto-discover flag-reading helpers in kernel.flags.lint</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
+  <item>RFC-1176 follow-up: drop duplicated writes[] on mission.validate — the contract sweep's narrower evidence/** entry shadowed the existing evidence+distribution declaration (TS1117).</item>
   <history>ADR-0041, RFC-0560, RFC-1028, RFC-1095, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -275,7 +273,6 @@ export async function createMissionModule(): Promise<ModuleExport> {
       {
         name: "mission.validate",
         mutatesState: true,
-        writes: ["missions/{mission}/evidence/**"],
         generates: [],
         contract: "mission",
         rules: [],
