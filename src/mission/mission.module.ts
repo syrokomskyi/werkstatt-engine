@@ -376,6 +376,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
           mission: { kind: "string", required: true, description: "Mission id." },
         },
         writes: ["missions/{mission}/evidence/authored-diff.json"],
+        generates: [],
         reads: ["missions/{mission}/workpiece/**", "systems/{system}/system.pin.json"],
         execute: runMissionDiff,
       },
