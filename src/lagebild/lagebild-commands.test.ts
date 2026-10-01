@@ -4,10 +4,16 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: initial lagebild command tests.</item>
+  <item>m000170: EC-16 — isolate workspace root in a per-run tmpdir sandbox so
+    resolveCacheClonePath resolves to a private systems-cache pool; un-quarantine
+    from .flaky-tests.json.</item>
 </CHANGE_SUMMARY>
 */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterAll } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 // Mock registry-io
@@ -108,10 +114,20 @@ function makeInput(flags: Record<string, unknown>) {
   return { flags, argv: [] } as unknown as Parameters<typeof runLagebildConnect>[0];
 }
 
-function makeContext(workspaceRoot: string) {
+// EC-16: the workspace root feeds `resolveCacheClonePath` → "<root>/../systems-cache/<id>".
+// A shared literal like /tmp/test makes sibling-pool test files race on
+// /tmp/systems-cache (ENOENT flakes under `vitest related`). Per-run sandbox keeps
+// this file isolated; teardown removes it.
+const workRoot = mkdtempSync(join(tmpdir(), "lagebild-commands-"));
+
+afterAll(() => {
+  rmSync(workRoot, { recursive: true, force: true });
+});
+
+function makeContext() {
   return {
     io: createDefaultIO().io,
-    workspaceRoot,
+    workspaceRoot: workRoot,
     dryRun: false,
     site: undefined,
   } as unknown as Parameters<typeof runLagebildConnect>[1];
@@ -189,7 +205,7 @@ describe("RFC-1065: lagebild.connect", () => {
         "source-system-id": "src-1",
         channel: "main",
       }),
-      makeContext("/tmp/test"),
+      makeContext(),
     );
     expect(runWranglerSecretPut).toHaveBeenCalledTimes(4);
     const calls = vi.mocked(runWranglerSecretPut).mock.calls;
@@ -213,7 +229,7 @@ describe("RFC-1065: lagebild.connect", () => {
         "api-key": "secret-key-123",
         "tenant-id": "tenant-1",
       }),
-      makeContext("/tmp/test"),
+      makeContext(),
     );
     expect(result.data!.secrets).toHaveLength(4);
     const pushedFlags = result.data!.secrets.map((s) => s.pushed);
@@ -230,7 +246,7 @@ describe("RFC-1065: lagebild.connect", () => {
         "tenant-id": "tenant-1",
         channel: "dev",
       }),
-      makeContext("/tmp/test"),
+      makeContext(),
     );
     expect(runWranglerSecretPut).toHaveBeenCalled();
     const firstCall = vi.mocked(runWranglerSecretPut).mock.calls[0];
@@ -246,7 +262,7 @@ describe("RFC-1065: lagebild.connect", () => {
           "api-key": "",
           "tenant-id": "tenant-1",
         }),
-        makeContext("/tmp/test"),
+        makeContext(),
       ),
     ).rejects.toThrow("--api-key");
   });
@@ -261,7 +277,7 @@ describe("RFC-1065: lagebild.connect", () => {
         "source-system-id": "src-1",
         channel: "main",
       }),
-      makeContext("/tmp/test"),
+      makeContext(),
     );
     expect(writeSystemStateSmart).toHaveBeenCalledTimes(1);
     const writtenState = vi.mocked(writeSystemStateSmart).mock.calls[0][2] as typeof mockState & {
@@ -284,7 +300,7 @@ describe("RFC-1065: lagebild.connect", () => {
           "api-key": "secret-key-123",
           "tenant-id": "tenant-1",
         }),
-        makeContext("/tmp/test"),
+        makeContext(),
       ),
     ).rejects.toThrow("not found");
   });
@@ -293,26 +309,20 @@ describe("RFC-1065: lagebild.connect", () => {
     await expect(
       runLagebildConnect(
         makeInput({ "api-url": "u", "api-key": "k", "tenant-id": "t" }),
-        makeContext("/tmp/test"),
+        makeContext(),
       ),
     ).rejects.toThrow("--site is required");
   });
 
   it("throws if --api-url is missing", async () => {
     await expect(
-      runLagebildConnect(
-        makeInput({ site: "s", "api-key": "k", "tenant-id": "t" }),
-        makeContext("/tmp/test"),
-      ),
+      runLagebildConnect(makeInput({ site: "s", "api-key": "k", "tenant-id": "t" }), makeContext()),
     ).rejects.toThrow("--api-url is required");
   });
 
   it("throws if --tenant-id is missing", async () => {
     await expect(
-      runLagebildConnect(
-        makeInput({ site: "s", "api-url": "u", "api-key": "k" }),
-        makeContext("/tmp/test"),
-      ),
+      runLagebildConnect(makeInput({ site: "s", "api-url": "u", "api-key": "k" }), makeContext()),
     ).rejects.toThrow("--tenant-id is required");
   });
 
@@ -324,7 +334,7 @@ describe("RFC-1065: lagebild.connect", () => {
         "api-key": "secret-key-123",
         "tenant-id": "tenant-1",
       }),
-      makeContext("/tmp/test"),
+      makeContext(),
     );
     const writtenState = vi.mocked(writeSystemStateSmart).mock.calls[0][2] as typeof mockState & {
       lagebild?: { sourceSystemId: string };
@@ -340,7 +350,7 @@ describe("RFC-1065: lagebild.validate", () => {
     );
     const result = await runLagebildValidate(
       makeInput({ site: "test-site", channel: "main" }),
-      makeContext("/tmp/test"),
+      makeContext(),
     );
     expect(result.data!.secrets).toHaveLength(4);
     expect(result.data!.secrets.map((s) => s.name)).toEqual([
@@ -355,19 +365,13 @@ describe("RFC-1065: lagebild.validate", () => {
     mockSpawnChild(
       "LAGEBILD_API_URL  2024-01-01T00:00:00Z\nLAGEBILD_API_KEY  2024-01-01T00:00:00Z\nLAGEBILD_TENANT_ID  2024-01-01T00:00:00Z\nLAGEBILD_SOURCE_SYSTEM_ID  2024-01-01T00:00:00Z\n",
     );
-    const result = await runLagebildValidate(
-      makeInput({ site: "test-site" }),
-      makeContext("/tmp/test"),
-    );
+    const result = await runLagebildValidate(makeInput({ site: "test-site" }), makeContext());
     expect(result.data!.allSecretsPresent).toBe(true);
   });
 
   it("AC-6: returns allSecretsPresent: false and exitCode 1 when secrets missing", async () => {
     mockSpawnChild("LAGEBILD_API_URL  2024-01-01T00:00:00Z\n");
-    const result = await runLagebildValidate(
-      makeInput({ site: "test-site" }),
-      makeContext("/tmp/test"),
-    );
+    const result = await runLagebildValidate(makeInput({ site: "test-site" }), makeContext());
     expect(result.data!.allSecretsPresent).toBe(false);
     expect(result.exitCode).toBe(1);
   });
@@ -376,12 +380,12 @@ describe("RFC-1065: lagebild.validate", () => {
     const enoentError = new Error("ENOENT: no such file or directory");
     vi.mocked(readSystemConfigSmart).mockRejectedValueOnce(enoentError as never);
     await expect(
-      runLagebildValidate(makeInput({ site: "missing-site" }), makeContext("/tmp/test")),
+      runLagebildValidate(makeInput({ site: "missing-site" }), makeContext()),
     ).rejects.toThrow("not found");
   });
 
   it("throws if --site is missing", async () => {
-    await expect(runLagebildValidate(makeInput({}), makeContext("/tmp/test"))).rejects.toThrow(
+    await expect(runLagebildValidate(makeInput({}), makeContext())).rejects.toThrow(
       "--site is required",
     );
   });
@@ -401,10 +405,7 @@ describe("RFC-1065: lagebild.validate", () => {
         channel: "main",
       },
     } as never);
-    const result = await runLagebildValidate(
-      makeInput({ site: "test-site" }),
-      makeContext("/tmp/test"),
-    );
+    const result = await runLagebildValidate(makeInput({ site: "test-site" }), makeContext());
     expect(result.data!.state.connected).toBe(true);
   });
 });
@@ -422,11 +423,8 @@ describe("RFC-1065: lagebild.status", () => {
         channel: "main",
       },
     } as never);
-    const result = await runLagebildStatus(
-      makeInput({ site: "test-site" }),
-      makeContext("/tmp/test"),
-    );
-    expect(readSystemStateSmart).toHaveBeenCalledWith("/tmp/test", "test-site");
+    const result = await runLagebildStatus(makeInput({ site: "test-site" }), makeContext());
+    expect(readSystemStateSmart).toHaveBeenCalledWith(workRoot, "test-site");
     expect(result.data!.connected).toBe(true);
     expect(result.data!.apiUrl).toBe("https://api.lagebild.example");
     expect(result.data!.tenantId).toBe("tenant-1");
@@ -434,21 +432,18 @@ describe("RFC-1065: lagebild.status", () => {
   });
 
   it("AC-8: returns connected: false when lagebild block is undefined", async () => {
-    const result = await runLagebildStatus(
-      makeInput({ site: "test-site" }),
-      makeContext("/tmp/test"),
-    );
+    const result = await runLagebildStatus(makeInput({ site: "test-site" }), makeContext());
     expect(result.data!.connected).toBe(false);
   });
 
   it("AC-9: does not make network calls", async () => {
     vi.mocked(readSystemStateSmart).mockResolvedValueOnce(mockState as never);
-    await runLagebildStatus(makeInput({ site: "test-site" }), makeContext("/tmp/test"));
+    await runLagebildStatus(makeInput({ site: "test-site" }), makeContext());
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("throws if --site is missing", async () => {
-    await expect(runLagebildStatus(makeInput({}), makeContext("/tmp/test"))).rejects.toThrow(
+    await expect(runLagebildStatus(makeInput({}), makeContext())).rejects.toThrow(
       "--site is required",
     );
   });
