@@ -888,7 +888,7 @@ export async function runLeitstandCertify(
   return result;
 }
 
-async function resolveDevBaseUrl(
+export async function resolveDevBaseUrl(
   cacheCloneDir: string,
   baseUrlFlag: string | undefined,
   io: WorkspaceIO = createDefaultIO().io,
@@ -904,10 +904,11 @@ async function resolveDevBaseUrl(
         const content = await io.readFile(path.join(opsDir, entry.name));
         const record = JSON.parse(content) as {
           channel?: string;
+          state?: string;
           timestamp?: string;
           deploymentUrl?: string;
         };
-        if (record.channel === "dev" && record.deploymentUrl) {
+        if (record.channel === "dev" && record.state === "succeeded" && record.deploymentUrl) {
           const at = record.timestamp ?? "";
           if (!latestDevUrl || at > latestAt) {
             latestAt = at;
