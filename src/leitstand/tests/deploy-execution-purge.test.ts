@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1092: initial tests for purgeCapable() adapter interface and pipeline behavior.</item>
+  <item>REVIEW-CODE-2026-10-01-01: stub bootSmokeCapable() on makeAdapter (required DeploymentAdapter method).</item>
 </CHANGE_SUMMARY>
 */
 

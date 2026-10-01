@@ -6,16 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1126: step 4 — artifact-hash provenance
-
-resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
   <item>RFC-1126: step 7 — AC evidence alignment
 
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1136</history>
+  <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136</history>
 </CHANGE_SUMMARY>
 */
 

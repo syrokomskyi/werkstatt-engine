@@ -8,9 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -21,7 +18,8 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
 
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938</history>
+  <item>REVIEW-CODE-2026-10-01-01: resolveDevBaseUrl trusts only state:"succeeded" dev records (failed deploys poisoned the cert base URL — first-deploy deadlock) and narrows the parsed state field to DeploymentOperationState.</item>
+  <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 

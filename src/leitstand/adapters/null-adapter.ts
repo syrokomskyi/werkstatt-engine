@@ -6,7 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Extracted from leitstand-commands.ts so the adapter registry can resolve names without importing the command module; gained bootSmokeCapable() with the DeploymentAdapter capability surface.</item>
+  <item>REVIEW-CODE-2026-10-01-01: extracted from leitstand-commands.ts so the adapter registry can resolve names without importing the command module; carries bootSmokeCapable() → false (no runtime).</item>
 </CHANGE_SUMMARY>
 */
 

@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0379: initial adapter registry re-export.</item>
   <item>RFC-1091: re-export shared health-check helpers from health-helpers.ts.</item>
+  <item>REVIEW-CODE-2026-10-01-01: re-export nullAdapter + resolveAdapter — registry resolution moved here from leitstand-commands so non-command consumers resolve adapters without importing the command module.</item>
 </CHANGE_SUMMARY>
 */
 

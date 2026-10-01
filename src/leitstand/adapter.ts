@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0627: extend channel type to include "dev" for the three-channel deployment chain.</item>
   <item>RFC-0926: add optional versionId to RollbackInput and rolledBackToVersionId to RollbackResult for release-aware rollback.</item>
   <item>RFC-1092: add required purgeCapable() method to DeploymentAdapter for adapter-aware CDN purge.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0358, RFC-0379, RFC-0585, RFC-0587</history>
+  <item>REVIEW-CODE-2026-10-01-01: add required bootSmokeCapable() method to DeploymentAdapter — adapter capability replaces name-string predicates in release boot-smoke gating.</item>
+  <history>RFC-0358, RFC-0379, RFC-0585, RFC-0587, RFC-0627</history>
 </CHANGE_SUMMARY>
 */
 

@@ -6,7 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Extracted from leitstand-commands.ts so non-command consumers (release-commands boot-smoke gate) can resolve adapters through the registry barrel instead of name-string predicates.</item>
+  <item>REVIEW-CODE-2026-10-01-01: extracted from leitstand-commands.ts so non-command consumers (release-commands boot-smoke gate) resolve adapters through the registry barrel instead of name-string predicates.</item>
 </CHANGE_SUMMARY>
 */
 

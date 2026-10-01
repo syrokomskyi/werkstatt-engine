@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0866: initial test for executeDeployPhases with null adapter and dev channel.</item>
+  <item>REVIEW-CODE-2026-10-01-01: stub bootSmokeCapable() on the test nullAdapter (required DeploymentAdapter method).</item>
 </CHANGE_SUMMARY>
 */
 

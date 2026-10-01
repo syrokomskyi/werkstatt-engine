@@ -5,6 +5,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1136: initial tests covering AC-1 (releaseId resolved from lastPropagated), AC-2 (--release override), AC-3 (explicit unknown when no release recorded).</item>
   <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
+  <item>REVIEW-CODE-2026-10-01-01: barrel mock gains resolveAdapter (registry moved to adapters/index.ts) + bootSmokeCapable stub.</item>
 </CHANGE_SUMMARY>
 */
 
