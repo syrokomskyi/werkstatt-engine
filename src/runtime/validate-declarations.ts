@@ -7,7 +7,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1038: initial implementation — extracted from validateRegistration, adapted for CommandDeclaration[] instead of KernelRegistry.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -15,6 +14,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1138: scope all remaining exempt entries — 15 site-plugin commands to check (ALL_COMMANDS), nachweis.manifest.generate to nachweis, sichtpass.generate to sichtpass; stops stale-entry warnings in registries without those modules.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1177: GENERATOR_OWNERSHIP_EXEMPT += csp.hashes.generate (check) — rewrites emitted dist/client/_headers in place, owns no generated artifact.</item>
+  <history>RFC-1038</history>
 </CHANGE_SUMMARY>
 */
 
