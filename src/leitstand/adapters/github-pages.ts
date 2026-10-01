@@ -110,6 +110,7 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
         "gh-pages",
         "-d",
         "client",
+        "--dotfiles",
         "-b",
         branch,
         "-r",
