@@ -14,7 +14,7 @@ Follows the same pattern as env-persist.ts (RFC-0822) but for non-env operator c
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0840: initial operator-config-files module with OPERATOR_CONFIG_FILES, persistOperatorConfigFiles, and restoreOperatorConfigFiles.</item>
-  <item>m000170: OPTIONAL_OPERATOR_CONFIG_FILES — src/image-variants.config.yaml persists/restores like the required entries but stays opt-in (presence check + MAT-CONFIG-02 keep covering only the required list).</item>
+  <item>warpgogol-m000170: OPTIONAL_OPERATOR_CONFIG_FILES — src/image-variants.config.yaml persists/restores like the required entries but stays opt-in (presence check + MAT-CONFIG-02 keep covering only the required list).</item>
 </CHANGE_SUMMARY>
 */
 

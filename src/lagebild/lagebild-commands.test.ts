@@ -4,7 +4,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: initial lagebild command tests.</item>
-  <item>m000170: EC-16 — isolate workspace root in a per-run tmpdir sandbox so
+  <item>warpgogol-m000170: EC-16 — isolate workspace root in a per-run tmpdir sandbox so
     resolveCacheClonePath resolves to a private systems-cache pool; un-quarantine
     from .flaky-tests.json.</item>
 </CHANGE_SUMMARY>

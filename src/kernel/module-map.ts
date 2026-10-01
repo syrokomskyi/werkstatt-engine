@@ -19,7 +19,6 @@
 Extract pipeline-status derivation into packages/forge/src/pipeline-status.ts, refactor rfc.pipeline.status onto it, add os/queue module with queue.validate command, register in WORKSHOP_MODULE_MAP.forge + bin/cli.ts + package.json exports.</item>
   <item>RFC-1148: SITE_MODULE_MAP + siteModuleLoaders() — canonical 18-loader site module set shared by kernel.config.template.ts and listStaticCommandSurface; materializer refactored into a shared helper.</item>
   <item>RFC-1148: review fix — materializeDescriptors wraps import failure with descriptor key/spec context.</item>
-  <item>Auto-derive default modulePath from the descriptor spec (import.meta.resolve → packages/-relative path) — explicit per-command modulePath wins; commands loaded through descriptor loaders can no longer drift into OWN-XCHECK-03 "missing module" by omission.</item>
 </CHANGE_SUMMARY>
 */
 
