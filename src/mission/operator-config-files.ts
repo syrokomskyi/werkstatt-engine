@@ -14,6 +14,7 @@ Follows the same pattern as env-persist.ts (RFC-0822) but for non-env operator c
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0840: initial operator-config-files module with OPERATOR_CONFIG_FILES, persistOperatorConfigFiles, and restoreOperatorConfigFiles.</item>
+  <item>m000170: OPTIONAL_OPERATOR_CONFIG_FILES — src/image-variants.config.yaml persists/restores like the required entries but stays opt-in (presence check + MAT-CONFIG-02 keep covering only the required list).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,6 +31,19 @@ export const OPERATOR_CONFIG_FILES = [
   "src/image-delivery.config.yaml",
 ] as const;
 
+/**
+ * m000170: optional operator configs — persisted/restored like
+ * OPERATOR_CONFIG_FILES when present, but NOT required by
+ * workpiece.config.presence.check (a site may simply never need the knob).
+ * Excluded from MAT-CONFIG-02's dead-entry scan for the same reason.
+ */
+export const OPTIONAL_OPERATOR_CONFIG_FILES = ["src/image-variants.config.yaml"] as const;
+
+const ALL_OPERATOR_CONFIG_FILES: readonly string[] = [
+  ...OPERATOR_CONFIG_FILES,
+  ...OPTIONAL_OPERATOR_CONFIG_FILES,
+];
+
 export async function persistOperatorConfigFiles(
   workpieceDir: string,
   cacheCloneDir: string,
@@ -38,7 +52,7 @@ export async function persistOperatorConfigFiles(
   const copied: string[] = [];
   const skipped: string[] = [];
 
-  for (const entry of OPERATOR_CONFIG_FILES) {
+  for (const entry of ALL_OPERATOR_CONFIG_FILES) {
     const src = path.join(workpieceDir, entry);
     const dest = path.join(cacheCloneDir, entry);
     if (!(await io.exists(src))) continue;
@@ -62,7 +76,7 @@ export async function restoreOperatorConfigFiles(
   const copied: string[] = [];
   const skipped: string[] = [];
 
-  for (const entry of OPERATOR_CONFIG_FILES) {
+  for (const entry of ALL_OPERATOR_CONFIG_FILES) {
     const src = path.join(cacheCloneDir, entry);
     const dest = path.join(workpieceDir, entry);
     if (!(await io.exists(src))) continue;

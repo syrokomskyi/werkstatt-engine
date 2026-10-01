@@ -5,6 +5,8 @@ RFC-0840: materialize.config.validate command handler — workspace-scope valida
 that checks OPERATOR_CONFIG_FILES list stays in sync with actual workpiece and
 cache clone files. Emits MAT-CONFIG-01 (warning: unrecognized operator file) and
 MAT-CONFIG-02 (error: dead entry in OPERATOR_CONFIG_FILES).
+OPTIONAL_OPERATOR_CONFIG_FILES (m000170) whitelists MAT-CONFIG-01 but is not
+covered by MAT-CONFIG-02 — optional files legitimately exist on no site.
 </purpose>
 <non-goals>
   <item>Do not validate file contents — only presence/absence.</item>
@@ -15,6 +17,7 @@ MAT-CONFIG-02 (error: dead entry in OPERATOR_CONFIG_FILES).
 <CHANGE_SUMMARY>
   <item>RFC-0840: initial materialize.config.validate command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>m000170: OPTIONAL_OPERATOR_CONFIG_FILES joined into the MAT-CONFIG-01 whitelist; MAT-CONFIG-02 intentionally still scans only the required OPERATOR_CONFIG_FILES.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,7 +29,7 @@ import type {
   Diagnostic,
   CheckResult,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { OPERATOR_CONFIG_FILES } from "./operator-config-files.ts";
+import { OPERATOR_CONFIG_FILES, OPTIONAL_OPERATOR_CONFIG_FILES } from "./operator-config-files.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
 import { discoverSystems } from "../sternsystem/registry-io.ts";
 
@@ -71,7 +74,9 @@ function isBoilerplate(name: string): boolean {
 }
 
 function isOperatorConfigEntry(name: string): boolean {
-  return OPERATOR_CONFIG_FILES.some((entry) => entry === name || entry.endsWith(`/${name}`));
+  return [...OPERATOR_CONFIG_FILES, ...OPTIONAL_OPERATOR_CONFIG_FILES].some(
+    (entry) => entry === name || entry.endsWith(`/${name}`),
+  );
 }
 
 export async function runMaterializeConfigValidate(
@@ -138,7 +143,10 @@ export async function runMaterializeConfigValidate(
         if (entry.name === "system.md") continue;
         if (isGenerated(entry.name)) continue;
         const srcPath = `src/${entry.name}`;
-        if (OPERATOR_CONFIG_FILES.includes(srcPath as never)) continue;
+        if (
+          [...OPERATOR_CONFIG_FILES, ...OPTIONAL_OPERATOR_CONFIG_FILES].includes(srcPath as never)
+        )
+          continue;
         if (isBoilerplate(entry.name)) continue;
         if (entry.name.endsWith(".generated.mjs")) continue;
         diagnostics.push({
