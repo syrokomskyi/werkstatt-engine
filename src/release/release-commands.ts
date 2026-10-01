@@ -75,7 +75,11 @@ import {
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import { atomicWriteFile, atomicMoveDir, resolveStagingDir } from "../werkstatt/atomic.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
-import { readSystemState, writeSystemState } from "../sternsystem/registry-io.ts";
+import {
+  readSystemConfigSmart,
+  readSystemState,
+  writeSystemState,
+} from "../sternsystem/registry-io.ts";
 import { runPipelinePhase, computeBuildInputHash } from "../handoff/build-pipeline-helpers.ts";
 import { evaluateCSurfaceGate } from "./c-surface-guard.ts";
 import { checkBreaksCDeclaration } from "./breaks-c-helper.ts";
@@ -124,6 +128,15 @@ function deriveReleaseId(systemId: string, existing: string[]): string {
     );
   }
   return `${systemId}-r${String(next).padStart(6, "0")}`;
+}
+
+// Boot-smoke only applies to worker-runtime deployments — static and
+// no-runtime adapters emit no worker bundle, so a generated workpiece
+// wrangler.jsonc there is vestigial and there is nothing to boot in miniflare.
+export function bootSmokeAppliesToAdapter(adapter: string | undefined | null): boolean {
+  return (
+    adapter !== undefined && adapter !== null && adapter !== "null" && adapter !== "github-pages"
+  );
 }
 
 async function listReleaseIds(
@@ -543,7 +556,13 @@ export async function runReleasePrepare(
         ? astroWranglerPath
         : path.join(workpieceDir, "wrangler.jsonc");
       let bootSmokeVerdict: "pass" | "fail" = "pass";
-      if (await context.io.exists(wranglerConfigPath)) {
+      const deploymentAdapter = (await readSystemConfigSmart(workspaceRoot, systemId, context.io))
+        .deployment?.adapter;
+      if (!bootSmokeAppliesToAdapter(deploymentAdapter)) {
+        logger.info(
+          `  boot-smoke skipped — deployment adapter '${deploymentAdapter}' produces no worker entry`,
+        );
+      } else if (await context.io.exists(wranglerConfigPath)) {
         // When using the Astro-generated wrangler.json, the base directory is
         // dist/server/ (entry.mjs and assets.directory are relative to it).
         const bootSmokeDistDir =
