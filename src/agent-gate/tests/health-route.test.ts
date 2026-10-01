@@ -79,15 +79,75 @@ describe("RFC-1116 AC-1: healthy surface → 200 + full AgentHealth shape", () =
   });
 });
 
+const WRITE_ACTION = {
+  id: "lead.submit",
+  url: "/api/agent/v1/actions/lead.submit",
+  title: { de: "Lead" },
+  inputSchemaRef: "gogol.agent.action/lead.submit@1",
+  entitlement: "agent.actions" as const,
+  sideEffect: "write" as const,
+};
+
+const manifestWithWriteAction = buildAgentSurfaceManifest({
+  generatedAt: "2026-01-01T00:00:00.000Z",
+  site: "test-site",
+  baseUrl: "https://test.example",
+  languages: { default: "de", supported: ["de"] },
+  knowledge: [
+    {
+      domain: "offer",
+      url: "/.well-known/knowledge/offer.json",
+      schema: "gogol.agent.knowledge/offer@1",
+    },
+  ],
+  search: { url: "/api/agent/search", model: "@cf/baai/bge-m3", dimensions: 1024 },
+  actions: [WRITE_ACTION],
+});
+
 describe("RFC-1116 AC-2: missing dispatch binding → degraded + 503", () => {
   it("reports unconfigured dispatch and degraded status", async () => {
     const res = await runAgentHealth(
-      manifest,
+      manifestWithWriteAction,
       makeDeps({ fetchResponses: ALL_OK, qstashToken: undefined, ai: {}, searchIndex: {} }),
     );
     expect(res.status).toBe(503);
     expect(res.body.status).toBe("degraded");
     expect(res.body.checks.dispatch).toBe("unconfigured");
+  });
+});
+
+describe("dispatch requirement gating (actions-aware)", () => {
+  it("empty actions[] + missing dispatch token → still ok", async () => {
+    const res = await runAgentHealth(
+      manifest,
+      makeDeps({ fetchResponses: ALL_OK, qstashToken: undefined, ai: {}, searchIndex: {} }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+    expect(res.body.checks.dispatch).toBe("unconfigured");
+  });
+
+  it("preview-only action (sideEffect none) + missing token → still ok", async () => {
+    const previewOnly = buildAgentSurfaceManifest({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      site: "test-site",
+      baseUrl: "https://test.example",
+      languages: { default: "de", supported: ["de"] },
+      knowledge: [
+        {
+          domain: "offer",
+          url: "/.well-known/knowledge/offer.json",
+          schema: "gogol.agent.knowledge/offer@1",
+        },
+      ],
+      actions: [{ ...WRITE_ACTION, sideEffect: "none" }],
+    });
+    const res = await runAgentHealth(
+      previewOnly,
+      makeDeps({ fetchResponses: ALL_OK, qstashToken: undefined }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
   });
 });
 

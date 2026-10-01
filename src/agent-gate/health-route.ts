@@ -49,8 +49,9 @@ async function selfFetch(deps: AgentHealthDeps, path: string): Promise<Response 
 
 /**
  * Assemble the AgentHealth payload. `degraded` when the manifest or a declared
- * knowledge ref is unreachable, the dispatch token is absent, or the surface
- * advertises search while its bindings are missing. Returns the HTTP status
+ * knowledge ref is unreachable, the surface declares actions while the
+ * dispatch token is absent, or the surface advertises search while its
+ * bindings are missing. Returns the HTTP status
  * alongside the body so the adapter stays a thin wrapper.
  */
 export async function runAgentHealth(
@@ -74,12 +75,21 @@ export async function runAgentHealth(
     }
   }
 
+  // Dispatch (QStash) is only required when the surface declares write
+  // actions — preview-only ("none") and empty actions[] manifests never
+  // dispatch, so an absent UPSTASH_QSTASH_TOKEN must not degrade them
+  // (discovered during nicaragua-projekt dev deploy: a knowledge-only
+  // surface reported 503).
+  const dispatchRequired = manifest.actions.some((a) => a.sideEffect !== "none");
   const dispatchConfigured = Boolean(deps.qstashToken);
   const searchAvailable = Boolean(deps.env.AI && deps.env.SEARCH_INDEX);
   const searchAdvertised = manifest.interfaces.search !== null;
 
   const degraded =
-    !manifestOk || !knowledgeOk || !dispatchConfigured || (searchAdvertised && !searchAvailable);
+    !manifestOk ||
+    !knowledgeOk ||
+    (dispatchRequired && !dispatchConfigured) ||
+    (searchAdvertised && !searchAvailable);
 
   return {
     status: degraded ? 503 : 200,
