@@ -104,6 +104,11 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
         };
       }
 
+      // GitHub Pages runs Jekyll on legacy branch deploys, which drops
+      // underscore- and dot-prefixed paths (_astro/, .well-known/, _headers).
+      // An empty .nojekyll marker bypasses Jekyll entirely.
+      await io.writeFile(path.join(distDir, ".nojekyll"), "");
+
       const repoUrl = `https://x-access-token:${token}@github.com/${repo}.git`;
       const ghPagesArgs = [
         "--yes",

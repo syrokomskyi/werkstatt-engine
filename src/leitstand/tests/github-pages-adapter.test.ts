@@ -120,6 +120,35 @@ describe("propagate", () => {
     expect(result.state).toBe("succeeded");
   });
 
+  // Regression: gh-pages publish must bypass Jekyll (writes .nojekyll) and
+  // include dotfiles, or _astro/ and .well-known/ never reach the live site.
+  test("propagate writes .nojekyll into client and passes --dotfiles", async () => {
+    process.env.GH_TOKEN = "test-token";
+    const mockRunner: CommandRunner = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      stdout: "Published",
+      stderr: "",
+    });
+    const adapter = createGitHubPagesAdapter(mockRunner);
+    const input: PropagateInput = {
+      systemId: "test-system",
+      releaseId: "rel-001",
+      channel: "main",
+      distPath,
+      workerName: "owner/repo",
+      url: "https://owner.github.io/repo",
+      secretsFilePath: undefined,
+      expectedBehaviorSnapshotHash: "",
+    };
+    const result = await adapter.propagate(input);
+    expect(result.state).toBe("succeeded");
+    const [cmd, args] = vi.mocked(mockRunner).mock.calls[0];
+    expect(cmd).toBe("npx");
+    expect(args).toContain("--dotfiles");
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync(join(distPath, "client", ".nojekyll"), "utf8")).toBe("");
+  });
+
   // AC-4: propagate success returns state "succeeded" with deploymentUrl
   test("AC-4: propagate success returns succeeded with deploymentUrl", async () => {
     process.env.GH_TOKEN = "test-token";
