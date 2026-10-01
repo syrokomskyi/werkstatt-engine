@@ -85,6 +85,9 @@ const nullAdapter: DeploymentAdapter = {
   purgeCapable() {
     return false;
   },
+  bootSmokeCapable() {
+    return false;
+  },
 };
 
 const systemConfig: DeploymentStaticConfig = {

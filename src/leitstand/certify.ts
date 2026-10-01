@@ -38,6 +38,7 @@ import type {
   MainVerificationDecisionV1,
 } from "../certification/contracts/decisions.ts";
 import type { GateChannel } from "../certification/contracts/identifiers.ts";
+import type { DeploymentOperationState } from "../certification/state-machine.ts";
 import { astroCertificationProfile } from "../certification/profile/astro-profile.ts";
 import { makeR2ConfigFromEnv, resolveArtifactHash, flagSite } from "./deploy-helpers.ts";
 import { resolveCacheClonePath, readSystemStateSmart } from "../sternsystem/registry-io.ts";
@@ -904,7 +905,7 @@ export async function resolveDevBaseUrl(
         const content = await io.readFile(path.join(opsDir, entry.name));
         const record = JSON.parse(content) as {
           channel?: string;
-          state?: string;
+          state?: DeploymentOperationState;
           timestamp?: string;
           deploymentUrl?: string;
         };

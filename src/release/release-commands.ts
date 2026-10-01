@@ -95,7 +95,7 @@ import {
   signLatestBuildArtifacts,
 } from "../integrity/signing.ts";
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
-import { filterEnv } from "../leitstand/adapters/index.ts";
+import { filterEnv, resolveAdapter } from "../leitstand/adapters/index.ts";
 import { runIntegrityBuildRecord } from "../integrity/integrity-commands.ts";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
@@ -133,10 +133,15 @@ function deriveReleaseId(systemId: string, existing: string[]): string {
 // Boot-smoke only applies to worker-runtime deployments — static and
 // no-runtime adapters emit no worker bundle, so a generated workpiece
 // wrangler.jsonc there is vestigial and there is nothing to boot in miniflare.
+// The decision goes through the adapter's bootSmokeCapable() capability so new
+// static adapters opt out in their own file instead of extending a deny-list
+// here. Unknown adapter names keep boot-smoke enabled (strict default).
 export function bootSmokeAppliesToAdapter(adapter: string | undefined | null): boolean {
-  return (
-    adapter !== undefined && adapter !== null && adapter !== "null" && adapter !== "github-pages"
-  );
+  try {
+    return resolveAdapter(adapter ?? undefined).bootSmokeCapable();
+  } catch {
+    return true;
+  }
 }
 
 async function listReleaseIds(

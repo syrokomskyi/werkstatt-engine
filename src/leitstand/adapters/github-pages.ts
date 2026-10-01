@@ -186,6 +186,10 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
       return false;
     },
 
+    bootSmokeCapable() {
+      return false;
+    },
+
     async health(
       input: HealthInput,
     ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }> {

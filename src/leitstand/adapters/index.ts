@@ -21,4 +21,7 @@ export {
 
 export { createGitHubPagesAdapter } from "./github-pages.ts";
 
+export { nullAdapter } from "./null-adapter.ts";
+export { resolveAdapter } from "./resolve.ts";
+
 export { selectProbeRoutes, fetchWithRetry, createDefaultCommandRunner } from "./health-helpers.ts";

@@ -69,7 +69,8 @@ vi.mock("../../customdomain/redirect-register.ts", () => ({
   runRedirectRegister: vi.fn(async () => ({ exitCode: 0 })),
 }));
 
-vi.mock("../adapters/index.ts", () => ({
+vi.mock("../adapters/index.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../adapters/index.ts")>()),
   createCloudflareWorkersAdapter: vi.fn(() => ({ name: "cloudflare" })),
   createGitHubPagesAdapter: vi.fn(() => ({ name: "gh-pages" })),
   readBehaviorSnapshot: vi.fn(async () => null),

@@ -88,6 +88,9 @@ function makeAdapter(purgeCapable: boolean): DeploymentAdapter {
     purgeCapable() {
       return purgeCapable;
     },
+    bootSmokeCapable() {
+      return purgeCapable;
+    },
   };
 }
 

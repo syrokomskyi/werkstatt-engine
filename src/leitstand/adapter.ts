@@ -83,4 +83,5 @@ export interface DeploymentAdapter {
   ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }>;
   getLimits(): DeploymentLimits;
   purgeCapable(): boolean;
+  bootSmokeCapable(): boolean;
 }

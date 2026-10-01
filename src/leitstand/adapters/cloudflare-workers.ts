@@ -207,6 +207,10 @@ export function createCloudflareWorkersAdapter(exec?: CommandRunner): Deployment
       return true;
     },
 
+    bootSmokeCapable() {
+      return true;
+    },
+
     async health(
       input: HealthInput,
     ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }> {

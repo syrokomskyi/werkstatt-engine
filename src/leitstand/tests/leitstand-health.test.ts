@@ -19,8 +19,8 @@ vi.mock("../../sternsystem/registry-io.ts", () => ({
 
 const healthCalls: Array<Record<string, unknown>> = [];
 
-vi.mock("../adapters/index.ts", () => ({
-  createCloudflareWorkersAdapter: vi.fn(() => ({
+vi.mock("../adapters/index.ts", () => {
+  const cfAdapter = {
     name: "cloudflare-workers",
     propagate: vi.fn(),
     rollback: vi.fn(),
@@ -41,16 +41,26 @@ vi.mock("../adapters/index.ts", () => ({
     }),
     getLimits: vi.fn(() => ({ maxTotalSize: 0, maxFileSize: 0 })),
     purgeCapable: vi.fn(() => true),
-  })),
-  createGitHubPagesAdapter: vi.fn(),
-  readBehaviorSnapshot: vi.fn(),
-  sourceDotenv: vi.fn(),
-  filterEnv: vi.fn(),
-  verifyRedirectRoute: vi.fn(),
-  selectProbeRoutes: vi.fn(),
-  fetchWithRetry: vi.fn(),
-  createDefaultCommandRunner: vi.fn(),
-}));
+    bootSmokeCapable: vi.fn(() => true),
+  };
+  return {
+    createCloudflareWorkersAdapter: vi.fn(() => cfAdapter),
+    resolveAdapter: vi.fn((name?: string) => {
+      if (name === "cloudflare-workers") return cfAdapter;
+      throw new Error(
+        `[leitstand] adapter-not-implemented: '${name}' has no concrete implementation`,
+      );
+    }),
+    createGitHubPagesAdapter: vi.fn(),
+    readBehaviorSnapshot: vi.fn(),
+    sourceDotenv: vi.fn(),
+    filterEnv: vi.fn(),
+    verifyRedirectRoute: vi.fn(),
+    selectProbeRoutes: vi.fn(),
+    fetchWithRetry: vi.fn(),
+    createDefaultCommandRunner: vi.fn(),
+  };
+});
 
 const { runLeitstandHealth } = await import("../leitstand-commands.ts");
 const { readSystemConfigSmart, readSystemStateSmart } =

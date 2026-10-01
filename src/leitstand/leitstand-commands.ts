@@ -26,7 +26,6 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import type {
-  PropagationResult,
   HealthCheck,
   DeploymentStaticConfig,
   DeploymentChannel,
@@ -39,21 +38,8 @@ import {
   readSystemStateSmart,
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
-import type {
-  DeploymentAdapter,
-  DeploymentLimits,
-  PropagateInput,
-  RollbackInput,
-  RollbackResult,
-  HealthInput,
-} from "./adapter.ts";
-import {
-  createCloudflareWorkersAdapter,
-  createGitHubPagesAdapter,
-  readBehaviorSnapshot,
-  sourceDotenv,
-  filterEnv,
-} from "./adapters/index.ts";
+import type { DeploymentAdapter, DeploymentLimits } from "./adapter.ts";
+import { resolveAdapter, readBehaviorSnapshot, sourceDotenv, filterEnv } from "./adapters/index.ts";
 import {
   collectPurgeUrls,
   purgeCacheByUrls,
@@ -92,52 +78,6 @@ type Channel = "dev" | "alt" | "main";
 function parseChannel(value: string | undefined, defaultValue: Channel): Channel {
   if (value === "dev" || value === "alt" || value === "main") return value;
   return defaultValue;
-}
-
-// Null adapter for test fixtures and adapter: "null" registry entries
-const nullAdapter: DeploymentAdapter = {
-  name: "null",
-  async propagate(input: PropagateInput): Promise<PropagationResult> {
-    const now = new Date().toISOString();
-    return {
-      systemId: input.systemId,
-      releaseId: input.releaseId,
-      state: "succeeded",
-      deploymentUrl: input.url,
-      startedAt: now,
-      completedAt: now,
-      healthChecks: [],
-    };
-  },
-  async rollback(input: RollbackInput): Promise<RollbackResult> {
-    const now = new Date().toISOString();
-    return {
-      systemId: input.systemId,
-      channel: input.channel,
-      state: "succeeded",
-      workerName: input.workerName,
-      startedAt: now,
-      completedAt: now,
-      stdout: "",
-      stderr: "",
-    };
-  },
-  async health(_input: HealthInput) {
-    return { state: "unknown" as const, checks: [] };
-  },
-  getLimits() {
-    return { maxTotalSize: Infinity, maxFileSize: Infinity };
-  },
-  purgeCapable() {
-    return false;
-  },
-};
-
-function resolveAdapter(name: string | undefined): DeploymentAdapter {
-  if (!name || name === "null") return nullAdapter;
-  if (name === "cloudflare-workers") return createCloudflareWorkersAdapter();
-  if (name === "github-pages") return createGitHubPagesAdapter();
-  throw new Error(`[leitstand] adapter-not-implemented: '${name}' has no concrete implementation`);
 }
 
 function _getChannelConfig(dep: DeploymentStaticConfig, channel: Channel): DeploymentChannel {
