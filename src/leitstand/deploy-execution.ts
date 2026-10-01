@@ -467,6 +467,12 @@ export async function executeDeployPhases(
         `Wrangler deploy failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    if (propagateResult.state !== "succeeded") {
+      failingPhase = "wrangler-deploy";
+      throw new Error(
+        `Deploy failed: adapter '${ctx.adapter.name}' reported state=${propagateResult.state} (see adapter stderr above)`,
+      );
+    }
     const actualDeploymentUrl = propagateResult.deploymentUrl || deploymentUrl;
 
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {

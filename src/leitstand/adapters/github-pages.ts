@@ -130,6 +130,9 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
       });
 
       if (result.exitCode !== 0) {
+        console.error(
+          `[github-pages] gh-pages publish failed (exit ${result.exitCode}): ${result.stderr.trim().slice(-300)}`,
+        );
         return {
           systemId: input.systemId,
           releaseId: input.releaseId,
