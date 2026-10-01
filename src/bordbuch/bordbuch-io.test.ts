@@ -262,6 +262,18 @@ test("redactForBordbuch still allows real secrets to be caught after redaction",
   expect(containsSensitivePayload(redacted)).toBe(true);
 });
 
+test("containsSensitivePayload does not flag digit runs inside hex commit SHAs", () => {
+  // Regression: sha c7905119099c contains 7905119099, a 10-digit run that
+  // matched the phone pattern and silently dropped a mirror-sync entry.
+  const summary = "Mirror sync (push, branch: main) — c7905119099c";
+  expect(containsSensitivePayload(summary)).toBe(false);
+});
+
+test("containsSensitivePayload still flags standalone phone numbers", () => {
+  expect(containsSensitivePayload("Call +49 761 1234 5678 for details")).toBe(true);
+  expect(containsSensitivePayload("tel: 0761 1234 5678")).toBe(true);
+});
+
 test("appendBordbuchEntry stores redacted summary for SSH URL", async () => {
   const entry = await appendBordbuchEntry(
     tmpDir,

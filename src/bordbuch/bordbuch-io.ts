@@ -128,7 +128,7 @@ const SENSITIVE_PATTERNS: RegExp[] = [
   /credential/i,
   /api[_-]?key/i,
   /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
-  /\+?\d{1,4}[\s-]?\(?\d{1,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/,
+  /(?<![0-9a-zA-Z])\+?\d{1,4}[\s-]?\(?\d{1,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}(?![0-9a-zA-Z])/,
 ];
 
 const GIT_URL_REDACTION_PATTERNS: RegExp[] = [
