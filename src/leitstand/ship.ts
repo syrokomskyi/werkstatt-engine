@@ -445,10 +445,12 @@ export function buildShipPlan(input: {
   // failed release.prepare without manually running individual steps.
   if (skipLifecycle) {
     const lifecycleSteps = new Set(["mission-validate", "mission-reconcile", "mission-close"]);
-    const filtered = allSteps.filter((s) => !lifecycleSteps.has(s.name));
+    // PHASE_STEP_COUNT is indexed against the full step list — slice first,
+    // then drop lifecycle steps. Filtering before slicing overshoots the
+    // --until boundary by 3 (e.g. --until alt would include certify-main).
     return {
       op: "leitstand.ship",
-      steps: filtered.slice(0, stepCount),
+      steps: allSteps.slice(0, stepCount).filter((s) => !lifecycleSteps.has(s.name)),
     };
   }
 

@@ -566,3 +566,40 @@ test("resume restores releaseId from journal after release-prepare completed", a
   const certifyArgv = (certifyCalls[0][0] as { argv: string[] }).argv;
   expect(certifyArgv.some((a) => a === "--release=test-sys-r000099")).toBe(true);
 });
+
+test("closed mission + --until alt stops at sync-after-alt — promote never runs", async () => {
+  // PHASE_STEP_COUNT is indexed against the full 15-step plan; when lifecycle
+  // steps are filtered out for a closed mission, the slice must happen BEFORE
+  // the filter — otherwise --until alt overshoots into certify-main.
+  await fs.writeFile(path.join(tmpDir, "missions", "m000001", "mission.yaml"), "state: closed\n");
+
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000050" });
+  mockPhaseResult("sternsystem.sync", 0);
+  mockPhaseResult("release.ready", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
+  mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-alt" });
+  mockPhaseResult("leitstand.propagate", 0);
+  mockPhaseResult("sternsystem.sync", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "alt" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  // preflight, release-prepare, sync, release-ready, certify-dev, sync,
+  // certify-alt, sync — 8 steps; certify-main/promote must not be in the plan.
+  expect(result.data!.steps.length).toBe(8);
+  expect(result.data!.reachedPhase).toBe("alt");
+  const invokedCommands = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invokedCommands).not.toContain("leitstand.promote");
+  expect(invokedCommands).not.toContain("mission.validate");
+  assertAllPhaseCallsValid();
+});
