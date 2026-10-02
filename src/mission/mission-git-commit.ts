@@ -12,6 +12,7 @@
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
   <item>ADR-0104: scoped commits use git commit --only + scoped stagedFiles so index residue is neither committed nor validated</item>
+  <item>RFC-1185: shared.context.validate joins the commit gate — unscoped over pages/ and system.md because collision groups are whole-site per language</item>
   <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -68,6 +69,10 @@ export const VALIDATOR_MAPPINGS: ValidatorMapping[] = [
   { prefix: "src/content/pages/", validator: "page.block.validate", scoped: true },
   { prefix: "src/content/system.md", validator: "page.block.validate" },
   { prefix: "src/content/pages/", validator: "semantic.drift.validate" },
+  // RFC-1185: explicit inherit edges — collision groups are cross-page per
+  // language, so the validator always runs unscoped (no --scope-files).
+  { prefix: "src/content/pages/", validator: "shared.context.validate" },
+  { prefix: "src/content/system.md", validator: "shared.context.validate" },
   { prefix: "src/content/faq/", validator: "faq.validate" },
   // RFC-1160: source-image budget — scoped to staged content assets
   { prefix: "src/content/", validator: "image.variants.validate", scoped: true },

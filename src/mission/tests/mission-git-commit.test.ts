@@ -82,4 +82,24 @@ describe("mission-git-commit", () => {
     const validators = mod.selectValidators(["src/content/pages/de/assets/hero.webp"]);
     expect(validators).toContain("image.variants.validate");
   });
+
+  // RFC-1185
+  test("VALIDATOR_MAPPINGS maps pages+system.md to shared.context.validate unscoped", () => {
+    const mappings = mod.VALIDATOR_MAPPINGS.filter(
+      (m) => m.validator === "shared.context.validate",
+    );
+    expect(mappings.map((m) => m.prefix).sort()).toEqual([
+      "src/content/pages/",
+      "src/content/system.md",
+    ]);
+    expect(mappings.every((m) => m.scoped !== true)).toBe(true);
+  });
+
+  test("selectValidators picks shared.context.validate for pages and system.md files", () => {
+    const validators = mod.selectValidators([
+      "src/content/pages/de/agb.md",
+      "src/content/system.md",
+    ]);
+    expect(validators).toContain("shared.context.validate");
+  });
 });

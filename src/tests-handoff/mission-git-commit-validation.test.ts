@@ -8,6 +8,7 @@
   <item>RFC-1095: summary-record unit tests, commit integration tests, CS rules into compass.validate</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
+  <item>RFC-1185: shared.context.validate joins the pages/system.md prefix mapping — prefix-matching test updated for the sixth validator</item>
 </CHANGE_SUMMARY>
 */
 
@@ -97,6 +98,7 @@ test("prefix matching — business-profile and pages trigger correct validators"
     "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
     "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
     "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "shared.context.validate": { ok: true, exitCode: 0, summary: "pass" },
   };
   const result = await runPreCommitValidation(
     ["src/content/business-profile/de/offerings/automation.md", "src/content/pages/de/index.md"],
@@ -109,7 +111,9 @@ test("prefix matching — business-profile and pages trigger correct validators"
   expect(result.validatorsRun).toContain("semantic.drift.validate");
   expect(result.validatorsRun).toContain("image.variants.validate");
   expect(result.validatorsRun).toContain("typography.validate");
-  expect(result.validatorsRun).toHaveLength(5);
+  // RFC-1185: pages/ commits also trigger the explicit-inherit-edge validator.
+  expect(result.validatorsRun).toContain("shared.context.validate");
+  expect(result.validatorsRun).toHaveLength(6);
 });
 
 test("unregistered validator — skipped with warning, commit proceeds", async () => {
