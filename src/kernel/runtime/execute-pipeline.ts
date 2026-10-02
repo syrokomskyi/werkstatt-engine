@@ -159,6 +159,7 @@ function progressLine(message: string): void {
 function stepStatusLabel(report: KernelExecutionReport): string {
   if (report.cached) return "SKIP (cached)";
   if (report.exitCode === 0 && report.summary?.startsWith("Skipped:")) return "SKIP";
+  if (report.warned) return "WARN (warn-only)";
   if (report.timing.exceededTimeout) return "TIMEOUT";
   if (!report.ok) return "FAIL";
   if ((report.logSummary?.warning ?? 0) > 0) return "WARN";
@@ -168,10 +169,28 @@ function stepStatusLabel(report: KernelExecutionReport): string {
 function stepStatus(report: KernelExecutionReport): PipelineStepTiming["status"] {
   if (report.cached) return "skipped";
   if (report.exitCode === 0 && report.summary?.startsWith("Skipped:")) return "skipped";
+  if (report.warned) return "warn";
   if (report.timing.exceededTimeout) return "timeout";
   if (!report.ok) return "fail";
   if ((report.logSummary?.warning ?? 0) > 0) return "warn";
   return "pass";
+}
+
+/**
+ * RFC-1184: warn-only rollout mode — when a step declares `warnOnly: true`
+ * and its report failed, the failure is preserved on the report (exitCode,
+ * summary, `warned: true`) but `ok` is flipped so the scheduler treats the
+ * step as completed: the pipeline continues, dependents are not skipped or
+ * tainted, and `aggregateCollectErrors` never lists it among failedSteps.
+ * Blocking stays the default — warnOnly is explicit per-step opt-in for
+ * staged rollout of newly blocking gates (RFC-1179/1180 precedent).
+ */
+export function applyWarnOnly(report: KernelExecutionReport, step: KernelPipelineStep): void {
+  if (step.warnOnly === true && !report.ok) {
+    report.ok = true;
+    report.warned = true;
+    report.summary = `[warn-only] ${report.summary ?? `${step.command} failed`}`;
+  }
 }
 
 /**
@@ -590,6 +609,8 @@ async function executePipelineForSite(
             expectedDurationMs: budgetedExpectedDurationMs ?? step.expectedDurationMs,
           });
         }
+        // RFC-1184: warn-only steps record the failure but do not block.
+        applyWarnOnly(report, step);
         // RFC-0687 + RFC-1133: a cached report feeds the transitive-skip set —
         // on both executors now (the app-scoped path previously missed this).
         if (report.cached === true) {
@@ -830,6 +851,8 @@ async function executePipelineForWorkspace(
             expectedDurationMs: budgetedExpectedDurationMs ?? step.expectedDurationMs,
           });
         }
+        // RFC-1184: warn-only steps record the failure but do not block.
+        applyWarnOnly(report, step);
         // RFC-0687 + RFC-1133: a cached report feeds the transitive-skip set.
         if (report.cached === true) {
           runState.cacheHitCommands.add(step.command);

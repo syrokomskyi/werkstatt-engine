@@ -223,11 +223,25 @@ async function getKernelMock() {
   return vi.mocked(kernel.executeKernelCommand);
 }
 
+function mockReport(exitCode: number, summary: string) {
+  return {
+    commandName: "mock",
+    exitCode,
+    ok: exitCode === 0,
+    summary,
+    metadata: {} as never,
+    logs: [],
+    timing: { durationMs: 0, exceededTimeout: false },
+  };
+}
+
 async function mockFreshnessVerified() {
   const commands = await import("../leitstand/leitstand-commands.ts");
   vi.mocked(commands.verifyFreshness).mockResolvedValue({
     verified: true,
     cdnDistTreeHash: null,
+    localDistTreeHash: "",
+    attempts: 1,
   });
 }
 
@@ -266,8 +280,8 @@ test("executeDeployPhases marks failingPhase site-smoke when site.smoke.run exit
     mock.mockImplementation(async (input) => {
       const { commandName } = input as { commandName: string };
       return commandName === "site.smoke.run"
-        ? { exitCode: 1, summary: "2 check(s) failed" }
-        : { exitCode: 0, summary: "ok" };
+        ? mockReport(1, "2 check(s) failed")
+        : mockReport(0, "ok");
     });
     const result = await executeDeployPhases(makeCtx("op-smoke-fail", tmp), "alt");
     expect(result.failingPhase).toBe("site-smoke");
@@ -276,7 +290,7 @@ test("executeDeployPhases marks failingPhase site-smoke when site.smoke.run exit
     expect(names).not.toContain("deploy.smoke.run");
   } finally {
     const mock = await getKernelMock();
-    mock.mockResolvedValue({ exitCode: 0, summary: "ok" });
+    mock.mockResolvedValue(mockReport(0, "ok"));
     rmSync(tmp, { recursive: true, force: true });
     rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }
@@ -290,14 +304,14 @@ test("executeDeployPhases marks failingPhase deploy-smoke when deploy.smoke.run 
     mock.mockImplementation(async (input) => {
       const { commandName } = input as { commandName: string };
       return commandName === "deploy.smoke.run"
-        ? { exitCode: 1, summary: "console error on /" }
-        : { exitCode: 0, summary: "ok" };
+        ? mockReport(1, "console error on /")
+        : mockReport(0, "ok");
     });
     const result = await executeDeployPhases(makeCtx("op-smoke-fail2", tmp), "dev");
     expect(result.failingPhase).toBe("deploy-smoke");
   } finally {
     const mock = await getKernelMock();
-    mock.mockResolvedValue({ exitCode: 0, summary: "ok" });
+    mock.mockResolvedValue(mockReport(0, "ok"));
     rmSync(tmp, { recursive: true, force: true });
     rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   aggregateCollectErrors,
+  applyWarnOnly,
   shouldTransitiveSkip,
   loadImportedCacheHits,
   persistCacheHits,
@@ -235,5 +236,62 @@ describe("mergeCollectErrorsOption — RFC-1144 AC-6", () => {
       steps: [],
     });
     expect(merged).toBe(baseOptions);
+  });
+});
+
+describe("applyWarnOnly — RFC-1184", () => {
+  const warnStep = { command: "gate.new", warnOnly: true };
+  const blockingStep = { command: "gate.old" };
+
+  test("failing warnOnly step → ok=true, warned=true, exitCode preserved", () => {
+    const report = failReport("gate.new");
+    applyWarnOnly(report, warnStep);
+    expect(report.ok).toBe(true);
+    expect(report.warned).toBe(true);
+    expect(report.exitCode).toBe(1); // failure preserved for diagnostics
+    expect(report.summary).toMatch(/^\[warn-only\]/);
+  });
+
+  test("default (no warnOnly) failing step stays blocking", () => {
+    const report = failReport("gate.old");
+    applyWarnOnly(report, blockingStep);
+    expect(report.ok).toBe(false);
+    expect(report.warned).toBeUndefined();
+  });
+
+  test("warnOnly passing step is not marked warned", () => {
+    const report = okReport("gate.new");
+    applyWarnOnly(report, warnStep);
+    expect(report.ok).toBe(true);
+    expect(report.warned).toBeUndefined();
+  });
+
+  test("warned step does not enter collectErrors failedSteps — pipeline may pass", () => {
+    const report = failReport("gate.new");
+    applyWarnOnly(report, warnStep);
+    const results = [makeResult(0, report), makeResult(1, okReport("next"))];
+    expect(aggregateCollectErrors(results, true)).toBeUndefined();
+  });
+
+  test("mixed: warned failure + real failure — only the real one fails the pipeline", () => {
+    const warnedReport = failReport("gate.new");
+    applyWarnOnly(warnedReport, warnStep);
+    const results = [
+      makeResult(0, warnedReport),
+      makeResult(1, failReport("gate.old")),
+      makeResult(2, okReport("tail")),
+    ];
+    const collected = aggregateCollectErrors(results, true);
+    expect(collected).toBeDefined();
+    expect(collected!.failedSteps).toEqual(["gate.old"]);
+  });
+
+  test("warned step does not taint dependents (ok=true → completed, not failed)", () => {
+    // The scheduler reads report.ok only — applyWarnOnly flips it before the
+    // report returns, so dependents see "completed", never "failed". This is
+    // the contract collectErrors/dependency-skip builds on.
+    const report = failReport("gate.new");
+    applyWarnOnly(report, warnStep);
+    expect(report.ok).toBe(true);
   });
 });
