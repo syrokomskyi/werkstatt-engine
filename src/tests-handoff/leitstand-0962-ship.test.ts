@@ -468,6 +468,40 @@ test("epilogue sync sweeps journal tail after op-done (runs last)", async () => 
   expect(callNames[callNames.length - 1]).toBe("sternsystem.sync");
 });
 
+test("epilogue sync failure is non-fatal — ship result unaffected", async () => {
+  setupFullSuccessMocks();
+  mockPhaseResult("mission.archive", 0);
+  mockPhaseResult("sternsystem.sync", 1); // epilogue fails
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  expect(result.data!.releaseId).toBe("test-sys-r000001");
+});
+
+test("epilogue sync also sweeps after a failed op (journal reaches mirrors for --resume)", async () => {
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 1);
+  mockPhaseResult("sternsystem.sync", 0); // epilogue still runs
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "validated" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.data!.failedStep).toBe("mission-validate");
+  const syncCalls = mockExecuteKernelCommand.mock.calls.filter(
+    (c) => (c[0] as { commandName: string }).commandName === "sternsystem.sync",
+  );
+  expect(syncCalls.length).toBe(1);
+});
+
 test("--until alt stops after certify-alt + propagate + sync (11 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
