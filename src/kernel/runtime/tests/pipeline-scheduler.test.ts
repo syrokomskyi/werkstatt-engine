@@ -1,5 +1,6 @@
 import { test, expect, describe } from "vitest";
 import { buildSchedule, executeScheduledSteps, ScheduleError } from "../pipeline-scheduler.ts";
+import { applyWarnOnly } from "../execute-pipeline.ts";
 import type { KernelExecutionReport, KernelPipelineStep } from "@warpgogol/werkstatt-shared/kernel";
 
 function okReport(command: string): KernelExecutionReport {
@@ -278,5 +279,44 @@ describe("executeScheduledSteps — RFC-1144 collect-errors", () => {
     expect(results[1]!.report.ok).toBe(false);
     expect(results[2]!.dependencySkipped).toBe(false);
     expect(results[2]!.report.ok).toBe(true);
+  });
+});
+
+describe("executeScheduledSteps — RFC-1184 warnOnly", () => {
+  test("AC-2: failing warnOnly step completes, dependents run, report carries warned", async () => {
+    const schedule = buildSchedule([
+      { command: "gate.new", warnOnly: true },
+      { command: "dependent.step" },
+    ]);
+    const ran: string[] = [];
+    const results = await executeScheduledSteps(schedule, 1, async (s) => {
+      ran.push(s.step.command);
+      const report =
+        s.step.command === "gate.new" ? failReport("gate.new") : okReport(s.step.command);
+      // Production wiring: applyWarnOnly runs inside the executor callback
+      // before the report returns — the scheduler only ever reads ok.
+      applyWarnOnly(report, s.step);
+      return report;
+    });
+    expect(ran).toEqual(["gate.new", "dependent.step"]);
+    expect(results.every((r) => !r.dependencySkipped)).toBe(true);
+    const warnResult = results.find((r) => r.stepIndex === 0)!;
+    expect(warnResult.report.ok).toBe(true);
+    expect(warnResult.report.warned).toBe(true);
+    // Failure evidence preserved for diagnostics even though ok flipped.
+    expect(warnResult.report.exitCode).toBe(1);
+  });
+
+  test("AC-4: non-warnOnly failure still skips dependents and stays failed", async () => {
+    const schedule = buildSchedule([{ command: "gate.old" }, { command: "dependent.step" }]);
+    const results = await executeScheduledSteps(schedule, 1, async (s) => {
+      const report =
+        s.step.command === "gate.old" ? failReport("gate.old") : okReport(s.step.command);
+      applyWarnOnly(report, s.step);
+      return report;
+    });
+    expect(results[0]!.report.ok).toBe(false);
+    expect(results[0]!.report.warned).toBeUndefined();
+    expect(results[1]!.dependencySkipped).toBe(true);
   });
 });
