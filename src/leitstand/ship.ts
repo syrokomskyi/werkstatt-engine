@@ -8,13 +8,13 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0962 fo-fix: --until validation, releaseId restoration from journal on resume, step metadata + durationMs tracking via StepResult, removed duplicate ShipStepResult type.</item>
   <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check; auto-sync after release-prepare and certify-* steps; --force-with-lease in cache-to-bare push.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
+  <item>RFC-0986 fo-fix: final sternsystem.sync epilogue after runOperation — post-sync journal records (op-done and trailing step records) left the cache clone dirty until the next mission sweep, tripping the pre-prompt dirty-clone guard.</item>
   <history>RFC-0962</history>
 </CHANGE_SUMMARY>
 */
@@ -342,28 +342,30 @@ function buildCertifyAndDeployStep(
 
 // ─── buildShipPlan ───────────────────────────────────────────────────────────
 
+async function syncCacheCloneBestEffort(ctx: ShipContext, stepName: string): Promise<void> {
+  // RFC-0986: Auto-sync cache clone to bare repo after deployment phases
+  // that create commits. Non-fatal — sync failure is logged but does not
+  // block the deployment pipeline.
+  try {
+    const result = await runShipPhase(ctx, "sternsystem.sync", [`--id=${ctx.systemId}`]);
+    if (result.exitCode !== 0) {
+      ctx.logger.info(
+        `  [ship] ${stepName}: sternsystem.sync failed (non-fatal): ${result.summary ?? ""}`,
+      );
+    } else {
+      ctx.logger.info(`  [ship] ${stepName}: sternsystem.sync ok`);
+    }
+  } catch (err) {
+    ctx.logger.info(
+      `  [ship] ${stepName}: sternsystem.sync skipped (${err instanceof Error ? err.message : String(err)})`,
+    );
+  }
+}
+
 function buildSyncStep(stepName: string): OperationStep<ShipContext> {
   return {
     name: stepName,
-    run: async (ctx: ShipContext) => {
-      // RFC-0986: Auto-sync cache clone to bare repo after deployment phases
-      // that create commits. Non-fatal — sync failure is logged but does not
-      // block the deployment pipeline.
-      try {
-        const result = await runShipPhase(ctx, "sternsystem.sync", [`--id=${ctx.systemId}`]);
-        if (result.exitCode !== 0) {
-          ctx.logger.info(
-            `  [ship] ${stepName}: sternsystem.sync failed (non-fatal): ${result.summary ?? ""}`,
-          );
-        } else {
-          ctx.logger.info(`  [ship] ${stepName}: sternsystem.sync ok`);
-        }
-      } catch (err) {
-        ctx.logger.info(
-          `  [ship] ${stepName}: sternsystem.sync skipped (${err instanceof Error ? err.message : String(err)})`,
-        );
-      }
-    },
+    run: (ctx: ShipContext) => syncCacheCloneBestEffort(ctx, stepName),
   };
 }
 
@@ -648,6 +650,10 @@ export async function runLeitstandShip(
       if (line !== null) emitProgress(line);
     },
   });
+
+  // Journal tail records (post-sync step-done/op-done) are appended after the
+  // last in-plan sync — sweep and propagate so the cache clone exits clean.
+  await syncCacheCloneBestEffort(ctx, "sync-final");
 
   if (opResult.completed) {
     return {

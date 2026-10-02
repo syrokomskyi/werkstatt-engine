@@ -450,6 +450,24 @@ test("mission-archive step is non-fatal when mission.archive fails", async () =>
   expect(result.data!.steps.length).toBe(15);
 });
 
+test("epilogue sync sweeps journal tail after op-done (runs last)", async () => {
+  setupFullSuccessMocks();
+  mockPhaseResult("mission.archive", 0);
+  mockPhaseResult("sternsystem.sync", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  const callNames = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(callNames.filter((n) => n === "sternsystem.sync").length).toBe(5);
+  expect(callNames[callNames.length - 1]).toBe("sternsystem.sync");
+});
+
 test("--until alt stops after certify-alt + propagate + sync (11 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
