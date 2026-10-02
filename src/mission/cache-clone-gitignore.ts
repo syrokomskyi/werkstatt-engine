@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0913: initial module — CACHE_CLONE_GITIGNORE_SENTINEL, CACHE_CLONE_GENERATED_PATTERNS, CACHE_CLONE_ONLY_PATTERNS, restoreCacheCloneGitignore, untrackForbiddenGeneratedFiles.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1179: add releases/ to CACHE_CLONE_ONLY_PATTERNS so merge-restore keeps release evidence gitignored (ADR-0085 closed-workpiece exemption for deploy.smoke.run writes)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,6 +38,10 @@ export const CACHE_CLONE_GENERATED_PATTERNS: readonly string[] = [
 export const CACHE_CLONE_ONLY_PATTERNS: readonly string[] = [
   ...FORBIDDEN_PATTERNS.filter((p) => p !== "dist" && p !== "node_modules" && p !== "packages"),
   ...CACHE_CLONE_GENERATED_PATTERNS,
+  // RFC-1179: release evidence must stay gitignored inside the site so the
+  // ADR-0085 closed-workpiece exemption resolves declared writes[] for
+  // deploy.smoke.run / site.smoke.run.
+  "releases/",
 ];
 
 export async function restoreCacheCloneGitignore(

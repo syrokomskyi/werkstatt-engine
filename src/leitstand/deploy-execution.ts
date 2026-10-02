@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
+  <item>RFC-1179: blocking smoke gates after the health check on every channel — site.smoke.run (failingPhase "site-smoke") then deploy.smoke.run (failingPhase "deploy-smoke"); non-zero exits throw before propagation continues</item>
   <history>RFC-0866, RFC-0925, RFC-0931</history>
 </CHANGE_SUMMARY>
 */
@@ -524,6 +525,40 @@ export async function executeDeployPhases(
     if (healthState === "unhealthy") {
       failingPhase = "health-check";
       throw new Error("Health check failed — deployment is unhealthy");
+    }
+
+    // RFC-1179: blocking smoke gates on every channel — fetch-level status/body
+    // checks (site.smoke.run) then the Playwright runtime gate
+    // (deploy.smoke.run: console errors, pageerror, requestfailed, 4xx/5xx).
+    // Both run unconditionally — dev workers.dev URLs included — so a broken
+    // release never propagates to the next channel.
+    {
+      const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+      const smokeArgv = [
+        `--site=${ctx.systemId}`,
+        `--url=${actualDeploymentUrl}`,
+        "--json",
+        ...(ctx.releaseId ? [`--release-id=${ctx.releaseId}`] : []),
+        ...(ctx.commitSha ? [`--commit-sha=${ctx.commitSha}`] : []),
+      ];
+      const siteSmokeResult = (await executeKernelCommand({
+        workspaceRoot: ctx.workspaceRoot,
+        commandName: "site.smoke.run",
+        argv: smokeArgv,
+      })) as { exitCode?: number; summary?: string };
+      if ((siteSmokeResult.exitCode ?? 1) !== 0) {
+        failingPhase = "site-smoke";
+        throw new Error(`site.smoke.run failed: ${siteSmokeResult.summary ?? "unknown error"}`);
+      }
+      const deploySmokeResult = (await executeKernelCommand({
+        workspaceRoot: ctx.workspaceRoot,
+        commandName: "deploy.smoke.run",
+        argv: smokeArgv,
+      })) as { exitCode?: number; summary?: string };
+      if ((deploySmokeResult.exitCode ?? 1) !== 0) {
+        failingPhase = "deploy-smoke";
+        throw new Error(`deploy.smoke.run failed: ${deploySmokeResult.summary ?? "unknown error"}`);
+      }
     }
 
     // RFC-0948: Post-deploy feature smoke check — non-fatal warning
