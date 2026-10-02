@@ -6,6 +6,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0866: initial test for executeDeployPhases with null adapter and dev channel.</item>
   <item>REVIEW-CODE-2026-10-01-01: stub bootSmokeCapable() on the test nullAdapter (required DeploymentAdapter method).</item>
+  <item>RFC-1179: smoke-gate wiring tests — site.smoke.run/deploy.smoke.run invoked on every channel after health, non-zero exits map to failingPhase "site-smoke"/"deploy-smoke".</item>
 </CHANGE_SUMMARY>
 */
 
@@ -208,6 +209,95 @@ test("executeDeployPhases returns deploymentUrl from channel config for main", a
     const result = await executeDeployPhases(makeCtx("op-003", tmp), "main");
     expect(result.deploymentUrl).toBe("https://main.example.com");
   } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+// RFC-1179: smoke-gate wiring — the executeKernelCommand mock at module top
+// resolves { exitCode: 0 }; these tests override it per-case. verifyFreshness
+// must resolve verified or alt/main never reach the smoke gates.
+
+async function getKernelMock() {
+  const kernel = await import("@warpgogol/werkstatt-engine/kernel");
+  return vi.mocked(kernel.executeKernelCommand);
+}
+
+async function mockFreshnessVerified() {
+  const commands = await import("../leitstand/leitstand-commands.ts");
+  vi.mocked(commands.verifyFreshness).mockResolvedValue({
+    verified: true,
+    cdnDistTreeHash: null,
+  });
+}
+
+test("executeDeployPhases invokes site.smoke.run and deploy.smoke.run after health on every channel", async () => {
+  const tmp = makeWorkspace();
+  try {
+    await mockFreshnessVerified();
+    const mock = await getKernelMock();
+    for (const channel of ["dev", "alt", "main"] as const) {
+      mock.mockClear();
+      const result = await executeDeployPhases(makeCtx(`op-smoke-${channel}`, tmp), channel);
+      expect(result.failingPhase).toBeUndefined();
+      const names = mock.mock.calls.map((c) => (c[0] as { commandName: string }).commandName);
+      expect(names).toContain("site.smoke.run");
+      expect(names).toContain("deploy.smoke.run");
+      expect(names.indexOf("site.smoke.run")).toBeLessThan(names.indexOf("deploy.smoke.run"));
+      const smokeCall = mock.mock.calls.find(
+        (c) => (c[0] as { commandName: string }).commandName === "deploy.smoke.run",
+      );
+      const argv = (smokeCall?.[0] as { argv: string[] }).argv;
+      expect(argv).toContain("--site=test-sys");
+      expect(argv).toContain("--release-id=r000001");
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+test("executeDeployPhases marks failingPhase site-smoke when site.smoke.run exits non-zero", async () => {
+  const tmp = makeWorkspace();
+  try {
+    await mockFreshnessVerified();
+    const mock = await getKernelMock();
+    mock.mockClear();
+    mock.mockImplementation(async (input) => {
+      const { commandName } = input as { commandName: string };
+      return commandName === "site.smoke.run"
+        ? { exitCode: 1, summary: "2 check(s) failed" }
+        : { exitCode: 0, summary: "ok" };
+    });
+    const result = await executeDeployPhases(makeCtx("op-smoke-fail", tmp), "alt");
+    expect(result.failingPhase).toBe("site-smoke");
+    // deploy.smoke.run must not run when site.smoke.run already blocked.
+    const names = mock.mock.calls.map((c) => (c[0] as { commandName: string }).commandName);
+    expect(names).not.toContain("deploy.smoke.run");
+  } finally {
+    const mock = await getKernelMock();
+    mock.mockResolvedValue({ exitCode: 0, summary: "ok" });
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+test("executeDeployPhases marks failingPhase deploy-smoke when deploy.smoke.run exits non-zero", async () => {
+  const tmp = makeWorkspace();
+  try {
+    const mock = await getKernelMock();
+    mock.mockClear();
+    mock.mockImplementation(async (input) => {
+      const { commandName } = input as { commandName: string };
+      return commandName === "deploy.smoke.run"
+        ? { exitCode: 1, summary: "console error on /" }
+        : { exitCode: 0, summary: "ok" };
+    });
+    const result = await executeDeployPhases(makeCtx("op-smoke-fail2", tmp), "dev");
+    expect(result.failingPhase).toBe("deploy-smoke");
+  } finally {
+    const mock = await getKernelMock();
+    mock.mockResolvedValue({ exitCode: 0, summary: "ok" });
     rmSync(tmp, { recursive: true, force: true });
     rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }
