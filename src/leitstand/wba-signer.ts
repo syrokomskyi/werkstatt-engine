@@ -19,6 +19,7 @@ identifying User-Agent and is never broken by missing key material.
 <CHANGE_SUMMARY>
   <item>RFC-1188: initial outbound signer resolver for leitstand fleet fetches.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <item>RFC-1188: review hardening — AGS-WBA-01 validates every published key, wba-signer fail-soft on unresolvable appDir</item>
 </CHANGE_SUMMARY>
 */
 
@@ -110,8 +111,8 @@ export async function resolveOutboundAgentClient(
 
   if (!origin) return fail(`no main channel URL for identity site '${identityId}'`);
 
-  const keyFilePath = join(appDir, PASSPORT_PUBLIC_KEY_FILE);
-  if (!existsSync(keyFilePath)) {
+  const keyFilePath = appDir ? join(appDir, PASSPORT_PUBLIC_KEY_FILE) : "";
+  if (!keyFilePath || !existsSync(keyFilePath)) {
     return fail(`no cosmic-passport-key.json for identity site '${identityId}'`);
   }
   let kid: string;
