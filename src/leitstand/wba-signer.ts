@@ -20,12 +20,12 @@ identifying User-Agent and is never broken by missing key material.
   <item>RFC-1188: initial outbound signer resolver for leitstand fleet fetches.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: review hardening — AGS-WBA-01 validates every published key, wba-signer fail-soft on unresolvable appDir</item>
+  <item>RFC-1188: fo-review fix — IO-01 cleared (WorkspaceIO/fs helpers instead of node:fs), resolvePassportSigningKey + selectActivePassportKey dedup, onSigningFailure channel for signing-failure logging</item>
 </CHANGE_SUMMARY>
 */
 
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
 import {
   createOutboundAgentClient,
   createWbaSigner,
@@ -33,8 +33,13 @@ import {
   type OutboundAgentClient,
   type WbaSigner,
 } from "@warpgogol/werkstatt-shared/agent/wba-sign";
-import { PassportPublicKeyFileSchema } from "@warpgogol/werkstatt-shared/passport/schema";
-import { optionalEnv, readEnvFileValue } from "../integrity/signing.ts";
+import {
+  PassportPublicKeyFileSchema,
+  selectActivePassportKey,
+} from "@warpgogol/werkstatt-shared/passport/schema";
+import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { resolvePassportSigningKey } from "../integrity/signing.ts";
+import { pathExists, readText } from "../integrity/fs.ts";
 import {
   readSystemConfigSmart,
   resolveActiveWorkpieceDir,
@@ -54,6 +59,18 @@ export interface OutboundSignerResolution {
   reason?: string;
 }
 
+export interface OutboundSignerOptions {
+  /**
+   * Called when signing a request throws (bad key material, crypto failure) —
+   * the client falls back to unsigned either way. Defaults to console.warn so
+   * the "logs a warning" contract in OutboundAgentClient holds; command
+   * callers SHOULD pass their own logger.warn to route it into the report.
+   */
+  onSigningFailure?: (error: unknown) => void;
+  /** IO port for the passport-key read — defaults to the ambient adapter. */
+  io?: WorkspaceIO;
+}
+
 /**
  * Resolve the outbound agent client for fleet fetches originating from the
  * platform toward system `systemId`. Env: WBA_IDENTITY_SITE (identity system,
@@ -64,7 +81,17 @@ export async function resolveOutboundAgentClient(
   workspaceRoot: string,
   systemId?: string,
   fetchImpl?: typeof fetch,
+  opts?: OutboundSignerOptions,
 ): Promise<OutboundSignerResolution> {
+  const io = opts?.io ?? createDefaultIO().io;
+  const onSigningFailure =
+    opts?.onSigningFailure ??
+    ((error: unknown) =>
+      console.warn(
+        `[leitstand.wba-signer] outbound signing failed, request sent unsigned: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ));
   const identityId = process.env.WBA_IDENTITY_SITE?.trim() || systemId;
   // The active mission workpiece carries the freshest .env + key material —
   // mirror readSystemConfigSmart's preference so the signer tracks mission
@@ -93,17 +120,14 @@ export async function resolveOutboundAgentClient(
     : `WarpgogolBot/${ENGINE_VERSION}`;
 
   const fail = (reason: string): OutboundSignerResolution => ({
-    client: createOutboundAgentClient({ userAgent, fetchImpl }),
+    client: createOutboundAgentClient({ userAgent, fetchImpl, onSigningFailure }),
     mode: "degraded",
     reason,
   });
 
   let privateKeyHex: string | undefined;
   try {
-    privateKeyHex =
-      (await readEnvFileValue("PASSPORT_SIGNING_KEY", appDir)) ??
-      (await optionalEnv("PASSPORT_SIGNING_KEY", appDir)) ??
-      process.env["PASSPORT_SIGNING_KEY"];
+    privateKeyHex = await resolvePassportSigningKey(appDir);
   } catch {
     privateKeyHex = process.env["PASSPORT_SIGNING_KEY"];
   }
@@ -112,15 +136,13 @@ export async function resolveOutboundAgentClient(
   if (!origin) return fail(`no main channel URL for identity site '${identityId}'`);
 
   const keyFilePath = appDir ? join(appDir, PASSPORT_PUBLIC_KEY_FILE) : "";
-  if (!keyFilePath || !existsSync(keyFilePath)) {
+  if (!keyFilePath || !(await pathExists(keyFilePath, io))) {
     return fail(`no cosmic-passport-key.json for identity site '${identityId}'`);
   }
   let kid: string;
   try {
-    const keyFile = PassportPublicKeyFileSchema.parse(
-      JSON.parse(readFileSync(keyFilePath, "utf8")),
-    );
-    const active = keyFile.keys.find((k) => k.active);
+    const keyFile = PassportPublicKeyFileSchema.parse(JSON.parse(await readText(keyFilePath, io)));
+    const active = selectActivePassportKey(keyFile);
     if (!active) return fail(`no active key for identity site '${identityId}'`);
     kid = active.version;
   } catch {
@@ -138,7 +160,7 @@ export async function resolveOutboundAgentClient(
       signer,
       userAgent,
       fetchImpl,
-      onSigningFailure: () => undefined,
+      onSigningFailure,
     }),
     mode: "signed",
   };

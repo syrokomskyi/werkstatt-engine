@@ -59,6 +59,7 @@ export {
   requireEnv,
   optionalEnv,
   readEnvFileValue,
+  resolvePassportSigningKey,
 } from "./signing.ts";
 
 export { buildLatestDir, signedManifestPath } from "./paths.ts";

@@ -45,6 +45,11 @@ export {
 } from "./deploy-execution.ts";
 export { runLeitstandServiceDevDeploy } from "./service-dev-deploy.ts";
 export { runLeitstandServicePromote } from "./service-promote.ts";
+export {
+  resolveOutboundAgentClient,
+  type OutboundSignerOptions,
+  type OutboundSignerResolution,
+} from "./wba-signer.ts";
 export type {
   PreDeployGateResult,
   ServiceDevDeployData,

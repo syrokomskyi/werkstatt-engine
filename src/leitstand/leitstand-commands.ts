@@ -11,6 +11,7 @@
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <item>RFC-1188: fo-review fix — signing failures route into the command report via onSigningFailure → logger.warn instead of the default console channel</item>
   <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136</history>
 </CHANGE_SUMMARY>
 */
@@ -1850,7 +1851,12 @@ export async function runLeitstandHealth(
   try {
     // RFC-1188: standalone health probes are agent-directed traffic — sign
     // through the outbound client when the identity key resolves.
-    const outbound = await resolveOutboundAgentClient(context.workspaceRoot, systemId);
+    const outbound = await resolveOutboundAgentClient(context.workspaceRoot, systemId, undefined, {
+      onSigningFailure: (e) =>
+        context.logger.warn(
+          `[leitstand.health] outbound signing failed, request sent unsigned: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+    });
     const result = await adapter.health({
       systemId,
       deploymentUrl: channelConfig.url,
@@ -2469,7 +2475,12 @@ export async function runLeitstandVerify(
 
   // RFC-1188: channel probes are platform-originated agent traffic —
   // sign through OutboundAgentClient when the identity key resolves.
-  const outbound = await resolveOutboundAgentClient(context.workspaceRoot, systemId);
+  const outbound = await resolveOutboundAgentClient(context.workspaceRoot, systemId, undefined, {
+    onSigningFailure: (e) =>
+      context.logger.warn(
+        `[leitstand.verify] outbound signing failed, request sent unsigned: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+  });
   const fetchImpl = outbound.client.fetch;
 
   const fetchResults = await Promise.all(

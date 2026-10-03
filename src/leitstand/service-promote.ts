@@ -13,6 +13,7 @@ lock, wrangler deploy, health check, and prod state recording.</purpose>
   <item>RFC-0829: add test evidence gate (L1+L2+L5) via shared runTestEvidenceGate helper; throw after grace period if git HEAD unresolvable.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <item>RFC-1188: fo-review fix — signing failures surface through logger.warn via onSigningFailure</item>
 </CHANGE_SUMMARY>
 */
 
@@ -263,7 +264,12 @@ export async function runLeitstandServicePromote(
       logger.info(`[leitstand.service.promote] running health check on ${deployedUrl}…`);
       // RFC-1188: platform-originated agent-directed probe — sign when the
       // identity resolves (WBA_IDENTITY_SITE), degrade to unsigned otherwise.
-      const outbound = await resolveOutboundAgentClient(workspaceRoot);
+      const outbound = await resolveOutboundAgentClient(workspaceRoot, undefined, undefined, {
+        onSigningFailure: (e) =>
+          logger.warn(
+            `[leitstand.service.promote] outbound signing failed, request sent unsigned: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+      });
       healthState = await runHealthCheck(
         deployedUrl,
         serviceEntry.healthCheckPath,

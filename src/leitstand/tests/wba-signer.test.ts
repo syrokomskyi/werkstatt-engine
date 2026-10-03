@@ -17,7 +17,7 @@ import { getPublicKeyAsync } from "@noble/ed25519";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toMultibase } from "@warpgogol/werkstatt-shared/passport/sign";
 import { verifyBytes } from "@warpgogol/werkstatt-shared/signing";
 import {
@@ -32,6 +32,7 @@ const TEST_PRIVATE_KEY = new Uint8Array(
   TEST_PRIVATE_HEX.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
 );
 
+let sandboxDir = "";
 let workspaceRoot = "";
 
 const SYSTEM_ID = "testsys";
@@ -97,19 +98,19 @@ async function writeFixture(options: { keyFile: boolean; envKey: boolean }): Pro
 }
 
 beforeEach(async () => {
-  workspaceRoot = await mkdtemp(join(tmpdir(), "wba-signer-"));
-  delete process.env.PASSPORT_SIGNING_KEY;
-  delete process.env.WBA_IDENTITY_SITE;
+  // Unique sandbox per test — systems-cache must NOT resolve to the shared
+  // /tmp/systems-cache pool (EC-16 flake class: another worker's cleanup
+  // deletes the pool mid-test → ENOENT on fixture writes).
+  sandboxDir = await mkdtemp(join(tmpdir(), "wba-signer-"));
+  workspaceRoot = join(sandboxDir, "werkstatt");
+  await mkdir(workspaceRoot, { recursive: true });
+  vi.stubEnv("PASSPORT_SIGNING_KEY", "");
+  vi.stubEnv("WBA_IDENTITY_SITE", "");
 });
 
 afterEach(async () => {
-  await rm(workspaceRoot, { recursive: true, force: true });
-  await rm(resolve(workspaceRoot, "..", "systems-cache"), {
-    recursive: true,
-    force: true,
-  });
-  delete process.env.PASSPORT_SIGNING_KEY;
-  delete process.env.WBA_IDENTITY_SITE;
+  vi.unstubAllEnvs();
+  await rm(sandboxDir, { recursive: true, force: true });
 });
 
 function capturedFetch(): {

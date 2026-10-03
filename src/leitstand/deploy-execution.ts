@@ -17,6 +17,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1179: blocking smoke gates after the health check on every channel — site.smoke.run (failingPhase "site-smoke") then deploy.smoke.run (failingPhase "deploy-smoke"); non-zero exits throw before propagation continues</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <item>RFC-1188: fo-review fix — outbound client resolved once per channel invocation and shared by health/freshness/feature-smoke instead of three independent resolutions</item>
   <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092</history>
 </CHANGE_SUMMARY>
 */
@@ -234,10 +235,8 @@ async function runHealthCheckWithRetry(
   releaseId: string,
   workspaceRoot: string,
   authHeaders: Record<string, string> = {},
+  agentFetch?: typeof fetch,
 ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }> {
-  // RFC-1188: probes to the site's own URL are agent-directed traffic —
-  // resolve once per health run (identity = the probed system by default).
-  const outbound = await resolveOutboundAgentClient(workspaceRoot, systemId);
   for (let attempt = 1; attempt <= HEALTH_CHECK_MAX_ATTEMPTS; attempt++) {
     if (attempt > 1) {
       await sleep(HEALTH_CHECK_BACKOFF_DELAYS_MS[attempt - 2]);
@@ -251,7 +250,7 @@ async function runHealthCheckWithRetry(
         expectedBehaviorSnapshotHash: "",
         workspaceRoot,
         authHeaders,
-        agentFetch: outbound.client.fetch,
+        agentFetch,
       };
       const result = await adapter.health(healthInput);
       if (result.state === "healthy") {
@@ -501,15 +500,18 @@ export async function executeDeployPhases(
       }
     }
 
+    // RFC-1188: all agent-directed probes of this channel go through one
+    // outbound resolution — health, freshness, and feature-smoke share it.
+    const outbound = await resolveOutboundAgentClient(ctx.workspaceRoot, ctx.systemId);
+
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
       if (localDistTreeHash) {
-        const freshnessOutbound = await resolveOutboundAgentClient(ctx.workspaceRoot, ctx.systemId);
         freshness = await verifyFreshness(
           actualDeploymentUrl,
           localDistTreeHash,
           noopLogger,
           authHeaders,
-          freshnessOutbound.client.fetch,
+          outbound.client.fetch,
         );
         if (!freshness.verified) {
           failingPhase = "freshness";
@@ -526,6 +528,7 @@ export async function executeDeployPhases(
       ctx.releaseId ?? "",
       ctx.workspaceRoot,
       authHeaders,
+      outbound.client.fetch,
     );
     healthState = healthResult.state;
     healthChecks = healthResult.checks;
@@ -570,13 +573,12 @@ export async function executeDeployPhases(
 
     // RFC-0948: Post-deploy feature smoke check — non-fatal warning
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
-      const smokeOutbound = await resolveOutboundAgentClient(ctx.workspaceRoot, ctx.systemId);
       featureSmokeCheck = await runFeatureSmokeCheck(
         actualDeploymentUrl,
         authHeaders,
         ctx.workspaceRoot,
         ctx.releaseId,
-        smokeOutbound.client.fetch,
+        outbound.client.fetch,
       );
     }
 
@@ -666,6 +668,7 @@ export async function executeDeployPhases(
           ctx.releaseId ?? "",
           ctx.workspaceRoot,
           authHeaders,
+          outbound.client.fetch,
         );
         if (altHealth.state !== "healthy") {
           failingPhase = "alt-health-check";

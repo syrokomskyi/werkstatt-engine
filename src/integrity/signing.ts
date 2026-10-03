@@ -16,6 +16,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1188: fo-review fix — resolvePassportSigningKey single-sources the .env-authoritative + ambient-fallback chain both the WBA resolver and agent-shared used to inline</item>
 </CHANGE_SUMMARY>
 
 /**
@@ -162,6 +163,18 @@ export async function requireEnv(name: string, cwd = process.cwd()): Promise<str
 export async function optionalEnv(name: string, cwd = process.cwd()): Promise<string | undefined> {
   await loadDotEnv(cwd);
   return process.env[name] ?? undefined;
+}
+
+/**
+ * RFC-1188: the site's passport signing key — `.env` is authoritative
+ * (site-scoped secret), ambient env is the CI fallback. optionalEnv already
+ * consults process.env after loadDotEnv, so a third fallback is dead code.
+ */
+export async function resolvePassportSigningKey(cwd: string): Promise<string | undefined> {
+  return (
+    (await readEnvFileValue("PASSPORT_SIGNING_KEY", cwd)) ??
+    (await optionalEnv("PASSPORT_SIGNING_KEY", cwd))
+  );
 }
 
 export async function generateSigningKeyPairPemAsync(): Promise<SigningKeyPairPem> {

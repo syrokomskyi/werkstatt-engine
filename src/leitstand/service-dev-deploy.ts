@@ -11,6 +11,7 @@ health check, and dev state recording.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0806: initial dev-deploy command handler.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <item>RFC-1188: fo-review fix — signing failures surface through logger.warn via onSigningFailure</item>
 </CHANGE_SUMMARY>
 */
 
@@ -184,7 +185,12 @@ export async function runLeitstandServiceDevDeploy(
       logger.info(`[leitstand.service.dev-deploy] running health check on ${deployedUrl}…`);
       // RFC-1188: platform-originated agent-directed probe — sign when the
       // identity resolves (WBA_IDENTITY_SITE), degrade to unsigned otherwise.
-      const outbound = await resolveOutboundAgentClient(workspaceRoot);
+      const outbound = await resolveOutboundAgentClient(workspaceRoot, undefined, undefined, {
+        onSigningFailure: (e) =>
+          logger.warn(
+            `[leitstand.service.dev-deploy] outbound signing failed, request sent unsigned: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+      });
       healthState = await runHealthCheck(
         deployedUrl,
         serviceEntry.healthCheckPath,
