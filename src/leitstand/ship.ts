@@ -15,6 +15,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>RFC-0986 fo-fix: final sternsystem.sync epilogue after runOperation — post-sync journal records (op-done and trailing step records) left the cache clone dirty until the next mission sweep, tripping the pre-prompt dirty-clone guard.</item>
+  <item>warpgogol-m000175 fo-fix: archive-aware mission resolution via resolveMissionDir (deferred-release flow — ship works on missions/archive/&lt;state&gt;/&lt;id&gt;); closed-state env check accepts cache-clone .env (RFC-0822); stripped-node_modules preflight warning; explicit mission-not-found error replaces misleading .env failure.</item>
   <history>RFC-0962</history>
 </CHANGE_SUMMARY>
 */
@@ -31,6 +32,7 @@ import { getOrBuildWorkspaceRegistry } from "../kernel/runtime/registry-cache.ts
 import { runOperation, findIncompleteOperation } from "../journal/index.ts";
 import type { OperationDefinition, OperationStep, StepResult } from "../journal/index.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
+import { resolveMissionDir } from "../kernel/mission-resolver.ts";
 import { flagSite } from "./deploy-helpers.ts";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
@@ -98,9 +100,13 @@ export interface ShipContext {
   workspaceRoot: string;
   systemId: string;
   missionId: string;
+  /** Resolved mission directory — archive-aware (`missions/<id>` or `missions/archive/<state>/<id>`). */
+  missionDir: string;
   workpieceDir: string;
   cacheCloneDir: string;
   releaseId: string | null;
+  /** True when mission.yaml declares `state: closed` — lifecycle steps are skipped. */
+  missionClosed: boolean;
   logger: KernelRuntimeContext["logger"];
   io: KernelRuntimeContext["io"];
 }
@@ -200,13 +206,44 @@ function buildPreflightStep(): OperationStep<ShipContext> {
       }
 
       // 4. Env vars presence check
-      const envPath = path.join(ctx.workpieceDir, ".env");
-      if (!(await ctx.io.exists(envPath))) {
-        throw new Error(`preflight: .env file not found in workpiece ${ctx.workpieceDir}`);
+      // Closed missions persist .env to the cache clone at mission.close
+      // (RFC-0822); open missions carry it in the workpiece. Accept either
+      // location for closed missions, and name the checked paths in the
+      // error — a bare "not found in workpiece" hid both the archived-path
+      // and the close-persistence cases.
+      const envLocations = ctx.missionClosed
+        ? [ctx.cacheCloneDir, ctx.workpieceDir]
+        : [ctx.workpieceDir];
+      let envFound = false;
+      for (const dir of envLocations) {
+        if (await ctx.io.exists(path.join(dir, ".env"))) {
+          envFound = true;
+          break;
+        }
+      }
+      if (!envFound) {
+        const where = envLocations.map((d) => path.join(d, ".env")).join(" or ");
+        const hint = ctx.missionClosed
+          ? " (mission is closed — .env should have been persisted to the cache clone by mission.close)"
+          : "";
+        throw new Error(`preflight: .env file not found at ${where}${hint}`);
       }
       ctx.logger.info("  [ship] preflight: env vars presence check ok");
 
-      // 5. Cache-clone git divergence check (RFC-0986)
+      // 5. Stripped-archive notice — mission.archive removes workpiece
+      // node_modules unless the mission had no releaseId. release.prepare
+      // still resolves the archived workpiece but fails on
+      // WORKPIECE-IMPORTS-01; warn early with the recovery recipe.
+      if (
+        ctx.missionClosed &&
+        !(await ctx.io.exists(path.join(ctx.workpieceDir, "node_modules")))
+      ) {
+        ctx.logger.info(
+          `  [ship] preflight: WARN workpiece node_modules missing (archive cleanup) — if release.prepare fails on WORKPIECE-IMPORTS-01, move missions/archive/closed/${ctx.missionId} back to missions/${ctx.missionId} and run pnpm install --filter ${ctx.systemId}, then re-archive after release`,
+        );
+      }
+
+      // 6. Cache-clone git divergence check (RFC-0986)
       // Warns if cache clone HEAD and bare repo HEAD have diverged —
       // mirror sync will fail with non-fast-forward in this case.
       const cacheDir = ctx.cacheCloneDir;
@@ -465,11 +502,10 @@ export function buildShipPlan(input: {
 // ─── Command handler ─────────────────────────────────────────────────────────
 
 async function checkMissionClosed(
-  workspaceRoot: string,
-  missionId: string,
+  missionDir: string,
   io: KernelRuntimeContext["io"],
 ): Promise<boolean> {
-  const missionYamlPath = path.join(workspaceRoot, "missions", missionId, "mission.yaml");
+  const missionYamlPath = path.join(missionDir, "mission.yaml");
   if (!(await io.exists(missionYamlPath))) return false;
   try {
     const raw = await io.readFile(missionYamlPath);
@@ -537,7 +573,17 @@ export async function runLeitstandShip(
   const isResume = input.flags["resume"] === true;
   const isForce = input.flags["force"] === true;
 
-  const workpieceDir = path.join(workspaceRoot, "missions", missionId, "workpiece");
+  // Archive-aware mission resolution — closed missions may already sit in
+  // missions/archive/<state>/ (deferred-release flow: close at session end,
+  // ship later). resolveMissionDir returns the primary path as a fallback,
+  // so verify the directory exists before deriving workpiece paths.
+  const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
+  if (!(await context.io.exists(missionDir))) {
+    throw new Error(
+      `[leitstand.ship] mission ${missionId} not found — expected a directory in missions/${missionId} or missions/archive/{closed,aborted}/${missionId}`,
+    );
+  }
+  const workpieceDir = path.join(missionDir, "workpiece");
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const operationsDir = path.join(cacheCloneDir, "operations");
   const journalPath = path.join(operationsDir, `ship-${missionId}.jsonl`);
@@ -551,19 +597,21 @@ export async function runLeitstandShip(
     logger.info(`  [ship] --force: deleted stale journal ${journalPath}`);
   }
 
+  // Detect mission state — if already closed, skip lifecycle phases
+  const missionClosed = await checkMissionClosed(missionDir, context.io);
+
   const ctx: ShipContext = {
     workspaceRoot,
     systemId,
     missionId,
+    missionDir,
     workpieceDir,
     cacheCloneDir,
     releaseId: null,
+    missionClosed,
     logger,
     io: context.io,
   };
-
-  // Detect mission state — if already closed, skip lifecycle phases
-  const missionClosed = await checkMissionClosed(workspaceRoot, missionId, context.io);
   if (missionClosed) {
     logger.info(
       `  [ship] mission ${missionId} is closed — skipping lifecycle phases (validate, reconcile, close)`,

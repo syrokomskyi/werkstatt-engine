@@ -655,3 +655,50 @@ test("closed mission + --until alt stops at sync-after-alt — promote never run
   expect(invokedCommands).not.toContain("mission.validate");
   assertAllPhaseCallsValid();
 });
+
+test("archived closed mission — resolves archive path, skips lifecycle, .env from cache clone", async () => {
+  // Deferred-release layout: mission archived to missions/archive/closed/ and
+  // .env persisted to the cache clone by mission.close (RFC-0822). ship must
+  // resolve the archived workpiece and accept the cache-clone .env.
+  const src = path.join(tmpDir, "missions", "m000001");
+  const dst = path.join(tmpDir, "missions", "archive", "closed", "m000001");
+  await fs.mkdir(path.dirname(dst), { recursive: true });
+  await fs.rename(src, dst);
+  await fs.writeFile(path.join(dst, "mission.yaml"), "state: closed\n");
+  await fs.rm(path.join(dst, "workpiece", ".env"));
+  await fs.writeFile(path.join(tmpDir, "systems-cache", "test-sys", ".env"), "TEST=1\n");
+
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000060" });
+  mockPhaseResult("sternsystem.sync", 0);
+  mockPhaseResult("release.ready", 0);
+  mockPhaseResult("leitstand.certify", 0, { decisionId: "dec-dev" });
+  mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "dev" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  // preflight, release-prepare, sync, release-ready, certify-dev, dev-deploy — 6
+  const invokedCommands = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invokedCommands).toContain("release.prepare");
+  expect(invokedCommands).not.toContain("mission.validate");
+  expect(invokedCommands).not.toContain("mission.reconcile");
+  expect(invokedCommands).not.toContain("mission.close");
+  assertAllPhaseCallsValid();
+});
+
+test("mission not found — clear error instead of misleading .env failure", async () => {
+  await fs.rm(path.join(tmpDir, "missions", "m000001"), { recursive: true, force: true });
+
+  await expect(
+    runLeitstandShip(makeInput({ site: "test-sys", mission: "m000001" }), context),
+  ).rejects.toThrow("mission m000001 not found");
+});
