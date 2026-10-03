@@ -11,6 +11,9 @@ Covers CMD-OUTPUT-01/02/03 rules, helper-exempt returns, and --mode flag.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0903: initial unit tests for commands-validate.</item>
+  <item>ADR-0105 fo-review: regression test for the isHandlerFile detector gap —
+        a self-describing KernelCommandDefinition file with a multi-line
+        `import type` must be scanned, not skipped.</item>
 </CHANGE_SUMMARY>
 */
 
