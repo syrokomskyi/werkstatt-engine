@@ -341,6 +341,46 @@ export async function execute(): Promise<KernelCommandResult> {
     expect(result.nextSteps?.[0]?.kind).toBe("required");
   });
 
+  it("detector: self-describing KernelCommandDefinition file with multi-line import type is scanned (ADR-0105 gap)", async () => {
+    // Before the fix, isHandlerFile required a single-line `import.*KernelCommandResult`
+    // or a registerCommand/ALL_COMMANDS/moduleLoaders call — a self-describing
+    // definition file like this one escaped the gate entirely.
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt/src/checks/test-def.ts",
+      `import type {
+  KernelCommandDefinition,
+  KernelCommandResult,
+} from "@warpgogol/werkstatt-engine/kernel";
+
+export const testDefCommand: KernelCommandDefinition = {
+  name: "test.def",
+  mutatesState: false,
+  contract: "dist",
+  rules: ["TEST-DEF-01"],
+  modulePath: "packages/werkstatt/src/checks/test-def.ts",
+  description: "test",
+  scope: "app",
+  flags: {},
+  supportsAllSites: true,
+  reads: [],
+  cacheable: true,
+  modulePaths: ["test-def.ts"],
+  async execute(): Promise<KernelCommandResult> {
+    return { exitCode: 1 };
+  },
+};
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some((d) => d.file === "packages/werkstatt/src/checks/test-def.ts")).toBe(
+      true,
+    );
+  });
+
   it("non-command-result returns are not flagged (module descriptors, internal objects)", async () => {
     writeHandlerFile(
       workspaceRoot,

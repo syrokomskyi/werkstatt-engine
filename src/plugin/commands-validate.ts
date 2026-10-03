@@ -11,6 +11,9 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0903: initial implementation of werkstatt.commands.validate static analysis.</item>
+  <item>ADR-0105: detector gap fix — isHandlerFile missed self-describing KernelCommandDefinition
+        files whose type imports span multiple lines; FILE_DETECTION_PATTERNS now includes
+        KernelCommandDefinition and the import regex uses [^;]* to cross newlines.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -52,6 +55,10 @@ const FILE_DETECTION_PATTERNS = [
   /registry\.registerCommand\s*\(/,
   /\bALL_COMMANDS\b/,
   /\bmoduleLoaders\b/,
+  // Self-describing KernelCommandDefinition files (RFC-1101) — a definition-bearing
+  // module may import its result types via multi-line `import type` (invisible to
+  // the single-line import regex below) and register no registry call.
+  /\bKernelCommandDefinition\b/,
 ];
 
 const RETURN_OBJECT_PATTERN = /return\s*\{/g;
@@ -107,7 +114,9 @@ function shouldExcludeFile(fileName: string): boolean {
 }
 
 function isHandlerFile(content: string): boolean {
-  if (/import.*KernelCommandResult|import.*KernelNextStep/.test(content)) return true;
+  // [^;]* (not .*) so multi-line `import type {\n  KernelCommandResult,\n}` is detected —
+  // an import statement contains no `;` before its terminator (ADR-0105 detector gap).
+  if (/import[^;]*KernelCommandResult|import[^;]*KernelNextStep/.test(content)) return true;
   for (const pattern of FILE_DETECTION_PATTERNS) {
     if (pattern.test(content)) return true;
   }
