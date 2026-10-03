@@ -598,6 +598,11 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 - New constants added to release pipeline files must be documented in the `HARDCODED_VALUES_AUDIT` block.
 - The audit report lives at `docs/audits/2026-08-29-release-pipeline-hardcoded-values-audit.md`.
 
+## Outbound Web Bot Auth identity (RFC-1188)
+
+- **Every platform-originated agent-directed `fetch` MUST go through `resolveOutboundAgentClient`** (`src/leitstand/wba-signer.ts`, exported via `@warpgogol/werkstatt-engine/leitstand`). The client signs with the site's passport key (RFC 9421 HTTP Message Signatures, `Signature-Agent` → `/.well-known/http-message-signatures-directory`) when key material resolves, and degrades to an identifying `User-Agent` otherwise — identity never takes a call down. Callers pass `opts.onSigningFailure` to route signing failures into `context.logger.warn`; `executeDeployPhases` resolves one client per channel invocation shared by health/freshness/feature-smoke. Cloudflare/GitHub API calls are NOT agent-directed and stay raw. Discovered during REVIEW-CODE-2026-10-03-01: `agent.manifest.verify --url` bypassed the client with raw `fetch`.
+- **Kernel-IO lint forbids `node:fs` imports in command modules (IO-01).** Filesystem access goes through `KernelRuntimeContext.io`/`WorkspaceIO` ports or explicit helpers (`integrity/fs.ts` `pathExists`/`readText`, `createDefaultIO`) — never `existsSync`/`readFileSync`. Discovered during REVIEW-CODE-2026-10-03-01: `wba-signer.ts` was the third file the gate flagged.
+
 ## Leitstand.ship deployment resilience (RFC-0986)
 
 - **`leitstand.ship` MUST skip lifecycle phases (validate, reconcile, close) when the mission is already closed.** `buildShipPlan` reads `mission.yaml` via `checkMissionClosed` before constructing the step list. If `state: closed`, lifecycle steps are filtered out and the plan starts from `release-prepare`. This allows resuming a deployment after a failed `release.prepare` without manually running individual steps. The skip is automatic — no `--skip-step` flags (DNA-73). See `src/leitstand/ship.ts:404-414`, `src/leitstand/ship.ts:345-355`.
