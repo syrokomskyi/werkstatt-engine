@@ -214,23 +214,35 @@ export async function resolveAgentAuth(ctx: ActionContext): Promise<void> {
 }
 
 /**
+ * RFC-1187: the minimum shape the limit helpers need — ActionContext satisfies
+ * it on the HTTP route; MCP/A2A handlers build it from their own context so
+ * the elevated tier behaves identically on every action-bearing transport.
+ */
+export interface RateLimitSubject {
+  capabilityId: string;
+  clientIp: string;
+  verifiedAgent?: VerifiedAgent;
+  capability?: CapabilityRecord | null;
+}
+
+/**
  * RFC-1187: the limit applies per verified agent when the capability declares
  * `perMinutePerAgent` and the caller is authenticated — otherwise the
  * anonymous per-IP bucket (verified or not).
  */
-export function rateLimitKey(ctx: ActionContext): string {
-  if (ctx.verifiedAgent && ctx.capability?.limits.perMinutePerAgent) {
-    return `${ctx.capabilityId}:agent:${ctx.verifiedAgent.agentId}`;
+export function rateLimitKey(subject: RateLimitSubject): string {
+  if (subject.verifiedAgent && subject.capability?.limits.perMinutePerAgent) {
+    return `${subject.capabilityId}:agent:${subject.verifiedAgent.agentId}`;
   }
-  return `${ctx.capabilityId}:${ctx.clientIp}`;
+  return `${subject.capabilityId}:${subject.clientIp}`;
 }
 
 /** RFC-1187: the effective max — elevated tier only when both sides declare it. */
-export function rateLimitMax(ctx: ActionContext): number {
-  if (ctx.verifiedAgent && ctx.capability?.limits.perMinutePerAgent) {
-    return ctx.capability.limits.perMinutePerAgent;
+export function rateLimitMax(subject: RateLimitSubject): number {
+  if (subject.verifiedAgent && subject.capability?.limits.perMinutePerAgent) {
+    return subject.capability.limits.perMinutePerAgent;
   }
-  return ctx.capability!.limits.perMinutePerIp;
+  return subject.capability!.limits.perMinutePerIp;
 }
 
 export function checkRateLimit(ctx: ActionContext, limiter: RateLimiter | null): StepResult {

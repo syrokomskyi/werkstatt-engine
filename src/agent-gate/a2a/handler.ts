@@ -26,6 +26,7 @@ import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import { buildAgentProblem, type AgentProblemDetails } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "../ports.ts";
+import type { VerifiedAgent } from "@warpgogol/werkstatt-shared/agent";
 import type { RateLimiter } from "../limits.ts";
 import { validateAgainstCapabilitySchema } from "../actions.ts";
 import {
@@ -33,6 +34,8 @@ import {
   checkIdempotencyReplay,
   executeAction,
   mcpBodyHash,
+  rateLimitKey,
+  rateLimitMax,
 } from "../action-pipeline.ts";
 import {
   A2A_METHOD_SEND_MESSAGE,
@@ -60,6 +63,12 @@ export interface A2aHandlerContext {
   clientIp?: string;
   /** RFC-1112: the Idempotency-Key HTTP header, passed through by the transport boundary. */
   idempotencyKey?: string;
+  /**
+   * RFC-1187: Bearer identity resolved at the transport boundary — selects
+   * the elevated per-agent bucket and stamps verifiedAgentId, same contract
+   * as the HTTP action route.
+   */
+  verifiedAgent?: VerifiedAgent;
 }
 
 // RFC-0291: module-level limiter cache for the A2A path (mirrors mcp/handler.ts).
@@ -166,15 +175,21 @@ async function handleSendMessage(
     return problemError(id, replay as AgentProblemDetails);
   }
 
-  // RFC-0291: per-IP rate limit (fail-open if no limiter).
+  // RFC-1187: elevated per-agent bucket when a Bearer token verified and the
+  // capability declares perMinutePerAgent — same helpers as the HTTP path.
   if (ctx.ports.createRateLimiter) {
+    const subject = {
+      capabilityId: capability.id,
+      capability,
+      clientIp: ctx.clientIp ?? "unknown",
+      verifiedAgent: ctx.verifiedAgent,
+    };
     const limiter = getA2aLimiter(
       capability.id,
-      capability.limits.perMinutePerIp,
+      rateLimitMax(subject),
       ctx.ports.createRateLimiter,
     );
-    const clientIp = ctx.clientIp ?? "unknown";
-    const result = limiter.check(`${capability.id}:${clientIp}`);
+    const result = limiter.check(rateLimitKey(subject));
     if (!result.allowed) {
       const problem = buildAgentProblem("rate-limited", {
         retryAfterSeconds: result.retryAfterSeconds,

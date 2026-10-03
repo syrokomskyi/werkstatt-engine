@@ -19,6 +19,7 @@ anonymous, never to an error.
 <CHANGE_SUMMARY>
   <item>RFC-1187: initial authorization-server core — challenge/register/token/jwks/whoami/rotate + Bearer resolution.</item>
   <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
+  <item>RFC-1187: fo-review — keyVersion port (JWT/JWKS kid), realm=issuer, VerifiedAgent.registration single-fetch, TOCTOU note</item>
 </CHANGE_SUMMARY>
 */
 
@@ -48,11 +49,75 @@ export interface AgentAuthPorts {
   tokenPublicKey: Uint8Array;
   /** Site origin — JWT `iss` and the issuer field in discovery metadata. */
   issuer: string;
+  /**
+   * Active passport key version ("v1", "v2", …) — JWT header `kid` and the
+   * JWKS `kid` both source it, so `passport.key.rotate` transitions stay
+   * honest. Stamped into the manifest at generation (`interfaces.oauth.keyVersion`).
+   */
+  keyVersion: string;
   /** Absolute URL of the RFC 9728 protected-resource document. */
   resourceMetadataUrl: string;
 }
 
 const CHALLENGE_TTL_SECONDS = 300;
+
+/** RFC-1187: streamed cap on auth-endpoint bodies — 64 KiB, enforced WHILE reading. */
+export const MAX_AUTH_BODY_BYTES = 64 * 1024;
+
+/**
+ * Read a Request/Response body up to `maxBytes`; `null` when the stream
+ * exceeds the cap or a read error occurs, `""` when no body exists. The cap
+ * applies during the read — the isolate never buffers the unbounded body
+ * first (the inbound counterpart of the outbound JWKS fetch cap in astro.ts).
+ */
+export async function readBoundedBodyText(
+  source: { body: ReadableStream<Uint8Array> | null },
+  maxBytes: number,
+): Promise<string | null> {
+  const body = source.body;
+  if (!body) return "";
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  const chunks: string[] = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        return null;
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+    return chunks.join("");
+  } catch {
+    return null;
+  }
+}
+
+/** Content-Length fast-path + streamed cap; over-cap bodies become a 413 Response. */
+async function readAuthRequestBody(request: Request): Promise<string | Response> {
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (contentLength > MAX_AUTH_BODY_BYTES) {
+    return problemResponse(
+      buildAgentProblem("payload-too-large", {
+        detail: `Request body exceeds ${MAX_AUTH_BODY_BYTES} bytes.`,
+      }),
+    );
+  }
+  const text = await readBoundedBodyText(request, MAX_AUTH_BODY_BYTES);
+  if (text === null) {
+    return problemResponse(
+      buildAgentProblem("payload-too-large", {
+        detail: `Request body exceeds ${MAX_AUTH_BODY_BYTES} bytes.`,
+      }),
+    );
+  }
+  return text;
+}
 
 function jsonResponse(
   body: unknown,
@@ -107,13 +172,12 @@ export async function runOAuthChallenge(ports: AgentAuthPorts): Promise<Response
  * re-request a challenge to retry). On success the credential secret is
  * returned exactly once; only its sha256 is persisted.
  */
-export async function runAgentRegister(
-  request: Request,
-  ports: AgentAuthPorts,
-): Promise<Response> {
+export async function runAgentRegister(request: Request, ports: AgentAuthPorts): Promise<Response> {
+  const raw = await readAuthRequestBody(request);
+  if (raw instanceof Response) return raw;
   let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return problemResponse(buildAgentProblem("invalid-json"));
   }
@@ -142,6 +206,10 @@ export async function runAgentRegister(
     return problemResponse(buildAgentProblem("invalid-proof"));
   }
 
+  // TOCTOU note: the get→put pair is not atomic — two concurrent registrations
+  // of the same agentId both pass the existing-check and last-write-wins (the
+  // second secret's hash lands). Self-inflicted by one agent identity; the
+  // returned credential of the loser simply never authenticates.
   const existing = await ports.registry.get(verified.agentId);
   if (existing && !existing.revokedAt) {
     return problemResponse(
@@ -174,15 +242,17 @@ export async function runAgentRegister(
   );
 }
 
-/** Read a token request body in either OAuth form-encoding or JSON. */
-async function readTokenBody(request: Request): Promise<Record<string, string>> {
+/** Read a token request body in either OAuth form-encoding or JSON. Response = error to return. */
+async function readTokenBody(request: Request): Promise<Record<string, string> | Response> {
+  const raw = await readAuthRequestBody(request);
+  if (raw instanceof Response) return raw;
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/x-www-form-urlencoded")) {
-    const params = new URLSearchParams(await request.text());
+    const params = new URLSearchParams(raw);
     return Object.fromEntries(params.entries());
   }
   try {
-    const parsed = (await request.json()) as Record<string, unknown>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
     return Object.fromEntries(
       Object.entries(parsed).filter((e): e is [string, string] => typeof e[1] === "string"),
     );
@@ -196,11 +266,9 @@ async function readTokenBody(request: Request): Promise<Record<string, string>> 
  * sha256(secret) vs the stored hash; a successful check issues an EdDSA JWT
  * (sub = agentId, iss = site origin, TTL ≤ 3600s, scope from registration).
  */
-export async function runAgentToken(
-  request: Request,
-  ports: AgentAuthPorts,
-): Promise<Response> {
+export async function runAgentToken(request: Request, ports: AgentAuthPorts): Promise<Response> {
   const body = await readTokenBody(request);
+  if (body instanceof Response) return body;
   if (body.grant_type !== "client_credentials") {
     return oauthErrorResponse("unsupported_grant_type", 400);
   }
@@ -227,6 +295,7 @@ export async function runAgentToken(
       jti: randomUUID(),
     },
     ports.tokenPrivateKey,
+    ports.keyVersion,
   );
   return jsonResponse({
     access_token: token,
@@ -237,11 +306,7 @@ export async function runAgentToken(
 
 /** GET /api/agent/oauth/jwks.json — the RFC-1188 directory shares key "v1". */
 export function runAgentJwks(publicKeyJwk: JsonWebKey): Response {
-  return jsonResponse(
-    { keys: [publicKeyJwk] },
-    200,
-    { "cache-control": "public, max-age=300" },
-  );
+  return jsonResponse({ keys: [publicKeyJwk] }, 200, { "cache-control": "public, max-age=300" });
 }
 
 /**
@@ -266,6 +331,7 @@ export async function resolveBearerAgent(
     return {
       agentId: registration.agentId,
       scopes: registration.scopes,
+      registration,
     };
   } catch (err) {
     // Registry/Redis outage: degrade to anonymous with a warning (operator decision).
@@ -292,7 +358,7 @@ export async function requireBearerAgent(
       detail: "A valid Bearer token is required for this endpoint.",
     }),
     {
-      "WWW-Authenticate": `Bearer realm="agent", resource_metadata="${ports.resourceMetadataUrl}"`,
+      "WWW-Authenticate": `Bearer realm="${ports.issuer}", resource_metadata="${ports.resourceMetadataUrl}"`,
     },
   );
 }
@@ -301,15 +367,9 @@ export async function requireBearerAgent(
 export async function runWhoami(request: Request, ports: AgentAuthPorts): Promise<Response> {
   const agent = await requireBearerAgent(request, ports);
   if (agent instanceof Response) return agent;
-  const registration = await ports.registry.get(agent.agentId);
-  if (!registration) {
-    return problemResponse(
-      buildAgentProblem("unauthorized", { detail: "Registration no longer exists." }),
-      {
-        "WWW-Authenticate": `Bearer realm="agent", resource_metadata="${ports.resourceMetadataUrl}"`,
-      },
-    );
-  }
+  // The registration record rides the resolved identity — no second registry
+  // roundtrip (resolveBearerAgent already fetched and checked revokedAt).
+  const { registration } = agent;
   return jsonResponse({
     agent_id: registration.agentId,
     signature_agent: registration.signatureAgent,
@@ -328,15 +388,8 @@ export async function runWhoami(request: Request, ports: AgentAuthPorts): Promis
 export async function runRotate(request: Request, ports: AgentAuthPorts): Promise<Response> {
   const agent = await requireBearerAgent(request, ports);
   if (agent instanceof Response) return agent;
-  const registration = await ports.registry.get(agent.agentId);
-  if (!registration) {
-    return problemResponse(
-      buildAgentProblem("unauthorized", { detail: "Registration no longer exists." }),
-      {
-        "WWW-Authenticate": `Bearer realm="agent", resource_metadata="${ports.resourceMetadataUrl}"`,
-      },
-    );
-  }
+  // Reuse the registration record resolved with the Bearer token.
+  const { registration } = agent;
   const credentialSecret = `gogol-agent-${b64uEncode(randomBytes(32))}`;
   const rotated: AgentRegistration = {
     ...registration,

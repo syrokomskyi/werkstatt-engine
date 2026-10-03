@@ -4,6 +4,7 @@ import {
   EDITABLE_GENERATED_MARKER,
   buildGeneratedHeader,
   hasGeneratedMarker,
+  generatedOwnerCommand,
   stripGeneratedMarker,
 } from "../generated-marker.ts";
 
@@ -195,4 +196,16 @@ test("stripGeneratedMarker removes the full editable HTML block advisory header"
   expect(changed).toBe(true);
   expect(hasGeneratedMarker(stripped)).toBe(false);
   expect(stripped).toBe("# Agent Guide\n\nBody text.\n");
+});
+
+test("generatedOwnerCommand: extracts the owner across all comment styles", () => {
+  for (const filePath of ["route.ts", "headers.txt", "AGENTS.md", "tokens.css"]) {
+    const header = buildGeneratedHeader({ filePath, ownerCommand: "api.routes.generate" });
+    expect(generatedOwnerCommand(header)).toBe("api.routes.generate");
+  }
+});
+
+test("generatedOwnerCommand: null on bare legacy marker and on non-generated content", () => {
+  expect(generatedOwnerCommand(`// ${GENERATED_MARKER}\nexport const x = 1;\n`)).toBeNull();
+  expect(generatedOwnerCommand("export const x = 1;\n")).toBeNull();
 });

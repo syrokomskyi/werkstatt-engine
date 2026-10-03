@@ -40,6 +40,17 @@ export function hasGeneratedMarker(content: string): boolean {
   return content.includes(GENERATED_MARKER) || content.includes(EDITABLE_GENERATED_MARKER);
 }
 
+/**
+ * Extract the owning kernel command from a generated file's RFC-0336 advisory
+ * header (`Owner command: <cmd>` in any comment syntax). Null when the file
+ * carries a bare legacy marker without the advisory block — callers doing
+ * owner-aware garbage collection must treat null as "not mine, leave it".
+ */
+export function generatedOwnerCommand(content: string): string | null {
+  const match = /Owner command:[ \t]*([^\r\n*]+)/.exec(content);
+  return match ? match[1].trim() : null;
+}
+
 export interface StripGeneratedMarkerResult {
   changed: boolean;
   content: string;

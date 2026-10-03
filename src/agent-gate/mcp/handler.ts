@@ -27,6 +27,7 @@ UnsupportedProtocolVersionError naming the supported list.
 import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "../ports.ts";
+import type { VerifiedAgent } from "@warpgogol/werkstatt-shared/agent";
 import type { RateLimiter } from "../limits.ts";
 import { validateAgainstCapabilitySchema } from "../actions.ts";
 import {
@@ -34,6 +35,8 @@ import {
   checkIdempotencyReplay,
   executeAction,
   mcpBodyHash,
+  rateLimitKey,
+  rateLimitMax,
   MCP_IDEMPOTENCY_META_KEY,
 } from "../action-pipeline.ts";
 import { buildAgentProblem, type AgentProblemDetails } from "@warpgogol/werkstatt-shared/agent";
@@ -57,6 +60,12 @@ export interface McpHandlerContext {
   agentIdentity?: Record<string, string>;
   /** RFC-0291: client IP for rate-limit keying. */
   clientIp?: string;
+  /**
+   * RFC-1187: Bearer identity resolved at the transport boundary — selects
+   * the elevated per-agent bucket and stamps verifiedAgentId, same contract
+   * as the HTTP action route.
+   */
+  verifiedAgent?: VerifiedAgent;
 }
 
 // RFC-0291: module-level limiter cache for the MCP path (mirrors index.ts).
@@ -168,15 +177,21 @@ async function handleToolsCall(
       return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.SERVER_ERROR, problem.title, problem);
     }
 
-    // RFC-0291: per-IP rate limit (fail-open if no limiter).
+    // RFC-1187: elevated per-agent bucket when a Bearer token verified and the
+    // capability declares perMinutePerAgent — same helpers as the HTTP path.
     if (ctx.ports.createRateLimiter) {
+      const subject = {
+        capabilityId,
+        capability,
+        clientIp: ctx.clientIp ?? "unknown",
+        verifiedAgent: ctx.verifiedAgent,
+      };
       const limiter = getMcpLimiter(
         capabilityId,
-        capability.limits.perMinutePerIp,
+        rateLimitMax(subject),
         ctx.ports.createRateLimiter,
       );
-      const clientIp = ctx.clientIp ?? "unknown";
-      const result = limiter.check(`${capabilityId}:${clientIp}`);
+      const result = limiter.check(rateLimitKey(subject));
       if (!result.allowed) {
         const problem = buildAgentProblem("rate-limited", {
           retryAfterSeconds: result.retryAfterSeconds,

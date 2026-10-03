@@ -128,6 +128,7 @@ export {
   GENERATED_MARKER,
   EDITABLE_GENERATED_MARKER,
   hasGeneratedMarker,
+  generatedOwnerCommand,
   stripGeneratedMarker,
   isGeneratedMarkerTextCandidate,
   buildGeneratedHeader,

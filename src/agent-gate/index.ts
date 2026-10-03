@@ -59,6 +59,7 @@ import {
   problemResponse,
 } from "./action-pipeline.ts";
 import { buildAgentProblem } from "@warpgogol/werkstatt-shared/agent";
+import { resolveBearerAgent } from "./agent-auth.ts";
 
 export type { AgentGatePorts } from "./ports.ts";
 export * from "./agent-auth.ts";
@@ -222,12 +223,21 @@ export function createAgentGate(
           400,
         );
       }
+      // RFC-1187: a verified Bearer upgrades tools/call to the registered tier
+      // — the same contract as the HTTP action route (degrades to anonymous).
+      const verifiedAgent = ports.auth ? await resolveBearerAgent(request, ports.auth) : null;
+      const agentIdentity = extractAgentIdentity(request);
+      if (verifiedAgent) agentIdentity.verifiedAgentId = verifiedAgent.agentId;
+      if (traffic?.observedIdentity === undefined) {
+        if (traffic) traffic.observedIdentity = agentIdentity;
+      }
       const result: JsonRpcResponse = await handleJsonRpcRequest(body, {
         manifest,
         catalog,
         ports,
-        agentIdentity: extractAgentIdentity(request),
+        agentIdentity,
         clientIp: extractClientIp(request),
+        ...(verifiedAgent ? { verifiedAgent } : {}),
       });
       // RFC-1172: JSON-RPC errors ride HTTP 200 — the status code cannot
       // express them, so record the semantic outcome + problem token.
@@ -366,13 +376,20 @@ export function createAgentGate(
         // Non-null here: isSupportedA2aVersionHeader only rejects a present header.
         return jsonResponse(a2aVersionNotSupported(body.id ?? null, a2aVersion!), 400);
       }
+      // RFC-1187: Bearer upgrades SendMessage to the registered tier — same
+      // contract as the HTTP action route and MCP tools/call.
+      const verifiedAgent = ports.auth ? await resolveBearerAgent(request, ports.auth) : null;
+      const agentIdentity = extractAgentIdentity(request);
+      if (verifiedAgent) agentIdentity.verifiedAgentId = verifiedAgent.agentId;
+      if (traffic) traffic.observedIdentity = agentIdentity;
       const result: JsonRpcResponse = await handleA2aRequest(body, {
         manifest,
         catalog,
         ports,
-        agentIdentity: extractAgentIdentity(request),
+        agentIdentity,
         clientIp: extractClientIp(request),
         idempotencyKey: extractIdempotencyKey(request),
+        ...(verifiedAgent ? { verifiedAgent } : {}),
       });
       // RFC-1172: JSON-RPC errors ride HTTP 200 — record the semantic outcome.
       if (traffic && "error" in result) {

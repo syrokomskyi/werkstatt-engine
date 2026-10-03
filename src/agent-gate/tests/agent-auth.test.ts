@@ -80,6 +80,7 @@ function makeAuthPorts(
     },
     tokenPrivateKey: keys.privateKey,
     tokenPublicKey: keys.publicKey,
+    keyVersion: "v1",
     issuer: ISSUER,
     resourceMetadataUrl: `${ISSUER}/.well-known/oauth-protected-resource`,
   };
@@ -95,6 +96,7 @@ test("signAgentToken/verifyAgentToken roundtrip: valid token verifies", async ()
   const token = await signAgentToken(
     { iss: ISSUER, sub: "agent-1", iat: now, exp: now + 600, scope: "agent.actions.elevated" },
     privateKey,
+    "v1",
   );
   const result = await verifyAgentToken(token, publicKey, ISSUER);
   expect(result.ok).toBe(true);
@@ -104,6 +106,42 @@ test("signAgentToken/verifyAgentToken roundtrip: valid token verifies", async ()
   }
 });
 
+test("signAgentToken: header carries alg/typ/kid — AC-2 contract", async () => {
+  const { privateKey } = await generateKeyPair();
+  const now = Math.floor(Date.now() / 1000);
+  const token = await signAgentToken(
+    { iss: ISSUER, sub: "a", iat: now, exp: now + 60 },
+    privateKey,
+    "v7",
+  );
+  const [headerB64] = token.split(".");
+  const header = JSON.parse(
+    new TextDecoder().decode(Buffer.from(headerB64, "base64url")),
+  ) as Record<string, string>;
+  expect(header).toEqual({ alg: "EdDSA", typ: "JWT", kid: "v7" });
+});
+
+test("verifyAgentToken: kid-less or wrong-typ header rejected before signature", async () => {
+  const { privateKey, publicKey } = await generateKeyPair();
+  const now = Math.floor(Date.now() / 1000);
+  const good = await signAgentToken(
+    { iss: ISSUER, sub: "a", iat: now, exp: now + 60 },
+    privateKey,
+    "v1",
+  );
+  const [, payloadB64] = good.split(".");
+  const noKid = `${b64uEncode(JSON.stringify({ alg: "EdDSA", typ: "JWT" }))}.${payloadB64}.AAAA`;
+  expect(await verifyAgentToken(noKid, publicKey, ISSUER)).toEqual({
+    ok: false,
+    reason: "header",
+  });
+  const wrongTyp = `${b64uEncode(JSON.stringify({ alg: "EdDSA", typ: "JWT+at", kid: "v1" }))}.${payloadB64}.AAAA`;
+  expect(await verifyAgentToken(wrongTyp, publicKey, ISSUER)).toEqual({
+    ok: false,
+    reason: "header",
+  });
+});
+
 test("signAgentToken: rejects TTL above 3600s", async () => {
   const { privateKey } = await generateKeyPair();
   const now = Math.floor(Date.now() / 1000);
@@ -111,6 +149,7 @@ test("signAgentToken: rejects TTL above 3600s", async () => {
     signAgentToken(
       { iss: ISSUER, sub: "a", iat: now, exp: now + AGENT_TOKEN_MAX_TTL_SECONDS + 1 },
       privateKey,
+      "v1",
     ),
   ).rejects.toThrow("AGENT-TOKEN-TTL");
 });
@@ -122,12 +161,14 @@ test("verifyAgentToken: expired / wrong issuer / tampered signature / wrong key"
   const good = await signAgentToken(
     { iss: ISSUER, sub: "a", iat: now - 100, exp: now + 100 },
     privateKey,
+    "v1",
   );
   expect((await verifyAgentToken(good, publicKey, ISSUER)).ok).toBe(true);
 
   const expired = await signAgentToken(
     { iss: ISSUER, sub: "a", iat: now - 7200, exp: now - 3600 },
     privateKey,
+    "v1",
   );
   expect(await verifyAgentToken(expired, publicKey, ISSUER)).toEqual({
     ok: false,
@@ -308,7 +349,11 @@ test("runAgentToken: wrong secret / unknown client / wrong grant → OAuth error
 
 async function issueToken(keys: { privateKey: Uint8Array }, agentId: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return signAgentToken({ iss: ISSUER, sub: agentId, iat: now, exp: now + 600 }, keys.privateKey);
+  return signAgentToken(
+    { iss: ISSUER, sub: agentId, iat: now, exp: now + 600 },
+    keys.privateKey,
+    "v1",
+  );
 }
 
 function authed(token: string, url: string, method = "GET") {
@@ -323,6 +368,8 @@ test("runWhoami: 401 + WWW-Authenticate resource_metadata without Bearer", async
   expect(res.status).toBe(401);
   const wwwAuth = res.headers.get("WWW-Authenticate");
   expect(wwwAuth).toContain("Bearer");
+  // RFC-1187: the realm is the site origin — never the generic "agent".
+  expect(wwwAuth).toContain(`realm="${ISSUER}"`);
   expect(wwwAuth).toContain(`resource_metadata="${ISSUER}/.well-known/oauth-protected-resource"`);
 });
 
@@ -536,6 +583,133 @@ test("pipeline: invalid Bearer falls through to anonymous handling", async () =>
   const gate = createAgentGate(makeGateManifest(), [WRITE_CAP], ports);
   const res = await gate.handleAction("lead.submit", actionRequest("not-a-jwt"));
   expect(res.status).toBe(200);
+});
+
+// ---------------------------------------------------------------------------
+// Auth-endpoint body cap (64 KiB streamed)
+// ---------------------------------------------------------------------------
+
+test("runAgentRegister: body over 64 KiB → 413 payload-too-large", async () => {
+  const keys = await generateKeyPair();
+  const registry = makeRegistry();
+  const ports = makeAuthPorts(keys, registry);
+  const res = await runAgentRegister(
+    new Request(`${ISSUER}/api/agent/v1/registration`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(70 * 1024),
+      },
+      body: "x".repeat(70 * 1024),
+    }),
+    ports,
+  );
+  expect(res.status).toBe(413);
+  expect(((await res.json()) as { code: string }).code).toBe("payload-too-large");
+});
+
+test("runAgentToken: over-cap form body → 413, not a parse error", async () => {
+  const keys = await generateKeyPair();
+  const registry = makeRegistry();
+  const ports = makeAuthPorts(keys, registry);
+  const res = await runAgentToken(
+    new Request(`${ISSUER}/api/agent/oauth/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "content-length": String(70 * 1024),
+      },
+      body: `grant_type=client_credentials&pad=${"x".repeat(70 * 1024)}`,
+    }),
+    ports,
+  );
+  expect(res.status).toBe(413);
+});
+
+// ---------------------------------------------------------------------------
+// Bearer on MCP transport — same elevated-tier contract as the HTTP route
+// ---------------------------------------------------------------------------
+
+function mcpCall(token?: string): Request {
+  return new Request(`${ISSUER}/api/agent/mcp`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "mcp-protocol-version": "2026-07-28",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: {
+        name: "action.lead.submit",
+        arguments: { message: "hello there, this is a test" },
+        _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" },
+      },
+    }),
+  });
+}
+
+function makeMcpPorts(auth: AgentAuthPorts, seen: Array<Record<string, unknown>>): AgentGatePorts {
+  return {
+    knowledge: { read: async () => null },
+    dispatch: {
+      send: async (event) => {
+        seen.push(event.payload);
+        return {
+          receiptId: event.eventId,
+          status: "accepted" as const,
+          duplicate: false,
+          submittedAt: "2026-07-05T00:00:00.000Z",
+        };
+      },
+    },
+    now: () => new Date("2026-07-05T00:00:00.000Z"),
+    createRateLimiter: (max) => createFixedWindowLimiter(60, max),
+    auth,
+  };
+}
+
+test("MCP tools/call: verified Bearer stamps verifiedAgentId + elevated bucket", async () => {
+  __resetLimiterCache();
+  const keys = await generateKeyPair();
+  const registry = makeRegistry();
+  const auth = makeAuthPorts(keys, registry);
+  const { agentId } = await seedRegistration(auth, registry);
+  const seen: Array<Record<string, unknown>> = [];
+  const gate = createAgentGate(makeGateManifest(), [WRITE_CAP], makeMcpPorts(auth, seen));
+
+  const token = await issueToken(keys, agentId);
+  // Elevated bucket (per-agent max 10): three calls pass; verifiedAgentId stamped.
+  for (let i = 0; i < 3; i++) {
+    const res = await gate.handleMcp(mcpCall(token));
+    expect(res.status).toBe(200);
+    const rpc = (await res.json()) as { error?: unknown };
+    expect(rpc.error).toBeUndefined();
+  }
+  const identity = seen[0]?._agentIdentity as Record<string, string> | undefined;
+  expect(identity?.verifiedAgentId).toBe(agentId);
+});
+
+test("MCP tools/call: anonymous caller is per-IP limited; Bearer bypasses it", async () => {
+  __resetLimiterCache();
+  const keys = await generateKeyPair();
+  const registry = makeRegistry();
+  const auth = makeAuthPorts(keys, registry);
+  const { agentId } = await seedRegistration(auth, registry);
+  const gate = createAgentGate(makeGateManifest(), [WRITE_CAP], makeMcpPorts(auth, []));
+
+  // Anonymous: perMinutePerIp = 1 → second call is a JSON-RPC rate-limit error (HTTP 200).
+  const first = await gate.handleMcp(mcpCall());
+  expect(((await first.json()) as { error?: unknown }).error).toBeUndefined();
+  const second = await gate.handleMcp(mcpCall());
+  expect(((await second.json()) as { error?: unknown }).error).toBeDefined();
+
+  // Verified Bearer: the per-agent bucket is untouched by the IP bucket.
+  const token = await issueToken(keys, agentId);
+  const elevated = await gate.handleMcp(mcpCall(token));
+  expect(((await elevated.json()) as { error?: unknown }).error).toBeUndefined();
 });
 
 // Sanity: the proof-signature primitive the verifier consumes — signature over

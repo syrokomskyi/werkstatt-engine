@@ -19,6 +19,7 @@ public/ assets (works identically in dev and on Cloudflare Workers).
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
   <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
   <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
+  <item>RFC-1187: fo-review — 503+Retry-After auth-backend-unavailable, streamed 64KiB JWKS cap, keyVersion-fed kid</item>
   <history>RFC-0290, RFC-0954, RFC-1112, RFC-1114</history>
 </CHANGE_SUMMARY>
 */
@@ -49,6 +50,7 @@ import {
   runAgentJwks,
   runWhoami,
   runRotate,
+  readBoundedBodyText,
   type AgentAuthPorts,
 } from "./agent-auth.ts";
 import {
@@ -131,8 +133,12 @@ function createAgentRegistrationVerifier(): AgentRegistrationVerifier {
           headers: { accept: "application/json" },
         });
         if (!res.ok) return null;
-        const text = await res.text();
-        if (text.length > 64 * 1024) return null;
+        // 64 KiB cap enforced WHILE reading — a hostile directory must not
+        // stream unbounded bytes into the isolate before the check.
+        const contentLength = Number(res.headers.get("content-length") ?? "0");
+        if (contentLength > 64 * 1024) return null;
+        const text = await readBoundedBodyText(res, 64 * 1024);
+        if (text === null) return null;
         const doc = JSON.parse(text) as {
           keys?: Array<{ kty?: string; crv?: string; x?: string; kid?: string }>;
         };
@@ -187,6 +193,9 @@ async function buildAuthPorts(manifest: AgentSurfaceManifest): Promise<AgentAuth
     verifier: createAgentRegistrationVerifier(),
     tokenPrivateKey: privateKey,
     tokenPublicKey: publicKey,
+    // interfaces.oauth.keyVersion is stamped at generation from the active
+    // passport key; "v1" is the schema default when the field is absent.
+    keyVersion: manifest.interfaces?.oauth?.keyVersion ?? "v1",
     issuer: manifest.baseUrl.replace(/\/+$/, ""),
     resourceMetadataUrl: `${manifest.baseUrl.replace(/\/+$/, "")}/.well-known/oauth-protected-resource`,
   };
@@ -753,12 +762,19 @@ const OAUTH_UNAVAILABLE = () =>
     headers: { "content-type": "application/problem+json" },
   });
 
+// RFC-1187 §196/§258: a registry outage on the AS endpoints themselves is a
+// retryable 503 + Retry-After — never a bare Workers 500 page.
 const AUTH_BACKEND_UNAVAILABLE = () =>
   new Response(
     JSON.stringify(
-      buildAgentProblem("dispatch-failed", { detail: "Authorization backend unavailable." }),
+      buildAgentProblem("auth-backend-unavailable", {
+        detail: "Authorization backend unavailable — retry shortly.",
+      }),
     ),
-    { status: 502, headers: { "content-type": "application/problem+json" } },
+    {
+      status: 503,
+      headers: { "content-type": "application/problem+json", "Retry-After": "30" },
+    },
   );
 
 function oauthRoute(
@@ -807,7 +823,7 @@ export function createAgentOAuthTokenRoute(
   return oauthRoute(manifest, "oauth.token", ["POST"], (req, auth) => runAgentToken(req, auth));
 }
 
-/** GET /api/agent/oauth/jwks.json — passport public key "v1" as JWKS. */
+/** GET /api/agent/oauth/jwks.json — the active passport key as JWKS (kid follows rotation). */
 export function createAgentOAuthJwksRoute(
   manifest: AgentSurfaceManifest,
 ): Record<string, APIRoute> {
@@ -816,7 +832,7 @@ export function createAgentOAuthJwksRoute(
       kty: "OKP",
       crv: "Ed25519",
       x: b64uEncode(auth.tokenPublicKey),
-      kid: "v1",
+      kid: auth.keyVersion,
       alg: "EdDSA",
       use: "sig",
     } as JsonWebKey),
