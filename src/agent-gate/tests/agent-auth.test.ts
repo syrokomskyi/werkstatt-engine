@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1187: initial agent-auth tests.</item>
   <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
+  <item>RFC-1187: phases 5-7 — OAuth route/discovery generators, env schema, operator commands</item>
 </CHANGE_SUMMARY>
 */
 
@@ -92,14 +93,14 @@ test("signAgentToken/verifyAgentToken roundtrip: valid token verifies", async ()
   const { privateKey, publicKey } = await generateKeyPair();
   const now = Math.floor(Date.now() / 1000);
   const token = await signAgentToken(
-    { iss: ISSUER, sub: "agent-1", iat: now, exp: now + 600, scope: "actions:elevated" },
+    { iss: ISSUER, sub: "agent-1", iat: now, exp: now + 600, scope: "agent.actions.elevated" },
     privateKey,
   );
   const result = await verifyAgentToken(token, publicKey, ISSUER);
   expect(result.ok).toBe(true);
   if (result.ok) {
     expect(result.claims.sub).toBe("agent-1");
-    expect(result.claims.scope).toBe("actions:elevated");
+    expect(result.claims.scope).toBe("agent.actions.elevated");
   }
 });
 
@@ -237,7 +238,7 @@ async function seedRegistration(
     agentId: "agent-test0000000001",
     signatureAgent: "https://agent.example/jwks.json",
     credentialSecretHash: sha256Hex(secret),
-    scopes: ["actions:elevated", "registration:self"],
+    scopes: ["agent.actions.elevated", "agent.registration"],
     registeredAt: "2026-01-01T00:00:00.000Z",
     credentialVersion: 1,
   };
@@ -292,8 +293,12 @@ test("runAgentToken: wrong secret / unknown client / wrong grant → OAuth error
       ports,
     );
 
-  expect((await post(`grant_type=client_credentials&client_id=${agentId}&client_secret=wrong`)).status).toBe(401);
-  expect((await post(`grant_type=client_credentials&client_id=nobody&client_secret=x`)).status).toBe(401);
+  expect(
+    (await post(`grant_type=client_credentials&client_id=${agentId}&client_secret=wrong`)).status,
+  ).toBe(401);
+  expect(
+    (await post(`grant_type=client_credentials&client_id=nobody&client_secret=x`)).status,
+  ).toBe(401);
   expect((await post(`grant_type=password&client_id=${agentId}&client_secret=x`)).status).toBe(400);
 });
 
@@ -301,15 +306,9 @@ test("runAgentToken: wrong secret / unknown client / wrong grant → OAuth error
 // Protected routes — whoami / rotate
 // ---------------------------------------------------------------------------
 
-async function issueToken(
-  keys: { privateKey: Uint8Array },
-  agentId: string,
-): Promise<string> {
+async function issueToken(keys: { privateKey: Uint8Array }, agentId: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return signAgentToken(
-    { iss: ISSUER, sub: agentId, iat: now, exp: now + 600 },
-    keys.privateKey,
-  );
+  return signAgentToken({ iss: ISSUER, sub: agentId, iat: now, exp: now + 600 }, keys.privateKey);
 }
 
 function authed(token: string, url: string, method = "GET") {
@@ -337,7 +336,7 @@ test("runWhoami: valid Bearer returns the registration record", async () => {
   expect(res.status).toBe(200);
   const body = (await res.json()) as { agent_id: string; scopes: string[] };
   expect(body.agent_id).toBe(agentId);
-  expect(body.scopes).toContain("actions:elevated");
+  expect(body.scopes).toContain("agent.actions.elevated");
 });
 
 test("runRotate: issues new secret, bumps version, old secret dies", async () => {
@@ -404,7 +403,12 @@ const WRITE_CAP: CapabilityRecord = {
     additionalProperties: false,
     properties: { message: { type: "string", minLength: 10, maxLength: 4000 } },
   },
-  output: { type: "object", required: ["receiptId"], properties: { receiptId: { type: "string" } } },
+  output: {
+    type: "object",
+    required: ["receiptId"],
+    additionalProperties: false,
+    properties: { receiptId: { type: "string" } },
+  },
   integration: { eventKind: "lead", source: "agent" },
   requires: { entitlements: [], sections: [] },
   limits: { perMinutePerIp: 1, perMinutePerAgent: 10, maxPayloadBytes: 16384 },
