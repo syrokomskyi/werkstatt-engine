@@ -11,6 +11,7 @@
   <item>RFC-1091: initial github-pages adapter with injectable CommandRunner, GH_TOKEN from filterEnv(process.env), health checks via shared health-helpers.</item>
   <item>RFC-1091: source GH_TOKEN from secretsFilePath (workpiece .env) like cloudflare-workers adapter.</item>
   <item>REVIEW-CODE-2026-10-01-01: bootSmokeCapable() → false — static adapter emits no worker bundle, workpiece wrangler.jsonc is vestigial.</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
 </CHANGE_SUMMARY>
 */
 
@@ -230,6 +231,7 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
             maxAttempts,
             "manual",
             input.authHeaders ?? {},
+            input.agentFetch,
           );
 
           if (response === null) {
@@ -261,7 +263,7 @@ export function createGitHubPagesAdapter(exec?: CommandRunner): DeploymentAdapte
           continue;
         }
 
-        const response = await fetchWithRetry(url, maxAttempts, "follow", input.authHeaders ?? {});
+        const response = await fetchWithRetry(url, maxAttempts, "follow", input.authHeaders ?? {}, input.agentFetch);
 
         if (response === null) {
           anyNetworkFailure = true;

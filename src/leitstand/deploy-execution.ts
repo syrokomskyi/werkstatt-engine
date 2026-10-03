@@ -8,8 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0948: add post-deploy feature smoke check — fetches a page from the deployed URL and checks for feature markers in HTML. Non-fatal, warnings only.</item>
-  <item>RFC-1092: replace hardcoded github-pages purge skip with adapter-aware purgeCapable() check.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -18,12 +16,14 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1179: blocking smoke gates after the health check on every channel — site.smoke.run (failingPhase "site-smoke") then deploy.smoke.run (failingPhase "deploy-smoke"); non-zero exits throw before propagation continues</item>
-  <history>RFC-0866, RFC-0925, RFC-0931</history>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092</history>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import type { DeploymentAdapter, PropagateInput, HealthInput } from "./adapter.ts";
+import { resolveOutboundAgentClient } from "./wba-signer.ts";
 import type {
   DeploymentStaticConfig,
   DeploymentChannel,
@@ -167,6 +167,7 @@ async function runFeatureSmokeCheck(
   authHeaders: Record<string, string>,
   workspaceRoot: string,
   releaseId: string | undefined,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<FeatureSmokeCheckResult> {
   try {
     let smokePath = "/";
@@ -188,7 +189,7 @@ async function runFeatureSmokeCheck(
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       timer = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(fetchUrl, {
+      const response = await fetchImpl(fetchUrl, {
         headers: authHeaders,
         redirect: "follow",
         signal: controller.signal,
@@ -234,6 +235,9 @@ async function runHealthCheckWithRetry(
   workspaceRoot: string,
   authHeaders: Record<string, string> = {},
 ): Promise<{ state: "healthy" | "unhealthy" | "unknown"; checks: HealthCheck[] }> {
+  // RFC-1188: probes to the site's own URL are agent-directed traffic —
+  // resolve once per health run (identity = the probed system by default).
+  const outbound = await resolveOutboundAgentClient(workspaceRoot, systemId);
   for (let attempt = 1; attempt <= HEALTH_CHECK_MAX_ATTEMPTS; attempt++) {
     if (attempt > 1) {
       await sleep(HEALTH_CHECK_BACKOFF_DELAYS_MS[attempt - 2]);
@@ -247,6 +251,7 @@ async function runHealthCheckWithRetry(
         expectedBehaviorSnapshotHash: "",
         workspaceRoot,
         authHeaders,
+        agentFetch: outbound.client.fetch,
       };
       const result = await adapter.health(healthInput);
       if (result.state === "healthy") {
@@ -498,11 +503,13 @@ export async function executeDeployPhases(
 
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
       if (localDistTreeHash) {
+        const freshnessOutbound = await resolveOutboundAgentClient(ctx.workspaceRoot, ctx.systemId);
         freshness = await verifyFreshness(
           actualDeploymentUrl,
           localDistTreeHash,
           noopLogger,
           authHeaders,
+          freshnessOutbound.client.fetch,
         );
         if (!freshness.verified) {
           failingPhase = "freshness";
@@ -563,11 +570,13 @@ export async function executeDeployPhases(
 
     // RFC-0948: Post-deploy feature smoke check — non-fatal warning
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
+      const smokeOutbound = await resolveOutboundAgentClient(ctx.workspaceRoot, ctx.systemId);
       featureSmokeCheck = await runFeatureSmokeCheck(
         actualDeploymentUrl,
         authHeaders,
         ctx.workspaceRoot,
         ctx.releaseId,
+        smokeOutbound.client.fetch,
       );
     }
 

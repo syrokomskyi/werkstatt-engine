@@ -12,12 +12,14 @@ lock, wrangler deploy, health check, and prod state recording.</purpose>
   <item>RFC-0806: initial promote command handler (replaces leitstand.service.deploy).</item>
   <item>RFC-0829: add test evidence gate (L1+L2+L5) via shared runTestEvidenceGate helper; throw after grace period if git HEAD unresolvable.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import type { KernelCommandInput, KernelCommandResult } from "@warpgogol/werkstatt-engine/kernel";
 import { readServicesRegistry, findServiceEntry } from "../sternsystem/registry-io.ts";
+import { resolveOutboundAgentClient } from "./wba-signer.ts";
 import {
   flagString,
   flagBoolean,
@@ -259,7 +261,14 @@ export async function runLeitstandServicePromote(
     let healthState: "healthy" | "unhealthy" | "unknown" = "unknown";
     if (!skipHealthCheck && serviceEntry.publicEndpoints && deployedUrl) {
       logger.info(`[leitstand.service.promote] running health check on ${deployedUrl}…`);
-      healthState = await runHealthCheck(deployedUrl, serviceEntry.healthCheckPath);
+      // RFC-1188: platform-originated agent-directed probe — sign when the
+      // identity resolves (WBA_IDENTITY_SITE), degrade to unsigned otherwise.
+      const outbound = await resolveOutboundAgentClient(workspaceRoot);
+      healthState = await runHealthCheck(
+        deployedUrl,
+        serviceEntry.healthCheckPath,
+        outbound.client.fetch,
+      );
     } else if (!serviceEntry.publicEndpoints) {
       logger.info(
         `[leitstand.service.promote] skipping health check — service has no public endpoints`,

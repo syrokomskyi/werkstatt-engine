@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1091: extract readBehaviorSnapshot, verifyRedirectRoute, selectProbeRoutes, fetchWithRetry, filterEnv, sourceDotenv from cloudflare-workers.ts into shared module.</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
 </CHANGE_SUMMARY>
 */
 
@@ -121,10 +122,11 @@ export async function fetchWithRetry(
   maxAttempts: number,
   redirect: "follow" | "manual" = "follow",
   authHeaders: Record<string, string> = {},
+  fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: boolean; status: number; body: string; headers: Headers } | null> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const response = await fetch(url, { redirect, headers: authHeaders });
+      const response = await fetchImpl(url, { redirect, headers: authHeaders });
       const body = await response.text();
       return { ok: response.ok, status: response.status, body, headers: response.headers };
     } catch {

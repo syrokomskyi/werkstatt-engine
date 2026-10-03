@@ -4,6 +4,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0930: initial tests for leitstand.verify command covering all-match success, hash drift, unreachable channel, local mismatch, single-channel filter, access-protected channel, 404, no deployment config, --no-compare-local, and fetch timeout.</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
 </CHANGE_SUMMARY>
 */
 
@@ -14,6 +15,7 @@ vi.mock("../../sternsystem/registry-io.ts", () => ({
   readSystemConfigSmart: vi.fn(),
   readSystemStateSmart: vi.fn(),
   resolveCacheClonePath: vi.fn(),
+  resolveActiveWorkpieceDir: vi.fn().mockResolvedValue(null),
 }));
 
 const { runLeitstandVerify } = await import("../leitstand-commands.ts");

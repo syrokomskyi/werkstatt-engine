@@ -10,6 +10,7 @@ across the three new command handlers.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0806: initial extraction of shared service deploy helpers.</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
 </CHANGE_SUMMARY>
 */
 
@@ -129,10 +130,11 @@ export function extractWorkerVersionId(stdout: string): string | undefined {
 export async function runHealthCheck(
   url: string,
   healthCheckPath: string | undefined,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<"healthy" | "unhealthy"> {
   const checkUrl = url + (healthCheckPath ?? "/health");
   try {
-    const response = await fetch(checkUrl, { redirect: "follow" });
+    const response = await fetchImpl(checkUrl, { redirect: "follow" });
     if (response.status < 500) {
       return "healthy";
     }

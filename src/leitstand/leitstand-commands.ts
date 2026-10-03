@@ -6,13 +6,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1126: step 7 — AC evidence alignment
-
-resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136</history>
 </CHANGE_SUMMARY>
 */
@@ -46,6 +44,7 @@ import {
   BUILD_IDENTITY_PATH,
 } from "./cache-purge.ts";
 import { artifactStorePreflight } from "../artifact-store/index.ts";
+import { resolveOutboundAgentClient } from "./wba-signer.ts";
 import { verifyBuildIdentitySignature } from "../integrity/signing.ts";
 import { executeKernelCommand, KERNEL_UNIVERSAL_FLAGS } from "@warpgogol/werkstatt-engine/kernel";
 import { getOrBuildWorkspaceRegistry } from "../kernel/runtime/registry-cache.ts";
@@ -214,6 +213,7 @@ export async function verifyFreshness(
   localDistTreeHash: string,
   logger: { info: (m: string) => void },
   authHeaders: Record<string, string> = {},
+  fetchImpl: typeof fetch = fetch,
 ): Promise<FreshnessResult> {
   const base = deploymentUrl.replace(/\/$/, "");
   const url = `${base}${BUILD_IDENTITY_PATH}`;
@@ -230,7 +230,7 @@ export async function verifyFreshness(
     }
 
     try {
-      const response = await fetch(url, { headers: authHeaders });
+      const response = await fetchImpl(url, { headers: authHeaders });
       if (!response.ok) {
         lastCdnDistTreeHash = null;
         lastError = `CDN freshness fetch returned HTTP ${response.status} for ${url}`;
@@ -1848,6 +1848,9 @@ export async function runLeitstandHealth(
   }
 
   try {
+    // RFC-1188: standalone health probes are agent-directed traffic — sign
+    // through the outbound client when the identity key resolves.
+    const outbound = await resolveOutboundAgentClient(context.workspaceRoot, systemId);
     const result = await adapter.health({
       systemId,
       deploymentUrl: channelConfig.url,
@@ -1855,6 +1858,7 @@ export async function runLeitstandHealth(
       releaseId,
       expectedBehaviorSnapshotHash: "",
       workspaceRoot: context.workspaceRoot,
+      agentFetch: outbound.client.fetch,
     });
     return {
       data: {
@@ -2319,6 +2323,7 @@ async function fetchChannelBuildIdentity(
   url: string,
   authHeaders: Record<string, string>,
   timeoutMs: number,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<{
   reachable: boolean;
   httpStatus: number | null;
@@ -2331,7 +2336,7 @@ async function fetchChannelBuildIdentity(
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     timer = setTimeout(() => controller.abort(), timeoutMs);
-    const response = await fetch(fetchUrl, {
+    const response = await fetchImpl(fetchUrl, {
       headers: authHeaders,
       redirect: "follow",
       signal: controller.signal,
@@ -2462,9 +2467,20 @@ export async function runLeitstandVerify(
     );
   }
 
+  // RFC-1188: channel probes are platform-originated agent traffic —
+  // sign through OutboundAgentClient when the identity key resolves.
+  const outbound = await resolveOutboundAgentClient(context.workspaceRoot, systemId);
+  const fetchImpl = outbound.client.fetch;
+
   const fetchResults = await Promise.all(
     channelConfigs.map(async ({ channel, url }) => {
-      const result = await fetchChannelBuildIdentity(channel, url, authHeaders, timeoutMs);
+      const result = await fetchChannelBuildIdentity(
+        channel,
+        url,
+        authHeaders,
+        timeoutMs,
+        fetchImpl,
+      );
       const localEntry = systemState.lastPropagated?.[channel];
       const localState = localEntry
         ? {
@@ -2489,7 +2505,7 @@ export async function runLeitstandVerify(
         try {
           const base = url.replace(/\/$/, "");
           const pubKeyFetchUrl = `${base}/.well-known/release-pubkey.json`;
-          const pubKeyResponse = await fetch(pubKeyFetchUrl, {
+          const pubKeyResponse = await fetchImpl(pubKeyFetchUrl, {
             headers: authHeaders,
             redirect: "follow",
             signal: AbortSignal.timeout(timeoutMs),
@@ -2497,7 +2513,7 @@ export async function runLeitstandVerify(
           if (pubKeyResponse.ok) {
             const pubKeyData = (await pubKeyResponse.json()) as { publicKeyHex?: string };
             if (pubKeyData.publicKeyHex) {
-              const fullIdentity = await fetch(`${base}${BUILD_IDENTITY_PATH}`, {
+              const fullIdentity = await fetchImpl(`${base}${BUILD_IDENTITY_PATH}`, {
                 headers: authHeaders,
                 redirect: "follow",
                 signal: AbortSignal.timeout(timeoutMs),

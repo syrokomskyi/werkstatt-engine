@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0926: add optional versionId to RollbackInput and rolledBackToVersionId to RollbackResult for release-aware rollback.</item>
   <item>RFC-1092: add required purgeCapable() method to DeploymentAdapter for adapter-aware CDN purge.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>REVIEW-CODE-2026-10-01-01: add required bootSmokeCapable() method to DeploymentAdapter — adapter capability replaces name-string predicates in release boot-smoke gating.</item>
-  <history>RFC-0358, RFC-0379, RFC-0585, RFC-0587, RFC-0627</history>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <history>RFC-0358, RFC-0379, RFC-0585, RFC-0587, RFC-0627, RFC-0926</history>
 </CHANGE_SUMMARY>
 */
 
@@ -67,6 +67,12 @@ export interface HealthInput {
   expectedBehaviorSnapshotHash: string;
   workspaceRoot: string;
   authHeaders?: Record<string, string>;
+  /**
+   * RFC-1188: agent-directed fetch — probes to Sternsystem URLs go through
+   * OutboundAgentClient (WBA-signed when a signer resolves). Absent → plain
+   * fetch; the adapter treats it as optional transport decoration.
+   */
+  agentFetch?: typeof fetch;
 }
 
 export interface DeploymentLimits {

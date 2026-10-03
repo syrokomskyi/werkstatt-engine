@@ -10,12 +10,14 @@ health check, and dev state recording.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0806: initial dev-deploy command handler.</item>
+  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import type { KernelCommandInput, KernelCommandResult } from "@warpgogol/werkstatt-engine/kernel";
 import { readServicesRegistry, findServiceEntry } from "../sternsystem/registry-io.ts";
+import { resolveOutboundAgentClient } from "./wba-signer.ts";
 import {
   flagString,
   flagBoolean,
@@ -180,7 +182,14 @@ export async function runLeitstandServiceDevDeploy(
     let healthState: "healthy" | "unhealthy" | "unknown" = "unknown";
     if (!skipHealthCheck && deployedUrl) {
       logger.info(`[leitstand.service.dev-deploy] running health check on ${deployedUrl}…`);
-      healthState = await runHealthCheck(deployedUrl, serviceEntry.healthCheckPath);
+      // RFC-1188: platform-originated agent-directed probe — sign when the
+      // identity resolves (WBA_IDENTITY_SITE), degrade to unsigned otherwise.
+      const outbound = await resolveOutboundAgentClient(workspaceRoot);
+      healthState = await runHealthCheck(
+        deployedUrl,
+        serviceEntry.healthCheckPath,
+        outbound.client.fetch,
+      );
     }
 
     // 6. Smoke check (RFC-0825)
