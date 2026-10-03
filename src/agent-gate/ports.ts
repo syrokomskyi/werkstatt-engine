@@ -14,11 +14,13 @@ concrete port implementations (fetch-based knowledge reads, QStash dispatch).
   <item>RFC-0291: add optional createRateLimiter port.</item>
   <item>RFC-1112: dispatch.send returns ActionReceipt; add optional idempotency port.</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
+  <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
 </CHANGE_SUMMARY>
 */
 
 import type { IntegrationEvent } from "@warpgogol/werkstatt-shared/integration/port";
 import type { ActionReceipt, AgentTrafficEvent } from "@warpgogol/werkstatt-shared/agent";
+import type { AgentAuthPorts } from "./agent-auth.ts";
 import type { RateLimiter } from "./limits.ts";
 
 /**
@@ -57,4 +59,12 @@ export interface AgentGatePorts {
    * captures structured stdout); absent port = telemetry disabled.
    */
   telemetry?: (event: AgentTrafficEvent) => void;
+  /**
+   * RFC-1187: authorization-server ports. Present only when the site enabled
+   * `agent.auth` AND the runtime wiring exists (Upstash Redis secrets +
+   * SIGNING_PRIVATE_KEY). Absent port = anonymous tier everywhere — the same
+   * object backs Bearer resolution on action routes and the AS route
+   * handlers (challenge/register/token/jwks/whoami/rotate).
+   */
+  auth?: AgentAuthPorts;
 }

@@ -14,11 +14,11 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
   <item>RFC-1112/1113/1114 gap fix: CORS Allow-Headers gains Idempotency-Key, MCP-Protocol-Version, A2A-Version; Expose-Headers gains X-Agent-Idempotency.</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
   <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
+  <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
   <history>RFC-0290, RFC-0954, RFC-1112, RFC-1114</history>
 </CHANGE_SUMMARY>
 */
@@ -28,9 +28,29 @@ import {
   UPSTASH_QSTASH_TOKEN,
   UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN,
+  getSecret,
 } from "astro:env/server";
 import { buildQstashPublish, restRedisReceiptStore } from "@warpgogol/werkstatt-shared/integration";
+import { restRedisAgentRegistry } from "@warpgogol/werkstatt-shared/integration/agent-registry";
 import type { AgentSurfaceManifest } from "@warpgogol/werkstatt-shared/agent";
+import {
+  b64uDecode,
+  b64uEncode,
+  deriveAgentId,
+  buildAgentProblem,
+  type AgentRegistrationVerifier,
+} from "@warpgogol/werkstatt-shared/agent";
+import { getPublicKey, verifyBytes } from "@warpgogol/werkstatt-shared/signing";
+import { createHash } from "node:crypto";
+import {
+  runOAuthChallenge,
+  runAgentRegister,
+  runAgentToken,
+  runAgentJwks,
+  runWhoami,
+  runRotate,
+  type AgentAuthPorts,
+} from "./agent-auth.ts";
 import {
   SEARCH_EMBEDDING_MODEL,
   SEARCH_MAX_TOP_K,
@@ -52,10 +72,11 @@ import { runNlwebAsk } from "./nlweb-ask.ts";
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  // RFC-1112/1113/1114: browser agents must be allowed to send the protocol
-  // headers — Idempotency-Key (actions), MCP-Protocol-Version (MCP), A2A-Version.
+  // RFC-1112/1113/1114/1187: browser agents must be allowed to send the protocol
+  // headers — Idempotency-Key (actions), MCP-Protocol-Version (MCP), A2A-Version,
+  // Authorization (Bearer tokens for the registration tier).
   "Access-Control-Allow-Headers":
-    "Content-Type, Signature-Agent, Signature, User-Agent, x-search-reindex-token, Idempotency-Key, MCP-Protocol-Version, A2A-Version",
+    "Content-Type, Signature-Agent, Signature, User-Agent, x-search-reindex-token, Idempotency-Key, MCP-Protocol-Version, A2A-Version, Authorization",
   "Access-Control-Expose-Headers": "X-Agent-Idempotency",
   "Access-Control-Max-Age": "86400",
 };
@@ -67,7 +88,115 @@ function withCors(response: Response): Response {
   return response;
 }
 
-function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGatePorts {
+/**
+ * RFC-1187: decode the SIGNING_PRIVATE_KEY secret into an Ed25519 seed.
+ * Accepts the repo's two encodings: PEM wrapping the raw 32-byte seed
+ * (toPem output) or a standard PKCS8 DER (48 bytes — seed is the tail),
+ * plus 64-char hex.
+ */
+function parseSigningSecret(value: string): Uint8Array | null {
+  const trimmed = value.trim();
+  if (trimmed.includes("-----BEGIN")) {
+    const b64 = trimmed
+      .replace(/-----BEGIN [A-Z ]+-----/g, "")
+      .replace(/-----END [A-Z ]+-----/g, "")
+      .replace(/\s+/g, "");
+    const bytes = new Uint8Array(Buffer.from(b64, "base64"));
+    if (bytes.length === 32) return bytes;
+    if (bytes.length === 48) return bytes.slice(-32);
+    return null;
+  }
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    return new Uint8Array(Buffer.from(trimmed, "hex"));
+  }
+  return null;
+}
+
+/**
+ * RFC-1187: concrete key-proof verifier — the ONLY place the signatureAgent
+ * JWKS fetch happens (SSRF guards live here: https-only, redirect error,
+ * 3s timeout, 64 KiB body cap). Tries every Ed25519 OKP key in the fetched
+ * directory (kid narrows when present); the derived agentId binds to the
+ * signatureAgent URL, not to any caller-chosen handle.
+ */
+function createAgentRegistrationVerifier(): AgentRegistrationVerifier {
+  return {
+    async verify(proof) {
+      try {
+        const url = new URL(proof.signatureAgent);
+        if (url.protocol !== "https:") return null;
+        const res = await fetch(url, {
+          redirect: "error",
+          signal: AbortSignal.timeout(3000),
+          headers: { accept: "application/json" },
+        });
+        if (!res.ok) return null;
+        const text = await res.text();
+        if (text.length > 64 * 1024) return null;
+        const doc = JSON.parse(text) as {
+          keys?: Array<{ kty?: string; crv?: string; x?: string; kid?: string }>;
+        };
+        const candidates = (doc.keys ?? []).filter(
+          (key) =>
+            key.kty === "OKP" &&
+            key.crv === "Ed25519" &&
+            typeof key.x === "string" &&
+            (!proof.kid || key.kid === proof.kid),
+        );
+        const signature = b64uDecode(proof.signature);
+        if (!signature || signature.length !== 64) return null;
+        const message = new TextEncoder().encode(proof.challenge);
+        for (const key of candidates) {
+          const publicKey = b64uDecode(key.x!);
+          if (publicKey?.length === 32 && (await verifyBytes(publicKey, message, signature))) {
+            return {
+              agentId: deriveAgentId(proof.signatureAgent, (input) =>
+                createHash("sha256").update(input, "utf8").digest("hex"),
+              ),
+            };
+          }
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+/**
+ * RFC-1187: assemble the authorization-server ports when the runtime wiring
+ * exists — Upstash Redis (registry) + SIGNING_PRIVATE_KEY (token issuance,
+ * the same passport key). Absent either → anonymous tier everywhere.
+ */
+async function buildAuthPorts(manifest: AgentSurfaceManifest): Promise<AgentAuthPorts | null> {
+  if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) return null;
+  const secret = getSecret("SIGNING_PRIVATE_KEY");
+  if (!secret) return null;
+  const privateKey = parseSigningSecret(secret);
+  if (!privateKey) {
+    console.warn("agent-auth: SIGNING_PRIVATE_KEY is set but unreadable — auth ports disabled");
+    return null;
+  }
+  const publicKey = await getPublicKey(privateKey);
+  return {
+    registry: restRedisAgentRegistry({
+      url: UPSTASH_REDIS_REST_URL,
+      token: UPSTASH_REDIS_REST_TOKEN,
+    }),
+    verifier: createAgentRegistrationVerifier(),
+    tokenPrivateKey: privateKey,
+    tokenPublicKey: publicKey,
+    issuer: manifest.baseUrl.replace(/\/+$/, ""),
+    resourceMetadataUrl: `${manifest.baseUrl.replace(/\/+$/, "")}/.well-known/oauth-protected-resource`,
+  };
+}
+
+async function buildPorts(
+  manifest: AgentSurfaceManifest,
+  request: Request,
+): Promise<AgentGatePorts> {
+  const authPorts = await buildAuthPorts(manifest);
   return {
     knowledge: {
       async read(path: string): Promise<string | null> {
@@ -112,6 +241,9 @@ function buildPorts(manifest: AgentSurfaceManifest, request: Request): AgentGate
           }),
         }
       : {}),
+    // RFC-1187: auth ports ride the same request-scoped build — null when the
+    // site has no signing key wired (anonymous tier stays the contract).
+    ...(authPorts ? { auth: authPorts } : {}),
   };
 }
 
@@ -125,7 +257,7 @@ async function withTrafficEmit(
   protocol: "http" | "mcp" | "a2a" | "nlweb",
   run: (traffic: TrafficRecorder, ports: AgentGatePorts) => Promise<Response>,
 ): Promise<Response> {
-  const ports = buildPorts(manifest, request);
+  const ports = await buildPorts(manifest, request);
   const traffic: TrafficRecorder = {};
   const started = Date.now();
   const response = await run(traffic, ports);
@@ -606,4 +738,106 @@ export function createAgentHealthRoute(manifest: AgentSurfaceManifest): {
       }),
     OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// RFC-1187: authorization-server route adapters — thin wrappers over the pure
+// agent-auth.ts core. A missing `ports.auth` (no Redis secrets / no signing
+// key) answers oauth-unavailable rather than 500: the anonymous contract
+// stays the fallback everywhere.
+// ---------------------------------------------------------------------------
+
+const OAUTH_UNAVAILABLE = () =>
+  new Response(JSON.stringify(buildAgentProblem("oauth-unavailable")), {
+    status: 404,
+    headers: { "content-type": "application/problem+json" },
+  });
+
+const AUTH_BACKEND_UNAVAILABLE = () =>
+  new Response(
+    JSON.stringify(
+      buildAgentProblem("dispatch-failed", { detail: "Authorization backend unavailable." }),
+    ),
+    { status: 502, headers: { "content-type": "application/problem+json" } },
+  );
+
+function oauthRoute(
+  manifest: AgentSurfaceManifest,
+  operation: string,
+  methods: string[],
+  handler: (request: Request, auth: AgentAuthPorts) => Promise<Response> | Response,
+): Record<string, APIRoute> {
+  const run: APIRoute = async ({ request }) =>
+    withCors(
+      await withTrafficEmit(manifest, request, "http", async (traffic, ports) => {
+        traffic.operation = "other";
+        traffic.capability = operation;
+        traffic.observedIdentity = extractAgentIdentity(request);
+        if (!ports.auth) return OAUTH_UNAVAILABLE();
+        try {
+          return await handler(request, ports.auth);
+        } catch (err) {
+          // Registry/Redis outage on the stateful endpoints — retryable problem,
+          // never a bare Workers 500 page.
+          console.warn(
+            `agent-auth: ${operation} backend failure: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return AUTH_BACKEND_UNAVAILABLE();
+        }
+      }),
+    );
+  const routes: Record<string, APIRoute> = {
+    OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
+  };
+  for (const method of methods) routes[method] = run;
+  return routes;
+}
+
+/** POST /api/agent/oauth/challenge — single-use registration nonce. */
+export function createAgentOAuthChallengeRoute(
+  manifest: AgentSurfaceManifest,
+): Record<string, APIRoute> {
+  return oauthRoute(manifest, "oauth.challenge", ["POST"], (_req, auth) => runOAuthChallenge(auth));
+}
+
+/** POST /api/agent/oauth/token — client_credentials → EdDSA JWT. */
+export function createAgentOAuthTokenRoute(
+  manifest: AgentSurfaceManifest,
+): Record<string, APIRoute> {
+  return oauthRoute(manifest, "oauth.token", ["POST"], (req, auth) => runAgentToken(req, auth));
+}
+
+/** GET /api/agent/oauth/jwks.json — passport public key "v1" as JWKS. */
+export function createAgentOAuthJwksRoute(
+  manifest: AgentSurfaceManifest,
+): Record<string, APIRoute> {
+  return oauthRoute(manifest, "oauth.jwks", ["GET"], (_req, auth) =>
+    runAgentJwks({
+      kty: "OKP",
+      crv: "Ed25519",
+      x: b64uEncode(auth.tokenPublicKey),
+      kid: "v1",
+      alg: "EdDSA",
+      use: "sig",
+    } as JsonWebKey),
+  );
+}
+
+/** POST /api/agent/v1/registration — WBA key-proof registration. */
+export function createAgentRegistrationRoute(
+  manifest: AgentSurfaceManifest,
+): Record<string, APIRoute> {
+  return oauthRoute(manifest, "registration.register", ["POST"], (req, auth) =>
+    runAgentRegister(req, auth),
+  );
+}
+
+/** GET /api/agent/v1/registration/whoami — Bearer-required self-report. */
+export function createAgentWhoamiRoute(manifest: AgentSurfaceManifest): Record<string, APIRoute> {
+  return oauthRoute(manifest, "registration.whoami", ["GET"], (req, auth) => runWhoami(req, auth));
+}
+
+/** POST /api/agent/v1/registration/rotate — Bearer-required credential rotation. */
+export function createAgentRotateRoute(manifest: AgentSurfaceManifest): Record<string, APIRoute> {
+  return oauthRoute(manifest, "registration.rotate", ["POST"], (req, auth) => runRotate(req, auth));
 }

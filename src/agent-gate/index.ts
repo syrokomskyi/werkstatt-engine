@@ -12,12 +12,12 @@ astro-aware caller.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1114: handleA2a transport boundary — A2A-Version header gate, SendMessage routing.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>
   <item>RFC-1114: review findings — schema-violation for malformed message, drop unreachable fallback</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
   <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
-  <history>RFC-0290, RFC-0291, RFC-1112, RFC-1113</history>
+  <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
+  <history>RFC-0290, RFC-0291, RFC-1112, RFC-1113, RFC-1114</history>
 </CHANGE_SUMMARY>
 */
 
@@ -48,6 +48,8 @@ import {
   checkPayloadSize,
   checkIdempotency,
   checkRateLimit,
+  rateLimitMax,
+  resolveAgentAuth,
   parseJsonBody,
   validateSchema,
   dispatchOrPreview,
@@ -59,6 +61,7 @@ import {
 import { buildAgentProblem } from "@warpgogol/werkstatt-shared/agent";
 
 export type { AgentGatePorts } from "./ports.ts";
+export * from "./agent-auth.ts";
 export * from "./actions.ts";
 export * from "./mcp/protocol.ts";
 export * from "./mcp/tools.ts";
@@ -278,10 +281,13 @@ export function createAgentGate(
         () => resolveCapability(ctx),
         () => checkPayloadSize(ctx),
         () => checkIdempotency(ctx),
+        // RFC-1187: Bearer resolution precedes the limiter — a verified agent
+        // selects the elevated per-agent bucket (rateLimitMax/Key read ctx).
+        () => resolveAgentAuth(ctx),
         () =>
           checkRateLimit(
             ctx,
-            limitStore.get(capabilityId, ctx.capability!.limits.perMinutePerIp, ports),
+            limitStore.get(`${capabilityId}:${rateLimitMax(ctx)}`, rateLimitMax(ctx), ports),
           ),
         () => parseJsonBody(ctx),
         () => validateSchema(ctx),

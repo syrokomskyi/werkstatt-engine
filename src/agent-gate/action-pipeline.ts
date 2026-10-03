@@ -10,7 +10,6 @@ returns either a Response (short-circuit) or void (continue to next step).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1169: preview envelope — sideEffect "none" schema violations answer ready:false/missing/problems (200, never 422); the preview branch returns draftId + summary + nextAction linkage via buildPreviewReady/buildPreviewFailure, shared by HTTP, MCP, and A2A.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -19,6 +18,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
   <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
+  <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
+  <history>RFC-1169</history>
 </CHANGE_SUMMARY>
 */
 
@@ -36,6 +37,8 @@ import {
 } from "@warpgogol/werkstatt-shared/fingerprint";
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import type { AgentGatePorts } from "./ports.ts";
+import type { VerifiedAgent } from "@warpgogol/werkstatt-shared/agent";
+import { resolveBearerAgent } from "./agent-auth.ts";
 import type { RateLimiter } from "./limits.ts";
 import {
   validateAgainstCapabilitySchema,
@@ -70,6 +73,8 @@ export interface ActionContext {
   capability?: CapabilityRecord;
   parsed?: unknown;
   validatedValue?: Record<string, unknown>;
+  /** RFC-1187: resolved Bearer identity — set by resolveAgentAuth; drives elevated limits + attribution. */
+  verifiedAgent?: VerifiedAgent;
   /** RFC-1172: optional per-request telemetry recorder — steps record what only they know (duplicate replay). */
   traffic?: TrafficRecorder;
 }
@@ -192,9 +197,45 @@ export async function checkIdempotency(ctx: ActionContext): Promise<StepResult> 
   return problemResponse(replay);
 }
 
+/**
+ * RFC-1187: Bearer resolution — runs after resolveCapability (the elevated
+ * limit lookup needs the record) and before rate limiting. A verified token
+ * stamps `verifiedAgentId` into the observed identity (projected into
+ * `payload._agentIdentity` at dispatch); every failure leaves the field
+ * unset — anonymous is the default, never an error.
+ */
+export async function resolveAgentAuth(ctx: ActionContext): Promise<void> {
+  if (!ctx.ports.auth) return;
+  const agent = await resolveBearerAgent(ctx.request, ctx.ports.auth);
+  if (agent) {
+    ctx.verifiedAgent = agent;
+    ctx.agentIdentity.verifiedAgentId = agent.agentId;
+  }
+}
+
+/**
+ * RFC-1187: the limit applies per verified agent when the capability declares
+ * `perMinutePerAgent` and the caller is authenticated — otherwise the
+ * anonymous per-IP bucket (verified or not).
+ */
+export function rateLimitKey(ctx: ActionContext): string {
+  if (ctx.verifiedAgent && ctx.capability?.limits.perMinutePerAgent) {
+    return `${ctx.capabilityId}:agent:${ctx.verifiedAgent.agentId}`;
+  }
+  return `${ctx.capabilityId}:${ctx.clientIp}`;
+}
+
+/** RFC-1187: the effective max — elevated tier only when both sides declare it. */
+export function rateLimitMax(ctx: ActionContext): number {
+  if (ctx.verifiedAgent && ctx.capability?.limits.perMinutePerAgent) {
+    return ctx.capability.limits.perMinutePerAgent;
+  }
+  return ctx.capability!.limits.perMinutePerIp;
+}
+
 export function checkRateLimit(ctx: ActionContext, limiter: RateLimiter | null): StepResult {
   if (!limiter) return;
-  const result = limiter.check(`${ctx.capabilityId}:${ctx.clientIp}`);
+  const result = limiter.check(rateLimitKey(ctx));
   if (!result.allowed) {
     return problemResponse(
       buildAgentProblem("rate-limited", { retryAfterSeconds: result.retryAfterSeconds }),
