@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial action interpreter tests.</item>
   <item>Post-refactor hardening: cover prototype-key unknown property validation.</item>
+  <item>RFC-1186: step 4 — manifest bound set, formBinding stamp, gate formId tagging</item>
 </CHANGE_SUMMARY>
 */
 
@@ -141,6 +142,38 @@ test("buildIntegrationEventFromAction: ignores a client-supplied eventId field",
   // RFC-1112: eventId is never client-controlled — random UUID without a key.
   expect(event.eventId).not.toBe(clientId);
   expect(event.eventId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("buildIntegrationEventFromAction: bound capability tags payload.formId", () => {
+  const cap = {
+    ...makeCapability(),
+    id: "recommendation.submit",
+    integration: { eventKind: "recommendation", source: "agent" },
+    formBinding: { formId: "recommendation-form" },
+  } as CapabilityRecord;
+  const event = buildIntegrationEventFromAction(
+    cap,
+    { message: "a great fit for the directory" },
+    "de",
+    new Date("2026-10-03T00:00:00.000Z"),
+  );
+  expect(event.kind).toBe("recommendation");
+  expect(
+    event.payload.formId,
+    "a bound capability must stamp payload.formId from the generated formBinding — check agent-gate/actions.ts SiteBoundCapability handling",
+  ).toBe("recommendation-form");
+});
+
+test("buildIntegrationEventFromAction: unbound capability leaves payload untouched", () => {
+  const cap = makeCapability();
+  const event = buildIntegrationEventFromAction(
+    cap,
+    { message: "hello there!!" },
+    "de",
+    new Date(),
+  );
+  expect(event.payload).not.toHaveProperty("formId");
+  expect(event.payload).toEqual({ message: "hello there!!" });
 });
 
 test("buildIntegrationEventFromAction: idempotency key derives a deterministic eventId", () => {

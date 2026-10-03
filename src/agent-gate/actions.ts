@@ -11,14 +11,16 @@ handed to the delivery substrate on success.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0290: initial action interpreter.</item>
   <item>RFC-1169: ValidationFieldError gains closed code union (NOT_OBJECT, UNKNOWN_PROPERTY, REQUIRED, TYPE, MIN_LENGTH, MAX_LENGTH, FORMAT) emitted at the source — preview envelopes project it verbatim as problems[].code.</item>
+  <item>RFC-1186: bound capabilities tag IntegrationEvent.payload.formId from the site-stamped formBinding — parity with the RFC-0827 web form discriminator.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1186: step 4 — manifest bound set, formBinding stamp, gate formId tagging</item>
+  <history>RFC-0290</history>
 </CHANGE_SUMMARY>
 */
 
@@ -146,10 +148,21 @@ export function validateAgainstCapabilitySchema(
 const CONTACT_FIELDS = ["name", "email", "phone"] as const;
 
 /**
+ * Capability record as serialized into `agent-capabilities.generated.json` —
+ * RFC-1186 stamps `formBinding.formId` onto bound capabilities so the event
+ * payload carries the same discriminator the web form path sends (RFC-0827).
+ */
+type SiteBoundCapability = CapabilityRecord & {
+  formBinding?: { formId?: string };
+};
+
+/**
  * Normalize validated action input into the delivery substrate's event shape.
  * RFC-1112: when `idempotencyKey` is present the eventId is derived
  * deterministically from it (same key → same eventId → QStash dedup and the
  * receipt store agree). Without a key the eventId is a random UUID.
+ * RFC-1186: a bound capability tags `payload.formId` so downstream consumers
+ * can distinguish bound forms sharing a `kind` — parity with the web path.
  */
 export function buildIntegrationEventFromAction(
   capability: CapabilityRecord,
@@ -171,6 +184,7 @@ export function buildIntegrationEventFromAction(
   const eventId = idempotencyKey
     ? deriveActionEventId(capability.id, idempotencyKey)
     : crypto.randomUUID();
+  const boundFormId = (capability as SiteBoundCapability).formBinding?.formId;
 
   return {
     eventId,
@@ -179,6 +193,9 @@ export function buildIntegrationEventFromAction(
     locale,
     occurredAt: now.toISOString(),
     ...(Object.keys(contact).length > 0 ? { contact } : {}),
-    payload: input,
+    payload:
+      typeof boundFormId === "string" && boundFormId.length > 0
+        ? { ...input, formId: boundFormId }
+        : input,
   };
 }
