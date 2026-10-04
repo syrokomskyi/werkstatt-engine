@@ -17,6 +17,8 @@ export async function createLagebildModule(): Promise<ModuleExport> {
   const { runLagebildConnect } = await import("./lagebild-connect.ts");
   const { runLagebildValidate } = await import("./lagebild-validate.ts");
   const { runLagebildStatus } = await import("./lagebild-status.ts");
+  const { runLagebildReferralIssue, runLagebildReferralList } =
+    await import("./lagebild-referral.ts");
   return {
     name: "lagebild",
     version: "0.1.0",
@@ -92,6 +94,53 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         reads: ["../systems-cache/{system}/system-state.yaml"],
         requiresNetwork: false,
         execute: runLagebildStatus,
+      },
+      {
+        name: "lagebild.referral.issue",
+        modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
+        description:
+          "Issue a recommender ref-code via POST /v1/referrals and return the shareable <site-origin>/?ref=<code> link (RFC-1191). Required flags: `--site`, `--contact`.",
+        scope: "workspace",
+        flags: {
+          site: { kind: "string", required: true, description: "Sternsystem ID." },
+          contact: {
+            kind: "string",
+            required: true,
+            description: "Recommender contact email to bind the code to.",
+          },
+          channel: {
+            kind: "string",
+            description: "Deployment channel for the URL origin (default: main).",
+          },
+        },
+        // Mutates the remote Lagebild registry (creates a code) — not a local
+        // file write, but not read-only either.
+        mutatesState: true,
+        writes: [],
+        generates: [],
+        reads: [
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/.env",
+        ],
+        requiresNetwork: true,
+        execute: runLagebildReferralIssue,
+      },
+      {
+        name: "lagebild.referral.list",
+        modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
+        description:
+          "List the Lagebild referral registry rows via GET /v1/referrals (RFC-1191). Required flags: `--site`.",
+        scope: "workspace",
+        flags: {
+          site: { kind: "string", required: true, description: "Sternsystem ID." },
+        },
+        mutatesState: false,
+        writes: [],
+        generates: [],
+        reads: ["../systems-cache/{system}/system-state.yaml", "../systems-cache/{system}/.env"],
+        requiresNetwork: true,
+        execute: runLagebildReferralList,
       },
     ],
     pipelines: [],

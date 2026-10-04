@@ -67,6 +67,9 @@ global.fetch = mockFetch as unknown as typeof fetch;
 const { runLagebildConnect } = await import("./lagebild-connect.ts");
 const { runLagebildValidate } = await import("./lagebild-validate.ts");
 const { runLagebildStatus } = await import("./lagebild-status.ts");
+const { runLagebildReferralIssue, runLagebildReferralList } =
+  await import("./lagebild-referral.ts");
+const { sourceDotenv } = await import("../leitstand/adapters/index.ts");
 const { readSystemConfigSmart, readSystemStateSmart, writeSystemStateSmart } =
   await import("../sternsystem/registry-io.ts");
 const { runWranglerSecretPut } = await import("../leitstand/adapters/wrangler-secrets.ts");
@@ -446,5 +449,94 @@ describe("RFC-1065: lagebild.status", () => {
     await expect(runLagebildStatus(makeInput({}), makeContext())).rejects.toThrow(
       "--site is required",
     );
+  });
+});
+
+const connectedLagebildState = {
+  ...mockState,
+  lagebild: {
+    connected: true,
+    apiUrl: "https://api.lagebild.example",
+    tenantId: "tenant-1",
+    sourceSystemId: "src-1",
+    connectedAt: "2026-01-01T00:00:00Z",
+    channel: "main",
+  },
+};
+
+describe("RFC-1191: lagebild.referral.issue", () => {
+  beforeEach(() => {
+    vi.mocked(readSystemStateSmart).mockResolvedValue(
+      structuredClone(connectedLagebildState) as never,
+    );
+    vi.mocked(sourceDotenv).mockResolvedValue({ LAGEBILD_API_KEY: "key-1" } as never);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ref_code: "d3f7a2c4e6" }),
+    } as never);
+  });
+
+  it("AC-8: POSTs /v1/referrals and returns {refCode, url} with the channel origin", async () => {
+    const result = await runLagebildReferralIssue(
+      makeInput({ site: "test-site", contact: "rec@example.test" }),
+      makeContext(),
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.lagebild.example/v1/referrals");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ contact_email: "rec@example.test" });
+    expect(result.data!.refCode).toBe("d3f7a2c4e6");
+    expect(result.data!.url).toBe("https://test-site.example/?ref=d3f7a2c4e6");
+  });
+
+  it("uses the requested channel origin for the ?ref= URL", async () => {
+    const result = await runLagebildReferralIssue(
+      makeInput({ site: "test-site", contact: "rec@example.test", channel: "alt" }),
+      makeContext(),
+    );
+    expect(result.data!.url).toBe("https://alt.test-site.example/?ref=d3f7a2c4e6");
+  });
+
+  it("throws when the site is not connected to Lagebild", async () => {
+    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(structuredClone(mockState) as never);
+    await expect(
+      runLagebildReferralIssue(makeInput({ site: "test-site", contact: "rec@example.test" }), makeContext()),
+    ).rejects.toThrow("lagebild.connect");
+  });
+
+  it("throws if --site is missing", async () => {
+    await expect(
+      runLagebildReferralIssue(makeInput({ contact: "rec@example.test" }), makeContext()),
+    ).rejects.toThrow("--site is required");
+  });
+
+  it("throws if --contact is missing", async () => {
+    await expect(
+      runLagebildReferralIssue(makeInput({ site: "test-site" }), makeContext()),
+    ).rejects.toThrow("--contact is required");
+  });
+});
+
+describe("RFC-1191: lagebild.referral.list", () => {
+  beforeEach(() => {
+    vi.mocked(readSystemStateSmart).mockResolvedValue(
+      structuredClone(connectedLagebildState) as never,
+    );
+    vi.mocked(sourceDotenv).mockResolvedValue({ LAGEBILD_API_KEY: "key-1" } as never);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ rows: [{ ref_code: "d3f7a2c4e6", recommender_ref: "person-42" }] }),
+    } as never);
+  });
+
+  it("AC-9: issues an HTTP request and returns the registry rows", async () => {
+    const result = await runLagebildReferralList(makeInput({ site: "test-site" }), makeContext());
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.lagebild.example/v1/referrals");
+    expect(init.method).toBe("GET");
+    expect(result.data!.rows).toHaveLength(1);
   });
 });
