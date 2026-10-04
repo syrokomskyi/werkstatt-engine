@@ -116,4 +116,13 @@ describe("deriveModuleBasePath", () => {
   test("returns undefined for empty string", () => {
     expect(deriveModuleBasePath("")).toBeUndefined();
   });
+
+  test("RFC-1193: extracts base path up to and including /os", () => {
+    expect(deriveModuleBasePath("packages/forge/os/rfc/rfc.module.ts")).toBe("packages/forge/os");
+  });
+
+  test("RFC-1193: first segment wins when both /src/ and /os/ occur", () => {
+    expect(deriveModuleBasePath("packages/a/src/os/helper.ts")).toBe("packages/a/src");
+    expect(deriveModuleBasePath("packages/a/os/src/helper.ts")).toBe("packages/a/os");
+  });
 });

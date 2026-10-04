@@ -14,8 +14,13 @@ import {
   type CommandResultCacheKey,
 } from "../command-result-cache.ts";
 import { NoopCacheLayer } from "../noop-cache-layer.ts";
-import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
+import type {
+  KernelCommandDefinition,
+  KernelExecutionReport,
+} from "@warpgogol/werkstatt-shared/kernel";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import { buildWorkspaceTreeIndex } from "../workspace-tree-index.ts";
+import { getOrComputeModuleHash, resolveModuleSrcDir } from "../../runtime/result-cache.ts";
 
 function makeReport(overrides: Partial<KernelExecutionReport> = {}): KernelExecutionReport {
   return {
@@ -305,6 +310,69 @@ describe("RFC-0685: getCachedCommandResult wrapper format", () => {
 describe("COMMAND_RESULT_CACHE_NAMESPACE", () => {
   test("is command_results", () => {
     expect(COMMAND_RESULT_CACHE_NAMESPACE).toBe("command_results");
+  });
+});
+
+describe("RFC-1193: bounded module hashing", () => {
+  const makeCmd = (modulePath?: string): KernelCommandDefinition =>
+    ({
+      name: "test.cacheable",
+      modulePath,
+      reads: ["docs/**/*.md"],
+      execute: () => undefined,
+    }) as unknown as KernelCommandDefinition;
+
+  test("resolveModuleSrcDir returns unpatched when modulePath is absent", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    const resolved = await resolveModuleSrcDir(makeCmd(), ws);
+    expect(resolved).toEqual({ fallbackReason: "unpatched" });
+  });
+
+  test("resolveModuleSrcDir returns unrooted when modulePath has no /src/ or /os/", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    const resolved = await resolveModuleSrcDir(makeCmd("packages/x/kernel/mod.ts"), ws);
+    expect(resolved).toEqual({ fallbackReason: "unrooted" });
+  });
+
+  test("resolveModuleSrcDir returns missing when derived dir does not exist", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    const resolved = await resolveModuleSrcDir(makeCmd("packages/x/src/m.ts"), ws);
+    expect(resolved).toEqual({ fallbackReason: "missing" });
+  });
+
+  test("resolveModuleSrcDir resolves /os/ roots to a real directory", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    await fs.mkdir(path.join(ws, "packages/forge/os"), { recursive: true });
+    const resolved = await resolveModuleSrcDir(makeCmd("packages/forge/os/rfc/rfc.module.ts"), ws);
+    expect(resolved.srcDir).toBe(path.join(ws, "packages/forge/os"));
+  });
+
+  test("resolveModuleSrcDir resolves /src/ roots to a real directory", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    await fs.mkdir(path.join(ws, "packages/x/src"), { recursive: true });
+    const resolved = await resolveModuleSrcDir(makeCmd("packages/x/src/m.ts"), ws);
+    expect(resolved.srcDir).toBe(path.join(ws, "packages/x/src"));
+  });
+
+  test("getOrComputeModuleHash returns deterministic constant for fallbacks, not workspaceRoot", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    const cmd = makeCmd();
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    const h = await getOrComputeModuleHash(resolved, cmd, cache);
+    expect(h).toBe(byteHash("module-hash-fallback:unpatched"));
+    // Repeat calls hit the per-run cache and stay identical.
+    const h2 = await getOrComputeModuleHash(resolved, cmd, cache);
+    expect(h2).toBe(h);
+  });
+
+  test("getOrComputeModuleHash fingerprints srcDir when resolvable", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    const cmd = makeCmd("packages/x/src/m.ts");
+    const cache = new Map<string, string>();
+    const h = await getOrComputeModuleHash({ srcDir: path.join(ws, "packages/x/src") }, cmd, cache);
+    expect(h).toBeTruthy();
+    expect(h).not.toBe(byteHash("module-hash-fallback:missing"));
   });
 });
 

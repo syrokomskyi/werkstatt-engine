@@ -20,12 +20,13 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
 <CHANGE_SUMMARY>
   <item>RFC-1133: module created — isCommandCacheable, hasCacheBypassFlag, tryMtimeFastPath, and the read/write orchestrators relocated from execute-pipeline.ts; computeFlagsHash + CACHE_INVISIBLE_FLAGS added; key gains flagsHash (schema v2).</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
 </CHANGE_SUMMARY>
 */
 
 import { join, relative, sep } from "node:path";
 
-import { stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
+import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import type {
   KernelCommandDefinition,
   KernelExecutionReport,
@@ -166,11 +167,12 @@ export async function readCommandResult(
 
   const reads = call.command.reads ?? [];
   const flagsHash = computeFlagsHash(call.flags);
-  const moduleSrcDir = resolveModuleSrcDir(call.command, call.workspaceRoot);
+  const moduleResolved = await resolveModuleSrcDir(call.command, call.workspaceRoot, io);
   const moduleHashCache = cache.moduleHashCache ?? new Map<string, string>();
 
   // RFC-0685: mtime fast path — requires the pipeline's tree index.
-  if (cache.treeIndex) {
+  // RFC-1193: no fast path when moduleSrcDir fell back — the hash is a constant.
+  if (cache.treeIndex && moduleResolved.srcDir) {
     const fastPathResult = await tryMtimeFastPath(
       cache,
       call.command,
@@ -178,7 +180,7 @@ export async function readCommandResult(
       call.baseDir,
       call.workspaceRoot,
       call.siteName,
-      moduleSrcDir,
+      moduleResolved.srcDir,
       moduleHashCache,
       flagsHash,
     );
@@ -191,7 +193,7 @@ export async function readCommandResult(
     call.workspaceRoot,
     cache.treeIndex,
   );
-  const moduleHash = await getOrComputeModuleHash(moduleSrcDir, call.command, moduleHashCache);
+  const moduleHash = await getOrComputeModuleHash(moduleResolved, call.command, moduleHashCache);
 
   const key: CommandResultCacheKey = {
     schemaVersion: COMMAND_RESULT_CACHE_SCHEMA_VERSION,
@@ -245,9 +247,9 @@ export async function writeCommandResult(
     call.workspaceRoot,
     cache.treeIndex,
   );
-  const moduleSrcDir = resolveModuleSrcDir(call.command, call.workspaceRoot);
+  const moduleResolved = await resolveModuleSrcDir(call.command, call.workspaceRoot);
   const moduleHash = await getOrComputeModuleHash(
-    moduleSrcDir,
+    moduleResolved,
     call.command,
     cache.moduleHashCache ?? new Map<string, string>(),
   );
@@ -272,27 +274,62 @@ export async function writeCommandResult(
 }
 
 /**
- * RFC-1028: resolve the module source dir from command.modulePath.
- * Falls back to a constant hash when modulePath is absent (legacy modules).
+ * RFC-1193: bounded module-source resolution. A real directory is returned
+ * only when `modulePath` carries a `/src/` or `/os/` segment and resolves to an
+ * existing directory strictly below the workspace root. Every other outcome is
+ * a deterministic constant-hash fallback — caching degrades gracefully instead
+ * of fingerprinting unbounded trees (previously the whole workspace or an
+ * arbitrary package src).
  */
-function resolveModuleSrcDir(command: KernelCommandDefinition, workspaceRoot: string): string {
-  return command.modulePath
-    ? join(workspaceRoot, deriveModuleBasePath(command.modulePath) ?? "")
-    : join(workspaceRoot, "packages", "werkstatt-site", "src");
+export interface ResolvedModuleSrcDir {
+  /** Present when a real directory should be fingerprinted. */
+  srcDir?: string;
+  /** Present when a deterministic constant should replace the fingerprint. */
+  fallbackReason?: "unpatched" | "workspace-root" | "missing" | "unrooted";
 }
 
 /**
- * RFC-0637: resolve the module hash from the per-run cache, computing on miss.
+ * RFC-1028 + RFC-1193: resolve the module source dir from command.modulePath.
+ * Returns a descriptor, never `workspaceRoot`: `unpatched` when modulePath is
+ * absent, `unrooted` when modulePath has neither `/src/` nor `/os/`,
+ * `workspace-root`/`missing` when the derived path degenerates or is absent.
  */
-async function getOrComputeModuleHash(
-  moduleSrcDir: string,
+export async function resolveModuleSrcDir(
+  command: KernelCommandDefinition,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<ResolvedModuleSrcDir> {
+  if (!command.modulePath) return { fallbackReason: "unpatched" };
+  const basePath = deriveModuleBasePath(command.modulePath);
+  if (!basePath) return { fallbackReason: "unrooted" };
+  const srcDir = join(workspaceRoot, basePath);
+  if (srcDir === workspaceRoot) return { fallbackReason: "workspace-root" };
+  if (!(await io.exists(srcDir))) return { fallbackReason: "missing" };
+  return { srcDir };
+}
+
+/**
+ * RFC-0637 + RFC-1193: resolve the module hash from the per-run cache,
+ * computing on miss. Unresolvable moduleSrcDir yields a deterministic
+ * `module-hash-fallback:<reason>` constant (plus a warning) — never a
+ * whole-workspace fingerprint.
+ */
+export async function getOrComputeModuleHash(
+  resolved: ResolvedModuleSrcDir,
   command: KernelCommandDefinition,
   moduleHashCache: Map<string, string>,
 ): Promise<string> {
-  const moduleHashCacheKey = `${moduleSrcDir}:${command.modulePaths?.join(",") ?? ""}`;
+  const moduleHashCacheKey = `${resolved.srcDir ?? `fallback:${resolved.fallbackReason}`}:${command.modulePaths?.join(",") ?? ""}`;
   let moduleHash = moduleHashCache.get(moduleHashCacheKey);
   if (!moduleHash) {
-    moduleHash = await computeModuleHash(moduleSrcDir, command.modulePaths);
+    if (resolved.srcDir) {
+      moduleHash = await computeModuleHash(resolved.srcDir, command.modulePaths);
+    } else {
+      moduleHash = byteHash(`module-hash-fallback:${resolved.fallbackReason}`);
+      console.warn(
+        `Command "${command.name}": moduleSrcDir unresolved (${resolved.fallbackReason}) — using constant module hash fallback (RFC-1193).`,
+      );
+    }
     moduleHashCache.set(moduleHashCacheKey, moduleHash);
   }
   return moduleHash;
@@ -343,7 +380,11 @@ async function tryMtimeFastPath(
   const storedInputsHash = metaEntry.data as string;
   if (typeof storedInputsHash !== "string") return null;
 
-  const moduleHash = await getOrComputeModuleHash(moduleSrcDir, command, moduleHashCache);
+  const moduleHash = await getOrComputeModuleHash(
+    { srcDir: moduleSrcDir },
+    command,
+    moduleHashCache,
+  );
 
   const key: CommandResultCacheKey = {
     schemaVersion: COMMAND_RESULT_CACHE_SCHEMA_VERSION,

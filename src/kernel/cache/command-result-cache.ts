@@ -16,9 +16,6 @@ helpers for storing and retrieving KernelExecutionReport objects in the
   <item>Command results are cached by input hash — identical inputs skip re-execution.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1127: step 1 — cache barrel + parse fix
 
 Add ./kernel/cache subpath export (narrow barrel: createCacheLayer, computeModuleHash, key helpers). Fix parseCommandResultCacheKey truncating algo-prefixed hashes (sha256:hex) — list() returned garbage moduleHash for all real keys.</item>
@@ -27,6 +24,7 @@ Add ./kernel/cache subpath export (narrow barrel: createCacheLayer, computeModul
 CommandResultCacheKey gains flagsHash (stableJsonHash over cache-visible resolved flags); schemaVersion bumps to 2 so v1 keys orphan naturally. get/set helpers accept the narrow KernelResultCacheStore port from werkstatt-shared so the executor-level cache block in executeRegisteredCommand can run without a concrete CacheLayer import.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
   <history>RFC-0390, RFC-0637, RFC-0685, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -274,7 +272,7 @@ export async function computeModuleHash(
       if (s.isDirectory) {
         const result = await fingerprintTree(abs, {
           mode: "semantic",
-          ignore: ["__tests__", "node_modules", "dist"],
+          ignore: ["__tests__", "node_modules", "dist", ".git"],
         });
         hashes.push(`${p}:${result.value}`);
       } else {
@@ -287,7 +285,7 @@ export async function computeModuleHash(
   try {
     const result = await fingerprintTree(moduleSrcDir, {
       mode: "semantic",
-      ignore: ["__tests__", "node_modules", "dist"],
+      ignore: ["__tests__", "node_modules", "dist", ".git"],
     });
     return result.value;
   } catch {

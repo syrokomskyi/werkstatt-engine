@@ -17,6 +17,7 @@ import { deriveModuleBasePath } from "../runtime/registry.ts";
 <CHANGE_SUMMARY>
   <item>RFC-1028: initial tests for composite cache key and deriveModuleBasePath.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
+  <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
 </CHANGE_SUMMARY>
 */
 
@@ -107,8 +108,12 @@ test("deriveModuleBasePath extracts /src path from modulePath", () => {
   );
 });
 
-test("deriveModuleBasePath returns undefined when no /src/ in path", () => {
-  expect(deriveModuleBasePath("packages/forge/os/mission.module.ts")).toBeUndefined();
+test("deriveModuleBasePath returns undefined when no /src/ or /os/ in path", () => {
+  expect(deriveModuleBasePath("packages/forge/kernel/mission.module.ts")).toBeUndefined();
+});
+
+test("RFC-1193: deriveModuleBasePath treats /os/ as a module root", () => {
+  expect(deriveModuleBasePath("packages/forge/os/mission.module.ts")).toBe("packages/forge/os");
 });
 
 test("deriveModuleBasePath handles paths with multiple /src/ segments", () => {

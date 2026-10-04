@@ -13,14 +13,14 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1147/RFC-1148: listStaticCommandSurface — static enumeration over the workspace registry plus SITE_MODULE_MAP replaces listRegisteredKernelCommand*; commandInfo drops the siteName param (provider union narrowed to workspace | site-module).</item>
   <item>RFC-1147: site-module materialization memoized via getOrBuildSiteModuleStates — one materialization per workspaceRoot instead of 18 dynamic imports per call.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097</history>
+  <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
+  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097, RFC-1138</history>
 </CHANGE_SUMMARY>
 */
 
@@ -179,21 +179,29 @@ function commandInfo(
     ...(command.gate ? { gate: command.gate } : {}),
     ...(command.validatesOutputs ? { validatesOutputs: command.validatesOutputs } : {}),
     ...(command.generates ? { generates: command.generates } : {}),
-    ...(command.modulePath ? { moduleBasePath: deriveModuleBasePath(command.modulePath) } : {}),
+    ...(command.modulePath
+      ? { modulePath: command.modulePath, moduleBasePath: deriveModuleBasePath(command.modulePath) }
+      : {}),
     provider,
   };
 }
 
 /**
- * RFC-1028: Derive the module's src/ directory from a repo-relative modulePath.
- * Given "packages/werkstatt-engine/src/kernel/runtime/registry.ts", returns
- * "packages/werkstatt-engine/src" — everything up to and including the src/ segment.
- * Returns undefined if no src/ segment is found.
+ * RFC-1028: Derive the module's src/ or os/ directory from a repo-relative
+ * modulePath. Given "packages/werkstatt-engine/src/kernel/runtime/registry.ts",
+ * returns "packages/werkstatt-engine/src" — everything up to and including the
+ * src/ segment. RFC-1193: `/os/` is a module-root segment alongside `/src/`
+ * ("packages/forge/os/rfc/rfc.module.ts" → "packages/forge/os"); the first
+ * occurring segment wins. Returns undefined if neither segment is found.
  */
 export function deriveModuleBasePath(modulePath: string): string | undefined {
   const srcIndex = modulePath.indexOf("/src/");
-  if (srcIndex === -1) return undefined;
-  return modulePath.slice(0, srcIndex + 4); // include "/src"
+  const osIndex = modulePath.indexOf("/os/");
+  if (srcIndex === -1 && osIndex === -1) return undefined;
+  if (srcIndex !== -1 && (osIndex === -1 || srcIndex < osIndex)) {
+    return modulePath.slice(0, srcIndex + 4); // include "/src"
+  }
+  return modulePath.slice(0, osIndex + 3); // include "/os"
 }
 
 /**
