@@ -33,6 +33,11 @@ describe("parseKernelArgv (legacy heuristic parser)", () => {
     expect(flags["site"]).toBe("my-site");
   });
 
+  test("inline value containing = is preserved verbatim", () => {
+    const { flags } = parseKernelArgv(["--site=my-site=extra"]);
+    expect(flags["site"]).toBe("my-site=extra");
+  });
+
   test("collects repeated string flags into array", () => {
     const { flags } = parseKernelArgv(["--tag", "a", "--tag", "b"]);
     expect(flags["tag"]).toEqual(["a", "b"]);
@@ -88,6 +93,27 @@ describe("resolveCommandFlags (schema-driven parser)", () => {
     const { diagnostics } = resolveCommandFlags(["--id"], mockDefinition);
     const flag02 = diagnostics.filter((d) => d.ruleId === "KERNEL-FLAG-02");
     expect(flag02).toHaveLength(1);
+  });
+
+  test("emits KERNEL-FLAG-02 when a single-value string flag is repeated", () => {
+    const { diagnostics } = resolveCommandFlags(["--id", "a", "--id", "b"], mockDefinition);
+    const flag02 = diagnostics.filter((d) => d.ruleId === "KERNEL-FLAG-02");
+    expect(flag02).toHaveLength(1);
+    expect(flag02[0]!.message).toContain("single value");
+  });
+
+  test("repeated string[] flag still collects into an array without diagnostics", () => {
+    const { flags, diagnostics } = resolveCommandFlags(
+      ["--id", "x", "--tag", "a", "--tag", "b"],
+      mockDefinition,
+    );
+    expect(flags["tag"]).toEqual(["a", "b"]);
+    expect(diagnostics.filter((d) => d.ruleId === "KERNEL-FLAG-02")).toHaveLength(0);
+  });
+
+  test("inline value containing = is preserved verbatim", () => {
+    const { flags } = resolveCommandFlags(["--id=abc=def"], mockDefinition);
+    expect(flags["id"]).toBe("abc=def");
   });
 
   test("emits KERNEL-FLAG-03 for missing required flag", () => {

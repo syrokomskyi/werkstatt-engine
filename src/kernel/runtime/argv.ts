@@ -21,6 +21,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>Repeated kind-"string" flags now emit KERNEL-FLAG-02 instead of silently promoting to an array that crashes `as string` handler reads (the rfc.validate --id TypeError class); inline values containing "=" are preserved via indexOf split instead of split("=", 2) truncation.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -141,7 +142,9 @@ export function parseKernelArgv(argv: string[]): {
     }
 
     const withoutPrefix = entry.slice(2);
-    const [flagName, inlineValue] = withoutPrefix.split("=", 2);
+    const eqIndex = withoutPrefix.indexOf("=");
+    const flagName = eqIndex === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIndex);
+    const inlineValue = eqIndex === -1 ? undefined : withoutPrefix.slice(eqIndex + 1);
 
     if (!flagName) {
       continue;
@@ -249,7 +252,9 @@ export function resolveCommandFlags(
     }
 
     const withoutPrefix = entry.slice(2);
-    const [flagName, inlineValue] = withoutPrefix.split("=", 2);
+    const eqIndex = withoutPrefix.indexOf("=");
+    const flagName = eqIndex === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIndex);
+    const inlineValue = eqIndex === -1 ? undefined : withoutPrefix.slice(eqIndex + 1);
     if (!flagName) continue;
 
     const spec = schema[flagName];
@@ -302,6 +307,13 @@ export function resolveCommandFlags(
       });
     } else if (flags[flagName] === undefined && spec.default !== undefined) {
       flags[flagName] = spec.default;
+    } else if (spec.kind === "string" && Array.isArray(flags[flagName])) {
+      diagnostics.push({
+        ruleId: "KERNEL-FLAG-02",
+        severity: "error",
+        message: `Flag "--${flagName}" for command "${definition.name}" accepts a single value but was given multiple.`,
+        fixHint: `Pass --${flagName} once, or declare the flag as kind "string[]" if multiple values are intended.`,
+      });
     }
   }
 
