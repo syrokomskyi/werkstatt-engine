@@ -8,9 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
@@ -19,6 +16,7 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: resolveDevBaseUrl trusts only state:"succeeded" dev records (failed deploys poisoned the cert base URL — first-deploy deadlock) and narrows the parsed state field to DeploymentOperationState.</item>
+  <item>RECOVERY-2026-10-04: --base-url flag is now authoritative in resolveDevBaseUrl (checked before dev deployment records). Rationale: a poisoned live dev channel (succeeded deploy carrying a defect the gate now flags) made certify-dev unpassable — the gate measured the old artifact, blocking the deploy that would fix it. The explicit flag lets the operator certify a candidate served elsewhere (e.g. localhost artifact preview) and is the documented failed-gate recovery path.</item>
   <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -892,6 +890,8 @@ export async function resolveDevBaseUrl(
   baseUrlFlag: string | undefined,
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string | undefined> {
+  if (baseUrlFlag) return baseUrlFlag;
+
   const opsDir = path.join(cacheCloneDir, "deployment-operations");
   let latestDevUrl: string | undefined;
   try {
@@ -923,6 +923,5 @@ export async function resolveDevBaseUrl(
   }
 
   if (latestDevUrl) return latestDevUrl;
-  if (baseUrlFlag) return baseUrlFlag;
   return undefined;
 }

@@ -68,12 +68,28 @@ describe("resolveDevBaseUrl", () => {
     expect(await resolveDevBaseUrl(tmpDir, undefined)).toBeUndefined();
   });
 
-  it("falls back to the --base-url flag when no succeeded dev record exists", async () => {
+  it("returns the --base-url flag when no succeeded dev record exists", async () => {
     await writeOpRecord(tmpDir, "op-fail", {
       channel: "dev",
       state: "failed",
       timestamp: "2026-10-01T14:15:00.000Z",
       deploymentUrl: "https://dev.example.com",
+    });
+    expect(await resolveDevBaseUrl(tmpDir, "https://preview.example.com")).toBe(
+      "https://preview.example.com",
+    );
+  });
+
+  it("prefers the --base-url flag over succeeded dev records", async () => {
+    // An explicit flag is authoritative: it lets the operator certify a
+    // candidate served elsewhere (e.g. localhost) when the live dev channel
+    // still runs a release that would fail the gate — the failed-gate
+    // recovery path.
+    await writeOpRecord(tmpDir, "op-ok", {
+      channel: "dev",
+      state: "succeeded",
+      timestamp: "2026-10-01T13:00:00.000Z",
+      deploymentUrl: "https://dev-live.example.com",
     });
     expect(await resolveDevBaseUrl(tmpDir, "https://preview.example.com")).toBe(
       "https://preview.example.com",
