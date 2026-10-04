@@ -46,6 +46,9 @@ export async function createLagebildModule(): Promise<ModuleExport> {
           channel: { kind: "string", description: "Deployment channel (default: main)." },
         },
         mutatesState: true,
+        // Truth lives remotely (Worker secrets + API health) — a cached hit would
+        // replay "pushed" without calling the API.
+        cacheable: false,
         writes: ["../systems-cache/{system}/system-state.yaml", "../systems-cache/{system}/.env"],
         generates: [],
         reads: [
@@ -69,6 +72,8 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         },
         mutatesState: false,
         execOnReadOnly: true,
+        // Remote state (wrangler secret list + /health) is not covered by reads.
+        cacheable: false,
         writes: [],
         generates: [],
         reads: [
@@ -116,6 +121,8 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         // Mutates the remote Lagebild registry (creates a code) — not a local
         // file write, but not read-only either.
         mutatesState: true,
+        // A cached hit would replay the refCode without issuing it remotely.
+        cacheable: false,
         writes: [],
         generates: [],
         reads: [
@@ -136,6 +143,8 @@ export async function createLagebildModule(): Promise<ModuleExport> {
           site: { kind: "string", required: true, description: "Sternsystem ID." },
         },
         mutatesState: false,
+        // The registry is remote — reads cannot invalidate on new rows.
+        cacheable: false,
         writes: [],
         generates: [],
         reads: ["../systems-cache/{system}/system-state.yaml", "../systems-cache/{system}/.env"],
