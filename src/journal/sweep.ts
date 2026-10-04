@@ -8,6 +8,12 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0084: initial sweep — findIncompleteOperationsForMission, abandonIncompleteOperationsForMission. An op belongs to a mission when its op-started record carries the missionId, its opId contains the missionId, or the journal filename contains the missionId (filename inference covers records without mission attribution).</item>
+  <item>2026-10-04 recovery fix: excludeOpIds parameter — callers pass getActiveOpIds() so the sweep cannot abandon an operation that is still executing in this process (mission.close as a ship step was self-abandoning the ship journal, breaking --resume).</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -54,6 +60,7 @@ export async function findIncompleteOperationsForMission(
   operationsDir: string,
   missionId: string,
   io: WorkspaceIO = createDefaultIO().io,
+  excludeOpIds?: ReadonlySet<string>,
 ): Promise<OperationSweepResult> {
   const result: OperationSweepResult = { incomplete: [], unreadableFiles: [] };
   if (!(await io.exists(operationsDir))) {
@@ -82,7 +89,7 @@ export async function findIncompleteOperationsForMission(
         rec.missionId === missionId ||
         referencesMissionId(rec.opId, missionId) ||
         fileReferencesMission;
-      if (!belongsToMission || terminalOpIds.has(rec.opId)) continue;
+      if (!belongsToMission || terminalOpIds.has(rec.opId) || excludeOpIds?.has(rec.opId)) continue;
       result.incomplete.push({ opId: rec.opId, op: rec.op, journalPath });
     }
   }
@@ -98,8 +105,14 @@ export async function findIncompleteOperationsForMission(
 export async function abandonIncompleteOperationsForMission(
   operationsDir: string,
   missionId: string,
+  excludeOpIds?: ReadonlySet<string>,
 ): Promise<{ abandoned: IncompleteOperationRef[]; unreadableFiles: string[] }> {
-  const scan = await findIncompleteOperationsForMission(operationsDir, missionId);
+  const scan = await findIncompleteOperationsForMission(
+    operationsDir,
+    missionId,
+    undefined,
+    excludeOpIds,
+  );
   for (const op of scan.incomplete) {
     await abandonOperation(op.journalPath, op.opId, `mission closed: ${missionId}`);
   }

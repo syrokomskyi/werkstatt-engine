@@ -6,6 +6,12 @@
 <CHANGE_SUMMARY>
   <item>RFC-0927: initial test suite for hotfix composite command.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1190: add --mission to leitstand.dev-deploy PHASE_FLAGS mirror</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -74,7 +80,14 @@ const PHASE_FLAGS: Record<string, string[]> = {
     "base-url",
     "force",
   ],
-  "leitstand.dev-deploy": ["site", "system", "release", "skip-evidence-sync", "force-build"],
+  "leitstand.dev-deploy": [
+    "site",
+    "system",
+    "release",
+    "mission",
+    "skip-evidence-sync",
+    "force-build",
+  ],
 };
 
 function assertAllPhaseCallsValid(): void {

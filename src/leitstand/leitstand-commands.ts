@@ -6,13 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
-  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures route into the command report via onSigningFailure → logger.warn instead of the default console channel</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136</history>
+  <item>RFC-1190: resolveMissionContext precedence chain — --mission flag → releases/&lt;id&gt;/dist build-identity.json → system-state.currentMission, MISSION_CONTEXT_MISMATCH on flag/identity contradiction; dev-deploy, propagate, and promote block with MISSION_CONTEXT_UNRESOLVED when nothing resolves unless --skip-evidence-sync is passed; resolved context + axiom.status + evidence-sync outcome propagated into result data and executeDeployPhases.</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -571,24 +574,109 @@ function resolveSecretsFilePath(
     : undefined;
 }
 
-async function resolveMissionContext(
+export interface MissionContext {
+  missionId: string;
+  commitSha: string;
+  source: "flag" | "build-identity" | "current-mission" | "none";
+}
+
+interface MissionContextOptions {
+  missionFlag?: string;
+  releaseId?: string;
+}
+
+async function readBuildIdentityContext(
+  workspaceRoot: string,
+  releaseId: string,
+  io: WorkspaceIO,
+): Promise<{ missionId: string; commitSha: string } | null> {
+  try {
+    const identityPath = path.join(
+      workspaceRoot,
+      "releases",
+      releaseId,
+      "dist",
+      "client",
+      ".well-known",
+      "build-identity.json",
+    );
+    const parsed = JSON.parse(await io.readFile(identityPath)) as {
+      missionId?: unknown;
+      commitSha?: unknown;
+    };
+    const missionId = typeof parsed.missionId === "string" ? parsed.missionId : "";
+    if (!missionId) return null;
+    return {
+      missionId,
+      commitSha: typeof parsed.commitSha === "string" ? parsed.commitSha : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function workpieceHeadSha(
+  workspaceRoot: string,
+  missionId: string,
+  io: WorkspaceIO,
+): Promise<string> {
+  try {
+    const { resolveMissionDir } = await import("../kernel/mission-resolver.ts");
+    const missionDir = await resolveMissionDir(workspaceRoot, missionId, io);
+    const workpieceDir = path.join(missionDir, "workpiece");
+    if (!(await io.exists(workpieceDir))) return "";
+    const headResult = await io.exec("git", ["rev-parse", "HEAD"], { cwd: workpieceDir });
+    return headResult.exitCode === 0 ? headResult.stdout.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+// RFC-1190: mission identity is an explicit, precedence-ordered input —
+// --mission flag → release build-identity.json → system-state.currentMission.
+// The previous single-source currentMission lookup resolved to "" on every
+// release-mode deploy because mission.close nulls the pointer before deploys
+// run, silently disabling the dev mission.check, the RFC-0628 alt evidence
+// gate, and evidence.sync on every ship since the TLD-removal migration.
+export async function resolveMissionContext(
   workspaceRoot: string,
   systemId: string,
   io: WorkspaceIO = createDefaultIO().io,
-): Promise<{ missionId: string; commitSha: string }> {
+  opts: MissionContextOptions = {},
+): Promise<MissionContext> {
+  const buildIdentity = opts.releaseId
+    ? await readBuildIdentityContext(workspaceRoot, opts.releaseId, io)
+    : null;
+
+  if (opts.missionFlag) {
+    if (buildIdentity && buildIdentity.missionId !== opts.missionFlag) {
+      throw new Error(
+        `MISSION_CONTEXT_MISMATCH: --mission '${opts.missionFlag}' contradicts build-identity missionId '${buildIdentity.missionId}' of release ${opts.releaseId}`,
+      );
+    }
+    const commitSha =
+      buildIdentity?.commitSha || (await workpieceHeadSha(workspaceRoot, opts.missionFlag, io));
+    return { missionId: opts.missionFlag, commitSha, source: "flag" };
+  }
+
+  if (buildIdentity) {
+    return { ...buildIdentity, source: "build-identity" };
+  }
+
   try {
     const state = await readSystemStateSmart(workspaceRoot, systemId);
     const missionId = state.currentMission ?? "";
-    if (!missionId) return { missionId: "", commitSha: "" };
-    const workpieceDir = path.join(workspaceRoot, "missions", missionId, "workpiece");
-    if (!(await io.exists(workpieceDir))) return { missionId, commitSha: "" };
-    let commitSha = "";
-    const headResult = await io.exec("git", ["rev-parse", "HEAD"], { cwd: workpieceDir });
-    if (headResult.exitCode === 0) commitSha = headResult.stdout.trim();
-    return { missionId, commitSha };
+    if (!missionId) return { missionId: "", commitSha: "", source: "none" };
+    const commitSha = await workpieceHeadSha(workspaceRoot, missionId, io);
+    return { missionId, commitSha, source: "current-mission" };
   } catch {
-    return { missionId: "", commitSha: "" };
+    return { missionId: "", commitSha: "", source: "none" };
   }
+}
+
+function flagBool(input: KernelCommandInput, key: string): boolean {
+  const v = input.flags[key];
+  return v === true || v === "true";
 }
 
 export interface DevDeployResult {
@@ -596,6 +684,8 @@ export interface DevDeployResult {
   systemId: string;
   missionId: string;
   commitSha: string;
+  /** RFC-1190: resolved mission identity + which source provided it. */
+  missionContext: MissionContext;
   buildState: "succeeded" | "failed";
   buildSkipped: boolean;
   deployState: "succeeded" | "failed" | "failed-stale" | "in-progress";
@@ -658,6 +748,59 @@ export async function runLeitstandDevDeploy(
   if (!releaseId) {
     throw new Error("[leitstand.dev-deploy] --release is required");
   }
+
+  // RFC-1190: mission context is an explicit input — --mission flag →
+  // release build-identity.json → system-state.currentMission. A deploy
+  // that cannot resolve it refuses rather than silently degrading the
+  // mission-scoped gates (dev mission.check, alt evidence gate, evidence.sync);
+  // --skip-evidence-sync is the sole explicit escape hatch.
+  const skipEvidenceSync = flagBool(input, "skip-evidence-sync");
+  const missionCtx = await resolveMissionContext(context.workspaceRoot, systemId, context.io, {
+    missionFlag: flagString(input, "mission"),
+    releaseId,
+  });
+  if (!missionCtx.missionId && !skipEvidenceSync) {
+    return {
+      data: {
+        command: "leitstand.dev-deploy",
+        systemId,
+        missionId: "",
+        commitSha: "",
+        missionContext: missionCtx,
+        buildState: "failed",
+        buildSkipped: false,
+        deployState: "failed",
+        deploymentUrl: "",
+        buildIdentity: { releaseId, written: false, path: "" },
+        axiom: {
+          status: "not-run",
+          errors: 0,
+          warnings: 0,
+          exitCode: 0,
+          freshness: {
+            verified: false,
+            cdnDistTreeHash: null,
+            localDistTreeHash: "",
+            attempts: 0,
+          },
+        },
+        evidenceSynced: false,
+        evidenceSyncError: null,
+        releaseDeployed: releaseId,
+      },
+      summary: `[leitstand.dev-deploy] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
+      exitCode: 1,
+      diagnostics: [
+        {
+          ruleId: "MISSION_CONTEXT_UNRESOLVED",
+          severity: "error",
+          message: `mission context unresolved for release ${releaseId} — mission-scoped gates cannot be evaluated; pass --mission <id> or --skip-evidence-sync`,
+          evidence: [],
+        },
+      ],
+    } as unknown as KernelCommandResult<DevDeployResult>;
+  }
+
   const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
   const gateDecisionPath = resolveGateDecisionPath(
     cacheCloneDir,
@@ -739,7 +882,7 @@ export async function runLeitstandDevDeploy(
   const channelConfig = depConfig.channels.dev;
   const secretsFilePath = resolveSecretsFilePath(context.workspaceRoot, channelConfig);
 
-  const { missionId, commitSha } = await resolveMissionContext(context.workspaceRoot, systemId);
+  const { missionId, commitSha } = missionCtx;
 
   const { executeDeployPhases } = await import("./deploy-execution.ts");
   const deployResult = await executeDeployPhases(
@@ -756,10 +899,11 @@ export async function runLeitstandDevDeploy(
       operationId,
       gateDecisionPath,
       secretsFilePath,
-      skipEvidenceSync: Boolean(flagString(input, "skip-evidence-sync")),
+      skipEvidenceSync,
       forceBuild: Boolean(input.flags["force-build"]),
       missionId,
       commitSha,
+      missionContext: missionCtx,
     },
     "dev",
   );
@@ -774,16 +918,17 @@ export async function runLeitstandDevDeploy(
       systemId,
       missionId,
       commitSha,
+      missionContext: missionCtx,
       buildState: deployResult.failingPhase === "build" ? "failed" : "succeeded",
       buildSkipped: deployResult.buildSkipped,
       deployState: deployResult.failingPhase ? "failed" : "succeeded",
       deploymentUrl: deployResult.deploymentUrl,
       buildIdentity: deployResult.buildIdentity,
       axiom: {
-        status: "not-run" as const,
+        status: deployResult.axiomStatus,
         errors: 0,
         warnings: 0,
-        exitCode: 0,
+        exitCode: deployResult.axiomExitCode,
         freshness: deployResult.freshness,
       },
       evidenceSynced: deployResult.evidenceSynced,
@@ -843,6 +988,8 @@ export interface LeitstandPropagateData {
   axiomEvidenceVerified: boolean;
   testEvidenceVerified: boolean;
   failingPhase?: string;
+  /** RFC-1190: resolved mission identity + which source provided it. */
+  missionContext?: MissionContext;
 }
 
 export async function runLeitstandPropagate(
@@ -853,6 +1000,41 @@ export async function runLeitstandPropagate(
   if (!releaseId) throw new Error("[leitstand.propagate] --release is required");
   const systemId = flagSite(input);
   if (!systemId) throw new Error("[leitstand.propagate] --site is required");
+
+  // RFC-1190: mission context resolution + blocking UNRESOLVED check — see
+  // leitstand.dev-deploy for the precedence chain and escape hatch.
+  const skipEvidenceSync = flagBool(input, "skip-evidence-sync");
+  const missionCtx = await resolveMissionContext(context.workspaceRoot, systemId, context.io, {
+    missionFlag: flagString(input, "mission"),
+    releaseId,
+  });
+  if (!missionCtx.missionId && !skipEvidenceSync) {
+    return {
+      data: {
+        releaseId,
+        systemId,
+        channel: "alt",
+        deploymentUrl: "",
+        state: "failed",
+        releaseState: "alt-deployed",
+        devBuildIdentityVerified: false,
+        axiomEvidenceVerified: false,
+        testEvidenceVerified: false,
+        missionContext: missionCtx,
+      },
+      summary: `[leitstand.propagate] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
+      exitCode: 1,
+      diagnostics: [
+        {
+          ruleId: "MISSION_CONTEXT_UNRESOLVED",
+          severity: "error",
+          message: `mission context unresolved for release ${releaseId} — mission-scoped gates cannot be evaluated; pass --mission <id> or --skip-evidence-sync`,
+          evidence: [],
+        },
+      ],
+    } as unknown as KernelCommandResult<LeitstandPropagateData>;
+  }
+
   const gateDecisionFlag = flagString(input, "gate-decision");
   const candidateId = flagString(input, "candidate-id") ?? systemId;
   const artifactHashFlag = flagString(input, "artifact-hash");
@@ -942,7 +1124,7 @@ export async function runLeitstandPropagate(
   const channelConfig = depConfig.channels.alt;
   const secretsFilePath = resolveSecretsFilePath(context.workspaceRoot, channelConfig);
 
-  const { missionId, commitSha } = await resolveMissionContext(context.workspaceRoot, systemId);
+  const { missionId, commitSha } = missionCtx;
 
   const { executeDeployPhases } = await import("./deploy-execution.ts");
   const deployResult = await executeDeployPhases(
@@ -959,8 +1141,10 @@ export async function runLeitstandPropagate(
       operationId,
       gateDecisionPath,
       secretsFilePath,
+      skipEvidenceSync,
       missionId,
       commitSha,
+      missionContext: missionCtx,
     },
     "alt",
   );
@@ -985,6 +1169,7 @@ export async function runLeitstandPropagate(
       axiomEvidenceVerified: !deployResult.failingPhase,
       testEvidenceVerified: deployResult.evidenceSynced,
       failingPhase: deployResult.failingPhase,
+      missionContext: missionCtx,
     },
     summary: deployResult.failingPhase
       ? `[leitstand.propagate] failed at phase: ${deployResult.failingPhase}${deployResult.errorMessage ? ` — ${deployResult.errorMessage}` : ""}`
@@ -1024,6 +1209,8 @@ export interface LeitstandPromoteData {
   smokeResult?: SmokeRunResult;
   releaseState: "promoted";
   failingPhase?: string;
+  /** RFC-1190: resolved mission identity + which source provided it. */
+  missionContext?: MissionContext;
   /** RFC-1138: post-promote sternsystem.sync outcome (mirrors[2+] only) */
   mirror?: { synced: boolean; syncError: string | null };
 }
@@ -1083,6 +1270,41 @@ export async function runLeitstandPromote(
   if (!releaseId) throw new Error("[leitstand.promote] --release is required");
   const systemId = flagSite(input);
   if (!systemId) throw new Error("[leitstand.promote] --site is required");
+
+  // RFC-1190: mission context resolution + blocking UNRESOLVED check — see
+  // leitstand.dev-deploy for the precedence chain and escape hatch.
+  const skipEvidenceSync = flagBool(input, "skip-evidence-sync");
+  const missionCtx = await resolveMissionContext(context.workspaceRoot, systemId, context.io, {
+    missionFlag: flagString(input, "mission"),
+    releaseId,
+  });
+  if (!missionCtx.missionId && !skipEvidenceSync) {
+    return {
+      data: {
+        releaseId,
+        systemId,
+        channel: "main",
+        deploymentUrl: "",
+        state: "failed",
+        buildIdentityVerified: false,
+        testEvidenceVerified: false,
+        healthState: "unknown",
+        releaseState: "promoted",
+        missionContext: missionCtx,
+      },
+      summary: `[leitstand.promote] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
+      exitCode: 1,
+      diagnostics: [
+        {
+          ruleId: "MISSION_CONTEXT_UNRESOLVED",
+          severity: "error",
+          message: `mission context unresolved for release ${releaseId} — mission-scoped gates cannot be evaluated; pass --mission <id> or --skip-evidence-sync`,
+          evidence: [],
+        },
+      ],
+    } as unknown as KernelCommandResult<LeitstandPromoteData>;
+  }
+
   const gateDecisionFlag = flagString(input, "gate-decision");
   const candidateId = flagString(input, "candidate-id") ?? systemId;
   const artifactHashFlag = flagString(input, "artifact-hash");
@@ -1230,6 +1452,10 @@ export async function runLeitstandPromote(
       operationId,
       gateDecisionPath,
       secretsFilePath,
+      skipEvidenceSync,
+      missionId: missionCtx.missionId,
+      commitSha: missionCtx.commitSha,
+      missionContext: missionCtx,
     },
     "main",
   );
@@ -1280,6 +1506,7 @@ export async function runLeitstandPromote(
       healthState: deployResult.healthState,
       releaseState: "promoted",
       failingPhase: deployResult.failingPhase,
+      missionContext: missionCtx,
       mirror,
     },
     summary: deployResult.failingPhase
@@ -2232,7 +2459,7 @@ export async function runLeitstandHotfixDevDeploy(
   logger.info("  [hotfix] Phase 6 (certify): dev gate passed");
 
   // Phase 7: Deploy
-  const deployArgv = [`--site=${systemId}`, `--release=${releaseId}`];
+  const deployArgv = [`--site=${systemId}`, `--release=${releaseId}`, `--mission=${missionId}`];
   const deployResult = await runPhase(workspaceRoot, "leitstand.dev-deploy", deployArgv, logger);
   if (deployResult.exitCode !== 0) {
     return failResult("deploy", deployResult.summary ?? "leitstand.dev-deploy failed");

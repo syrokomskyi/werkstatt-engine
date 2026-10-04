@@ -8,14 +8,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1126: step 7 — AC evidence alignment
-
-resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: resolveDevBaseUrl trusts only state:"succeeded" dev records (failed deploys poisoned the cert base URL — first-deploy deadlock) and narrows the parsed state field to DeploymentOperationState.</item>
-  <item>RECOVERY-2026-10-04: --base-url flag is now authoritative in resolveDevBaseUrl (checked before dev deployment records). Rationale: a poisoned live dev channel (succeeded deploy carrying a defect the gate now flags) made certify-dev unpassable — the gate measured the old artifact, blocking the deploy that would fix it. The explicit flag lets the operator certify a candidate served elsewhere (e.g. localhost artifact preview) and is the documented failed-gate recovery path.</item>
+  <item>RECOVERY-2026-10-04: --base-url flag is now authoritative in resolveDevBaseUrl (checked before dev deployment records). Rationale: a poisoned live dev channel (succeeded deploy carrying a defect the gate now flags) made certify-dev unpassable — the gate measured the old artifact, blocking the deploy that would fix it. The explicit flag lets the operator certify a candidate served elsewhere (e.g. localhost artifact preview) and is the documented failed-gate recovery path. The preview MUST be a faithful Pages-equivalent server — run `wrangler dev` inside releases/&lt;id&gt;/dist/server so generated client/_headers and the Worker apply; a bare static server emits no security headers and fails certification with preview-only security-headers blockers.</item>
   <item>RECOVERY-2026-10-04: mission.check invocation now passes --channel=gateChannel — previously the flag was omitted, defaulting the suppression context to "main", so channelNot-scoped axiom suppressions (RFC-0684) never fired on dev/alt certifies. Gate channel is already validated to the same dev|alt|main enum.</item>
-  <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126</history>
+  <item>2026-10-04 recovery fix: mission.check timeouts raised to a shared 25min constant (was inner 5min race + outer 300s orchestrator timeout — a cold ~7-11min capture always exceeded both, racing a fail decision vs an "incomplete" no-decision return while abandoned mission.check processes kept running). Orchestrator timeout derives as +60s so the inner race still produces the diagnostic envelope deterministically.</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -56,6 +58,15 @@ import { gateDecisionV1Schema } from "../certification/contracts/decisions.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const PIN_DELETION_PROPAGATION_DELAY_MS = 5000;
+
+// 2026-10-04 recovery fix: a cold mission.check (110+ captures, fresh evidence
+// dir) takes ~7-11 minutes — the previous inner 5min race / outer 300s
+// orchestrator timeout always expired mid-capture, racing a "timed out" fail
+// decision against an "incomplete" no-decision return while the abandoned
+// in-process mission.check kept running. 25min covers worst-case capture; the
+// orchestrator timeout derives from it (+60s) so the inner race resolves first
+// and still writes a diagnostic-bearing fail decision rather than no decision.
+const MISSION_CHECK_TIMEOUT_MS = 25 * 60 * 1000;
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -493,7 +504,6 @@ export async function runLeitstandCertify(
             "--no-report",
           ];
           if (missionId) argv.push(`--mission=${missionId}`);
-          const MISSION_CHECK_TIMEOUT_MS = 5 * 60 * 1000;
           let timer: ReturnType<typeof setTimeout> | undefined;
           const timeoutPromise = new Promise<never>((_, reject) => {
             timer = setTimeout(
@@ -612,7 +622,7 @@ export async function runLeitstandCertify(
           ...DEFAULT_PRODUCER_CONFIG,
           operationId,
           timestamp: now,
-          timeoutMs: 300000,
+          timeoutMs: MISSION_CHECK_TIMEOUT_MS + 60_000,
           maxRetries: 1,
         },
       });

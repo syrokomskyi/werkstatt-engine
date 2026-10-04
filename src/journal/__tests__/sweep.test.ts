@@ -4,6 +4,12 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0084: initial sweep tests — mission matching (missionId field, opId, filename inference), terminal-record exclusion, multi-file sweep, unreadable-file reporting, reason string.</item>
+  <item>2026-10-04 recovery fix: excludeOpIds regression test — a still-running op listed in the exclusion set is not abandoned (mission.close must not self-abandon the ship journal it executes inside).</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -170,6 +176,35 @@ test("reports unreadable journal files without abandoning anything", async () =>
 
   expect(result.unreadableFiles).toEqual(["ship-m-009.jsonl"]);
   expect(result.abandoned).toEqual([]);
+});
+
+test("excludeOpIds skips still-running ops (mission.close must not self-abandon its caller)", async () => {
+  // Regression (2026-10-04): mission.close runs INSIDE leitstand.ship's
+  // journal op — the sweep saw the live ship op as incomplete and appended
+  // op-abandoned to it mid-run, marking the op terminal so --resume later
+  // reported "nothing to resume" for a genuinely failed run.
+  const journalPath = path.join(operationsDir, "ship-m-012.jsonl");
+  await writeOpStarted(journalPath, "leitstand-ship-12", "leitstand.ship", "m-012");
+
+  const excluded = new Set(["leitstand-ship-12"]);
+  const scan = await findIncompleteOperationsForMission(
+    operationsDir,
+    "m-012",
+    undefined,
+    excluded,
+  );
+  expect(scan.incomplete).toEqual([]);
+
+  const result = await abandonIncompleteOperationsForMission(operationsDir, "m-012", excluded);
+  expect(result.abandoned).toEqual([]);
+
+  const records = await readJournal(journalPath);
+  expect(records.find((r) => r.kind === "op-abandoned")).toBeUndefined();
+  expect(findIncompleteOperation(records)).not.toBeNull();
+
+  // Control: without the exclusion the same op IS abandoned
+  const control = await abandonIncompleteOperationsForMission(operationsDir, "m-012");
+  expect(control.abandoned).toHaveLength(1);
 });
 
 test("findIncompleteOperationsForMission lists incomplete ops without writing", async () => {

@@ -9,7 +9,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-import { runOperation, readJournal, abandonOperation, appendRecord } from "../runner.ts";
+import {
+  runOperation,
+  readJournal,
+  abandonOperation,
+  appendRecord,
+  getActiveOpIds,
+} from "../runner.ts";
 import type { OperationDefinition } from "../types.ts";
 
 interface TestCtx {
@@ -222,6 +228,86 @@ test("abandonOperation appends op-abandoned record", async () => {
   if (abandoned && abandoned.kind === "op-abandoned") {
     expect(abandoned.reason).toBe("manual abort");
   }
+});
+
+test("resume matches done steps by name, surviving plan shape shifts (seq re-indexing)", async () => {
+  // Regression (2026-10-04): buildStepState keyed done state on numeric seq —
+  // a journal produced by a plan whose early steps were later filtered out
+  // (buildShipPlan drops 3 lifecycle steps for a closed mission) mapped done
+  // seqs onto different steps and would skip never-executed work (certify-dev
+  // at seq 7 became "done" because seq 7 in the shifted plan was a different
+  // step). Step names are stable across plan shapes.
+  const ctx: TestCtx = { log: [], crashAtStep: 4, crashTriggered: false };
+  const fullDef: OperationDefinition<TestCtx> = {
+    op: "test.op",
+    steps: [
+      makeStep("preflight", ctx),
+      makeStep("mission-validate", ctx),
+      makeStep("mission-reconcile", ctx),
+      makeStep("mission-close", ctx),
+      makeStep("certify-dev", ctx),
+    ],
+  };
+
+  const firstResult = await runOperation(journalPath, fullDef, ctx, { missionId: "m-001" });
+  expect(firstResult.completed).toBe(false);
+  expect(firstResult.failedStep).toBe("certify-dev");
+
+  ctx.crashAtStep = undefined;
+  ctx.crashTriggered = false;
+  ctx.log = [];
+
+  // Closed-mission plan shape: lifecycle steps filtered out — certify-dev
+  // shifted from seq 4 to seq 1, and seq-keyed "done" state would skip it.
+  const shiftedDef: OperationDefinition<TestCtx> = {
+    op: "test.op",
+    steps: [makeStep("preflight", ctx), makeStep("certify-dev", ctx)],
+  };
+
+  const resumeResult = await runOperation(journalPath, shiftedDef, ctx, {
+    resumeOpId: firstResult.opId,
+  });
+
+  expect(resumeResult.completed).toBe(true);
+  expect(resumeResult.skipped).toEqual(["preflight"]);
+  expect(resumeResult.executed).toEqual(["certify-dev"]);
+  expect(ctx.log).toEqual(["certify-dev"]);
+});
+
+test("getActiveOpIds tracks the running op and clears it on completion", async () => {
+  let observed: string[] = [];
+  const ctx: TestCtx = { log: [], crashTriggered: false };
+  const def: OperationDefinition<TestCtx> = {
+    op: "test.op",
+    steps: [
+      {
+        name: "s0",
+        async run(c: TestCtx) {
+          observed = [...getActiveOpIds()];
+          c.log.push("s0");
+        },
+      },
+    ],
+  };
+
+  const result = await runOperation(journalPath, def, ctx);
+
+  expect(result.completed).toBe(true);
+  expect(observed).toEqual([result.opId]);
+  expect(getActiveOpIds().has(result.opId)).toBe(false);
+});
+
+test("getActiveOpIds clears the opId even when the run fails", async () => {
+  const ctx: TestCtx = { log: [], crashAtStep: 0, crashTriggered: false };
+  const def: OperationDefinition<TestCtx> = {
+    op: "test.op",
+    steps: [makeStep("s0", ctx)],
+  };
+
+  const result = await runOperation(journalPath, def, ctx);
+
+  expect(result.completed).toBe(false);
+  expect(getActiveOpIds().has(result.opId)).toBe(false);
 });
 
 test("same-kind incomplete operation auto-resumes without explicit resumeOpId", async () => {

@@ -6,16 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>ADR-0084: abandon-incomplete-operations step before transition-state — sweeps systems-cache operations/*.jsonl for incomplete ops referencing the closing mission and appends op-abandoned, then commits the journal updates to the cache clone.</item>
+  <item>2026-10-04 recovery fix: sweep passes getActiveOpIds() — ops still executing in this process (the ship journal that mission.close runs inside) are excluded so the live ship op is not self-abandoned mid-run.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
-  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992</history>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -54,7 +54,7 @@ import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { resolveActor } from "./actor-identity.ts";
 import { persistEnvFilesToCacheClone } from "./env-persist.ts";
 import { persistOperatorConfigFiles } from "./operator-config-files.ts";
-import { runOperation } from "../journal/runner.ts";
+import { runOperation, getActiveOpIds } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import {
   abandonIncompleteOperationsForMission,
@@ -682,7 +682,15 @@ export async function buildCloseSteps(
         if (!(await cc.context.io.exists(operationsDir))) {
           return;
         }
-        const sweep = await abandonIncompleteOperationsForMission(operationsDir, cc.missionId);
+        // Exclude ops still executing in this process — the sweep itself runs
+        // inside leitstand.ship's journal op, and abandoning that live journal
+        // marks the ship terminal mid-run (observed 2026-10-04: --resume then
+        // reported "nothing to resume" for a genuinely failed certify-dev).
+        const sweep = await abandonIncompleteOperationsForMission(
+          operationsDir,
+          cc.missionId,
+          getActiveOpIds(),
+        );
         // Fail closed when a journal file that may reference this mission is
         // unreadable — we cannot prove no resumable op remains.
         const blocking = sweep.unreadableFiles.filter((f) => referencesMissionId(f, cc.missionId));
@@ -726,7 +734,12 @@ export async function buildCloseSteps(
           return true;
         }
         try {
-          const scan = await findIncompleteOperationsForMission(operationsDir, cc.missionId);
+          const scan = await findIncompleteOperationsForMission(
+            operationsDir,
+            cc.missionId,
+            cc.context.io,
+            getActiveOpIds(),
+          );
           return scan.incomplete.length === 0 && scan.unreadableFiles.length === 0;
         } catch {
           return false;

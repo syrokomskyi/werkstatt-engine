@@ -56,7 +56,9 @@ vi.mock("../../sternsystem/registry-io.ts", () => ({
       channels: { dev: channel, alt: channel, main: channel },
     },
   })),
-  readSystemStateSmart: vi.fn(async () => ({})),
+  // RFC-1190: currentMission supplies the mission context promote now
+  // requires — without it the command blocks with MISSION_CONTEXT_UNRESOLVED.
+  readSystemStateSmart: vi.fn(async () => ({ currentMission: "acme-m000001" })),
   resolveCacheClonePath: vi.fn((root: string, id: string) => path.join(root, "systems-cache", id)),
   readSystemConfig: () => readSystemConfigMock(),
   resolveMirrorPath: vi.fn((root: string, p: string) => path.join(root, p)),

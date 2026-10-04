@@ -8,17 +8,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1179: blocking smoke gates after the health check on every channel — site.smoke.run (failingPhase "site-smoke") then deploy.smoke.run (failingPhase "deploy-smoke"); non-zero exits throw before propagation continues</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — outbound client resolved once per channel invocation and shared by health/freshness/feature-smoke instead of three independent resolutions</item>
-  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092</history>
+  <item>RFC-1190: evidence.sync fail-closed when evidence/axiom + evidence-metadata.json exist (throws EVIDENCE_SYNC_FAILED, failingPhase "evidence-sync") and a clean no-op when absent — replaces the swallowed-error branch that reported deploy success while uploading nothing; axiomStatus/axiomExitCode + missionContext surfaced on DeployExecutionResult.</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138</history>
 </CHANGE_SUMMARY>
 */
 
@@ -38,6 +37,7 @@ import {
   verifyFreshness,
   runMissionCheckWithResilience,
   type FreshnessResult,
+  type MissionContext,
 } from "./leitstand-commands.ts";
 import type { AuthorizeOutcome } from "./deploy-helpers.ts";
 import type { DeploymentEffectRecordV1 } from "../certification/deployment/authority.ts";
@@ -88,6 +88,8 @@ export interface DeployExecutionContext {
   operationId: string;
   missionId?: string;
   commitSha?: string;
+  /** RFC-1190: full resolution record — how missionId/commitSha were obtained. */
+  missionContext?: MissionContext;
   gateDecisionPath: string;
   secretsFilePath?: string;
   skipEvidenceSync?: boolean;
@@ -123,6 +125,11 @@ export interface DeployExecutionResult {
   systemStateUpdated: boolean;
   evidenceSynced: boolean;
   evidenceSyncError: string | null;
+  /** RFC-1190: dev-channel post-deploy mission.check outcome (recorded, not just thrown). */
+  axiomStatus: "pass" | "fail" | "not-run";
+  axiomExitCode: number;
+  /** RFC-1190: mission identity resolution record propagated to the deploy result. */
+  missionContext?: MissionContext;
   failingPhase?: string;
   errorMessage?: string;
 }
@@ -294,6 +301,8 @@ export async function executeDeployPhases(
   let healthChecks: HealthCheck[] = [];
   let evidenceSynced = false;
   let evidenceSyncError: string | null = null;
+  let axiomStatus: "pass" | "fail" | "not-run" = "not-run";
+  let axiomExitCode = 0;
   let bordbuchCommitted = false;
   let systemStateUpdated = false;
   let failingPhase: string | undefined;
@@ -617,6 +626,8 @@ export async function executeDeployPhases(
           ctx.commitSha,
           noopLogger,
         );
+        axiomExitCode = missionResult.exitCode;
+        axiomStatus = missionResult.exitCode === 0 ? "pass" : "fail";
         if (missionResult.exitCode === 1) {
           failingPhase = "mission-check";
           throw new Error("mission.check failed with content violations (exit 1)");
@@ -679,17 +690,36 @@ export async function executeDeployPhases(
       }
     }
 
+    // RFC-1190: evidence archival is fail-closed once axiom evidence exists —
+    // previously failures were swallowed into a field nothing surfaced while
+    // deployState reported "succeeded" (DNA-106). Absent evidence dir or
+    // missing evidence-metadata.json is a clean no-op, not a failure.
     if (!ctx.skipEvidenceSync && ctx.missionId) {
-      try {
-        const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-        await executeKernelCommand({
-          workspaceRoot: ctx.workspaceRoot,
-          commandName: "evidence.sync",
-          argv: [`--site=${ctx.systemId}`, `--mission=${ctx.missionId}`],
-        });
-        evidenceSynced = true;
-      } catch (err) {
-        evidenceSyncError = err instanceof Error ? err.message : String(err);
+      const { resolveMissionDir } = await import("../kernel/mission-resolver.ts");
+      const missionDir = await resolveMissionDir(ctx.workspaceRoot, ctx.missionId, io);
+      const axiomEvidenceDir = path.join(missionDir, "evidence", "axiom");
+      const hasAxiomEvidence =
+        (await io.exists(axiomEvidenceDir)) &&
+        (await io.exists(path.join(axiomEvidenceDir, "evidence-metadata.json")));
+      if (hasAxiomEvidence) {
+        try {
+          const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+          const syncResult = (await executeKernelCommand({
+            workspaceRoot: ctx.workspaceRoot,
+            commandName: "evidence.sync",
+            argv: [`--site=${ctx.systemId}`, `--mission=${ctx.missionId}`],
+          })) as
+            | { exitCode?: number; summary?: string }
+            | Array<{ exitCode?: number; summary?: string }>;
+          const reports = Array.isArray(syncResult) ? syncResult : [syncResult];
+          const failed = reports.find((r) => (r?.exitCode ?? 0) !== 0);
+          if (failed) throw new Error(failed?.summary ?? "evidence.sync exited non-zero");
+          evidenceSynced = true;
+        } catch (err) {
+          evidenceSyncError = err instanceof Error ? err.message : String(err);
+          failingPhase = "evidence-sync";
+          throw new Error(`EVIDENCE_SYNC_FAILED: ${evidenceSyncError}`);
+        }
       }
     }
 
@@ -769,6 +799,9 @@ export async function executeDeployPhases(
       systemStateUpdated,
       evidenceSynced,
       evidenceSyncError,
+      axiomStatus,
+      axiomExitCode,
+      missionContext: ctx.missionContext,
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -806,6 +839,9 @@ export async function executeDeployPhases(
       systemStateUpdated,
       evidenceSynced,
       evidenceSyncError,
+      axiomStatus,
+      axiomExitCode,
+      missionContext: ctx.missionContext,
       failingPhase: failingPhase ?? "unknown",
       errorMessage,
     };

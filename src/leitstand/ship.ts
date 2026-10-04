@@ -8,15 +8,16 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0986: skip lifecycle phases (validate/reconcile/close) when mission is already closed; add cache-clone git divergence pre-flight check; auto-sync after release-prepare and certify-* steps; --force-with-lease in cache-to-bare push.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>RFC-0986 fo-fix: final sternsystem.sync epilogue after runOperation — post-sync journal records (op-done and trailing step records) left the cache clone dirty until the next mission sweep, tripping the pre-prompt dirty-clone guard.</item>
   <item>warpgogol-m000175 fo-fix: archive-aware mission resolution via resolveMissionDir (deferred-release flow — ship works on missions/archive/&lt;state&gt;/&lt;id&gt;); closed-state env check accepts cache-clone .env (RFC-0822); stripped-node_modules preflight warning; explicit mission-not-found error replaces misleading .env failure.</item>
-  <history>RFC-0962</history>
+  <item>RFC-1190: evidence-sync-* journaled steps after each certify-* — evidence archival out of deploy-execution's invisible branch (clean no-op without evidence/axiom metadata, blocking EVIDENCE_SYNC_FAILED on upload errors); certify+deploy argv forwards --mission; phase maps updated for the 18-step open / 15-step closed plan shapes.</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -126,10 +127,10 @@ export interface ShipResult {
 const PHASE_STEP_COUNT: Record<ShipPhase, number> = {
   validated: 2,
   closed: 4,
-  dev: 9,
-  alt: 11,
-  main: 13,
-  archived: 15,
+  dev: 10,
+  alt: 13,
+  main: 16,
+  archived: 18,
 };
 
 // ─── Phase runner (delegates to executeKernelCommand with flag validation) ───
@@ -406,6 +407,35 @@ function buildSyncStep(stepName: string): OperationStep<ShipContext> {
   };
 }
 
+// RFC-1190: dedicated journaled evidence-sync steps after each certify-* —
+// archival moves out of deploy-execution's invisible branch. Absent
+// evidence/axiom or missing evidence-metadata.json is a clean no-op; a failed
+// upload while evidence exists is blocking (EVIDENCE_SYNC_FAILED).
+function buildEvidenceSyncStep(stepName: string): OperationStep<ShipContext> {
+  return {
+    name: stepName,
+    run: async (ctx: ShipContext): Promise<Record<string, unknown>> => {
+      const evidenceDir = path.join(ctx.missionDir, "evidence", "axiom");
+      const metadataPath = path.join(evidenceDir, "evidence-metadata.json");
+      if (!(await ctx.io.exists(evidenceDir)) || !(await ctx.io.exists(metadataPath))) {
+        return {
+          missionId: ctx.missionId,
+          skipped: true,
+          reason: "no axiom evidence directory or evidence-metadata.json",
+        };
+      }
+      const result = await runShipPhase(ctx, "evidence.sync", [
+        `--site=${ctx.systemId}`,
+        `--mission=${ctx.missionId}`,
+      ]);
+      if (result.exitCode !== 0) {
+        throw new Error(`EVIDENCE_SYNC_FAILED: ${result.summary ?? "evidence.sync failed"}`);
+      }
+      return { missionId: ctx.missionId, skipped: false, ...(result.data ?? {}) };
+    },
+  };
+}
+
 export function buildShipPlan(input: {
   until: ShipPhase;
   missionClosed?: boolean;
@@ -441,20 +471,28 @@ export function buildShipPlan(input: {
     buildCertifyAndDeployStep("certify-dev", "dev", "leitstand.dev-deploy", (ctx, releaseId) => [
       `--site=${ctx.systemId}`,
       `--release=${releaseId}`,
+      `--mission=${ctx.missionId}`,
     ]),
+    // RFC-1190: axiom evidence archival is a journaled step, not an invisible
+    // deploy-internal branch — runs after the certify+deploy pair produced it.
+    buildEvidenceSyncStep("evidence-sync-dev"),
     // RFC-0986: Auto-sync after certify-dev — certification may create evidence
     // commits in the cache clone.
     buildSyncStep("sync-after-dev"),
     buildCertifyAndDeployStep("certify-alt", "alt", "leitstand.propagate", (ctx, releaseId) => [
       `--site=${ctx.systemId}`,
       `--release=${releaseId}`,
+      `--mission=${ctx.missionId}`,
     ]),
+    buildEvidenceSyncStep("evidence-sync-alt"),
     // RFC-0986: Auto-sync after certify-alt.
     buildSyncStep("sync-after-alt"),
     buildCertifyAndDeployStep("certify-main", "main", "leitstand.promote", (ctx, releaseId) => [
       `--site=${ctx.systemId}`,
       `--release=${releaseId}`,
+      `--mission=${ctx.missionId}`,
     ]),
+    buildEvidenceSyncStep("evidence-sync-main"),
     // RFC-0986: Auto-sync after certify-main.
     buildSyncStep("sync-after-main"),
     buildSimpleStep("verify", "leitstand.verify", (ctx) => [`--site=${ctx.systemId}`]),
@@ -522,13 +560,13 @@ function phaseFromStepCount(stepCount: number, missionClosed = false): ShipPhase
     switch (stepCount) {
       case 0:
         return "preflight";
-      case 6:
+      case 7:
         return "dev";
-      case 8:
-        return "alt";
       case 10:
+        return "alt";
+      case 13:
         return "main";
-      case 12:
+      case 15:
         return "archived";
       default:
         return "preflight";
@@ -541,13 +579,13 @@ function phaseFromStepCount(stepCount: number, missionClosed = false): ShipPhase
       return "validated";
     case 4:
       return "closed";
-    case 9:
+    case 10:
       return "dev";
-    case 11:
-      return "alt";
     case 13:
+      return "alt";
+    case 16:
       return "main";
-    case 15:
+    case 18:
       return "archived";
     default:
       return "preflight";

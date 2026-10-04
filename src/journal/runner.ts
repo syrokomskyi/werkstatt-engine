@@ -7,10 +7,16 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0958: initial step runner — runOperation, readJournal, findIncompleteOperation.</item>
   <item>RFC-0962 fo-fix: step metadata capture (run returns Record), per-step durationMs timing, StepResult[] in RunOperationResult, step-done meta field populated.</item>
   <item>RFC-1168: onTransition option on runOperation — per-record callback so callers can stream progress (stderr) without waiting for run completion.</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
+  <item>2026-10-04 recovery fix: buildStepState keys done/crash tracking on step name instead of seq index — a resumed plan with filtered steps (e.g. buildShipPlan missionClosed drops 3 lifecycle steps) shifted every later seq and would skip unexecuted steps or re-run done ones; step names are stable across plan shapes. Also adds getActiveOpIds() — the in-process set of currently-running opIds — so mission.close's ADR-0084 sweep can exclude the journal of the very operation it is invoked from (observed: ship op self-abandoned mid-run, breaking --resume).</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>RFC-0958</history>
 </CHANGE_SUMMARY>
 */
 
@@ -37,34 +43,46 @@ function generateOpId(op: string): string {
 }
 
 interface StepJournalState {
-  doneSteps: Set<number>;
-  crashStep: number | null;
+  doneSteps: Set<string>;
+  crashStepName: string | null;
 }
 
+/**
+ * Reconstruct step state for resume — keyed on step NAME, not seq index.
+ * Plans may change shape between runs (e.g. buildShipPlan filters lifecycle
+ * steps for closed missions, shifting every later seq); names survive that.
+ * A step counts as crashed when its latest step-started has no following
+ * terminal record (step-done/step-failed/step-skipped) for the same name.
+ */
 function buildStepState(records: JournalRecord[], opId: string): StepJournalState {
-  const doneSteps = new Set<number>();
-  let crashStep: number | null = null;
+  const doneSteps = new Set<string>();
+  const openStepNames: string[] = [];
 
   for (const r of records) {
     if (r.opId !== opId) continue;
-    if (r.kind === "step-done") {
-      doneSteps.add(r.seq);
-    } else if (r.kind === "step-started") {
-      if (!doneSteps.has(r.seq) && r.kind === "step-started") {
-        const hasTerminal = records.some(
-          (r2) =>
-            r2.opId === opId &&
-            (r2.kind === "step-done" || r2.kind === "step-failed" || r2.kind === "step-skipped") &&
-            r2.seq === r.seq,
-        );
-        if (!hasTerminal) {
-          crashStep = r.seq;
-        }
-      }
+    if (r.kind === "step-started") {
+      openStepNames.push(r.step);
+    } else if (r.kind === "step-done" || r.kind === "step-failed" || r.kind === "step-skipped") {
+      if (r.kind === "step-done") doneSteps.add(r.step);
+      const i = openStepNames.lastIndexOf(r.step);
+      if (i !== -1) openStepNames.splice(i, 1);
     }
   }
 
-  return { doneSteps, crashStep };
+  return { doneSteps, crashStepName: openStepNames[openStepNames.length - 1] ?? null };
+}
+
+/**
+ * OpIds currently executing inside this process. The ADR-0084 mission sweep
+ * must skip these: a sweep invoked from inside a running operation (e.g.
+ * mission.close as a leitstand.ship step) must not append op-abandoned to the
+ * journal its caller is still writing to — that would mark the live op
+ * terminal and break --resume.
+ */
+const activeOpIds = new Set<string>();
+
+export function getActiveOpIds(): ReadonlySet<string> {
+  return activeOpIds;
 }
 
 export async function runOperation<C>(
@@ -96,7 +114,7 @@ export async function runOperation<C>(
 
   let opId: string;
   let isResume = false;
-  let stepState: StepJournalState = { doneSteps: new Set(), crashStep: null };
+  let stepState: StepJournalState = { doneSteps: new Set(), crashStepName: null };
 
   if (opts?.resumeOpId) {
     opId = opts.resumeOpId;
@@ -118,21 +136,40 @@ export async function runOperation<C>(
     });
   }
 
+  activeOpIds.add(opId);
+
   const skipped: string[] = [];
   const executed: string[] = [];
   const stepResults: StepResult[] = [];
 
-  for (let seq = 0; seq < def.steps.length; seq++) {
-    const step = def.steps[seq];
+  try {
+    for (let seq = 0; seq < def.steps.length; seq++) {
+      const step = def.steps[seq];
 
-    if (isResume && stepState.doneSteps.has(seq)) {
-      skipped.push(step.name);
-      stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
-      continue;
-    }
+      if (isResume && stepState.doneSteps.has(step.name)) {
+        skipped.push(step.name);
+        stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
+        continue;
+      }
 
-    if (isResume && stepState.crashStep === seq) {
-      if (step.verify) {
+      if (isResume && stepState.crashStepName === step.name) {
+        if (step.verify) {
+          const verified = await step.verify(ctx);
+          if (verified) {
+            await append({
+              kind: "step-skipped",
+              opId,
+              step: step.name,
+              seq,
+              at: nowIso(),
+              reason: "resume",
+            });
+            skipped.push(step.name);
+            stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
+            continue;
+          }
+        }
+      } else if (!isResume && step.verify) {
         const verified = await step.verify(ctx);
         if (verified) {
           await append({
@@ -141,123 +178,114 @@ export async function runOperation<C>(
             step: step.name,
             seq,
             at: nowIso(),
-            reason: "resume",
+            reason: "already-satisfied",
           });
           skipped.push(step.name);
           stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
           continue;
         }
       }
-    } else if (!isResume && step.verify) {
-      const verified = await step.verify(ctx);
-      if (verified) {
-        await append({
-          kind: "step-skipped",
-          opId,
-          step: step.name,
-          seq,
-          at: nowIso(),
-          reason: "already-satisfied",
-        });
-        skipped.push(step.name);
-        stepResults.push({ step: step.name, status: "skipped", durationMs: 0 });
-        continue;
-      }
-    }
 
-    await append({
-      kind: "step-started",
-      opId,
-      step: step.name,
-      seq,
-      at: nowIso(),
-    });
-
-    const stepStart = Date.now();
-    let stepMeta: Record<string, unknown> | undefined;
-    try {
-      const runResult = await step.run(ctx);
-      if (runResult && typeof runResult === "object") {
-        stepMeta = runResult;
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      const durationMs = Date.now() - stepStart;
       await append({
-        kind: "step-failed",
+        kind: "step-started",
         opId,
         step: step.name,
         seq,
         at: nowIso(),
-        error: errorMsg,
       });
-      stepResults.push({ step: step.name, status: "failed", durationMs });
-      return {
-        opId,
-        completed: false,
-        failedStep: step.name,
-        failedStepError: errorMsg,
-        skipped,
-        executed,
-        stepResults,
-      };
-    }
 
-    if (step.verify) {
-      const verified = await step.verify(ctx);
-      if (!verified) {
+      const stepStart = Date.now();
+      let stepMeta: Record<string, unknown> | undefined;
+      try {
+        const runResult = await step.run(ctx);
+        if (runResult && typeof runResult === "object") {
+          stepMeta = runResult;
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const durationMs = Date.now() - stepStart;
         await append({
           kind: "step-failed",
           opId,
           step: step.name,
           seq,
           at: nowIso(),
-          error: `verify returned false after run for step "${step.name}"`,
+          error: errorMsg,
         });
-        stepResults.push({ step: step.name, status: "failed", durationMs: Date.now() - stepStart });
+        stepResults.push({ step: step.name, status: "failed", durationMs });
         return {
           opId,
           completed: false,
           failedStep: step.name,
-          failedStepError: `verify returned false after run for step "${step.name}"`,
+          failedStepError: errorMsg,
           skipped,
           executed,
           stepResults,
         };
       }
+
+      if (step.verify) {
+        const verified = await step.verify(ctx);
+        if (!verified) {
+          await append({
+            kind: "step-failed",
+            opId,
+            step: step.name,
+            seq,
+            at: nowIso(),
+            error: `verify returned false after run for step "${step.name}"`,
+          });
+          stepResults.push({
+            step: step.name,
+            status: "failed",
+            durationMs: Date.now() - stepStart,
+          });
+          return {
+            opId,
+            completed: false,
+            failedStep: step.name,
+            failedStepError: `verify returned false after run for step "${step.name}"`,
+            skipped,
+            executed,
+            stepResults,
+          };
+        }
+      }
+
+      const durationMs = Date.now() - stepStart;
+      await append({
+        kind: "step-done",
+        opId,
+        step: step.name,
+        seq,
+        at: nowIso(),
+        ...(stepMeta ? { meta: stepMeta } : {}),
+      });
+      executed.push(step.name);
+      stepResults.push({
+        step: step.name,
+        status: "done",
+        durationMs,
+        ...(stepMeta ? { meta: stepMeta } : {}),
+      });
     }
 
-    const durationMs = Date.now() - stepStart;
     await append({
-      kind: "step-done",
+      kind: "op-done",
       opId,
-      step: step.name,
-      seq,
       at: nowIso(),
-      ...(stepMeta ? { meta: stepMeta } : {}),
     });
-    executed.push(step.name);
-    stepResults.push({
-      step: step.name,
-      status: "done",
-      durationMs,
-      ...(stepMeta ? { meta: stepMeta } : {}),
-    });
+
+    return {
+      opId,
+      completed: true,
+      skipped,
+      executed,
+      stepResults,
+    };
+  } finally {
+    activeOpIds.delete(opId);
   }
-
-  await append({
-    kind: "op-done",
-    opId,
-    at: nowIso(),
-  });
-
-  return {
-    opId,
-    completed: true,
-    skipped,
-    executed,
-    stepResults,
-  };
 }
 
 export async function abandonOperation(

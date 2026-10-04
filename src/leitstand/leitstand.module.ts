@@ -7,14 +7,16 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1136: resolve deployed releaseId in leitstand.health before probing</item>
-  <item>RFC-1141: KERNEL-FLAG-07 helper-mediated flag reads in kernel.flags.lint
-
-FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097</history>
+  <item>RFC-1190: declare --mission and --skip-evidence-sync on leitstand.dev-deploy/propagate/promote — explicit mission-context input plus the sole escape hatch for unresolvable context.</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141</history>
 </CHANGE_SUMMARY>
 */
 
@@ -68,9 +70,15 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             description:
               "RFC-0700: Deploy an existing release to dev without open mission. When set, deploys from releases/<id>/dist/.",
           },
+          mission: {
+            kind: "string",
+            description:
+              "RFC-1190: Explicit mission id for evidence archival + mission.check. Falls back to releases/<id>/dist build-identity.json, then system-state.currentMission.",
+          },
           "skip-evidence-sync": {
             kind: "boolean",
-            description: "RFC-0652: Skip best-effort evidence.sync to R2 after axiom.report.",
+            description:
+              "RFC-0652/1190: Skip evidence.sync to R2 after deploy. Also the explicit escape hatch when no mission context can be resolved.",
           },
           "force-build": {
             kind: "boolean",
@@ -126,6 +134,16 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             kind: "string",
             description: "Alias for --site.",
           },
+          mission: {
+            kind: "string",
+            description:
+              "RFC-1190: Explicit mission id for the RFC-0628 evidence gate + evidence.sync. Falls back to releases/<id>/dist build-identity.json, then system-state.currentMission.",
+          },
+          "skip-evidence-sync": {
+            kind: "boolean",
+            description:
+              "RFC-1190: Skip evidence.sync to R2 after deploy; explicit escape hatch when no mission context can be resolved.",
+          },
           "gate-decision": {
             kind: "string",
             description:
@@ -177,6 +195,16 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           system: {
             kind: "string",
             description: "Alias for --site.",
+          },
+          mission: {
+            kind: "string",
+            description:
+              "RFC-1190: Explicit mission id for evidence.sync. Falls back to releases/<id>/dist build-identity.json, then system-state.currentMission.",
+          },
+          "skip-evidence-sync": {
+            kind: "boolean",
+            description:
+              "RFC-1190: Skip evidence.sync to R2 after deploy; explicit escape hatch when no mission context can be resolved.",
           },
           "gate-decision": {
             kind: "string",

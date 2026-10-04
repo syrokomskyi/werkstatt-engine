@@ -7,6 +7,12 @@
   <item>RFC-0962: initial test suite for ship composite command.</item>
   <item>RFC-0962 fo-fix: added --until alt, --until main, invalid --until, releaseId restoration on resume tests; fixed resume test for stepResults including skipped steps.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1190: step-count updates for the 18-step plan (evidence-sync-* after each certify-*); mission + skip-evidence-sync added to deploy PHASE_FLAGS; evidence.sync flag table entry.</item>
+  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
+
+RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
+
+2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -90,11 +96,20 @@ const PHASE_FLAGS: Record<string, string[]> = {
     "base-url",
     "force",
   ],
-  "leitstand.dev-deploy": ["site", "system", "release", "skip-evidence-sync", "force-build"],
+  "leitstand.dev-deploy": [
+    "site",
+    "system",
+    "release",
+    "mission",
+    "skip-evidence-sync",
+    "force-build",
+  ],
   "leitstand.propagate": [
     "site",
     "system",
     "release",
+    "mission",
+    "skip-evidence-sync",
     "gate-decision",
     "candidate-id",
     "artifact-hash",
@@ -103,11 +118,14 @@ const PHASE_FLAGS: Record<string, string[]> = {
     "site",
     "system",
     "release",
+    "mission",
+    "skip-evidence-sync",
     "gate-decision",
     "main-verification-decision",
     "candidate-id",
     "artifact-hash",
   ],
+  "evidence.sync": ["mission", "site", "system", "run-timestamp", "dry-run", "json"],
   "leitstand.verify": [
     "site",
     "system",
@@ -196,7 +214,7 @@ function setupFullSuccessMocks(releaseId: string = "test-sys-r000001"): void {
   mockPhaseResult("leitstand.verify", 0);
 }
 
-test("full pipeline success — all 15 steps complete, exitCode 0", async () => {
+test("full pipeline success — all 18 steps complete, exitCode 0", async () => {
   setupFullSuccessMocks();
 
   const result = await runLeitstandShip(
@@ -208,7 +226,7 @@ test("full pipeline success — all 15 steps complete, exitCode 0", async () => 
   expect(result.data!.completed).toBe(true);
   expect(result.data!.failedStep).toBeUndefined();
   expect(result.data!.releaseId).toBe("test-sys-r000001");
-  expect(result.data!.steps.length).toBe(15);
+  expect(result.data!.steps.length).toBe(18);
   assertAllPhaseCallsValid();
 });
 
@@ -248,7 +266,7 @@ test("--until closed stops after mission-close (4 steps)", async () => {
   assertAllPhaseCallsValid();
 });
 
-test("--until dev stops after certify-dev + dev-deploy + sync (9 steps)", async () => {
+test("--until dev stops after certify-dev + dev-deploy + evidence-sync + sync (10 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
@@ -268,7 +286,7 @@ test("--until dev stops after certify-dev + dev-deploy + sync (9 steps)", async 
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(9);
+  expect(result.data!.steps.length).toBe(10);
   expect(result.data!.reachedPhase).toBe("dev");
   assertAllPhaseCallsValid();
 });
@@ -447,7 +465,7 @@ test("mission-archive step is non-fatal when mission.archive fails", async () =>
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(15);
+  expect(result.data!.steps.length).toBe(18);
 });
 
 test("epilogue sync sweeps journal tail after op-done (runs last)", async () => {
@@ -502,7 +520,7 @@ test("epilogue sync also sweeps after a failed op (journal reaches mirrors for -
   expect(syncCalls.length).toBe(1);
 });
 
-test("--until alt stops after certify-alt + propagate + sync (11 steps)", async () => {
+test("--until alt stops after certify-alt + propagate + evidence-sync + sync (13 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
@@ -525,12 +543,12 @@ test("--until alt stops after certify-alt + propagate + sync (11 steps)", async 
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(11);
+  expect(result.data!.steps.length).toBe(13);
   expect(result.data!.reachedPhase).toBe("alt");
   assertAllPhaseCallsValid();
 });
 
-test("--until main stops after certify-main + promote + verify + sync (13 steps)", async () => {
+test("--until main stops after certify-main + promote + evidence-sync + sync (16 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
@@ -557,7 +575,7 @@ test("--until main stops after certify-main + promote + verify + sync (13 steps)
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  expect(result.data!.steps.length).toBe(13);
+  expect(result.data!.steps.length).toBe(16);
   expect(result.data!.reachedPhase).toBe("main");
   assertAllPhaseCallsValid();
 });
@@ -644,9 +662,10 @@ test("closed mission + --until alt stops at sync-after-alt — promote never run
 
   expect(result.exitCode).toBe(0);
   expect(result.data!.completed).toBe(true);
-  // preflight, release-prepare, sync, release-ready, certify-dev, sync,
-  // certify-alt, sync — 8 steps; certify-main/promote must not be in the plan.
-  expect(result.data!.steps.length).toBe(8);
+  // preflight, release-prepare, sync, release-ready, certify-dev,
+  // evidence-sync-dev, sync, certify-alt, evidence-sync-alt, sync — 10 steps;
+  // certify-main/promote must not be in the plan.
+  expect(result.data!.steps.length).toBe(10);
   expect(result.data!.reachedPhase).toBe("alt");
   const invokedCommands = mockExecuteKernelCommand.mock.calls.map(
     (c) => (c[0] as { commandName: string }).commandName,
