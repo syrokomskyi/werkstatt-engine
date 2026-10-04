@@ -21,6 +21,7 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
   <item>RFC-1133: module created — isCommandCacheable, hasCacheBypassFlag, tryMtimeFastPath, and the read/write orchestrators relocated from execute-pipeline.ts; computeFlagsHash + CACHE_INVISIBLE_FLAGS added; key gains flagsHash (schema v2).</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
+  <item>RFC-1193: review findings (discriminated union, dead condition, fixture)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -281,12 +282,11 @@ export async function writeCommandResult(
  * of fingerprinting unbounded trees (previously the whole workspace or an
  * arbitrary package src).
  */
-export interface ResolvedModuleSrcDir {
-  /** Present when a real directory should be fingerprinted. */
-  srcDir?: string;
-  /** Present when a deterministic constant should replace the fingerprint. */
-  fallbackReason?: "unpatched" | "workspace-root" | "missing" | "unrooted";
-}
+export type ModuleHashFallbackReason = "unpatched" | "workspace-root" | "missing" | "unrooted";
+
+export type ResolvedModuleSrcDir =
+  | { srcDir: string; fallbackReason?: never }
+  | { srcDir?: never; fallbackReason: ModuleHashFallbackReason };
 
 /**
  * RFC-1028 + RFC-1193: resolve the module source dir from command.modulePath.
