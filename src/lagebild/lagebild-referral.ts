@@ -28,6 +28,7 @@ import {
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
 import { sourceDotenv, filterEnv } from "../leitstand/adapters/index.ts";
+import { REF_CODE_PATTERN } from "@warpgogol/werkstatt-shared/integration/referral";
 import type { ChannelName } from "./lagebild-helpers.ts";
 
 function flagString(input: KernelCommandInput, name: string): string | undefined {
@@ -106,6 +107,11 @@ export async function runLagebildReferralIssue(
   const refCode = body.ref_code;
   if (!refCode) {
     throw new Error("[lagebild.referral.issue] POST /v1/referrals returned no ref_code");
+  }
+  if (!REF_CODE_PATTERN.test(refCode)) {
+    throw new Error(
+      `[lagebild.referral.issue] POST /v1/referrals returned a ref_code outside REF_CODE_PATTERN: ${refCode}`,
+    );
   }
 
   const config = await readSystemConfigSmart(context.workspaceRoot, systemId);
