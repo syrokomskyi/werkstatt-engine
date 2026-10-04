@@ -25,7 +25,7 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
 </CHANGE_SUMMARY>
 */
 
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 
 import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
 import type {
@@ -194,7 +194,13 @@ export async function readCommandResult(
     call.workspaceRoot,
     cache.treeIndex,
   );
-  const moduleHash = await getOrComputeModuleHash(moduleResolved, call.command, moduleHashCache);
+  const moduleHash = await getOrComputeModuleHash(
+    moduleResolved,
+    call.command,
+    moduleHashCache,
+    call.workspaceRoot,
+    io,
+  );
 
   const key: CommandResultCacheKey = {
     schemaVersion: COMMAND_RESULT_CACHE_SCHEMA_VERSION,
@@ -253,6 +259,7 @@ export async function writeCommandResult(
     moduleResolved,
     call.command,
     cache.moduleHashCache ?? new Map<string, string>(),
+    call.workspaceRoot,
   );
 
   const key: CommandResultCacheKey = {
@@ -318,16 +325,27 @@ export async function getOrComputeModuleHash(
   resolved: ResolvedModuleSrcDir,
   command: KernelCommandDefinition,
   moduleHashCache: Map<string, string>,
+  workspaceRoot: string,
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
-  const moduleHashCacheKey = `${resolved.srcDir ?? `fallback:${resolved.fallbackReason}`}:${command.modulePaths?.join(",") ?? ""}`;
+  // RFC-1194: declared modulePaths anchor to dirname(modulePath) — the module
+  // file's own directory — independent of the /src//os/ module root. A command
+  // in an unrooted location can still declare modulePaths and get real
+  // invalidation; only modulePath-less commands stay on the fallbacks.
+  const anchorBase =
+    (command.modulePaths?.length ?? 0) > 0 && command.modulePath
+      ? dirname(join(workspaceRoot, command.modulePath))
+      : resolved.srcDir;
+  const moduleHashCacheKey = `${anchorBase ?? `fallback:${resolved.fallbackReason}`}:${command.modulePaths?.join(",") ?? ""}`;
   let moduleHash = moduleHashCache.get(moduleHashCacheKey);
   if (!moduleHash) {
-    if (resolved.srcDir) {
-      moduleHash = await computeModuleHash(resolved.srcDir, command.modulePaths);
+    if (anchorBase && (await io.exists(anchorBase))) {
+      moduleHash = await computeModuleHash(anchorBase, command.modulePaths, workspaceRoot, io);
     } else {
-      moduleHash = byteHash(`module-hash-fallback:${resolved.fallbackReason}`);
+      const reason = anchorBase ? "missing" : (resolved.fallbackReason ?? "unpatched");
+      moduleHash = byteHash(`module-hash-fallback:${reason}`);
       console.warn(
-        `Command "${command.name}": moduleSrcDir unresolved (${resolved.fallbackReason}) — using constant module hash fallback (RFC-1193).`,
+        `Command "${command.name}": module hash base unresolved (${reason}) — using constant module hash fallback (RFC-1193/RFC-1194).`,
       );
     }
     moduleHashCache.set(moduleHashCacheKey, moduleHash);
@@ -384,6 +402,8 @@ async function tryMtimeFastPath(
     { srcDir: moduleSrcDir },
     command,
     moduleHashCache,
+    workspaceRoot,
+    io,
   );
 
   const key: CommandResultCacheKey = {

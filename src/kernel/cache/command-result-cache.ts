@@ -29,7 +29,7 @@ CommandResultCacheKey gains flagsHash (stableJsonHash over cache-visible resolve
 </CHANGE_SUMMARY>
 */
 
-import { join, relative, sep } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import picomatch from "picomatch";
 
 import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
@@ -252,21 +252,29 @@ export async function computeInputsHash(
  * Uses @warpgogol/fingerprint fingerprintTree in semantic mode.
  * The caller should cache this per-package per-pipeline-run.
  *
- * RFC-0637: when `modulePaths` is provided and non-empty, fingerprints only
- * the listed paths (files and/or directories relative to `moduleSrcDir`)
- * instead of the full `src/` directory. Non-existent paths are silently
- * skipped. When `modulePaths` is absent or empty, falls back to full `src/`
- * directory fingerprint (backward compatible).
+ * RFC-0637 + RFC-1194: when `modulePaths` is provided and non-empty,
+ * fingerprints only the listed paths (files and/or directories relative to
+ * `moduleBaseDir` — the caller supplies the anchoring base, which is
+ * `dirname(modulePath)` for declared entries) instead of the full directory.
+ * Non-existent paths are silently skipped; entries resolving outside
+ * `workspaceRoot` are skipped as well — `..` is permitted only within the
+ * workspace (CRC-05 gates the declaration statically). When `modulePaths` is
+ * absent or empty, falls back to a full `moduleBaseDir` tree fingerprint.
  */
 export async function computeModuleHash(
-  moduleSrcDir: string,
+  moduleBaseDir: string,
   modulePaths?: string[],
+  workspaceRoot?: string,
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string> {
   if (modulePaths && modulePaths.length > 0) {
     const hashes: string[] = [];
     for (const p of modulePaths) {
-      const abs = join(moduleSrcDir, p);
+      const abs = join(moduleBaseDir, p);
+      if (workspaceRoot) {
+        const rel = relative(workspaceRoot, abs);
+        if (rel.startsWith("..") || isAbsolute(rel)) continue;
+      }
       if (!(await io.exists(abs))) continue;
       const s = await io.stat(abs);
       if (s.isDirectory) {
@@ -283,13 +291,13 @@ export async function computeModuleHash(
     return stableJsonHash({ paths: hashes });
   }
   try {
-    const result = await fingerprintTree(moduleSrcDir, {
+    const result = await fingerprintTree(moduleBaseDir, {
       mode: "semantic",
       ignore: ["__tests__", "node_modules", "dist", ".git"],
     });
     return result.value;
   } catch {
-    return byteHash(`module-hash-fallback:${moduleSrcDir}`);
+    return byteHash(`module-hash-fallback:${moduleBaseDir}`);
   }
 }
 

@@ -182,6 +182,7 @@ function commandInfo(
     ...(command.modulePath
       ? { modulePath: command.modulePath, moduleBasePath: deriveModuleBasePath(command.modulePath) }
       : {}),
+    ...(command.modulePaths ? { modulePaths: command.modulePaths } : {}),
     provider,
   };
 }

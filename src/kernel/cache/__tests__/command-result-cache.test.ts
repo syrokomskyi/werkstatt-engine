@@ -18,7 +18,7 @@ import type {
   KernelCommandDefinition,
   KernelExecutionReport,
 } from "@warpgogol/werkstatt-shared/kernel";
-import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
+import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import { buildWorkspaceTreeIndex } from "../workspace-tree-index.ts";
 import { getOrComputeModuleHash, resolveModuleSrcDir } from "../../runtime/result-cache.ts";
 
@@ -314,10 +314,11 @@ describe("COMMAND_RESULT_CACHE_NAMESPACE", () => {
 });
 
 describe("RFC-1193: bounded module hashing", () => {
-  const makeCmd = (modulePath?: string): KernelCommandDefinition =>
+  const makeCmd = (modulePath?: string, modulePaths?: string[]): KernelCommandDefinition =>
     ({
       name: "test.cacheable",
       modulePath,
+      modulePaths,
       reads: ["docs/**/*.md"],
       execute: () => undefined,
     }) as unknown as KernelCommandDefinition;
@@ -359,20 +360,116 @@ describe("RFC-1193: bounded module hashing", () => {
     const cmd = makeCmd();
     const cache = new Map<string, string>();
     const resolved = await resolveModuleSrcDir(cmd, ws);
-    const h = await getOrComputeModuleHash(resolved, cmd, cache);
+    const h = await getOrComputeModuleHash(resolved, cmd, cache, ws);
     expect(h).toBe(byteHash("module-hash-fallback:unpatched"));
     // Repeat calls hit the per-run cache and stay identical.
-    const h2 = await getOrComputeModuleHash(resolved, cmd, cache);
+    const h2 = await getOrComputeModuleHash(resolved, cmd, cache, ws);
     expect(h2).toBe(h);
   });
 
   test("getOrComputeModuleHash fingerprints srcDir when resolvable", async () => {
     const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-src-"));
+    const srcDir = path.join(ws, "packages/x/src");
+    await fs.mkdir(srcDir, { recursive: true });
     const cmd = makeCmd("packages/x/src/m.ts");
     const cache = new Map<string, string>();
-    const h = await getOrComputeModuleHash({ srcDir: path.join(ws, "packages/x/src") }, cmd, cache);
+    const h = await getOrComputeModuleHash({ srcDir }, cmd, cache, ws);
     expect(h).toBeTruthy();
     expect(h).not.toBe(byteHash("module-hash-fallback:missing"));
+  });
+});
+
+describe("RFC-1194: modulePaths anchored to dirname(modulePath)", () => {
+  const makeCmd = (modulePath: string, modulePaths: string[]): KernelCommandDefinition =>
+    ({
+      name: "test.cacheable",
+      modulePath,
+      modulePaths,
+      reads: ["docs/**/*.md"],
+      execute: () => undefined,
+    }) as unknown as KernelCommandDefinition;
+
+  test("AC-1: entry existing only under dirname(modulePath) changes the hash", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-anchor-"));
+    const modDir = path.join(ws, "packages/x/src/checks");
+    await fs.mkdir(modDir, { recursive: true });
+    await fs.writeFile(path.join(modDir, "check.ts"), "export const a = 1;");
+    const cmd = makeCmd("packages/x/src/checks/mod.ts", ["check.ts"]);
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    const h1 = await getOrComputeModuleHash(resolved, cmd, cache, ws);
+    await fs.writeFile(path.join(modDir, "check.ts"), "export const a = 2;");
+    const cache2 = new Map<string, string>();
+    const h2 = await getOrComputeModuleHash(resolved, cmd, cache2, ws);
+    expect(h1).not.toBe(h2);
+    expect(h1).not.toBe(byteHash("module-hash-fallback:missing"));
+  });
+
+  test("AC-6: entry existing only under src/ root does not contribute", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-anchor-"));
+    const modDir = path.join(ws, "packages/x/src/checks");
+    await fs.mkdir(modDir, { recursive: true });
+    // "lonely.ts" exists under src/ but NOT under src/checks/.
+    await fs.writeFile(path.join(ws, "packages/x/src/lonely.ts"), "export const l = 1;");
+    const cmd = makeCmd("packages/x/src/checks/mod.ts", ["lonely.ts"]);
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    const h = await getOrComputeModuleHash(resolved, cmd, cache, ws);
+    // The entry resolves to nothing under dirname(modulePath) — silently
+    // skipped at runtime (CRC-05 gates it statically), so the hash equals the
+    // empty-allowlist constant.
+    expect(h).toBe(stableJsonHash({ paths: [] }));
+  });
+
+  test(".. entry resolving within workspaceRoot contributes to the hash", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-anchor-"));
+    const modDir = path.join(ws, "packages/x/src/testing/contract");
+    await fs.mkdir(modDir, { recursive: true });
+    const helperDir = path.join(ws, "packages/x/src/checks");
+    await fs.mkdir(helperDir, { recursive: true });
+    await fs.writeFile(path.join(helperDir, "result-helpers.ts"), "export const h = 1;");
+    const cmd = makeCmd("packages/x/src/testing/contract/mod.ts", [
+      "../../checks/result-helpers.ts",
+    ]);
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    const h1 = await getOrComputeModuleHash(resolved, cmd, cache, ws);
+    await fs.writeFile(path.join(helperDir, "result-helpers.ts"), "export const h = 2;");
+    const h2 = await getOrComputeModuleHash(resolved, cmd, new Map<string, string>(), ws);
+    expect(h1).not.toBe(h2);
+  });
+
+  test(".. entry escaping workspaceRoot is never fingerprinted", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-anchor-"));
+    const modDir = path.join(ws, "packages/x/src/checks");
+    await fs.mkdir(modDir, { recursive: true });
+    const cmd = makeCmd("packages/x/src/checks/mod.ts", ["../../../outside.ts"]);
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    const h = await getOrComputeModuleHash(resolved, cmd, cache, ws);
+    expect(h).toBe(stableJsonHash({ paths: [] }));
+  });
+
+  test("unrooted modulePath with modulePaths still anchors to its dirname", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-anchor-"));
+    const modDir = path.join(ws, "packages/x/kernel");
+    await fs.mkdir(modDir, { recursive: true });
+    await fs.writeFile(path.join(modDir, "helper.ts"), "export const k = 1;");
+    const cmd = makeCmd("packages/x/kernel/mod.ts", ["helper.ts"]);
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    expect(resolved).toEqual({ fallbackReason: "unrooted" });
+    const h = await getOrComputeModuleHash(resolved, cmd, cache, ws);
+    expect(h).not.toBe(byteHash("module-hash-fallback:unrooted"));
+  });
+
+  test("modulePaths with missing dirname falls back to constant missing hash", async () => {
+    const ws = await fs.mkdtemp(path.join(os.tmpdir(), "mod-anchor-"));
+    const cmd = makeCmd("packages/x/src/checks/mod.ts", ["a.ts"]);
+    const cache = new Map<string, string>();
+    const resolved = await resolveModuleSrcDir(cmd, ws);
+    const h = await getOrComputeModuleHash(resolved, cmd, cache, ws);
+    expect(h).toBe(byteHash("module-hash-fallback:missing"));
   });
 });
 
