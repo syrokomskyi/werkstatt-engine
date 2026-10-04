@@ -13,6 +13,7 @@
   <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
   <item>ADR-0104: scoped commits use git commit --only + scoped stagedFiles so index residue is neither committed nor validated</item>
   <item>RFC-1185: shared.context.validate joins the commit gate — unscoped over pages/ and system.md because collision groups are whole-site per language</item>
+  <item>RFC-1189: material.credits.public-text.validate joins the commit gate — unscoped over src/content/prose/ and src/content/site/ so generated-credits public-text leaks fail at commit time</item>
   <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -77,6 +78,11 @@ export const VALIDATOR_MAPPINGS: ValidatorMapping[] = [
   // RFC-1160: source-image budget — scoped to staged content assets
   { prefix: "src/content/", validator: "image.variants.validate", scoped: true },
   { prefix: "src/content/", validator: "typography.validate", scoped: true },
+  // RFC-1189: public-text hygiene of generated credits.md — prose edits (the
+  // generated page lives under prose/) and labels.md edits (partyKindLabels
+  // is the kind-label source) trigger the read-only scan at commit time.
+  { prefix: "src/content/prose/", validator: "material.credits.public-text.validate" },
+  { prefix: "src/content/site/", validator: "material.credits.public-text.validate" },
 ];
 
 function matchesPrefix(filePath: string, prefix: string): boolean {
