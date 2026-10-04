@@ -11,6 +11,7 @@ permissions needed.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial dns.record.list command handler.</item>
+  <item>RFC-0753: project live ttl in the output record shape — it was silently dropped even though the Cloudflare API returns it, hiding ttl drift evidence from operators.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -78,6 +79,7 @@ export async function runDnsRecordList(
         content: r.content,
         proxied: r.proxied,
         priority: r.priority,
+        ttl: r.ttl,
       })),
     },
     summary: `[dns.record.list] ${systemId}: ${records.length} records in zone ${zoneDomain}`,

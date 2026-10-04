@@ -11,6 +11,7 @@ zone ID resolution, environment variable resolution, and record identity.
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial DNS helpers — loadDnsRecordFile, resolveDnsZoneId, resolveDnsEnv, recordIdentity.</item>
   <item>RFC-0753: recordsMatch — SVCB/HTTPS rdata parse-compare via svcb-normalize (AGD-05 subset params, HTTPS satisfies declared SVCB), replacing literal compare that flagged Cloudflare presentation normalization as drift.</item>
+  <item>RFC-0753: pickBestLiveMatch — best-fit declared→live selection for duplicate type+name identities, extracted from dns.record.validate for unit testing.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -128,6 +129,35 @@ export function recordsMatch(
   }
 
   return true;
+}
+
+/**
+ * Best-fit declared→live matching: multiple live records may share a type+name
+ * identity (parallel MX, dual TXT at apex). Pick the unconsumed live record that
+ * fully matches the declaration; fall back to the first candidate so the caller
+ * still has a live record for mismatch detail. A live HTTPS record is a
+ * candidate for a declared SVCB (wire alias).
+ */
+export function pickBestLiveMatch(
+  declared: DnsRecordDeclaration,
+  liveRecords: Array<{
+    id: string;
+    type: string;
+    name: string;
+    content: string;
+    proxied: boolean;
+    priority: number | null;
+    ttl?: number | null;
+  }>,
+  consumedLiveIds: ReadonlySet<string>,
+): (typeof liveRecords)[number] | undefined {
+  const candidates = liveRecords.filter(
+    (r) =>
+      !consumedLiveIds.has(r.id) &&
+      r.name === declared.name &&
+      (r.type === declared.type || (declared.type === "SVCB" && isSvcbType(r.type))),
+  );
+  return candidates.find((r) => recordsMatch(declared, r)) ?? candidates[0];
 }
 
 function normalizeTxtForCompare(content: string): string {

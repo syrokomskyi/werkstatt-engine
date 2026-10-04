@@ -28,6 +28,7 @@ interface CloudflareDnsRecord {
   content: string;
   proxied: boolean;
   priority: number | null;
+  ttl?: number;
 }
 
 interface CloudflareWorkersRoute {

@@ -13,6 +13,7 @@ and overall state. Exit code 0 for all validation states.
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial dns.record.validate command handler.</item>
   <item>RFC-0753: live lookup falls back to the HTTPS wire-alias record for declared SVCB when no exact-type match exists at the name.</item>
+  <item>RFC-0753: best-fit declared→live matching with consumed-live tracking — duplicate type+name identities (parallel MX, dual apex TXT) validate correctly, and unconsumed same-identity live records surface as extra instead of being hidden by the identity set.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,8 +30,8 @@ import {
   resolveDnsZoneId,
   resolveDnsEnv,
   recordsMatch,
+  pickBestLiveMatch,
 } from "./dns-helpers.ts";
-import { isSvcbType } from "./svcb-normalize.ts";
 
 export interface DnsRecordValidateResult {
   command: "dns.record.validate";
@@ -79,19 +80,17 @@ export async function runDnsRecordValidate(
   let missing = 0;
   let extra = 0;
 
+  const consumedLiveIds = new Set<string>();
   for (const declared of declaration.records) {
     const identity = `${declared.type}:${declared.name}`;
-    const live =
-      liveRecords.find((r) => r.type === declared.type && r.name === declared.name) ??
-      (declared.type === "SVCB"
-        ? liveRecords.find((r) => r.name === declared.name && isSvcbType(r.type))
-        : undefined);
+    const live = pickBestLiveMatch(declared, liveRecords, consumedLiveIds);
 
     if (!live) {
       missing++;
       records.push({ identity, state: "missing", liveId: null, detail: null });
       continue;
     }
+    consumedLiveIds.add(live.id);
 
     if (recordsMatch(declared, live)) {
       match++;
@@ -117,10 +116,9 @@ export async function runDnsRecordValidate(
     }
   }
 
-  const declaredIdentities = new Set(declaration.records.map((r) => `${r.type}:${r.name}`));
   for (const live of liveRecords) {
-    const identity = `${live.type}:${live.name}`;
-    if (!declaredIdentities.has(identity)) {
+    if (!consumedLiveIds.has(live.id)) {
+      const identity = `${live.type}:${live.name}`;
       extra++;
       records.push({ identity, state: "extra", liveId: live.id, detail: null });
     }

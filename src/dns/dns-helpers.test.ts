@@ -8,9 +8,11 @@
 */
 
 import { test, expect } from "vitest";
+import type { DnsRecordDeclaration } from "@warpgogol/werkstatt-shared/ontology/schemas";
 import {
   flagString,
   flagBoolean,
+  pickBestLiveMatch,
   recordsMatch,
   resolveZoneDomainForSystem,
 } from "./dns-helpers.ts";
@@ -241,6 +243,50 @@ test("recordsMatch: mismatched type", () => {
       { type: "AAAA", name: "warpgogol.com", content: "192.0.2.1", proxied: true, priority: null },
     ),
   ).toBe(false);
+});
+
+const liveMx = (id: string, content: string, priority: number) => ({
+  id,
+  type: "MX",
+  name: "warpgogol.com",
+  content,
+  proxied: false,
+  priority,
+});
+
+test("pickBestLiveMatch: duplicate type+name picks the fully matching live record", () => {
+  const live = [
+    liveMx("r3", "route3.mx.cloudflare.net", 17),
+    liveMx("r2", "route2.mx.cloudflare.net", 67),
+    liveMx("r1", "route1.mx.cloudflare.net", 92),
+  ];
+  const declared: DnsRecordDeclaration = {
+    name: "warpgogol.com",
+    type: "MX",
+    content: "route1.mx.cloudflare.net",
+    priority: 92,
+    proxied: false,
+  };
+  expect(pickBestLiveMatch(declared, live, new Set())?.id).toBe("r1");
+});
+
+test("pickBestLiveMatch: consumed live records are skipped; fallback is first candidate", () => {
+  const live = [
+    liveMx("r3", "route3.mx.cloudflare.net", 17),
+    liveMx("r1", "route1.mx.cloudflare.net", 92),
+  ];
+  const declared: DnsRecordDeclaration = {
+    name: "warpgogol.com",
+    type: "MX",
+    content: "route1.mx.cloudflare.net",
+    priority: 92,
+    proxied: false,
+  };
+  // r1 already consumed by an earlier declaration — the declaration can no
+  // longer match it, so the fallback returns the first remaining candidate.
+  expect(pickBestLiveMatch(declared, live, new Set(["r1"]))?.id).toBe("r3");
+  // Nothing left to consume → missing semantics for the caller.
+  expect(pickBestLiveMatch(declared, live, new Set(["r1", "r3"]))).toBeUndefined();
 });
 
 test("resolveZoneDomainForSystem: extracts hostname from main URL", () => {
