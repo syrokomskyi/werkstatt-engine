@@ -14,6 +14,7 @@ Supports --dry-run to preview changes without making API calls.
   <item>RFC-0753: initial dns.record.upsert command handler.</item>
   <item>RFC-0812: export toApiRecord for unit testing.</item>
   <item>RFC-0817: graceful skip when dns-records.yaml is absent instead of throwing.</item>
+  <item>RECOVERY-2026-10-04: upsert matches via pickBestLiveMatch + consumed-live tracking (same as dns.record.validate) — naive find(type+name) compared every declaration against the first same-identity record, misbinding parallel MX / dual apex TXT and producing bogus update/create calls (CF 1046 on Email-Routing MX, 81058 duplicate-TXT). Cloudflare codes 1046/81058 now classify as skipped (goal state externally owned or already satisfied) instead of errors.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -35,6 +36,7 @@ import {
   resolveDnsZoneId,
   resolveDnsEnv,
   recordsMatch,
+  pickBestLiveMatch,
 } from "./dns-helpers.ts";
 import { ensureTxtQuoted } from "./txt-normalize.ts";
 import type { DnsRecordDeclaration } from "@warpgogol/werkstatt-shared/ontology/schemas";
@@ -131,12 +133,14 @@ export async function runDnsRecordUpsert(
   let skipped = 0;
 
   let errors = 0;
+  const consumedLiveIds = new Set<string>();
   for (const declared of declaration.records) {
     const identity = `${declared.type}:${declared.name}`;
-    const matching = liveRecords.find((r) => r.type === declared.type && r.name === declared.name);
+    const matching = pickBestLiveMatch(declared, liveRecords, consumedLiveIds);
 
     if (matching && recordsMatch(declared, matching)) {
       skipped++;
+      consumedLiveIds.add(matching.id);
       results.push({ identity, action: "skipped", recordId: matching.id });
       continue;
     }
@@ -156,6 +160,7 @@ export async function runDnsRecordUpsert(
 
     try {
       if (matching) {
+        consumedLiveIds.add(matching.id);
         await updateDnsRecord(zoneId, apiToken, matching.id, apiRecord);
         updated++;
         results.push({ identity, action: "updated", recordId: matching.id });
@@ -165,10 +170,16 @@ export async function runDnsRecordUpsert(
         results.push({ identity, action: "created", recordId: created_record.id });
       }
     } catch (err) {
-      errors++;
-      results.push({ identity, action: "skipped", recordId: null });
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[dns.record.upsert] ${identity}: API error — ${msg}`);
+      if (isUnmanageableRecordError(msg)) {
+        skipped++;
+        results.push({ identity, action: "skipped", recordId: matching?.id ?? null });
+        console.warn(`[dns.record.upsert] ${identity}: skipped — ${msg}`);
+      } else {
+        errors++;
+        results.push({ identity, action: "skipped", recordId: null });
+        console.warn(`[dns.record.upsert] ${identity}: API error — ${msg}`);
+      }
     }
   }
 
@@ -205,6 +216,16 @@ export async function runDnsRecordUpsert(
               },
             ],
   };
+}
+
+/**
+ * Cloudflare API codes whose failure means the declared goal is unreachable
+ * through this command or already satisfied — never an actionable error:
+ * 1046 = record managed by Cloudflare Email Routing (update/remove forbidden),
+ * 81058 = an identical record already exists (create is a no-op).
+ */
+function isUnmanageableRecordError(message: string): boolean {
+  return /\b(1046|81058):/.test(message);
 }
 
 export function toApiRecord(declared: DnsRecordDeclaration): {

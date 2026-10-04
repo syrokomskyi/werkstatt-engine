@@ -21,12 +21,34 @@ import { toApiRecord, runDnsRecordUpsert } from "./dns-record-upsert.ts";
 import type { DnsRecordDeclaration } from "@warpgogol/werkstatt-shared/ontology/schemas";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { loadDnsRecordFile, resolveDnsZoneId, resolveDnsEnv } from "./dns-helpers.ts";
+import {
+  listDnsRecords,
+  createDnsRecord,
+  updateDnsRecord,
+} from "../leitstand/adapters/cloudflare-api.ts";
 
 vi.mock("./dns-helpers.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("./dns-helpers.ts")>();
   return {
     ...original,
     loadDnsRecordFile: vi.fn().mockResolvedValue(null),
+    resolveDnsZoneId: vi.fn().mockReturnValue("zone-1"),
+    resolveDnsEnv: vi.fn().mockResolvedValue({ CLOUDFLARE_API_TOKEN: "token" }),
+  };
+});
+
+vi.mock("../leitstand/adapters/cloudflare-api.ts", () => ({
+  listDnsRecords: vi.fn(),
+  createDnsRecord: vi.fn(),
+  updateDnsRecord: vi.fn(),
+}));
+
+vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../sternsystem/registry-io.ts")>();
+  return {
+    ...original,
+    discoverSystems: vi.fn().mockResolvedValue({ systems: [] }),
   };
 });
 
@@ -351,5 +373,79 @@ describe("RFC-0817: dns.record.upsert graceful skip", () => {
     expect(result.data?.results).toEqual([]);
     expect(result.summary).toContain("skipped");
     expect(result.summary).toContain("no dns-records.yaml");
+  });
+});
+
+describe("RECOVERY-2026-10-04: upsert best-fit live matching", () => {
+  function ctx(): KernelRuntimeContext {
+    return {
+      io: createDefaultIO().io,
+      workspaceRoot: "/test",
+    } as unknown as KernelRuntimeContext;
+  }
+
+  function input(): KernelCommandInput {
+    return { argv: [], flags: { system: "test-system" } } as unknown as KernelCommandInput;
+  }
+
+  const liveTxt = (id: string, content: string) => ({
+    id,
+    type: "TXT",
+    name: "example.com",
+    content,
+    proxied: false,
+    priority: null,
+    ttl: 1,
+  });
+
+  it("skips a TXT declaration that matches a non-first same-name live record", async () => {
+    vi.mocked(loadDnsRecordFile).mockResolvedValue({
+      zone: "example.com",
+      records: [
+        rec({ type: "TXT", name: "example.com", content: "v=spf1 -all" }),
+        rec({ type: "TXT", name: "example.com", content: "google-site-verification=abc" }),
+      ],
+    } as never);
+    vi.mocked(listDnsRecords).mockResolvedValue([
+      liveTxt("r-spf", '"v=spf1 -all"'),
+      liveTxt("r-google", '"google-site-verification=abc"'),
+    ] as never);
+
+    const result = await runDnsRecordUpsert(input(), ctx());
+
+    expect(result.data?.summary.errors).toBe(0);
+    expect(result.data?.summary.skipped).toBe(2);
+    expect(vi.mocked(createDnsRecord)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateDnsRecord)).not.toHaveBeenCalled();
+  });
+
+  it("classifies Cloudflare 1046 (externally managed) as skipped, not error", async () => {
+    vi.mocked(loadDnsRecordFile).mockResolvedValue({
+      zone: "example.com",
+      records: [
+        rec({ type: "MX", name: "example.com", content: "route1.mx.cloudflare.net", priority: 92 }),
+      ],
+    } as never);
+    vi.mocked(listDnsRecords).mockResolvedValue([
+      {
+        id: "r-mx",
+        type: "MX",
+        name: "example.com",
+        content: "route9.mx.cloudflare.net",
+        proxied: false,
+        priority: 11,
+        ttl: 1,
+      },
+    ] as never);
+    vi.mocked(updateDnsRecord).mockRejectedValue(
+      new Error(
+        "[cloudflare-api] updateDnsRecord API errors: 1046: This record is managed by Email Routing.",
+      ),
+    );
+
+    const result = await runDnsRecordUpsert(input(), ctx());
+
+    expect(result.data?.summary.errors).toBe(0);
+    expect(result.data?.summary.skipped).toBe(1);
   });
 });
