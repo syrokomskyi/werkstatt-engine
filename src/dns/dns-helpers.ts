@@ -10,6 +10,7 @@ zone ID resolution, environment variable resolution, and record identity.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial DNS helpers — loadDnsRecordFile, resolveDnsZoneId, resolveDnsEnv, recordIdentity.</item>
+  <item>RFC-0753: recordsMatch — SVCB/HTTPS rdata parse-compare via svcb-normalize (AGD-05 subset params, HTTPS satisfies declared SVCB), replacing literal compare that flagged Cloudflare presentation normalization as drift.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -19,6 +20,7 @@ import type {
   DnsRecordDeclaration,
   DnsRecordFile,
 } from "@warpgogol/werkstatt-shared/ontology/schemas";
+import { isSvcbType, svcbContentsMatch } from "./svcb-normalize.ts";
 import { filterEnv, sourceDotenv } from "../leitstand/adapters/cloudflare-workers.ts";
 import { resolveZoneId } from "../subdomain/subdomain-helpers.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
@@ -96,14 +98,23 @@ export function recordsMatch(
     ttl?: number | null;
   },
 ): boolean {
-  if (live.type !== declared.type) return false;
+  if (live.type !== declared.type && !(declared.type === "SVCB" && live.type === "HTTPS")) {
+    return false;
+  }
   if (live.name !== declared.name) return false;
 
-  const declaredContent =
-    declared.type === "TXT" ? normalizeTxtForCompare(declared.content) : declared.content;
-  const liveContent = declared.type === "TXT" ? normalizeTxtForCompare(live.content) : live.content;
-
-  if (declaredContent !== liveContent) return false;
+  // SVCB/HTTPS rdata is presentation-normalized by Cloudflare (trailing dot on
+  // the canonical target, quoted params) — parse-compare instead of literal
+  // compare, with declared ⊆ live param semantics per AGD-05.
+  if (isSvcbType(declared.type)) {
+    if (!svcbContentsMatch(declared.content, live.type, live.content)) return false;
+  } else {
+    const declaredContent =
+      declared.type === "TXT" ? normalizeTxtForCompare(declared.content) : declared.content;
+    const liveContent =
+      declared.type === "TXT" ? normalizeTxtForCompare(live.content) : live.content;
+    if (declaredContent !== liveContent) return false;
+  }
 
   const declaredProxied = declared.proxied ?? false;
   if (live.proxied !== declaredProxied) return false;

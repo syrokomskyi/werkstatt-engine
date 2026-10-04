@@ -92,6 +92,106 @@ test("recordsMatch: TXT content normalized for comparison", () => {
   ).toBe(true);
 });
 
+test("recordsMatch: SVCB tolerates Cloudflare presentation normalization", () => {
+  expect(
+    recordsMatch(
+      {
+        name: "_index._agents.warpgogol.com",
+        type: "SVCB",
+        content: "1 warpgogol.com alpn=h2 port=443",
+        proxied: false,
+      },
+      {
+        type: "SVCB",
+        name: "_index._agents.warpgogol.com",
+        content: '1 warpgogol.com. alpn="h2" port="443"',
+        proxied: false,
+        priority: null,
+      },
+    ),
+  ).toBe(true);
+});
+
+test("recordsMatch: live HTTPS satisfies declared SVCB", () => {
+  expect(
+    recordsMatch(
+      {
+        name: "_mcp._agents.warpgogol.com",
+        type: "SVCB",
+        content: "1 mcp.warpgogol.com alpn=h2 port=443",
+        proxied: false,
+      },
+      {
+        type: "HTTPS",
+        name: "_mcp._agents.warpgogol.com",
+        content: '1 mcp.warpgogol.com. alpn="h2" port="443" ipv4hint="104.21.0.1"',
+        proxied: false,
+        priority: null,
+      },
+    ),
+  ).toBe(true);
+});
+
+test("recordsMatch: SVCB mismatched declared param value", () => {
+  expect(
+    recordsMatch(
+      {
+        name: "_index._agents.warpgogol.com",
+        type: "SVCB",
+        content: "1 warpgogol.com alpn=h2 port=443",
+        proxied: false,
+      },
+      {
+        type: "SVCB",
+        name: "_index._agents.warpgogol.com",
+        content: '1 warpgogol.com. alpn="h3" port="443"',
+        proxied: false,
+        priority: null,
+      },
+    ),
+  ).toBe(false);
+});
+
+test("recordsMatch: SVCB missing declared param in live", () => {
+  expect(
+    recordsMatch(
+      {
+        name: "_index._agents.warpgogol.com",
+        type: "SVCB",
+        content: "1 warpgogol.com alpn=h2 port=443",
+        proxied: false,
+      },
+      {
+        type: "SVCB",
+        name: "_index._agents.warpgogol.com",
+        content: '1 warpgogol.com. alpn="h2"',
+        proxied: false,
+        priority: null,
+      },
+    ),
+  ).toBe(false);
+});
+
+test("recordsMatch: SVCB mismatched target", () => {
+  expect(
+    recordsMatch(
+      {
+        name: "_index._agents.warpgogol.com",
+        type: "SVCB",
+        content: "1 warpgogol.com alpn=h2 port=443",
+        proxied: false,
+      },
+      {
+        type: "SVCB",
+        name: "_index._agents.warpgogol.com",
+        content: '1 other.example.com. alpn="h2" port="443"',
+        proxied: false,
+        priority: null,
+      },
+    ),
+  ).toBe(false);
+});
+
 test("recordsMatch: MX with matching priority", () => {
   expect(
     recordsMatch(

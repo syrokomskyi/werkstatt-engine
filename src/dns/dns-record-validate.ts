@@ -12,6 +12,7 @@ and overall state. Exit code 0 for all validation states.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial dns.record.validate command handler.</item>
+  <item>RFC-0753: live lookup falls back to the HTTPS wire-alias record for declared SVCB when no exact-type match exists at the name.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,6 +30,7 @@ import {
   resolveDnsEnv,
   recordsMatch,
 } from "./dns-helpers.ts";
+import { isSvcbType } from "./svcb-normalize.ts";
 
 export interface DnsRecordValidateResult {
   command: "dns.record.validate";
@@ -79,7 +81,11 @@ export async function runDnsRecordValidate(
 
   for (const declared of declaration.records) {
     const identity = `${declared.type}:${declared.name}`;
-    const live = liveRecords.find((r) => r.type === declared.type && r.name === declared.name);
+    const live =
+      liveRecords.find((r) => r.type === declared.type && r.name === declared.name) ??
+      (declared.type === "SVCB"
+        ? liveRecords.find((r) => r.name === declared.name && isSvcbType(r.type))
+        : undefined);
 
     if (!live) {
       missing++;
