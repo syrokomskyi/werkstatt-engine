@@ -17,6 +17,7 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <item>RECOVERY-2026-10-05: stale-channel detection — resolveDevDeploymentRecord captures the releaseId of the latest succeeded dev record; detectMeasuredReleaseMismatch flags when a remote (non---base-url) certify would measure a different artifact than the candidate. Upfront logger.warn, measured-release reason in the gate decision, and a fail-summary hint pointing at the --base-url recovery path (warpgogol r000028 dev gate measured stale r000027).</item>
   <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -275,7 +276,21 @@ export async function runLeitstandCertify(
   const gateChannel = gate as GateChannel;
 
   const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
-  const baseUrl = await resolveDevBaseUrl(cacheCloneDir, baseUrlFlag);
+  const resolvedBase = await resolveDevDeploymentRecord(cacheCloneDir, baseUrlFlag);
+  const baseUrl = resolvedBase?.deploymentUrl;
+
+  // RECOVERY-2026-10-05: stale-channel detection. Without --base-url the gate
+  // crawls the latest *succeeded dev* deployment record's URL — which may host
+  // a different release than the candidate. Surface that upfront so a
+  // misleading verdict self-explains instead of being chased as a regression.
+  const measuredReleaseId = baseUrlFlag ? undefined : resolvedBase?.releaseId;
+  const measuredMismatch = detectMeasuredReleaseMismatch(baseUrlFlag, measuredReleaseId, releaseId);
+  if (measuredMismatch) {
+    context.logger.warn(
+      `[leitstand.certify] gate=${gate} measures the recorded dev deployment of ${measuredMismatch}, not candidate ${releaseId} — findings reflect the deployed channel artifact. ` +
+        `For candidate-true certification serve the release artifact locally and pass --base-url (RECOVERY-2026-10-04).`,
+    );
+  }
 
   const forceRequested = flagBoolean(input, "force");
 
@@ -714,7 +729,16 @@ export async function runLeitstandCertify(
       })),
       status: evaluationResult.status,
       coverage: evaluationResult.coverage,
-      reasons: [...evaluationResult.reasons],
+      reasons: [
+        ...evaluationResult.reasons,
+        ...(measuredReleaseId
+          ? [
+              measuredMismatch
+                ? `measured-release=${measuredReleaseId} differs from candidate=${releaseId} — gate evaluated the deployed channel artifact, not the candidate`
+                : `measured-release=${measuredReleaseId}`,
+            ]
+          : []),
+      ],
       actionPackRef: null,
       decidedAt: now,
     };
@@ -738,7 +762,7 @@ export async function runLeitstandCertify(
         selectedEvidence: gateDecision.selectedEvidence,
         status: "pass",
         coverage: evaluationResult.coverage,
-        reasons: [...evaluationResult.reasons],
+        reasons: gateDecision.reasons,
         actionPackRef: null,
         rootDossierRef: artifactHash,
         priorOperationRef: null,
@@ -804,7 +828,11 @@ export async function runLeitstandCertify(
         producerCount: producerCount,
         evidenceCount: evidence.length,
       },
-      summary: `[leitstand.certify] gate=${gate} status=${evaluationResult.status} decision=${decisionId} output=${outputPath}`,
+      summary:
+        `[leitstand.certify] gate=${gate} status=${evaluationResult.status} decision=${decisionId} output=${outputPath}` +
+        (measuredMismatch && evaluationResult.status === "fail"
+          ? ` — WARN: gate measured the deployed ${measuredMismatch} artifact, not candidate ${releaseId}; findings may be stale-channel state. Re-certify the candidate via --base-url (RECOVERY-2026-10-04), or deploy it first and re-run.`
+          : ""),
       exitCode: 0,
       nextSteps:
         evaluationResult.status === "pass"
@@ -894,15 +922,20 @@ export async function runLeitstandCertify(
   return result;
 }
 
-export async function resolveDevBaseUrl(
+export interface DevDeploymentRecord {
+  deploymentUrl: string;
+  releaseId?: string;
+}
+
+export async function resolveDevDeploymentRecord(
   cacheCloneDir: string,
   baseUrlFlag: string | undefined,
   io: WorkspaceIO = createDefaultIO().io,
-): Promise<string | undefined> {
-  if (baseUrlFlag) return baseUrlFlag;
+): Promise<DevDeploymentRecord | undefined> {
+  if (baseUrlFlag) return { deploymentUrl: baseUrlFlag };
 
   const opsDir = path.join(cacheCloneDir, "deployment-operations");
-  let latestDevUrl: string | undefined;
+  let latest: DevDeploymentRecord | undefined;
   try {
     const entries = await io.readdir(opsDir);
     let latestAt = "";
@@ -915,12 +948,13 @@ export async function resolveDevBaseUrl(
           state?: DeploymentOperationState;
           timestamp?: string;
           deploymentUrl?: string;
+          releaseId?: string;
         };
         if (record.channel === "dev" && record.state === "succeeded" && record.deploymentUrl) {
           const at = record.timestamp ?? "";
-          if (!latestDevUrl || at > latestAt) {
+          if (!latest || at > latestAt) {
             latestAt = at;
-            latestDevUrl = record.deploymentUrl;
+            latest = { deploymentUrl: record.deploymentUrl, releaseId: record.releaseId };
           }
         }
       } catch {
@@ -931,6 +965,29 @@ export async function resolveDevBaseUrl(
     // No deployment-operations directory yet
   }
 
-  if (latestDevUrl) return latestDevUrl;
-  return undefined;
+  return latest;
+}
+
+export async function resolveDevBaseUrl(
+  cacheCloneDir: string,
+  baseUrlFlag: string | undefined,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string | undefined> {
+  return (await resolveDevDeploymentRecord(cacheCloneDir, baseUrlFlag, io))?.deploymentUrl;
+}
+
+// RECOVERY-2026-10-05: stale-channel detection. A remote certify without
+// --base-url measures whatever artifact the dev channel currently serves —
+// which may be an older release than the candidate (poisoned channel: the
+// gate's findings then belong to the deployed artifact, not the candidate).
+// Returns the measured releaseId when it differs from the candidate, else null.
+export function detectMeasuredReleaseMismatch(
+  baseUrlFlag: string | undefined,
+  measuredReleaseId: string | undefined,
+  candidateReleaseId: string,
+): string | null {
+  if (baseUrlFlag || !measuredReleaseId || measuredReleaseId === candidateReleaseId) {
+    return null;
+  }
+  return measuredReleaseId;
 }

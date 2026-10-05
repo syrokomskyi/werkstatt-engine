@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { resolveDevBaseUrl } from "../leitstand/certify.ts";
+import {
+  resolveDevBaseUrl,
+  resolveDevDeploymentRecord,
+  detectMeasuredReleaseMismatch,
+} from "../leitstand/certify.ts";
 
 let tmpDir: string;
 
@@ -94,5 +98,85 @@ describe("resolveDevBaseUrl", () => {
     expect(await resolveDevBaseUrl(tmpDir, "https://preview.example.com")).toBe(
       "https://preview.example.com",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveDevDeploymentRecord — RECOVERY-2026-10-05
+// ---------------------------------------------------------------------------
+
+describe("resolveDevDeploymentRecord", () => {
+  it("captures the releaseId of the latest succeeded dev record", async () => {
+    await writeOpRecord(tmpDir, "op-ok", {
+      channel: "dev",
+      state: "succeeded",
+      timestamp: "2026-10-01T13:00:00.000Z",
+      deploymentUrl: "https://dev-live.example.com",
+      releaseId: "warpgogol-r000027",
+    });
+    const record = await resolveDevDeploymentRecord(tmpDir, undefined);
+    expect(record).toEqual({
+      deploymentUrl: "https://dev-live.example.com",
+      releaseId: "warpgogol-r000027",
+    });
+  });
+
+  it("prefers the latest succeeded record — a newer failed deploy does not shadow it", async () => {
+    await writeOpRecord(tmpDir, "op-fail", {
+      channel: "dev",
+      state: "failed",
+      timestamp: "2026-10-01T14:15:00.000Z",
+      deploymentUrl: "https://dev.example.com",
+      releaseId: "warpgogol-r000028",
+    });
+    await writeOpRecord(tmpDir, "op-ok", {
+      channel: "dev",
+      state: "succeeded",
+      timestamp: "2026-10-01T13:00:00.000Z",
+      deploymentUrl: "https://dev-live.example.com",
+      releaseId: "warpgogol-r000027",
+    });
+    expect(await resolveDevDeploymentRecord(tmpDir, undefined)).toEqual({
+      deploymentUrl: "https://dev-live.example.com",
+      releaseId: "warpgogol-r000027",
+    });
+  });
+
+  it("--base-url returns a record without releaseId (operator target, not a recorded deploy)", async () => {
+    expect(await resolveDevDeploymentRecord(tmpDir, "https://preview.example.com")).toEqual({
+      deploymentUrl: "https://preview.example.com",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectMeasuredReleaseMismatch — RECOVERY-2026-10-05 stale-channel detection
+// ---------------------------------------------------------------------------
+
+describe("detectMeasuredReleaseMismatch", () => {
+  it("returns the measured release when the channel serves a different artifact", () => {
+    expect(detectMeasuredReleaseMismatch(undefined, "warpgogol-r000027", "warpgogol-r000028")).toBe(
+      "warpgogol-r000027",
+    );
+  });
+
+  it("is silent when the channel serves the candidate", () => {
+    expect(
+      detectMeasuredReleaseMismatch(undefined, "warpgogol-r000028", "warpgogol-r000028"),
+    ).toBeNull();
+  });
+
+  it("is silent when no recorded release exists (no deploy record)", () => {
+    expect(detectMeasuredReleaseMismatch(undefined, undefined, "warpgogol-r000028")).toBeNull();
+  });
+
+  it("is silent under --base-url — the flag is authoritative", () => {
+    expect(
+      detectMeasuredReleaseMismatch(
+        "https://preview.example.com",
+        "warpgogol-r000027",
+        "warpgogol-r000028",
+      ),
+    ).toBeNull();
   });
 });
