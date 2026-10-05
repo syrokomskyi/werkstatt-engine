@@ -1651,7 +1651,6 @@ export async function runLeitstandChannels(
     summary: `[leitstand.channels] alias of leitstand.status — ${summaryBody}`,
     data: result.data ? { ...result.data, aliasedTo: "leitstand.status" } : result.data,
     exitCode: result.exitCode ?? 0,
-    nextSteps: result.nextSteps,
   };
 }
 
