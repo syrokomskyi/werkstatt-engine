@@ -6,6 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1203: export runLeitstandChannels (leitstand.channels alias handler).</item>
   <item>RFC-0842: add leitstand.pipeline.check command for release pipeline state inspection.</item>
   <item>RFC-0866: add leitstand.certify command and shared deploy-execution pipeline.</item>
   <item>RFC-0927: add leitstand.hotfix.dev-deploy composite command export.</item>
@@ -27,6 +28,7 @@ export {
   runLeitstandPromote,
   type LeitstandPromoteData,
   runLeitstandStatus,
+  runLeitstandChannels,
   type LeitstandStatusData,
   runLeitstandRollback,
   type LeitstandRollbackData,

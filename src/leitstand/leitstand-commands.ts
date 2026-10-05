@@ -6,6 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1203: runLeitstandChannels relabeling wrapper + LeitstandStatusData.aliasedTo — leitstand.channels delegates to runLeitstandStatus and re-labels summary/data so the alias names its canonical command (DNA-82 prefix rule).</item>
   <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures route into the command report via onSigningFailure → logger.warn instead of the default console channel</item>
@@ -1559,6 +1560,8 @@ export interface LeitstandStatusData {
       purgeResult?: PurgeResult;
     } | null;
   };
+  /** RFC-1203: set by the leitstand.channels alias wrapper; absent on canonical leitstand.status results. */
+  aliasedTo?: "leitstand.status";
 }
 
 export async function runLeitstandStatus(
@@ -1631,6 +1634,24 @@ export async function runLeitstandStatus(
         kind: "optional",
       },
     ],
+  };
+}
+
+// §5.2b: leitstand.channels (RFC-1203) — relabeling alias of leitstand.status.
+// The wrapper owns the alias surface (summary prefix + data.aliasedTo); the
+// canonical handler stays untouched and thrown errors propagate verbatim.
+export async function runLeitstandChannels(
+  input: KernelCommandInput,
+  context: KernelRuntimeContext,
+): Promise<KernelCommandResult<LeitstandStatusData>> {
+  const result = await runLeitstandStatus(input, context);
+  const summaryBody = result.summary?.replace(/^\[leitstand\.status\]\s*/, "") ?? "";
+  return {
+    ...result,
+    summary: `[leitstand.channels] alias of leitstand.status — ${summaryBody}`,
+    data: result.data ? { ...result.data, aliasedTo: "leitstand.status" } : result.data,
+    exitCode: result.exitCode ?? 0,
+    nextSteps: result.nextSteps,
   };
 }
 

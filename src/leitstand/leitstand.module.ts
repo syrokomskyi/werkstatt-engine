@@ -7,6 +7,7 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1203: leitstand.channels alias — shared leitstandStatusFlags/leitstandStatusReads consts consumed by status+channels declarations; alias delegates to runLeitstandChannels relabeling wrapper.</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
@@ -20,7 +21,24 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 </CHANGE_SUMMARY>
 */
 
-import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
+import type { KernelFlagSpec, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
+
+// RFC-1203: declaration surface shared by leitstand.status and its
+// leitstand.channels alias — flag/read additions propagate to both.
+const leitstandStatusFlags: Record<string, KernelFlagSpec> = {
+  site: { kind: "string", required: true, description: "Sternsystem id." },
+  system: { kind: "string", description: "Alias for --site." },
+  channel: {
+    kind: "string",
+    description: "Filter to a single channel: dev, alt, or main.",
+  },
+};
+
+const leitstandStatusReads: string[] = [
+  "systems-cache/{system}/system-config.yaml",
+  "systems-cache/{system}/system-state.yaml",
+  "systems-cache/{system}/system.pin.json",
+];
 
 export async function createLeitstandModule(): Promise<ModuleExport> {
   const {
@@ -28,6 +46,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
     runLeitstandPropagate,
     runLeitstandPromote,
     runLeitstandStatus,
+    runLeitstandChannels,
     runLeitstandRollback,
     runLeitstandHealth,
     runLeitstandPipelineCheck,
@@ -247,21 +266,23 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           "Print deployment state for all channels (RFC-0627). Flags: --site, [--channel dev|alt|main].",
         scope: "workspace",
         supportsAllSites: false,
-        flags: {
-          site: { kind: "string", required: true, description: "Sternsystem id." },
-          system: { kind: "string", description: "Alias for --site." },
-          channel: {
-            kind: "string",
-            description: "Filter to a single channel: dev, alt, or main.",
-          },
-        },
-        reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/system.pin.json",
-        ],
+        flags: leitstandStatusFlags,
+        reads: leitstandStatusReads,
         cacheable: false,
         execute: runLeitstandStatus,
+      },
+      {
+        name: "leitstand.channels",
+        mutatesState: false,
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        description:
+          "Alias of leitstand.status (RFC-1203): prints per-channel deployment state and names the canonical command in every response. Flags: --site, [--channel dev|alt|main].",
+        scope: "workspace",
+        supportsAllSites: false,
+        flags: leitstandStatusFlags,
+        reads: leitstandStatusReads,
+        cacheable: false,
+        execute: runLeitstandChannels,
       },
       {
         name: "leitstand.rollback",
