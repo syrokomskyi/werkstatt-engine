@@ -15,6 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
+  <item>RFC-1199: MATERIALIZATION-IN-PROGRESS sentinel — written in setup-staging into stagingDir/.git (rides atomic-move into workpiece/.git) or inside git-init-commit after git init on the non-git fallback; deleted only after the baseline commit lands; git-init-commit is idempotent on resume (skip commit when HEAD resolves and the staged index is clean); workpiece commit hook installs early in setup-staging</item>
   <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958</history>
 </CHANGE_SUMMARY>
 */
@@ -61,6 +62,17 @@ import {
 } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import type { KernelPipelineStep } from "@warpgogol/werkstatt-engine/kernel";
 import { runOperation, checkDifferentKindOperation, type OperationStep } from "../journal/index.ts";
+
+/**
+ * RFC-1199: marker written into the workpiece `.git/` for the window between
+ * workpiece creation and the `git-init-commit` baseline commit. Lives inside
+ * `.git` so it can never enter the index; `mission.git.commit` and the
+ * workpiece pre-commit hook fail closed while it exists. Written in
+ * `setup-staging` (rides `atomic-move` into the workpiece) or inside
+ * `git-init-commit` on the non-git fallback; deleted only after the baseline
+ * commit lands.
+ */
+export const MATERIALIZATION_SENTINEL = "MATERIALIZATION-IN-PROGRESS";
 
 export interface MissionMaterializeData {
   missionId: string;
@@ -1334,6 +1346,17 @@ export async function buildMaterializeSteps(
           await cc.context.io.rename(path.join(tempCloneDir, ".git"), cc.clonedGitDir);
           await cc.context.io.rm(tempCloneDir, { recursive: true });
           cc.logger.info(`  Cloned cache clone git history into staging`);
+
+          // RFC-1199: write the sentinel the moment .git materializes — it
+          // rides atomic-move into workpiece/.git and guards the whole window
+          // (build-prepare runs post-move against workpieceDir). The hook
+          // installs into staging .git/hooks and survives the rename.
+          await atomicWriteFile(
+            path.join(cc.clonedGitDir, MATERIALIZATION_SENTINEL),
+            JSON.stringify({ missionId: cc.missionId, startedAt: new Date().toISOString() }) + "\n",
+          );
+          await installWorkpieceCommitHook(cc.stagingDir);
+          cc.logger.info(`  Materialization sentinel written + commit hook installed in staging`);
         }
       },
     },
@@ -1724,37 +1747,63 @@ export async function buildMaterializeSteps(
       name: "git-init-commit",
       run: async (c: unknown) => {
         const cc = c as MaterializeStepCtx;
-        if (await cc.context.io.exists(path.join(cc.workpieceDir, ".git"))) {
-          // Stage all files — data, generated, and custom composition files.
-          // git add -A ensures custom files (src/pages/portal/[token].astro,
-          // src/components/*, etc.) are included in the materialize commit.
-          await execOrThrow(cc.context.io, "git", ["add", "-A"], { cwd: cc.workpieceDir });
-          await execOrThrow(
-            cc.context.io,
-            "git",
-            ["commit", "-m", `materialize from pin ${cc.pinVersion}`],
-            { cwd: cc.workpieceDir, env: { MISSION_GIT_COMMIT: "1" } },
-          );
-          await installWorkpieceCommitHook(cc.workpieceDir);
-          cc.logger.info(
-            `  Git commit created in workpiece (full working tree, on top of cloned history)`,
-          );
-        } else {
+        const sentinelPath = path.join(cc.workpieceDir, ".git", MATERIALIZATION_SENTINEL);
+        const hasGit = await cc.context.io.exists(path.join(cc.workpieceDir, ".git"));
+        if (!hasGit) {
           await execOrThrow(cc.context.io, "git", ["init", "-b", "main"], {
             cwd: cc.workpieceDir,
           });
-          await execOrThrow(cc.context.io, "git", ["add", "-A"], { cwd: cc.workpieceDir });
+          // RFC-1199: on the non-git fallback the sentinel attaches right after
+          // git init — the earliest .git point this path has. The pre-init
+          // window is guarded by the manifest.materializedAt == null fallback
+          // in mission.git.commit (a repo-less directory cannot host a raw
+          // commit anyway).
+          await atomicWriteFile(
+            sentinelPath,
+            JSON.stringify({ missionId: cc.missionId, startedAt: new Date().toISOString() }) + "\n",
+          );
+          await installWorkpieceCommitHook(cc.workpieceDir);
+        }
+        // Stage all files — data, generated, and custom composition files.
+        // git add -A ensures custom files (src/pages/portal/[token].astro,
+        // src/components/*, etc.) are included in the materialize commit.
+        await execOrThrow(cc.context.io, "git", ["add", "-A"], { cwd: cc.workpieceDir });
+        // RFC-1199: idempotent on resume — a crash between the baseline commit
+        // and sentinel deletion re-runs this step; commit is skipped when HEAD
+        // resolves and the staged index is clean, instead of wedging on
+        // "nothing to commit".
+        const head = await cc.context.io.exec("git", ["rev-parse", "--verify", "HEAD"], {
+          cwd: cc.workpieceDir,
+        });
+        let shouldCommit = head.exitCode !== 0;
+        if (!shouldCommit) {
+          const diff = await cc.context.io.exec("git", ["diff", "--cached", "--quiet"], {
+            cwd: cc.workpieceDir,
+          });
+          shouldCommit = diff.exitCode !== 0;
+        }
+        if (shouldCommit) {
           await execOrThrow(
             cc.context.io,
             "git",
             ["commit", "-m", `materialize from pin ${cc.pinVersion}`],
             { cwd: cc.workpieceDir, env: { MISSION_GIT_COMMIT: "1" } },
           );
-          await installWorkpieceCommitHook(cc.workpieceDir);
-          cc.logger.info(
-            `  Git initialized in workpiece with initial commit (non-git cache clone fallback)`,
-          );
+        } else {
+          cc.logger.info(`  Baseline commit already exists — skipping commit (resumed run)`);
         }
+        // RFC-1199: the sentinel comes down only after the baseline commit
+        // landed (or is confirmed present on resume). Hook install is
+        // idempotent — covers re-runs and the setup-staging early install.
+        if (await cc.context.io.exists(sentinelPath)) {
+          await cc.context.io.rm(sentinelPath);
+        }
+        await installWorkpieceCommitHook(cc.workpieceDir);
+        cc.logger.info(
+          hasGit
+            ? `  Git commit created in workpiece (full working tree, on top of cloned history)`
+            : `  Git initialized in workpiece with initial commit (non-git cache clone fallback)`,
+        );
       },
     },
     {

@@ -14,6 +14,7 @@
   <item>ADR-0104: scoped commits use git commit --only + scoped stagedFiles so index residue is neither committed nor validated</item>
   <item>RFC-1185: shared.context.validate joins the commit gate — unscoped over pages/ and system.md because collision groups are whole-site per language</item>
   <item>RFC-1189: material.credits.public-text.validate joins the commit gate — unscoped over src/content/prose/ and src/content/site/ so generated-credits public-text leaks fail at commit time</item>
+  <item>RFC-1199: fail-closed materialization preflight — MATERIALIZATION_IN_PROGRESS result when workpiece/.git/MATERIALIZATION-IN-PROGRESS exists or manifest.materializedAt is null; runs before the .git check, staging, and commit-gate validators</item>
   <history>RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -32,6 +33,7 @@ import type {
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { runCompassSummaryRecord, stripConventionalPrefix } from "@warpgogol/forge/os/compass";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { MATERIALIZATION_SENTINEL } from "./mission-materialize.ts";
 import { createSignedCommit } from "./signed-commit.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 
@@ -484,6 +486,31 @@ export async function runMissionGitCommit(
     throw new Error(
       `[mission.git.commit] workpiece not found for mission '${missionId}' — run mission.materialize first`,
     );
+  }
+
+  // RFC-1199: fail closed while materialization is in flight. The sentinel
+  // marks the window precisely (workpiece/.git exists, baseline commit not yet
+  // landed); manifest.materializedAt == null is the fallback for a crashed
+  // run that lost the sentinel or never reached git-init-commit — mission.open
+  // auto-materializes (RFC-0951), so an open mission with materializedAt unset
+  // is always mid-materialization. Runs before the .git check so the named
+  // error is uniform, including the repo-less fallback window.
+  const sentinelPath = path.join(workpieceDir, ".git", MATERIALIZATION_SENTINEL);
+  if ((await context.io.exists(sentinelPath)) || manifest.materializedAt == null) {
+    return {
+      exitCode: 1,
+      summary:
+        `[mission.git.commit] MATERIALIZATION_IN_PROGRESS: workpiece for '${missionId}' ` +
+        `is still being materialized — the pipeline has not created the baseline commit yet`,
+      nextSteps: [
+        {
+          action:
+            `Wait for mission.materialize to finish; if the operation failed, ` +
+            `run mission.resume --mission ${missionId}`,
+          kind: "required",
+        },
+      ],
+    };
   }
 
   if (!(await context.io.exists(path.join(workpieceDir, ".git")))) {

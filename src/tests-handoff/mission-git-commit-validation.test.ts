@@ -9,6 +9,7 @@
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
   <item>RFC-1185: shared.context.validate joins the pages/system.md prefix mapping — prefix-matching test updated for the sixth validator</item>
+  <item>RFC-1199: MATERIALIZATION_IN_PROGRESS guard tests — sentinel blocks, materializedAt-null fallback blocks, guard precedes .git check</item>
 </CHANGE_SUMMARY>
 */
 
@@ -267,7 +268,8 @@ test("validator fails — passed is false, failure recorded with files", async (
 // Integration tests — test through runMissionGitCommit with real git workpiece
 // ---------------------------------------------------------------------------
 
-function setupWorkpiece(): string {
+function setupWorkpiece(options: { materializedAt?: string | null } = {}): string {
+  const { materializedAt = "2026-07-30T01:00:00.000Z" } = options;
   gitInit(tmpWorkspace);
 
   mkdirSync(join(tmpWorkspace, "systems"), { recursive: true });
@@ -309,7 +311,7 @@ systems:
     closedAt: null,
     closedBy: null,
     pinAtOpen: "1.0.0",
-    materializedAt: "2026-07-30T01:00:00.000Z",
+    materializedAt,
     migratedAt: null,
     reconciledAt: null,
     releaseId: null,
@@ -679,4 +681,83 @@ test("RFC-1095: --adr writes X-ADR trailer", async () => {
     stdio: ["pipe", "pipe", "pipe"],
   });
   expect(logBody).toContain("X-ADR: ADR-0042");
+});
+
+// ---------------------------------------------------------------------------
+// RFC-1199: materialization-in-progress preflight (AC-1, AC-3)
+// ---------------------------------------------------------------------------
+
+test("RFC-1199 AC-1: sentinel in workpiece/.git blocks commit with MATERIALIZATION_IN_PROGRESS", async () => {
+  const workpieceDir = setupWorkpiece();
+  const { MATERIALIZATION_SENTINEL } = await import("../mission/mission-materialize.ts");
+  writeFileSync(
+    join(workpieceDir, ".git", MATERIALIZATION_SENTINEL),
+    JSON.stringify({ missionId: "test-system-m000001" }) + "\n",
+  );
+  writeFileSync(join(workpieceDir, "dirty.txt"), "in-flight change\n");
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: { mission: "test-system-m000001", message: "raced commit" },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode).toBe(1);
+  expect(result.summary).toContain("MATERIALIZATION_IN_PROGRESS");
+  expect(result.nextSteps?.[0]?.action).toContain("mission.resume");
+
+  // Guard precedes staging — the dirty file must not be staged or committed.
+  const statusOutput = execSync("git status --porcelain", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  expect(statusOutput).toContain("?? dirty.txt");
+  const logOutput = execSync("git log --oneline", {
+    cwd: workpieceDir,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+  expect(logOutput.split("\n")).toHaveLength(1);
+});
+
+test("RFC-1199 AC-3: materializedAt null without sentinel blocks with the same error", async () => {
+  const workpieceDir = setupWorkpiece({ materializedAt: null });
+  writeFileSync(join(workpieceDir, "dirty.txt"), "in-flight change\n");
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: { mission: "test-system-m000001", message: "raced commit" },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode).toBe(1);
+  expect(result.summary).toContain("MATERIALIZATION_IN_PROGRESS");
+  expect(result.summary).toContain("test-system-m000001");
+});
+
+test("RFC-1199: guard precedes the .git check — missing .git + materializedAt null still yields MATERIALIZATION_IN_PROGRESS", async () => {
+  const workpieceDir = setupWorkpiece({ materializedAt: null });
+  rmSync(join(workpieceDir, ".git"), { recursive: true, force: true });
+
+  const { runMissionGitCommit } = await import("../mission/mission-git-commit.ts");
+  const input = {
+    flags: { mission: "test-system-m000001", message: "raced commit" },
+  } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionGitCommit(input, context);
+  expect(result.exitCode).toBe(1);
+  expect(result.summary).toContain("MATERIALIZATION_IN_PROGRESS");
 });

@@ -12,6 +12,7 @@
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1176 follow-up: drop duplicated writes[] on mission.validate — the contract sweep's narrower evidence/** entry shadowed the existing evidence+distribution declaration (TS1117).</item>
+  <item>RFC-1199: mission.git.commit description documents the MATERIALIZATION_IN_PROGRESS fail-closed guard</item>
   <history>ADR-0041, RFC-0560, RFC-1028, RFC-1095, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -416,7 +417,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
-          "Commit operator edits to the mission workpiece git repository (RFC-0480). Required flags: `--mission`, `--message`.",
+          "Commit operator edits to the mission workpiece git repository (RFC-0480). Fails closed with MATERIALIZATION_IN_PROGRESS while the workpiece is still being materialized (RFC-1199). Required flags: `--mission`, `--message`.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,

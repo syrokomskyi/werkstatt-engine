@@ -16,6 +16,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0821: initial installWorkpieceCommitHook implementation.</item>
   <item>RFC-0878: add .closed sentinel check — block commits in closed workpieces even with MISSION_GIT_COMMIT=1.</item>
+  <item>RFC-1199: sentinel-aware refusal message for MATERIALIZATION-IN-PROGRESS; hook now installs during setup-staging (rides atomic-move) instead of post-commit.</item>
 </CHANGE_SUMMARY> 
 */
 
@@ -29,10 +30,20 @@ export interface WorkpieceHookResult {
 }
 
 const HOOK_SCRIPT = `#!/bin/sh
-# Warpgogol workpiece commit guard (RFC-0821 + RFC-0878)
+# Warpgogol workpiece commit guard (RFC-0821 + RFC-0878 + RFC-1199)
 # Rejects raw git commit — use mission.git.commit instead:
 #   pnpm exec werkstatt run mission.git.commit --mission=<id> --message="<msg>"
 if [ -z "\${MISSION_GIT_COMMIT:-}" ]; then
+  # RFC-1199: name the materialization window explicitly when its sentinel is
+  # present — during that window there is no baseline commit to build on.
+  if [ -f "$(pwd)/.git/MATERIALIZATION-IN-PROGRESS" ]; then
+    echo "ERROR: Commit blocked — workpiece materialization is still in progress (RFC-1199)." >&2
+    echo "" >&2
+    echo "The pipeline has not created the baseline commit yet." >&2
+    echo "Wait for mission.materialize to finish; if it failed, run:" >&2
+    echo "  pnpm exec werkstatt run mission.resume --mission <missionId>" >&2
+    exit 1
+  fi
   echo "ERROR: Direct git commit blocked in workpiece (RFC-0821)." >&2
   echo "" >&2
   echo "Use mission.git.commit instead:" >&2
