@@ -7,6 +7,16 @@
   <item>warpgogol-m000170: EC-16 — isolate workspace root in a per-run tmpdir sandbox so
     resolveCacheClonePath resolves to a private systems-cache pool; un-quarantine
     from .flaky-tests.json.</item>
+  <item>RFC-1198: cookie-free referral attribution — /r/<slug> partner landings + voluntary referrer field
+
+Replace the RFC-1191 wg_ref cookie capture with URL+form attribution:
+static /r/<slug> and /<lang>/r/<slug> partner landings (noindex, zero JS,
+consent-gated via publicNameConsentRef), ?ref prefill on the existing
+referrerField rail, server-side slug resolution against the bundled
+partners.yaml, referral_partner_slug/name on the Lagebild ingress contract,
+legacy /?ref -> /r/<slug> 302 in the generated worker, and full removal of
+the cookie capture module (wg_ref, referral.attribution entitlement,
+payload.attribution).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -464,7 +474,7 @@ const connectedLagebildState = {
   },
 };
 
-describe("RFC-1191: lagebild.referral.issue", () => {
+describe("RFC-1198: lagebild.referral.issue", () => {
   beforeEach(() => {
     vi.mocked(readSystemStateSmart).mockResolvedValue(
       structuredClone(connectedLagebildState) as never,
@@ -473,53 +483,76 @@ describe("RFC-1191: lagebild.referral.issue", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ ref_code: "d3f7a2c4e6" }),
+      json: async () => ({ slug: "anna" }),
     } as never);
   });
 
-  it("AC-8: POSTs /v1/referrals and returns {refCode, url} with the channel origin", async () => {
-    const result = await runLagebildReferralIssue(
-      makeInput({ site: "test-site", contact: "rec@example.test" }),
-      makeContext(),
-    );
+  const issue = (flags: Record<string, string>) =>
+    runLagebildReferralIssue(makeInput(flags), makeContext());
+
+  it("AC-8: POSTs /v1/referrals and returns {slug, url} with the channel origin", async () => {
+    const result = await issue({
+      site: "test-site",
+      slug: "anna",
+      name: "Anna Beispiel",
+      contact: "rec@example.test",
+    });
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.lagebild.example/v1/referrals");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ contact_email: "rec@example.test" });
-    expect(result.data!.refCode).toBe("d3f7a2c4e6");
-    expect(result.data!.url).toBe("https://test-site.example/?ref=d3f7a2c4e6");
+    expect(JSON.parse(init.body as string)).toEqual({
+      slug: "anna",
+      display_name: "Anna Beispiel",
+      contact_email: "rec@example.test",
+    });
+    expect(result.data!.slug).toBe("anna");
+    expect(result.data!.url).toBe("https://test-site.example/r/anna");
   });
 
-  it("uses the requested channel origin for the ?ref= URL", async () => {
-    const result = await runLagebildReferralIssue(
-      makeInput({ site: "test-site", contact: "rec@example.test", channel: "alt" }),
-      makeContext(),
-    );
-    expect(result.data!.url).toBe("https://alt.test-site.example/?ref=d3f7a2c4e6");
+  it("uses the requested channel origin for the /r/ URL", async () => {
+    const result = await issue({
+      site: "test-site",
+      slug: "anna",
+      name: "Anna Beispiel",
+      channel: "alt",
+    });
+    expect(result.data!.url).toBe("https://alt.test-site.example/r/anna");
+  });
+
+  it("omits contact_email when --contact is absent", async () => {
+    await issue({ site: "test-site", slug: "anna", name: "Anna Beispiel" });
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      slug: "anna",
+      display_name: "Anna Beispiel",
+    });
   });
 
   it("throws when the site is not connected to Lagebild", async () => {
     vi.mocked(readSystemStateSmart).mockResolvedValueOnce(structuredClone(mockState) as never);
-    await expect(
-      runLagebildReferralIssue(makeInput({ site: "test-site", contact: "rec@example.test" }), makeContext()),
-    ).rejects.toThrow("lagebild.connect");
+    await expect(issue({ site: "test-site", slug: "anna", name: "Anna" })).rejects.toThrow(
+      "lagebild.connect",
+    );
   });
 
   it("throws if --site is missing", async () => {
-    await expect(
-      runLagebildReferralIssue(makeInput({ contact: "rec@example.test" }), makeContext()),
-    ).rejects.toThrow("--site is required");
+    await expect(issue({ slug: "anna", name: "Anna" })).rejects.toThrow("--site is required");
   });
 
-  it("throws if --contact is missing", async () => {
-    await expect(
-      runLagebildReferralIssue(makeInput({ site: "test-site" }), makeContext()),
-    ).rejects.toThrow("--contact is required");
+  it("throws if --slug is missing or malformed", async () => {
+    await expect(issue({ site: "test-site", name: "Anna" })).rejects.toThrow("--slug");
+    await expect(issue({ site: "test-site", slug: "Anna!", name: "Anna" })).rejects.toThrow(
+      "--slug",
+    );
+  });
+
+  it("throws if --name is missing", async () => {
+    await expect(issue({ site: "test-site", slug: "anna" })).rejects.toThrow("--name");
   });
 });
 
-describe("RFC-1191: lagebild.referral.list", () => {
+describe("RFC-1198: lagebild.referral.list", () => {
   beforeEach(() => {
     vi.mocked(readSystemStateSmart).mockResolvedValue(
       structuredClone(connectedLagebildState) as never,
@@ -528,7 +561,7 @@ describe("RFC-1191: lagebild.referral.list", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ rows: [{ ref_code: "d3f7a2c4e6", recommender_ref: "person-42" }] }),
+      json: async () => ({ rows: [{ slug: "anna", display_name: "Anna Beispiel" }] }),
     } as never);
   });
 

@@ -8,6 +8,16 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1065: initial lagebild module — lagebild.connect, lagebild.validate, lagebild.status commands.</item>
+  <item>RFC-1198: cookie-free referral attribution — /r/<slug> partner landings + voluntary referrer field
+
+Replace the RFC-1191 wg_ref cookie capture with URL+form attribution:
+static /r/<slug> and /<lang>/r/<slug> partner landings (noindex, zero JS,
+consent-gated via publicNameConsentRef), ?ref prefill on the existing
+referrerField rail, server-side slug resolution against the bundled
+partners.yaml, referral_partner_slug/name on the Lagebild ingress contract,
+legacy /?ref -> /r/<slug> 302 in the generated worker, and full removal of
+the cookie capture module (wg_ref, referral.attribution entitlement,
+payload.attribution).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -104,14 +114,24 @@ export async function createLagebildModule(): Promise<ModuleExport> {
         name: "lagebild.referral.issue",
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
-          "Issue a recommender ref-code via POST /v1/referrals and return the shareable <site-origin>/?ref=<code> link (RFC-1191). Required flags: `--site`, `--contact`.",
+          "Register a referral-partner slug via POST /v1/referrals and return the shareable <site-origin>/r/<slug> link (RFC-1198). The public page also needs the site-side partners.yaml entry. Required flags: `--site`, `--slug`, `--name`.",
         scope: "workspace",
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem ID." },
-          contact: {
+          slug: {
             kind: "string",
             required: true,
-            description: "Recommender contact email to bind the code to.",
+            description:
+              "Human-readable partner slug (kebab-case, 3–32 chars) — becomes /r/<slug>.",
+          },
+          name: {
+            kind: "string",
+            required: true,
+            description: "Partner display name (public on /r/<slug> — consent required).",
+          },
+          contact: {
+            kind: "string",
+            description: "Partner contact email for CRM notifications (optional).",
           },
           channel: {
             kind: "string",
