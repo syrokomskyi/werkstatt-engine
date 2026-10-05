@@ -5,11 +5,12 @@
 
 <non-goals>
   <item>Does not integrate with mission.close or leitstand.dev-deploy — that is RFC-0652.</item>
-  <item>Does not implement content-addressed deduplication — rejected for simplicity (RFC-0650).</item>
+  <item>Does not implement content-addressed deduplication — rejected for simplicity (RFC-0650). The RFC-1202 upload manifest is a per-prefix completion marker, not a dedup index: keys stay timestamped and same-key re-uploads remain byte-identical overwrites.</item>
   <item>Does not support partial sync or resumable uploads.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1202: prefix-completion idempotency — {runTimestamp}.upload-manifest.json sibling object written last after a successful upload; matching manifest skips the upload entirely (deduped: true); broad-catch manifest read (absent/corrupt/network → upload); dry-run performs the check when R2 env resolves.</item>
   <item>ADR-0025: add periodic progress logging (30s heartbeat) during R2 upload loop.</item>
   <item>RFC-1190: --site/--system flag — explicit Sternsystem for the R2 key prefix, validated against the resolved systemId (SYSTEM_MISMATCH on contradiction); falls back to the currentMission scan / missionId prefix when absent so leitstand.ship evidence-sync-* steps can pass it explicitly.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
@@ -44,8 +45,54 @@ export interface EvidenceSyncResult {
   r2KeyPrefix: string;
   uploadedFiles: string[];
   skippedFiles: string[];
+  deduped: boolean;
   totalBytes: number;
   durationMs: number;
+}
+
+// RFC-1202: completion marker written strictly after the last successful
+// upload. Sibling of the run prefix ({ts}.upload-manifest.json), never inside
+// it — evidence.fetch downloads every key under runPrefix, so an in-prefix
+// marker would pollute downloadedFiles and file counts.
+export interface EvidenceUploadManifest {
+  schemaVersion: 1;
+  missionId: string;
+  runTimestamp: string;
+  fileCount: number;
+  totalBytes: number;
+  files: string[]; // relative paths, sorted
+  completedAt: string;
+}
+
+const UPLOAD_MANIFEST_SUFFIX = ".upload-manifest.json";
+
+function uploadManifestKey(r2KeyPrefix: string): string {
+  return `${r2KeyPrefix.replace(/\/$/, "")}${UPLOAD_MANIFEST_SUFFIX}`;
+}
+
+type R2Client = ReturnType<typeof createR2Client>;
+
+// Deliberately broad catch — NoSuchKey, network errors, and corrupt JSON all
+// mean "no usable manifest": the upload proceeds. Evidence integrity is never
+// traded for the optimization.
+async function readUploadManifest(
+  client: R2Client,
+  key: string,
+): Promise<EvidenceUploadManifest | null> {
+  try {
+    const result = await client.getObject(key);
+    const parsed = JSON.parse(new TextDecoder().decode(result.body)) as EvidenceUploadManifest;
+    if (!parsed || !Array.isArray(parsed.files) || parsed.schemaVersion !== 1) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function manifestMatches(manifest: EvidenceUploadManifest, relativeFiles: string[]): boolean {
+  const local = [...relativeFiles].sort();
+  const stored = [...manifest.files].sort();
+  return local.length === stored.length && local.every((f, i) => f === stored[i]);
 }
 
 interface EvidenceMetadata {
@@ -161,6 +208,28 @@ export async function runEvidenceSync(
   const uploadedFiles: string[] = [];
   const skippedFiles: string[] = [];
   let totalBytes = 0;
+  const manifestKey = uploadManifestKey(r2KeyPrefix);
+
+  const dedupedResult = (dry: boolean): KernelCommandResult<EvidenceSyncResult> => {
+    const skipped = [...relativeFiles].sort();
+    return {
+      data: {
+        missionId,
+        systemId,
+        runTimestamp,
+        r2KeyPrefix,
+        uploadedFiles: [],
+        skippedFiles: skipped,
+        deduped: true,
+        totalBytes: 0,
+        durationMs: Date.now() - startTime,
+      },
+      exitCode: 0,
+      summary: dry
+        ? `[evidence.sync] ${missionId}: dry-run — already archived, ${skipped.length} files would be skipped (manifest match at ${r2KeyPrefix})`
+        : `[evidence.sync] ${missionId}: already archived — ${skipped.length} files skipped (manifest match at ${r2KeyPrefix})`,
+    };
+  };
 
   if (!dryRun) {
     let r2Config;
@@ -176,6 +245,7 @@ export async function runEvidenceSync(
             r2KeyPrefix,
             uploadedFiles: [],
             skippedFiles: [],
+            deduped: false,
             totalBytes: 0,
             durationMs: Date.now() - startTime,
           },
@@ -187,6 +257,13 @@ export async function runEvidenceSync(
     }
 
     const client = createR2Client(r2Config);
+
+    // RFC-1202: a matching completion manifest means the prefix is already
+    // archived — one small read replaces the whole upload.
+    const manifest = await readUploadManifest(client, manifestKey);
+    if (manifest && manifestMatches(manifest, relativeFiles)) {
+      return dedupedResult(false);
+    }
 
     context.logger.info(
       `[evidence.sync] uploading ${relativeFiles.length} files to R2 prefix ${r2KeyPrefix}`,
@@ -251,6 +328,7 @@ export async function runEvidenceSync(
           r2KeyPrefix,
           uploadedFiles,
           skippedFiles,
+          deduped: false,
           totalBytes,
           durationMs: Date.now() - startTime,
         },
@@ -258,7 +336,44 @@ export async function runEvidenceSync(
         summary: `[evidence.sync] R2_UPLOAD_ERROR: failed to upload '${firstError.relPath}': ${firstError.err}`,
       };
     }
+
+    // RFC-1202: manifest written strictly after the loop — a prefix is complete
+    // only when this object exists. A failed write degrades to one extra
+    // upload next run; it never falsifies archival state.
+    const manifestPayload: EvidenceUploadManifest = {
+      schemaVersion: 1,
+      missionId,
+      runTimestamp,
+      fileCount: relativeFiles.length,
+      totalBytes,
+      files: [...relativeFiles].sort(),
+      completedAt: new Date().toISOString(),
+    };
+    try {
+      await client.putObject({
+        key: manifestKey,
+        body: new TextEncoder().encode(JSON.stringify(manifestPayload, null, 2) + "\n"),
+        contentType: "application/json",
+      });
+    } catch (err) {
+      context.logger.warn(
+        `[evidence.sync] upload manifest write failed (next run re-uploads): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   } else {
+    // RFC-1202: dry-run performs the manifest check when R2 env resolves;
+    // MissingEnvError degrades to the plain listing (today's behavior).
+    try {
+      const dryR2Config = resolveR2ConfigFromEnv("axiom-evidence", "R2_AXIOM");
+      const dryClient = createR2Client(dryR2Config);
+      const manifest = await readUploadManifest(dryClient, manifestKey);
+      if (manifest && manifestMatches(manifest, relativeFiles)) {
+        return dedupedResult(true);
+      }
+    } catch (err) {
+      if (!(err instanceof MissingEnvError)) throw err;
+    }
+
     for (const relPath of relativeFiles) {
       const fullPath = path.join(evidenceDir, relPath);
       const stat = await context.io.stat(fullPath);
@@ -281,6 +396,7 @@ export async function runEvidenceSync(
       r2KeyPrefix,
       uploadedFiles,
       skippedFiles,
+      deduped: false,
       totalBytes,
       durationMs,
     },

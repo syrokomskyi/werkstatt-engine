@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1190: declare --site/--system on evidence.sync so leitstand.ship evidence-sync-* steps pass flag validation.</item>
+  <item>RFC-1202: evidence.sync description documents the upload-manifest dedup (repeated runs against an unchanged prefix become manifest-check no-ops).</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
@@ -44,6 +45,9 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
           "RFC-0651: upload all evidence artifacts from missions/{mission}/evidence/axiom/ to R2 " +
           "under {systemId}/{missionId}/{runTimestamp}/ key prefix. Reads runTimestamp from " +
           "evidence-metadata.json (or --run-timestamp flag). Supports --dry-run. " +
+          "RFC-1202: writes a {runTimestamp}.upload-manifest.json sibling marker after a successful " +
+          "upload; a repeat run whose evidence set matches the manifest skips the upload entirely " +
+          "(deduped: true). " +
           "Failure modes: MISSING_ENV, NOT_FOUND, INVALID_EVIDENCE, R2_UPLOAD_ERROR. Required flags: `--mission`.",
         scope: "workspace",
         supportsAllSites: false,

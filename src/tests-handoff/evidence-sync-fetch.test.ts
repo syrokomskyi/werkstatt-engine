@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial evidence sync and fetch unit tests.</item>
+  <item>RFC-1202: upload-manifest dedup tests — AC-1..AC-5, AC-8 + dry-run env fallback + corrupt-manifest recovery.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -204,8 +205,10 @@ describe("evidence.sync (RFC-0651)", () => {
     expect(data.r2KeyPrefix).toBe("warpgogol-com/warpgogol-com-m000025/2026-08-02T13-46-00-000Z/");
     expect(data.uploadedFiles).toContain("evidence-metadata.json");
     expect(data.uploadedFiles).toContain("raw/page-1-axe.json");
-    expect(mockR2State.putCalls).toBe(6);
+    // 6 evidence files + the RFC-1202 upload manifest sibling object.
+    expect(mockR2State.putCalls).toBe(7);
     expect(data.systemId).toBe("warpgogol-com");
+    expect(data.deduped).toBe(false);
   });
 
   it("--dry-run reports what would be uploaded without R2 API calls", async () => {
@@ -280,6 +283,184 @@ describe("evidence.sync (RFC-0651)", () => {
     const data = syncData(result);
     expect(data.runTimestamp).toBe("2026-08-01T00-00-00-000Z");
     expect(data.r2KeyPrefix).toContain("2026-08-01T00-00-00-000Z/");
+  });
+});
+
+describe("evidence.sync upload manifest (RFC-1202)", () => {
+  let tmpDir: string;
+  const TS = "2026-08-02T13-46-00-000Z";
+  const MISSION = "warpgogol-com-m000025";
+  const manifestKey = `warpgogol-com/${MISSION}/${TS}.upload-manifest.json`;
+
+  const files: Record<string, string> = {
+    "evidence-metadata.json": evidenceMeta(TS),
+    "study-run.json": "{}",
+    "observation-bundle.json": "{}",
+  };
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "evidence-manifest-test-"));
+    mockR2State.objects.clear();
+    mockR2State.putCalls = 0;
+    mockR2State.getCalls = 0;
+    mockR2State.listCalls = 0;
+    mockR2State.putShouldFail = false;
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("AC-2/AC-8: first run uploads all files and writes the manifest strictly last", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+
+    const result = await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+
+    expect(result.exitCode).toBe(0);
+    const data = syncData(result);
+    expect(data.deduped).toBe(false);
+    expect(data.uploadedFiles).toHaveLength(3);
+    // Manifest is the final object written — Map preserves insertion order.
+    const keys = [...mockR2State.objects.keys()];
+    expect(keys.at(-1)).toBe(manifestKey);
+    const stored = JSON.parse(new TextDecoder().decode(mockR2State.objects.get(manifestKey)!)) as {
+      files: string[];
+      fileCount: number;
+      schemaVersion: number;
+    };
+    expect(stored.schemaVersion).toBe(1);
+    expect(stored.fileCount).toBe(3);
+    expect(stored.files).toEqual([
+      "evidence-metadata.json",
+      "observation-bundle.json",
+      "study-run.json",
+    ]);
+  });
+
+  it("AC-1/AC-6: second run against unchanged evidence set dedupes — zero file uploads", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+    await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+    const putsAfterFirst = mockR2State.putCalls;
+
+    const result = await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+
+    expect(result.exitCode).toBe(0);
+    const data = syncData(result);
+    expect(data.deduped).toBe(true);
+    expect(data.uploadedFiles).toEqual([]);
+    expect([...data.skippedFiles].sort()).toEqual(
+      ["evidence-metadata.json", "observation-bundle.json", "study-run.json"].sort(),
+    );
+    expect(mockR2State.putCalls).toBe(putsAfterFirst);
+    expect(result.summary).toContain("already archived");
+  });
+
+  it("AC-3: interrupted upload writes no manifest; retry uploads the full set", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+
+    mockR2State.putShouldFail = "simulated network failure";
+    const failed = await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+    expect(failed.exitCode).toBe(1);
+    expect(failed.summary).toContain("R2_UPLOAD_ERROR");
+    expect(mockR2State.objects.has(manifestKey)).toBe(false);
+
+    mockR2State.putShouldFail = false;
+    const retry = await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+    expect(retry.exitCode).toBe(0);
+    const data = syncData(retry);
+    expect(data.deduped).toBe(false);
+    expect(data.uploadedFiles).toHaveLength(3);
+    expect(mockR2State.objects.has(manifestKey)).toBe(true);
+  });
+
+  it("AC-4: diverged manifest file list triggers a full upload and manifest rewrite", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+    mockR2State.objects.set(
+      manifestKey,
+      new TextEncoder().encode(
+        JSON.stringify({
+          schemaVersion: 1,
+          missionId: MISSION,
+          runTimestamp: TS,
+          fileCount: 99,
+          totalBytes: 1,
+          files: ["stale-file.json"],
+          completedAt: "2026-08-02T13:00:00.000Z",
+        }),
+      ),
+    );
+
+    const result = await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+
+    expect(result.exitCode).toBe(0);
+    const data = syncData(result);
+    expect(data.deduped).toBe(false);
+    expect(data.uploadedFiles).toHaveLength(3);
+    const stored = JSON.parse(new TextDecoder().decode(mockR2State.objects.get(manifestKey)!)) as {
+      fileCount: number;
+    };
+    expect(stored.fileCount).toBe(3);
+  });
+
+  it("AC-5: dry-run reports the dedup decision and writes nothing", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+    await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+    const putsAfterFirst = mockR2State.putCalls;
+
+    const result = await runEvidenceSync(
+      makeInput({ mission: MISSION, "dry-run": true }),
+      makeContext(tmpDir),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const data = syncData(result);
+    expect(data.deduped).toBe(true);
+    expect(data.skippedFiles).toHaveLength(3);
+    expect(result.summary).toContain("dry-run");
+    expect(mockR2State.putCalls).toBe(putsAfterFirst);
+  });
+
+  it("AC-5: dry-run without manifest reports would-upload and writes nothing", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+
+    const result = await runEvidenceSync(
+      makeInput({ mission: MISSION, "dry-run": true }),
+      makeContext(tmpDir),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const data = syncData(result);
+    expect(data.deduped).toBe(false);
+    expect(result.summary).toContain("would be uploaded");
+    expect(mockR2State.putCalls).toBe(0);
+  });
+
+  it("dry-run with missing R2 env degrades to the plain file listing", async () => {
+    const { resolveR2ConfigFromEnv } = await import("../evidence/r2-client.ts");
+    vi.mocked(resolveR2ConfigFromEnv).mockImplementationOnce(() => {
+      throw new MissingEnvError("R2_AXIOM_ACCOUNT_ID");
+    });
+    await createEvidenceDir(tmpDir, MISSION, files);
+
+    const result = await runEvidenceSync(
+      makeInput({ mission: MISSION, "dry-run": true }),
+      makeContext(tmpDir),
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(syncData(result).deduped).toBe(false);
+    expect(result.summary).toContain("would be uploaded");
+  });
+
+  it("corrupt manifest is treated as absent — full upload proceeds", async () => {
+    await createEvidenceDir(tmpDir, MISSION, files);
+    mockR2State.objects.set(manifestKey, new TextEncoder().encode("not json {"));
+
+    const result = await runEvidenceSync(makeInput({ mission: MISSION }), makeContext(tmpDir));
+
+    expect(result.exitCode).toBe(0);
+    expect(syncData(result).deduped).toBe(false);
+    expect(syncData(result).uploadedFiles).toHaveLength(3);
   });
 });
 
