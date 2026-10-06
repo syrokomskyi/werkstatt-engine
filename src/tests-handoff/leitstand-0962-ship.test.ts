@@ -4,7 +4,6 @@
   <keywords>RFC-0962, leitstand, ship, composite, test, resume, journal</keywords>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0962: initial test suite for ship composite command.</item>
   <item>RFC-0962 fo-fix: added --until alt, --until main, invalid --until, releaseId restoration on resume tests; fixed resume test for stepResults including skipped steps.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1190: step-count updates for the 18-step plan (evidence-sync-* after each certify-*); mission + skip-evidence-sync added to deploy PHASE_FLAGS; evidence.sync flag table entry.</item>
@@ -13,6 +12,8 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <history>RFC-0962</history>
 </CHANGE_SUMMARY>
 */
 
@@ -94,7 +95,9 @@ const PHASE_FLAGS: Record<string, string[]> = {
     "candidate-id",
     "artifact-hash",
     "base-url",
+    "target",
     "force",
+    "auto-manage-pin",
   ],
   "leitstand.dev-deploy": [
     "site",
@@ -370,6 +373,51 @@ test("self-healing: dirty workpiece after validate triggers auto-commit + re-val
   );
   expect(commitCalls.length).toBe(1);
   assertAllPhaseCallsValid();
+});
+
+test("RFC-1207 AC-6: certify step-done journal record carries candidatePreview.artifactHash", async () => {
+  const journalPath = path.join(operationsDir, "ship-m000001.jsonl");
+  const artifactHash = `sha256:${"b".repeat(64)}`;
+
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+  mockPhaseResult("mission.reconcile", 0);
+  mockPhaseResult("mission.close", 0);
+  mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000004" });
+  mockPhaseResult("sternsystem.sync", 0);
+  mockPhaseResult("release.ready", 0);
+  mockPhaseResult("leitstand.certify", 0, {
+    decisionId: "dec-dev",
+    preview: {
+      artifactHash,
+      baseUrl: "http://127.0.0.1:59999",
+      port: 59999,
+    },
+  });
+  mockPhaseResult("leitstand.dev-deploy", 0, { deploymentUrl: "https://dev.example.com" });
+  mockPhaseResult("sternsystem.sync", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "dev" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  const journalContent = await fs.readFile(journalPath, "utf-8");
+  const certifyDone = journalContent
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map(
+      (line) =>
+        JSON.parse(line) as { kind?: string; step?: string; meta?: Record<string, unknown> },
+    )
+    .find((rec) => rec.kind === "step-done" && rec.step === "certify-dev");
+  expect(certifyDone).toBeDefined();
+  const candidatePreview = certifyDone!.meta?.candidatePreview as
+    { artifactHash?: string; baseUrl?: string } | undefined;
+  expect(candidatePreview?.artifactHash).toBe(artifactHash);
+  expect(candidatePreview?.baseUrl).toBe("http://127.0.0.1:59999");
 });
 
 test("resume after failure skips completed steps", async () => {

@@ -7,8 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1203: leitstand.channels alias — shared leitstandStatusFlags/leitstandStatusReads consts consumed by status+channels declarations; alias delegates to runLeitstandChannels relabeling wrapper.</item>
-  <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1190: declare --mission and --skip-evidence-sync on leitstand.dev-deploy/propagate/promote — explicit mission-context input plus the sole escape hatch for unresolvable context.</item>
@@ -17,7 +15,8 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141</history>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 
@@ -422,7 +421,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:
-          "Produce a GateDecisionV1 JSON file via certification orchestration (RFC-0866). Flags: --site, --gate, --release, --artifact-hash.",
+          "Produce a GateDecisionV1 JSON file via certification orchestration (RFC-0866). Gates measure the candidate artifact through a local wrangler-dev preview by default (RFC-1207). Flags: --site, --gate, --release, --artifact-hash, --target, --base-url.",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -458,7 +457,12 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           "base-url": {
             kind: "string",
             description:
-              "RFC-0866: Dev deployment URL for mission-check producer. Defaults to latest dev effect record URL.",
+              "RFC-0866: Dev deployment URL for mission-check producer. Explicit override — disables candidate preview.",
+          },
+          target: {
+            kind: "string",
+            description:
+              "RFC-1207: measurement target — candidate (default: boots wrangler dev on releases/<id>/dist/server) or channel (audit-only: latest succeeded dev deployment record). --base-url overrides both.",
           },
           force: {
             kind: "boolean",

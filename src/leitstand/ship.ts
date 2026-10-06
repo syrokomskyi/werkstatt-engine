@@ -8,7 +8,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>RFC-0986 fo-fix: final sternsystem.sync epilogue after runOperation — post-sync journal records (op-done and trailing step records) left the cache clone dirty until the next mission sweep, tripping the pre-prompt dirty-clone guard.</item>
   <item>warpgogol-m000175 fo-fix: archive-aware mission resolution via resolveMissionDir (deferred-release flow — ship works on missions/archive/&lt;state&gt;/&lt;id&gt;); closed-state env check accepts cache-clone .env (RFC-0822); stripped-node_modules preflight warning; explicit mission-not-found error replaces misleading .env failure.</item>
   <item>RFC-1190: evidence-sync-* journaled steps after each certify-* — evidence archival out of deploy-execution's invisible branch (clean no-op without evidence/axiom metadata, blocking EVIDENCE_SYNC_FAILED on upload errors); certify+deploy argv forwards --mission; phase maps updated for the 18-step open / 15-step closed plan shapes.</item>
@@ -17,7 +16,8 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149</history>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168</history>
 </CHANGE_SUMMARY>
 */
 
@@ -373,7 +373,15 @@ function buildCertifyAndDeployStep(
       if (deployResult.exitCode !== 0) {
         throw new Error(`${deployCommand} failed: ${deployResult.summary ?? ""}`);
       }
-      return { gate, releaseId, ...(deployResult.data ?? {}) };
+      // RFC-1207: journal the candidate-preview identity in step-done.meta so
+      // --resume can attribute evidence to the measured artifact (AC-6).
+      const certifyData = certifyResult.data as { preview?: Record<string, unknown> } | undefined;
+      return {
+        gate,
+        releaseId,
+        ...(certifyData?.preview ? { candidatePreview: certifyData.preview } : {}),
+        ...(deployResult.data ?? {}),
+      };
     },
   };
 }

@@ -9,6 +9,7 @@
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
 </CHANGE_SUMMARY>
 */
 
@@ -128,6 +129,9 @@ test("RFC-0929: certify fails with clear message when accessPin is set", async (
       gate: "alt",
       release: "test-sys-r000001",
       "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      // RFC-1207: --base-url marks explicit mode — bypasses the candidate
+      // dist/server requirement so the PIN pre-flight is what fails.
+      "base-url": "http://127.0.0.1:8788",
       "auto-manage-pin": false,
     }),
     context,
@@ -164,6 +168,8 @@ test("RFC-0929: --force does not bypass accessPin check", async () => {
       release: "test-sys-r000001",
       "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       force: true,
+      // RFC-1207: explicit mode — bypasses the candidate dist/server check.
+      "base-url": "http://127.0.0.1:8788",
       "auto-manage-pin": false,
     }),
     context,
@@ -194,6 +200,9 @@ test("RFC-0929: tryReuseEvidence skips gate decisions with status=fail", async (
   const artifactHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
   const releaseId = "test-sys-r000001";
 
+  // RFC-1207: the run passes --target channel (below) — audit mode needs no
+  // dist/server fixture and spawns no preview. tryReuseEvidence is
+  // target-agnostic, so the reuse-skip assertion is unchanged.
   mockReaddir.mockImplementation(async (dirPath: string) => {
     if (typeof dirPath === "string" && dirPath.includes("gate-decisions")) {
       return [`${releaseId}-dev.json`];
@@ -232,6 +241,7 @@ test("RFC-0929: tryReuseEvidence skips gate decisions with status=fail", async (
       gate: "alt",
       release: releaseId,
       "artifact-hash": artifactHash,
+      target: "channel",
     }),
     context,
   );

@@ -4,13 +4,13 @@
   <keywords>RFC-0938, leitstand, certify, accessPin, auto-manage, test</keywords>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0938: test unprotect failure — certify fails, PIN not removed, site stays protected.</item>
   <item>RFC-0938: test restore failure — hard fail exitCode 1, restoreError set.</item>
   <item>RFC-0938: test --auto-manage-pin=false preserves RFC-0929 fail-early behavior.</item>
   <item>RFC-0938: test no PIN active — certify proceeds, pinManagement absent or autoManaged true.</item>
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <history>RFC-0938</history>
 </CHANGE_SUMMARY>
 */
@@ -111,7 +111,10 @@ const context = {
 } as unknown as KernelRuntimeContext;
 
 function makeInput(flags: Record<string, KernelFlagValue>): KernelCommandInput {
-  return { flags, argv: [] };
+  // RFC-1207: these tests exercise PIN management, which is target-agnostic.
+  // Channel audit mode reproduces the legacy resolution path (no dist/server
+  // fixture needed, no wrangler dev spawn).
+  return { flags: { target: "channel", ...flags }, argv: [] };
 }
 
 beforeEach(() => {

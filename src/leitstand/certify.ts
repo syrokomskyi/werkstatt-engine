@@ -8,8 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-01-01: resolveDevBaseUrl trusts only state:"succeeded" dev records (failed deploys poisoned the cert base URL — first-deploy deadlock) and narrows the parsed state field to DeploymentOperationState.</item>
-  <item>RECOVERY-2026-10-04: --base-url flag is now authoritative in resolveDevBaseUrl (checked before dev deployment records). Rationale: a poisoned live dev channel (succeeded deploy carrying a defect the gate now flags) made certify-dev unpassable — the gate measured the old artifact, blocking the deploy that would fix it. The explicit flag lets the operator certify a candidate served elsewhere (e.g. localhost artifact preview) and is the documented failed-gate recovery path. The preview MUST be a faithful Pages-equivalent server — run `wrangler dev` inside releases/&lt;id&gt;/dist/server so generated client/_headers and the Worker apply; a bare static server emits no security headers and fails certification with preview-only security-headers blockers.</item>
   <item>RECOVERY-2026-10-04: mission.check invocation now passes --channel=gateChannel — previously the flag was omitted, defaulting the suppression context to "main", so channelNot-scoped axiom suppressions (RFC-0684) never fired on dev/alt certifies. Gate channel is already validated to the same dev|alt|main enum.</item>
   <item>2026-10-04 recovery fix: mission.check timeouts raised to a shared 25min constant (was inner 5min race + outer 300s orchestrator timeout — a cold ~7-11min capture always exceeded both, racing a fail decision vs an "incomplete" no-decision return while abandoned mission.check processes kept running). Orchestrator timeout derives as +60s so the inner race still produces the diagnostic envelope deterministically.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -18,7 +16,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RECOVERY-2026-10-05: stale-channel detection — resolveDevDeploymentRecord captures the releaseId of the latest succeeded dev record; detectMeasuredReleaseMismatch flags when a remote (non---base-url) certify would measure a different artifact than the candidate. Upfront logger.warn, measured-release reason in the gate decision, and a fail-summary hint pointing at the --base-url recovery path (warpgogol r000028 dev gate measured stale r000027).</item>
-  <history>RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -38,6 +37,11 @@ import type { GateChannel } from "../certification/contracts/identifiers.ts";
 import type { DeploymentOperationState } from "../certification/state-machine.ts";
 import { astroCertificationProfile } from "../certification/profile/astro-profile.ts";
 import { makeR2ConfigFromEnv, resolveArtifactHash, flagSite } from "./deploy-helpers.ts";
+import {
+  provisionCandidatePreview,
+  type CandidatePreview,
+  type CertifyTarget,
+} from "./candidate-preview.ts";
 import { resolveCacheClonePath, readSystemStateSmart } from "../sternsystem/registry-io.ts";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
 import { gitExec } from "../werkstatt/git-exec.ts";
@@ -244,6 +248,15 @@ export interface CertifyResult {
   producerCount: number;
   evidenceCount: number;
   pinManagement?: PinManagement;
+  // RFC-1207: measurement-target provenance — which artifact the gate evaluated.
+  measurementTarget?: "candidate-preview" | "channel" | "explicit";
+  measuredReleaseId?: string;
+  /** Candidate-preview identity. Present on every candidate-mode run; baseUrl/port only when a preview was actually provisioned (evidence-reuse runs skip the boot). */
+  preview?: {
+    artifactHash: string;
+    baseUrl?: string;
+    port?: number;
+  };
 }
 
 export async function runLeitstandCertify(
@@ -275,21 +288,54 @@ export async function runLeitstandCertify(
   const baseUrlFlag = flagString(input, "base-url");
   const gateChannel = gate as GateChannel;
 
-  const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
-  const resolvedBase = await resolveDevDeploymentRecord(cacheCloneDir, baseUrlFlag);
-  const baseUrl = resolvedBase?.deploymentUrl;
-
-  // RECOVERY-2026-10-05: stale-channel detection. Without --base-url the gate
-  // crawls the latest *succeeded dev* deployment record's URL — which may host
-  // a different release than the candidate. Surface that upfront so a
-  // misleading verdict self-explains instead of being chased as a regression.
-  const measuredReleaseId = baseUrlFlag ? undefined : resolvedBase?.releaseId;
-  const measuredMismatch = detectMeasuredReleaseMismatch(baseUrlFlag, measuredReleaseId, releaseId);
-  if (measuredMismatch) {
-    context.logger.warn(
-      `[leitstand.certify] gate=${gate} measures the recorded dev deployment of ${measuredMismatch}, not candidate ${releaseId} — findings reflect the deployed channel artifact. ` +
-        `For candidate-true certification serve the release artifact locally and pass --base-url (RECOVERY-2026-10-04).`,
+  // RFC-1207: measurement target resolution — `--base-url` is the explicit
+  // override (verbatim, unchanged); `--target channel` keeps the legacy
+  // channel-measuring audit path; the default `candidate` mode provisions a
+  // local `wrangler dev` preview of the candidate artifact inside certifyCore.
+  const targetFlag = flagString(input, "target");
+  if (targetFlag !== undefined && targetFlag !== "candidate" && targetFlag !== "channel") {
+    throw new Error(
+      `[leitstand.certify] --target must be "candidate" or "channel" (got: ${targetFlag})`,
     );
+  }
+  const certifyTarget: CertifyTarget = targetFlag === "channel" ? "channel" : "candidate";
+
+  const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
+  const candidateServerDir = path.join(releaseDir, "dist", "server");
+
+  // Candidate mode fails closed when the built artifact is missing — the
+  // authorizing gate never silently measures the incumbent channel. The check
+  // runs before PIN management so an absent artifact does not churn the access
+  // PIN. Explicit --base-url and --target channel bypass it.
+  if (!baseUrlFlag && certifyTarget === "candidate") {
+    const earlyIo = context.io;
+    if (!(await earlyIo.exists(candidateServerDir))) {
+      const msg =
+        `[leitstand.certify] candidate artifact missing: ${candidateServerDir} not found. ` +
+        `The gate measures the candidate artifact through a local preview (RFC-1207) — build it first.`;
+      return {
+        data: {
+          command: "leitstand.certify",
+          systemId,
+          gate,
+          decisionId: "",
+          status: "fail",
+          outputPath: "",
+          producerCount: 0,
+          evidenceCount: 0,
+          measurementTarget: "candidate-preview",
+          measuredReleaseId: releaseId,
+        } as CertifyResult,
+        summary: msg,
+        exitCode: 2,
+        nextSteps: [
+          {
+            action: `Build the release artifact: pnpm exec werkstatt run release.prepare --mission <mission-id>`,
+            kind: "required",
+          },
+        ],
+      } as unknown as KernelCommandResult<CertifyResult>;
+    }
   }
 
   const forceRequested = flagBoolean(input, "force");
@@ -383,6 +429,42 @@ export async function runLeitstandCertify(
   const certifyCore = async (
     io: WorkspaceIO = createDefaultIO().io,
   ): Promise<KernelCommandResult<CertifyResult>> => {
+    // RFC-1207: resolve the measurement target inside certifyCore so the
+    // preview lifecycle stays scoped to the evaluation. Explicit --base-url
+    // wins verbatim; channel mode keeps the legacy deployment-record path;
+    // candidate mode provisions wrangler dev lazily — only when producers
+    // actually run (evidence reuse skips the boot entirely).
+    let baseUrl: string | undefined;
+    let measuredReleaseId: string | undefined;
+    let measurementTarget: "candidate-preview" | "channel" | "explicit" | undefined;
+    let measuredMismatch: string | null = null;
+    let preview: CandidatePreview | null = null;
+
+    if (baseUrlFlag) {
+      baseUrl = baseUrlFlag;
+      measurementTarget = "explicit";
+    } else if (certifyTarget === "channel") {
+      const resolvedBase = await resolveDevDeploymentRecord(cacheCloneDir, undefined);
+      baseUrl = resolvedBase?.deploymentUrl;
+      measuredReleaseId = resolvedBase?.releaseId;
+      measurementTarget = "channel";
+      // RECOVERY-2026-10-05: stale-channel detection. The gate crawls the
+      // latest *succeeded dev* deployment record's URL — which may host a
+      // different release than the candidate. Surface that upfront so a
+      // misleading verdict self-explains instead of being chased as a
+      // regression. Audit-only mode — ship never passes --target channel.
+      measuredMismatch = detectMeasuredReleaseMismatch(undefined, measuredReleaseId, releaseId);
+      if (measuredMismatch) {
+        context.logger.warn(
+          `[leitstand.certify] gate=${gate} measures the recorded dev deployment of ${measuredMismatch}, not candidate ${releaseId} — findings reflect the deployed channel artifact. ` +
+            `For candidate-true certification serve the release artifact locally and pass --base-url (RECOVERY-2026-10-04).`,
+        );
+      }
+    } else {
+      measurementTarget = "candidate-preview";
+      measuredReleaseId = releaseId;
+    }
+
     const reuseEntry = await tryReuseEvidence(
       cacheCloneDir,
       releaseId,
@@ -629,54 +711,110 @@ export async function runLeitstandCertify(
       evidence = reuseEntry.evidence;
       producerCount = 0;
     } else {
-      const execResult = await executeProducers(plan, handler, {
-        candidate,
-        profile: astroCertificationProfile,
-        policyBundle,
-        config: {
-          ...DEFAULT_PRODUCER_CONFIG,
-          operationId,
-          timestamp: now,
-          timeoutMs: MISSION_CHECK_TIMEOUT_MS + 60_000,
-          maxRetries: 1,
-        },
-      });
-
-      if (!execResult.ok) {
-        return {
-          data: {
-            command: "leitstand.certify",
-            systemId,
-            gate,
-            decisionId: "",
-            status: "incomplete",
-            outputPath: "",
-            producerCount: producerNodes.length,
-            evidenceCount: 0,
-          },
-          summary: `[leitstand.certify] producer execution failed: ${execResult.ruleId} — ${execResult.message}`,
-          exitCode: 1,
-          diagnostics: [
-            {
-              ruleId: execResult.ruleId,
-              severity: "error",
-              message: execResult.message,
-              evidence: [],
-            },
-          ],
-        } as unknown as KernelCommandResult<CertifyResult>;
+      // RFC-1207: candidate mode boots the preview only here — evidence-reuse
+      // paths never spawn wrangler dev, and PIN-failure early returns precede
+      // certifyCore entirely.
+      if (measurementTarget === "candidate-preview") {
+        try {
+          preview = await provisionCandidatePreview({
+            serverDir: candidateServerDir,
+            releaseId,
+            artifactHash,
+            logger: context.logger,
+          });
+          baseUrl = preview.baseUrl;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return {
+            data: {
+              command: "leitstand.certify",
+              systemId,
+              gate,
+              decisionId: "",
+              status: "fail",
+              outputPath: "",
+              producerCount: 0,
+              evidenceCount: 0,
+              measurementTarget,
+              measuredReleaseId,
+            } as CertifyResult,
+            summary: `[leitstand.certify] candidate preview failed (infrastructure): ${msg}`,
+            exitCode: 2,
+            nextSteps: [
+              {
+                action: `Verify ${candidateServerDir} exists and wrangler is installed (pnpm exec wrangler --version), then re-run the gate`,
+                kind: "required",
+              },
+            ],
+          } as unknown as KernelCommandResult<CertifyResult>;
+        }
       }
 
-      evidence = execResult.evidence;
+      try {
+        const execResult = await executeProducers(plan, handler, {
+          candidate,
+          profile: astroCertificationProfile,
+          policyBundle,
+          config: {
+            ...DEFAULT_PRODUCER_CONFIG,
+            operationId,
+            timestamp: now,
+            timeoutMs: MISSION_CHECK_TIMEOUT_MS + 60_000,
+            maxRetries: 1,
+          },
+        });
 
-      await writeEvidenceSidecar(
-        cacheCloneDir,
-        releaseId,
-        artifactHash,
-        evidence,
-        now,
-        gateChannel,
-      );
+        if (!execResult.ok) {
+          return {
+            data: {
+              command: "leitstand.certify",
+              systemId,
+              gate,
+              decisionId: "",
+              status: "incomplete",
+              outputPath: "",
+              producerCount: producerNodes.length,
+              evidenceCount: 0,
+              measurementTarget,
+              measuredReleaseId,
+            } as CertifyResult,
+            summary: `[leitstand.certify] producer execution failed: ${execResult.ruleId} — ${execResult.message}`,
+            exitCode: 1,
+            diagnostics: [
+              {
+                ruleId: execResult.ruleId,
+                severity: "error",
+                message: execResult.message,
+                evidence: [],
+              },
+            ],
+          } as unknown as KernelCommandResult<CertifyResult>;
+        }
+
+        evidence = execResult.evidence;
+
+        await writeEvidenceSidecar(
+          cacheCloneDir,
+          releaseId,
+          artifactHash,
+          evidence,
+          now,
+          gateChannel,
+        );
+      } finally {
+        // RFC-1207 (AC-7): preview teardown is finally-guaranteed — a failed
+        // evaluation leaves no orphan wrangler dev. A crashed teardown warns
+        // but does not flip the verdict.
+        if (preview) {
+          try {
+            await preview.stop();
+          } catch (stopErr) {
+            context.logger.warn(
+              `[leitstand.certify] candidate preview teardown failed: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`,
+            );
+          }
+        }
+      }
     }
 
     const evaluationResult = evaluateCertificationDecision({
@@ -700,7 +838,9 @@ export async function runLeitstandCertify(
           outputPath: "",
           producerCount: producerCount,
           evidenceCount: evidence.length,
-        },
+          measurementTarget,
+          measuredReleaseId,
+        } as CertifyResult,
         summary: `[leitstand.certify] evaluation failed: ${evaluationResult.code} — ${evaluationResult.message}`,
         exitCode: 1,
         diagnostics: [
@@ -741,6 +881,11 @@ export async function runLeitstandCertify(
       ],
       actionPackRef: null,
       decidedAt: now,
+      // RFC-1207 (AC-2): provenance persisted on the decision record itself —
+      // not only the command result — so audits can tell which artifact the
+      // verdict measured.
+      measurementTarget,
+      measuredReleaseId,
     };
 
     const outputDir = path.join(cacheCloneDir, "gate-decisions");
@@ -827,6 +972,18 @@ export async function runLeitstandCertify(
         mainVerificationPath,
         producerCount: producerCount,
         evidenceCount: evidence.length,
+        measurementTarget,
+        measuredReleaseId,
+        // Preview identity rides every candidate-mode result — including
+        // evidence-reuse runs that never booted a preview — so leitstand.ship
+        // can journal candidatePreview.artifactHash for resume attribution.
+        preview:
+          measurementTarget === "candidate-preview"
+            ? {
+                artifactHash,
+                ...(preview ? { baseUrl: preview.baseUrl, port: preview.port } : {}),
+              }
+            : undefined,
       },
       summary:
         `[leitstand.certify] gate=${gate} status=${evaluationResult.status} decision=${decisionId} output=${outputPath}` +

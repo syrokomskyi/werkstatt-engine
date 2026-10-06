@@ -5,7 +5,8 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0867: initial tests for evidence reuse — same hash, different hash, --force, stale, missing sidecar.</item>
-<item>Contract test: real evidence envelopes from runLeitstandCertify must pass evidenceEnvelopeV1Schema.safeParse — catches ID format mismatches that silently break reuse.</item>
+  <item>Contract test: real evidence envelopes from runLeitstandCertify must pass evidenceEnvelopeV1Schema.safeParse — catches ID format mismatches that silently break reuse.</item>
+  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
 </CHANGE_SUMMARY>
 */
 
@@ -209,6 +210,7 @@ test("same artifact hash → evidence reused (producers not executed)", async ()
       gate: "alt",
       release: releaseId,
       "artifact-hash": ARTIFACT_HASH,
+      target: "channel",
     },
     argv: [],
   };
@@ -233,6 +235,7 @@ test("different artifact hash → producers execute", async () => {
       gate: "alt",
       release: releaseId,
       "artifact-hash": DIFFERENT_HASH,
+      target: "channel",
     },
     argv: [],
   };
@@ -255,6 +258,7 @@ test("--force → producers execute even with matching hash", async () => {
       release: releaseId,
       "artifact-hash": ARTIFACT_HASH,
       force: true,
+      target: "channel",
     },
     argv: [],
   };
@@ -276,6 +280,7 @@ test("stale evidence → producers execute", async () => {
       gate: "alt",
       release: releaseId,
       "artifact-hash": ARTIFACT_HASH,
+      target: "channel",
     },
     argv: [],
   };
@@ -297,6 +302,7 @@ test("missing evidence sidecar → producers execute (no error)", async () => {
       gate: "alt",
       release: releaseId,
       "artifact-hash": ARTIFACT_HASH,
+      target: "channel",
     },
     argv: [],
   };
@@ -319,6 +325,7 @@ test("contract: real evidence envelopes pass evidenceEnvelopeV1Schema validation
       gate: "dev",
       release: releaseId,
       "artifact-hash": ARTIFACT_HASH,
+      target: "channel",
     },
     argv: [],
   };
