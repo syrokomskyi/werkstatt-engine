@@ -12,6 +12,7 @@ passport stale.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0092: initial staleness helpers — BOOKKEEPING_BORDBUCH_KINDS, isBordbuchDriftBookkeepingOnly, dropTrailingBookkeepingEntries.</item>
+  <item>RFC-1210: closed-loop signal ingest to bounded missions (RFC-1210)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -23,7 +24,12 @@ import type { BordbuchEntry, BordbuchEntryKind } from "@warpgogol/werkstatt-engi
  * treated as state-changing, so a new bookkeeping kind must be added
  * explicitly or it will (correctly) stale passports.
  */
-export const BOOKKEEPING_BORDBUCH_KINDS: ReadonlySet<BordbuchEntryKind> = new Set(["mirror-sync"]);
+export const BOOKKEEPING_BORDBUCH_KINDS: ReadonlySet<BordbuchEntryKind> = new Set([
+  "mirror-sync",
+  // RFC-1210: remediation-mission records signal-triggered mission opens —
+  // propagation/bookkeeping of an autonomy decision, not authored state change.
+  "remediation-mission",
+]);
 
 /**
  * ADR-0092: true when every entry appended after `recordedHead` is a
