@@ -4,12 +4,12 @@
 <keywords>RFC-0594, mission.git.commit, pre-commit, validation, gate, test</keywords>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0594: initial unit and integration tests for runPreCommitValidation and mission.git.commit gate.</item>
-  <item>RFC-1095: summary-record unit tests, commit integration tests, CS rules into compass.validate</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1160: commit-gate validators (page.block.validate + image.variants.validate scoped mode, IMG-VARIANT-SRC rules, any-unscoped-wins scope resolution)</item>
   <item>RFC-1185: shared.context.validate joins the pages/system.md prefix mapping — prefix-matching test updated for the sixth validator</item>
   <item>RFC-1199: MATERIALIZATION_IN_PROGRESS guard tests — sentinel blocks, materializedAt-null fallback blocks, guard precedes .git check</item>
+  <item>RFC-1204: trigger effects.contract.validate unscoped on pages/prose staging</item>
+  <history>RFC-0594, RFC-1095</history>
 </CHANGE_SUMMARY>
 */
 
@@ -100,6 +100,7 @@ test("prefix matching — business-profile and pages trigger correct validators"
     "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
     "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
     "shared.context.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "effects.contract.validate": { ok: true, exitCode: 0, summary: "pass" },
   };
   const result = await runPreCommitValidation(
     ["src/content/business-profile/de/offerings/automation.md", "src/content/pages/de/index.md"],
@@ -114,7 +115,9 @@ test("prefix matching — business-profile and pages trigger correct validators"
   expect(result.validatorsRun).toContain("typography.validate");
   // RFC-1185: pages/ commits also trigger the explicit-inherit-edge validator.
   expect(result.validatorsRun).toContain("shared.context.validate");
-  expect(result.validatorsRun).toHaveLength(6);
+  // RFC-1204: pages/ commits trigger the unscoped effect-signature parity check.
+  expect(result.validatorsRun).toContain("effects.contract.validate");
+  expect(result.validatorsRun).toHaveLength(7);
 });
 
 test("unregistered validator — skipped with warning, commit proceeds", async () => {
@@ -219,6 +222,29 @@ test("mixed system.md + pages commit runs page.block.validate UNSCOPED (AC-9, an
   expect(
     mockState.validatorArgv["page.block.validate"],
     "mixed commit with system.md must force an unscoped page.block.validate",
+  ).toBeUndefined();
+});
+
+test("pages commit runs effects.contract.validate UNSCOPED (RFC-1204 AC-6)", async () => {
+  const { runPreCommitValidation } = await import("../mission/mission-git-commit.ts");
+  mockState.validatorResults = {
+    "page.block.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "semantic.drift.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "image.variants.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "shared.context.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "effects.contract.validate": { ok: true, exitCode: 0, summary: "pass" },
+  };
+  const result = await runPreCommitValidation(
+    ["src/content/pages/de/agb.md"],
+    "test-system",
+    tmpWorkspace,
+  );
+  expect(result.passed).toBe(true);
+  expect(result.validatorsRun).toContain("effects.contract.validate");
+  expect(
+    mockState.validatorArgv["effects.contract.validate"],
+    "effect-signature parity is cross-page/cross-locale — argv must omit --scope-files",
   ).toBeUndefined();
 });
 

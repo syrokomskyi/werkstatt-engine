@@ -102,4 +102,22 @@ describe("mission-git-commit", () => {
     ]);
     expect(validators).toContain("shared.context.validate");
   });
+
+  // RFC-1204
+  test("VALIDATOR_MAPPINGS maps pages+prose to effects.contract.validate unscoped", () => {
+    const mappings = mod.VALIDATOR_MAPPINGS.filter(
+      (m) => m.validator === "effects.contract.validate",
+    );
+    expect(mappings.map((m) => m.prefix).sort()).toEqual([
+      "src/content/pages/",
+      "src/content/prose/",
+    ]);
+    // Parity is cross-page/cross-locale — never scoped to the staged files.
+    expect(mappings.every((m) => m.scoped !== true)).toBe(true);
+  });
+
+  test("selectValidators picks effects.contract.validate for page files (AC-6)", () => {
+    const validators = mod.selectValidators(["src/content/pages/uk/kontakt.md"]);
+    expect(validators).toContain("effects.contract.validate");
+  });
 });
