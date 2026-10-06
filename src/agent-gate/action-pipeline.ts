@@ -40,6 +40,7 @@ import type { AgentGatePorts } from "./ports.ts";
 import type { VerifiedAgent } from "@warpgogol/werkstatt-shared/agent";
 import { resolveBearerAgent } from "./agent-auth.ts";
 import type { RateLimiter } from "./limits.ts";
+import { emitAgentUsage } from "./usage.ts";
 import {
   validateAgainstCapabilitySchema,
   buildIntegrationEventFromAction,
@@ -406,6 +407,15 @@ export async function executeAction(input: ActionExecutionInput): Promise<Action
   }
   try {
     const receipt = await ports.dispatch.send(event);
+    // RFC-1212: metered capabilities journal exactly one usage record — only
+    // here, after dispatch.send resolved, so rejected/replayed calls never
+    // bill. Fire-and-forget; the sink dropping is non-fatal (journaled pull).
+    await emitAgentUsage(ports, {
+      siteId: manifest.site,
+      capability,
+      callerIdentity: agentIdentity.verifiedAgentId ?? "anonymous",
+      idempotencyKey,
+    });
     if (idempotencyKey && ports.idempotency && bodyHash) {
       try {
         await ports.idempotency.put(idempotencyKey, bodyHash, receipt, IDEMPOTENCY_TTL_SECONDS);

@@ -19,7 +19,11 @@ concrete port implementations (fetch-based knowledge reads, QStash dispatch).
 */
 
 import type { IntegrationEvent } from "@warpgogol/werkstatt-shared/integration/port";
-import type { ActionReceipt, AgentTrafficEvent } from "@warpgogol/werkstatt-shared/agent";
+import type {
+  ActionReceipt,
+  AgentTrafficEvent,
+  AgentUsageRecord,
+} from "@warpgogol/werkstatt-shared/agent";
 import type { AgentAuthPorts } from "./agent-auth.ts";
 import type { RateLimiter } from "./limits.ts";
 
@@ -44,8 +48,12 @@ export interface AgentGatePorts {
    */
   dispatch: { send(event: IntegrationEvent): Promise<ActionReceipt> };
   now(): Date;
-  /** RFC-0291: optional rate limiter factory. If absent, no rate limiting (fail-open). */
-  createRateLimiter?: (maxPerWindow: number) => RateLimiter;
+  /**
+   * RFC-0291: optional rate limiter factory. If absent, no rate limiting (fail-open).
+   * RFC-1212: optional `windowSeconds` — metering free-allowance windows are
+   * day/month-scale; adapters default to their throttle window when omitted.
+   */
+  createRateLimiter?: (maxPerWindow: number, windowSeconds?: number) => RateLimiter;
   /**
    * RFC-1112: optional receipt store for Idempotency-Key dedup. If absent,
    * requests proceed without dedup and responses carry `X-Agent-Idempotency: disabled`.
@@ -59,6 +67,16 @@ export interface AgentGatePorts {
    * captures structured stdout); absent port = telemetry disabled.
    */
   telemetry?: (event: AgentTrafficEvent) => void;
+  /**
+   * RFC-1212: optional sink for journaled `gogol.agent-usage/1` records —
+   * called exactly once per dispatched metered call (post-dispatch only;
+   * rejected/replayed calls never reach it). Fire-and-forget: the emit helper
+   * swallows sink errors. The engine only journals — the pull-model bridge in
+   * `werkstatt-site/src/billing` drains records into billing; the engine
+   * never imports billing packages (AC-9). Absent port = metering records
+   * drop silently (metering never breaks the request path).
+   */
+  usage?: (record: AgentUsageRecord) => void;
   /**
    * RFC-1187: authorization-server ports. Present only when the site enabled
    * `agent.auth` AND the runtime wiring exists (Upstash Redis secrets +

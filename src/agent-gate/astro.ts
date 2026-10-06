@@ -66,6 +66,7 @@ import {
 import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, extractAgentIdentity, type AgentGatePorts } from "./index.ts";
 import { emitAgentTraffic, workerLogTelemetry, type TrafficRecorder } from "./telemetry.ts";
+import { workerLogUsage } from "./usage.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 import { runAgentSearch } from "./search-route.ts";
 import { runAgentHealth } from "./health-route.ts";
@@ -237,8 +238,13 @@ async function buildPorts(
     now: () => new Date(),
     // RFC-1172: one structured JSON line per gate request → Workers logs.
     telemetry: workerLogTelemetry,
-    // RFC-0291: 60-second fixed window per capability per IP.
-    createRateLimiter: (maxPerWindow) => createFixedWindowLimiter(60, maxPerWindow),
+    // RFC-1212: journaled usage records — same stdout channel, drained by the
+    // site billing bridge (pull model — engine never calls billing packages).
+    usage: workerLogUsage,
+    // RFC-0291: 60-second fixed window per capability per IP by default;
+    // RFC-1212 metering free-allowance windows pass day/month-scale seconds.
+    createRateLimiter: (maxPerWindow, windowSeconds = 60) =>
+      createFixedWindowLimiter(windowSeconds, maxPerWindow),
     // RFC-1112: receipt store over the same EU Redis as the delivery ledger.
     // Absent when the secrets are not configured — the gate then answers with
     // X-Agent-Idempotency: disabled.
