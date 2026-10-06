@@ -42,6 +42,7 @@ import {
   type JsonRpcResponse,
 } from "./mcp/protocol.ts";
 import type { TrafficRecorder } from "./telemetry.ts";
+import { extractHttpPresentation } from "./presentation.ts";
 import {
   type ActionContext,
   resolveCapability,
@@ -284,6 +285,9 @@ export function createAgentGate(
         agentIdentity,
         idempotencyKey,
         bodyHash,
+        // RFC-1213: verifiable presentation rides the dedicated header — the
+        // body schema stays closed per capability.
+        presentation: extractHttpPresentation(request),
         ...(traffic ? { traffic } : {}),
       };
 
@@ -389,6 +393,7 @@ export function createAgentGate(
         agentIdentity,
         clientIp: extractClientIp(request),
         idempotencyKey: extractIdempotencyKey(request),
+        presentation: extractHttpPresentation(request),
         ...(verifiedAgent ? { verifiedAgent } : {}),
       });
       // RFC-1172: JSON-RPC errors ride HTTP 200 — record the semantic outcome.

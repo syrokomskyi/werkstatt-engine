@@ -67,6 +67,7 @@ import type { CapabilityRecord } from "@warpgogol/werkstatt-shared/ontology";
 import { createAgentGate, extractAgentIdentity, type AgentGatePorts } from "./index.ts";
 import { emitAgentTraffic, workerLogTelemetry, type TrafficRecorder } from "./telemetry.ts";
 import { workerLogUsage } from "./usage.ts";
+import { workerLogPresentationVerdict } from "./presentation.ts";
 import { createFixedWindowLimiter } from "./limits.ts";
 import { runAgentSearch } from "./search-route.ts";
 import { runAgentHealth } from "./health-route.ts";
@@ -241,6 +242,10 @@ async function buildPorts(
     // RFC-1212: journaled usage records — same stdout channel, drained by the
     // site billing bridge (pull model — engine never calls billing packages).
     usage: workerLogUsage,
+    // RFC-1213: journaled presentation verdicts — hash-only records, drained
+    // like usage. The presentationVerifier port stays unconfigured until a
+    // VC DM 2.0 library is selected (readiness — the boundary fails closed).
+    presentationJournal: workerLogPresentationVerdict,
     // RFC-0291: 60-second fixed window per capability per IP by default;
     // RFC-1212 metering free-allowance windows pass day/month-scale seconds.
     createRateLimiter: (maxPerWindow, windowSeconds = 60) =>

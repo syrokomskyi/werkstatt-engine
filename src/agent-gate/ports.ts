@@ -23,7 +23,9 @@ import type {
   ActionReceipt,
   AgentTrafficEvent,
   AgentUsageRecord,
+  PresentationJournalRecord,
 } from "@warpgogol/werkstatt-shared/agent";
+import type { PresentationVerifier } from "./presentation.ts";
 import type { AgentAuthPorts } from "./agent-auth.ts";
 import type { RateLimiter } from "./limits.ts";
 
@@ -77,6 +79,21 @@ export interface AgentGatePorts {
    * drop silently (metering never breaks the request path).
    */
   usage?: (record: AgentUsageRecord) => void;
+  /**
+   * RFC-1213: injected cryptographic verifier for verifiable presentations —
+   * a maintained VC DM 2.0 / OIDC4VP library plugs in here. Absent = no
+   * verifier surface; capabilities declaring requires.verifiablePresentation
+   * fail closed at the boundary (AGP-02 blocks the declaration at author time).
+   */
+  presentationVerifier?: PresentationVerifier;
+  /**
+   * RFC-1213: journaled sink for `gogol.presentation-verdict/1` records —
+   * called once per completed verification (success or failure) carrying
+   * {requirementId, verified, issuer, failureReason, presentationHash} only;
+   * claim values never reach the journal. Fire-and-forget; the emit helper
+   * swallows sink errors.
+   */
+  presentationJournal?: (record: PresentationJournalRecord) => void;
   /**
    * RFC-1187: authorization-server ports. Present only when the site enabled
    * `agent.auth` AND the runtime wiring exists (Upstash Redis secrets +

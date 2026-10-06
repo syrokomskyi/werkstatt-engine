@@ -69,6 +69,8 @@ export interface A2aHandlerContext {
    * as the HTTP action route.
    */
   verifiedAgent?: VerifiedAgent;
+  /** RFC-1213: verifiable presentation extracted at the transport boundary (VP header). */
+  presentation?: unknown;
 }
 
 // RFC-0291: module-level limiter cache for the A2A path (mirrors mcp/handler.ts).
@@ -249,6 +251,7 @@ async function handleSendMessage(
     agentIdentity: ctx.agentIdentity ?? {},
     idempotencyKey: ctx.idempotencyKey,
     bodyHash,
+    presentation: ctx.presentation,
   });
   switch (result.kind) {
     case "receipt":

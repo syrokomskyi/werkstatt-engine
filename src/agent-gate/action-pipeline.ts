@@ -27,6 +27,7 @@ import type {
   AgentSurfaceManifest,
   ActionReceipt,
   AgentProblemDetails,
+  PresentationVerdict,
 } from "@warpgogol/werkstatt-shared/agent";
 import { buildAgentProblem } from "@warpgogol/werkstatt-shared/agent";
 import type { TrafficRecorder } from "./telemetry.ts";
@@ -41,6 +42,7 @@ import type { VerifiedAgent } from "@warpgogol/werkstatt-shared/agent";
 import { resolveBearerAgent } from "./agent-auth.ts";
 import type { RateLimiter } from "./limits.ts";
 import { emitAgentUsage } from "./usage.ts";
+import { checkPresentationRequirement } from "./presentation.ts";
 import {
   validateAgainstCapabilitySchema,
   buildIntegrationEventFromAction,
@@ -78,6 +80,10 @@ export interface ActionContext {
   verifiedAgent?: VerifiedAgent;
   /** RFC-1172: optional per-request telemetry recorder — steps record what only they know (duplicate replay). */
   traffic?: TrafficRecorder;
+  /** RFC-1213: raw verifiable presentation extracted from the transport (header/_meta). */
+  presentation?: unknown;
+  /** RFC-1213: the bound verdict — the only presentation fact downstream sees. */
+  presentationVerdict?: PresentationVerdict;
 }
 
 export type StepResult = Response | void;
@@ -297,12 +303,18 @@ export interface ActionExecutionInput {
   agentIdentity: Record<string, string>;
   idempotencyKey?: string;
   bodyHash?: string;
+  /**
+   * RFC-1213: the raw verifiable presentation attached by the caller
+   * (X-Agent-Verifiable-Presentation header on HTTP, params._meta on MCP/A2A)
+   * — parsed and verified inside this boundary only.
+   */
+  presentation?: unknown;
 }
 
 export type ActionExecution =
-  | { kind: "receipt"; receipt: ActionReceipt }
-  | { kind: "preview"; envelope: ActionPreviewResult }
-  | { kind: "problem"; problem: AgentProblemDetails };
+  | { kind: "receipt"; receipt: ActionReceipt; verdict?: PresentationVerdict }
+  | { kind: "preview"; envelope: ActionPreviewResult; verdict?: PresentationVerdict }
+  | { kind: "problem"; problem: AgentProblemDetails; verdict?: PresentationVerdict };
 
 /** RFC-1169: one machine-readable field violation on the preview failure branch. */
 export interface ActionPreviewProblem {
@@ -371,8 +383,35 @@ export function buildPreviewReady(
  * already succeeded — the receipt is still returned).
  */
 export async function executeAction(input: ActionExecutionInput): Promise<ActionExecution> {
-  const { capability, manifest, ports, validatedValue, agentIdentity, idempotencyKey, bodyHash } =
-    input;
+  const {
+    capability,
+    manifest,
+    ports,
+    validatedValue,
+    agentIdentity,
+    idempotencyKey,
+    bodyHash,
+    presentation,
+  } = input;
+
+  // RFC-1213: the verifier boundary runs inside the shared core so HTTP, MCP,
+  // and A2A enforce identically — required presentations gate previews AND
+  // dispatches, and the check never reaches claim values downstream.
+  const presentationCheck = await checkPresentationRequirement({
+    ports,
+    siteId: manifest.site,
+    capability,
+    presentation,
+    verifiedAgentId: agentIdentity.verifiedAgentId,
+  });
+  if (presentationCheck.problem) {
+    return {
+      kind: "problem",
+      problem: presentationCheck.problem,
+      verdict: presentationCheck.verdict,
+    };
+  }
+  const verdict = presentationCheck.verdict.verified ? presentationCheck.verdict : undefined;
 
   if (capability.sideEffect === "none") {
     const snapshot = snapshotCanonicalJsonObjectV1(validatedValue);
@@ -387,6 +426,7 @@ export async function executeAction(input: ActionExecutionInput): Promise<Action
     return {
       kind: "preview",
       envelope: buildPreviewReady(capability, canonicalJsonHashV1(snapshot.value), validatedValue),
+      ...(verdict ? { verdict } : {}),
     };
   }
 
@@ -425,7 +465,7 @@ export async function executeAction(input: ActionExecutionInput): Promise<Action
         );
       }
     }
-    return { kind: "receipt", receipt };
+    return { kind: "receipt", receipt, ...(verdict ? { verdict } : {}) };
   } catch {
     return {
       kind: "problem",
@@ -446,7 +486,10 @@ export async function dispatchOrPreview(ctx: ActionContext): Promise<StepResult>
     agentIdentity: ctx.agentIdentity,
     idempotencyKey: ctx.idempotencyKey,
     bodyHash: ctx.bodyHash,
+    presentation: ctx.presentation,
   });
+  // RFC-1213: the verdict is the only presentation fact allowed downstream.
+  if (result.verdict) ctx.presentationVerdict = result.verdict;
   switch (result.kind) {
     case "receipt":
       return jsonResponse(result.receipt, 200);

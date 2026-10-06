@@ -40,6 +40,7 @@ import {
   rateLimitMax,
   MCP_IDEMPOTENCY_META_KEY,
 } from "../action-pipeline.ts";
+import { PRESENTATION_META_KEY } from "../presentation.ts";
 import { buildAgentProblem, type AgentProblemDetails } from "@warpgogol/werkstatt-shared/agent";
 import { buildToolsList } from "./tools.ts";
 import { buildUiResourceList, resolveUiResourcePath, uiResourceContentBlock } from "./resources.ts";
@@ -172,6 +173,8 @@ async function handleToolsCall(
         ? (meta[MCP_IDEMPOTENCY_META_KEY] as string)
         : undefined;
     const bodyHash = idempotencyKey ? mcpBodyHash(params.arguments) : undefined;
+    // RFC-1213: verifiable presentation rides params._meta (MCP has no headers).
+    const presentation = meta?.[PRESENTATION_META_KEY];
 
     // RFC-1112: replay check runs before rate limiting — a replay must not
     // consume budget.
@@ -244,6 +247,7 @@ async function handleToolsCall(
       agentIdentity: ctx.agentIdentity ?? {},
       idempotencyKey,
       bodyHash,
+      presentation,
     });
     switch (result.kind) {
       case "receipt": {
