@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial integration test — skips when R2 credentials are absent.</item>
   <item>RFC-0651: fix integration test type errors</item>
+  <item>RFC-1202: unflake evidence integration test — unique run timestamp + live dedup assertion</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,7 +31,7 @@ import type {
 import { runEvidenceSync } from "../evidence/evidence-sync.ts";
 import { runEvidenceFetch } from "../evidence/evidence-fetch.ts";
 
-const RUN_TIMESTAMP = "2026-08-02T00-00-00-000Z";
+const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, "-");
 const MISSION_ID = "warpgogol-com-integration-test";
 const _SYSTEM_ID = "warpgogol-com";
 
@@ -125,6 +126,16 @@ describe.skipIf(!process.env.R2_AXIOM_ACCOUNT_ID)(
         await readFile(join(fetchDir, "evidence-metadata.json"), "utf8"),
       );
       expect(fetchedMeta).toEqual(originalMeta);
+
+      const resyncResult = await runEvidenceSync(
+        makeInput({ mission: MISSION_ID, "run-timestamp": RUN_TIMESTAMP }),
+        makeContext(tmpDir),
+      );
+      expect(resyncResult.exitCode).toBe(0);
+      const resyncData = resyncResult.data as EvidenceSyncResult | undefined;
+      expect(resyncData?.deduped).toBe(true);
+      expect(resyncData?.uploadedFiles).toEqual([]);
+      expect(resyncData?.skippedFiles).toContain("evidence-metadata.json");
     });
 
     it("evidence.fetch --list returns the synced run", async () => {
