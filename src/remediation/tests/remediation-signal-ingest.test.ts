@@ -132,7 +132,7 @@ test("ingest: undeclared source exits 1 with SIG-02 and opens no mission", async
       { openMission },
     );
     expect(result.exitCode).toBe(1);
-    const diags = (result.data as { diagnostics: { ruleId: string }[] }).diagnostics;
+    const diags = (result.data as unknown as { diagnostics: { ruleId: string }[] }).diagnostics;
     expect(diags[0].ruleId).toBe("SIG-02");
     expect(openMission.calls).toHaveLength(0);
   } finally {
@@ -149,7 +149,7 @@ test("ingest: unknown class exits 1 with SIG-01", async () => {
       { openMission: fakeOpenMission(workspaceRoot) },
     );
     expect(result.exitCode).toBe(1);
-    const diags = (result.data as { diagnostics: { ruleId: string }[] }).diagnostics;
+    const diags = (result.data as unknown as { diagnostics: { ruleId: string }[] }).diagnostics;
     expect(diags[0].ruleId).toBe("SIG-01");
   } finally {
     await rm(join(workspaceRoot, ".."), { recursive: true });

@@ -21,6 +21,7 @@ UnsupportedProtocolVersionError naming the supported list.
   <item>RFC-1112: idempotency via params._meta, shared executeAction core, problem-details in error.data.</item>
   <item>RFC-1113: server/discover + per-request protocol-version gate; initialize → UnsupportedProtocolVersionError.</item>
   <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
+  <item>RFC-1211: resources/list + resources/read serve committed ui:// artifacts; ui-capable action results embed a {type:"resource"} block.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -41,6 +42,7 @@ import {
 } from "../action-pipeline.ts";
 import { buildAgentProblem, type AgentProblemDetails } from "@warpgogol/werkstatt-shared/agent";
 import { buildToolsList } from "./tools.ts";
+import { buildUiResourceList, resolveUiResourcePath, uiResourceContentBlock } from "./resources.ts";
 import {
   SUPPORTED_MCP_PROTOCOL_VERSIONS,
   JSON_RPC_ERROR,
@@ -141,6 +143,18 @@ async function handleToolsCall(
       return jsonRpcError(req.id ?? null, JSON_RPC_ERROR.INVALID_PARAMS, `Unknown tool "${name}".`);
     }
 
+    // RFC-1211: ui-capable capabilities get a {type:"resource"} content block
+    // on every tool result — the committed /.well-known/ui/<id>.html bytes when
+    // readable, else the bare uri+mimeType reference for resources/read.
+    const uiContentBlock = async () =>
+      capability.ui?.resource === true
+        ? uiResourceContentBlock(
+            ctx.manifest.site,
+            capabilityId,
+            await ctx.ports.knowledge.read(`/.well-known/ui/${capabilityId}.html`),
+          )
+        : null;
+
     // RFC-0291: payload size cap on MCP action arguments.
     const argsBytes = new TextEncoder().encode(JSON.stringify(params.arguments ?? {})).length;
     if (argsBytes > capability.limits.maxPayloadBytes) {
@@ -205,8 +219,12 @@ async function handleToolsCall(
       // RFC-1169: preview capabilities answer validation failures with the
       // readiness envelope — identical fields to the HTTP path.
       if (capability.sideEffect === "none") {
+        const uiBlock = await uiContentBlock();
         return jsonRpcSuccess(req.id ?? null, {
-          content: [{ type: "text", text: JSON.stringify(buildPreviewFailure(validated.errors)) }],
+          content: [
+            { type: "text", text: JSON.stringify(buildPreviewFailure(validated.errors)) },
+            ...(uiBlock ? [uiBlock] : []),
+          ],
         });
       }
       const problem = buildAgentProblem("schema-violation", {
@@ -228,14 +246,24 @@ async function handleToolsCall(
       bodyHash,
     });
     switch (result.kind) {
-      case "receipt":
+      case "receipt": {
+        const uiBlock = await uiContentBlock();
         return jsonRpcSuccess(req.id ?? null, {
-          content: [{ type: "text", text: JSON.stringify(result.receipt) }],
+          content: [
+            { type: "text", text: JSON.stringify(result.receipt) },
+            ...(uiBlock ? [uiBlock] : []),
+          ],
         });
-      case "preview":
+      }
+      case "preview": {
+        const uiBlock = await uiContentBlock();
         return jsonRpcSuccess(req.id ?? null, {
-          content: [{ type: "text", text: JSON.stringify(result.envelope) }],
+          content: [
+            { type: "text", text: JSON.stringify(result.envelope) },
+            ...(uiBlock ? [uiBlock] : []),
+          ],
         });
+      }
       case "problem":
         return jsonRpcError(
           req.id ?? null,
@@ -255,6 +283,24 @@ async function handleResourcesRead(
 ): Promise<JsonRpcResponse> {
   const params = (req.params ?? {}) as { uri?: unknown };
   const uri = typeof params.uri === "string" ? params.uri : "";
+
+  // RFC-1211: ui:// URIs resolve to the committed /.well-known/ui/<id>.html
+  // artifact through the same static-artifact port as knowledge files.
+  const uiPath = resolveUiResourcePath(uri, ctx.manifest.site, ctx.catalog);
+  if (uiPath !== null) {
+    const text = await ctx.ports.knowledge.read(uiPath);
+    if (text === null) {
+      return jsonRpcError(
+        req.id ?? null,
+        JSON_RPC_ERROR.SERVER_ERROR,
+        `Could not read "${uiPath}".`,
+      );
+    }
+    return jsonRpcSuccess(req.id ?? null, {
+      contents: [{ uri, mimeType: "text/html", text }],
+    });
+  }
+
   const ref = ctx.manifest.knowledge.find((k) => absoluteUrl(ctx.manifest.baseUrl, k.url) === uri);
   if (!ref) {
     return jsonRpcError(
@@ -341,11 +387,15 @@ export async function handleJsonRpcRequest(
       return handleToolsCall(req, ctx);
     case "resources/list":
       return jsonRpcSuccess(id, {
-        resources: ctx.manifest.knowledge.map((ref) => ({
-          uri: absoluteUrl(ctx.manifest.baseUrl, ref.url),
-          name: ref.domain,
-          mimeType: "application/json",
-        })),
+        resources: [
+          ...ctx.manifest.knowledge.map((ref) => ({
+            uri: absoluteUrl(ctx.manifest.baseUrl, ref.url),
+            name: ref.domain,
+            mimeType: "application/json",
+          })),
+          // RFC-1211: committed ui:// projections of ui-capable capabilities.
+          ...buildUiResourceList(ctx.manifest.site, ctx.catalog),
+        ],
       });
     case "resources/read":
       return handleResourcesRead(req, ctx);
