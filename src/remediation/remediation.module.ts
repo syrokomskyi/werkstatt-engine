@@ -13,6 +13,12 @@ with validator rules[] declarations.
 <CHANGE_SUMMARY>
   <item>RFC-1027: initial implementation.</item>
   <item>RFC-1210: closed-loop signal ingest to bounded missions (RFC-1210)</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -73,7 +79,7 @@ export async function createRemediationModule(): Promise<ModuleExport> {
         description:
           "Normalize and route a remediation signal (RFC-1210): --source is gated against the site's remediation.signalSources allowlist (SIG-02 blocking), unknown --class rejected (SIG-01), then dedup + daily rate cap decide between auto-mission | action-pack | suppressed-autonomy-off | deduped | rate-capped. Auto-missions open via the internal openRemediationMission step composing mission.open — there is intentionally no remediation.mission.open command. Required flags: --site, --class, --source.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         generates: [],
         contract: "remediation-signal",

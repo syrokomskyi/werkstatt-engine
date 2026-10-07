@@ -7,12 +7,17 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1176 follow-up: drop duplicated writes[] on mission.validate — the contract sweep's narrower evidence/** entry shadowed the existing evidence+distribution declaration (TS1117).</item>
   <item>RFC-1199: mission.git.commit description documents the MATERIALIZATION_IN_PROGRESS fail-closed guard</item>
-  <history>ADR-0041, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146</history>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146</history>
 </CHANGE_SUMMARY>
 */
 
@@ -52,7 +57,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Open a new mission for a Sternsystem (RFC-0355). Required flags: `--system`, `--brief`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           system: { kind: "string", required: true, description: "Sternsystem id." },
@@ -87,7 +92,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Print mission manifest and Bordbuch entries (RFC-0355). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
         },
@@ -100,7 +105,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         generates: [],
         description: "Close an open mission (RFC-0355). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -171,7 +176,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Abort an open mission and discard Werkstück/Distribution (RFC-0355). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -208,7 +213,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "List missions, optionally filtered by system (RFC-0355).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           system: { kind: "string", description: "Filter by Sternsystem id." },
         },
@@ -222,7 +227,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Populate the mission Werkstück from the pinned Sternsystem bundle (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -251,7 +256,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Apply pending migrators from the RFC-id-keyed registry to the workpiece (RFC-0479). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -279,7 +284,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "Validate the materialized Werkstück (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
           "skip-content-regression": {
@@ -329,7 +334,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Start a blocking dev server for the mission workpiece (RFC-0480). Works for open, closed, and aborted missions. Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
           port: { kind: "string", description: "Port number (default: 4321)." },
@@ -351,7 +356,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Build the Werkstück into a local Distribution (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -371,7 +376,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Compute the data-set diff between Werkstück and pinned state (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
         },
@@ -387,7 +392,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Reconcile validated Werkstück data changes to the Sternsystem repo (RFC-0356). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -418,7 +423,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Commit operator edits to the mission workpiece git repository (RFC-0480). Fails closed with MATERIALIZATION_IN_PROGRESS while the workpiece is still being materialized (RFC-1199). Required flags: `--mission`, `--message`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -451,7 +456,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Remove workpiece/distribution for a closed or aborted mission, or clean old missions by age (RFC-0480). --stale-dirs archives aborted missions and removes stub dirs (RFC-0985).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", description: "Mission id (for single-mission cleanup)." },
@@ -487,7 +492,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Read a file from a mission workpiece with DNA-22 path validation (RFC-0555). Required flags: `--mission`, `--path`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
           path: { kind: "string", required: true, description: "Relative path within workpiece." },
@@ -503,7 +508,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Write a file to a mission workpiece with DNA-22 path validation. Content via stdin. No auto-commit (RFC-0555). Required flags: `--mission`, `--path`, `--stdin`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -524,7 +529,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Validate OPERATOR_CONFIG_FILES list is in sync with actual workpiece/cache clone files (RFC-0840).",
         scope: "workspace",
-        supportsAllSites: true,
+        acceptsAllFlag: true,
         flags: {},
         reads: ["missions/*/workpiece/*", "missions/*/workpiece/src/*", "systems-cache/*/"],
         cacheable: false,
@@ -539,7 +544,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Verify OPERATOR_CONFIG_FILES are present in the active workpiece before build (RFC-0844). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
         },
@@ -554,7 +559,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Run post-build validators on existing dist/ without a full rebuild (RFC-0883).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", description: "Mission id." },
           site: { kind: "string", description: "Site id." },
@@ -574,7 +579,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Resume the last incomplete lifecycle operation for a mission (RFC-0958). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
@@ -599,7 +604,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Show the operation journal for a mission (RFC-0958). Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
           op: { kind: "string", description: "Filter by operation id." },
@@ -616,7 +621,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Run ownership.sync.validate and generated.stale.validate against the cache clone before opening a mission (RFC-0971). Required flags: `--system`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         execOnReadOnly: true,
         flags: {
@@ -634,7 +639,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         description:
           "Inspect validation cache state for a mission (RFC-1028). Read-only. Required flags: `--mission`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },

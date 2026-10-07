@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0931: add release.sign command for Ed25519 signing of build-identity.json and signed-manifest.json.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -16,7 +15,13 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
-  <history>RFC-0655, RFC-0656</history>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <history>RFC-0655, RFC-0656, RFC-0931</history>
 </CHANGE_SUMMARY>
 */
 
@@ -45,7 +50,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         description:
           "Prepare a release candidate from a validated mission (RFC-0357). Flags: --mission, [--semver].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           mission: { kind: "string", required: true, description: "Mission id to release." },
@@ -63,7 +68,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         description:
           "Mark a prepared release as ready with discipline gates and artifact storage (RFC-0357, RFC-0724). Flags: --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           release: { kind: "string", required: true, description: "Release id to mark ready." },
@@ -89,7 +94,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "Validate a release artifact (RFC-0357). Flags: --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           release: { kind: "string", required: true, description: "Release id to validate." },
         },
@@ -102,7 +107,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "List releases, optionally filtered by site (RFC-0357). Flags: [--site].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           site: { kind: "string", description: "Filter by Sternsystem id." },
         },
@@ -118,7 +123,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         description:
           "Validate release pipeline consistency between mission.yaml, close-report.json, release.yaml, bordbuch, and registry.yaml (RFC-0655). Flags: --mission, --release, --site.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           mission: { kind: "string", description: "Mission id to validate." },
           release: { kind: "string", description: "Release id to validate." },
@@ -145,7 +150,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         description:
           "Report non-deterministic files in a dist directory by comparing stable vs byte hashes (RFC-0656). Flags: --release, --mission.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           release: { kind: "string", description: "Release id whose dist to validate." },
@@ -168,7 +173,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         description:
           "Sign build-identity.json and produce signed-manifest.json for a release using Ed25519 (RFC-0931). Flags: --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           release: { kind: "string", required: true, description: "Release id to sign." },
@@ -189,7 +194,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         description:
           "Boot built worker in miniflare/workerd and execute representative requests to catch runtime crashes before deploy (RFC-0961, RFC-0979). Flags: --site, [--dist], [--wrangler-config], [--languages], [--diagnose].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem id." },

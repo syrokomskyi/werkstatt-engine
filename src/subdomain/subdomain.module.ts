@@ -11,6 +11,12 @@ subdomain.register, subdomain.validate, subdomain.list.
 <CHANGE_SUMMARY>
   <item>RFC-0752: initial subdomain module with register, validate, list commands.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -31,7 +37,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
         description:
           "Register DNS CNAME and Workers route for a service subdomain (RFC-0752). Idempotent. Flags: --service.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           service: {
@@ -53,7 +59,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
         description:
           "Validate DNS CNAME and Workers route for a service subdomain (RFC-0752). Flags: --service.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           service: {
             kind: "string",
@@ -72,7 +78,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
         description:
           "List all subdomains in a zone by cross-referencing DNS records with Workers routes (RFC-0752). Flags: --zone.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           zone: {
             kind: "string",

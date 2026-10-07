@@ -4,6 +4,12 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1203: initial tests for leitstand.channels covering exit-code/channel-data parity with leitstand.status, [leitstand.channels] summary prefix + data.aliasedTo, shared flags object identity on both declarations, and identical missing-site failure.</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -102,7 +108,7 @@ describe("leitstand.channels (RFC-1203)", () => {
     expect(channels?.flags, "alias must reuse the canonical flags object by reference").toBe(status?.flags);
     expect(channels?.reads).toBe(status?.reads);
     expect(channels?.scope).toBe(status?.scope);
-    expect(channels?.supportsAllSites).toBe(status?.supportsAllSites);
+    expect(channels?.acceptsAllFlag).toBe(status?.acceptsAllFlag);
   });
 
   it("propagates the canonical failure verbatim on missing --site (AC-6)", async () => {

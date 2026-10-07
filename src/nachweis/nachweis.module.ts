@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0886: add nachweis.screenshot.upload command registration, add --scope flag to nachweis.consent.update.</item>
   <item>RFC-0890: add nachweis.screenshot.ingest command registration.</item>
   <item>RFC-0891: add nachweis.screenshot.process command registration.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -17,7 +16,13 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0707, RFC-0714, RFC-0715, RFC-0871, RFC-0872, RFC-0873, RFC-0874, RFC-0875</history>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <history>RFC-0707, RFC-0714, RFC-0715, RFC-0871, RFC-0872, RFC-0873, RFC-0874, RFC-0875, RFC-0886</history>
 </CHANGE_SUMMARY>
 */
 
@@ -55,7 +60,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0707: Ingest a PDF evidence document — compute SHA-256, upload to R2, append Bordbuch entry. Required flags: `--file`, `--record-type`, `--slug`, `--title-de`, `--title-uk`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -87,7 +92,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0707/RFC-0872: Validate PBP trust entities and enforce policy-driven publication gate V2 conditions (attestation-v1, operational-measurement-v1, technical-assessment-v1).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         cacheable: false,
         flags: {
@@ -104,7 +109,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0707: Generate public/nachweise/manifest.json from published records (generatedAt: null per RFC-0602).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -133,7 +138,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0707/RFC-0886: Update PBP Consent entity's consentScope[scope] and append nachweis-consent Bordbuch entry. Granular per-aspect consent via --scope flag. Required flags: `--consent-id`, `--status`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -166,7 +171,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0707/RFC-0872: Enforce policy-driven publication gate V2 and transition record to published. Gate policy resolved by evidence kind; technical-assessment does not require consent or public derivative. Required flags: `--slug`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -185,7 +190,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0707/RFC-0872: Withdraw a published record — consent revocation is policy-driven (attestation only), set withdrawn status, regenerate manifest. Idempotent. Required flags: `--slug`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -205,7 +210,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0714: Record human approval, verification level, and legal content check in a Bordbuch entry. Operator-invoked only. Required flags: `--slug`, `--verification-level`, `--legal-content-check`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -238,7 +243,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0714: Upload a public-derivative PDF to R2 and update evidence-source items.public.storage to public. Idempotent by SHA-256. Required flags: `--slug`, `--file`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -273,7 +278,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0715: Generate an Ed25519 keypair for Nachweis operator signatures. Writes private key to file, publishes public key JSON. Required flags: `--key-file`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -298,7 +303,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0715: Sign a Nachweis record with an Ed25519 operator key. Appends nachweis-signed Bordbuch entry. Idempotent. Required flags: `--slug`, `--key-file`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -323,7 +328,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0715/RFC-0871: Obtain an RFC 3161 timestamp token for a signed Nachweis record. Requires nachweis.sign to have run first. Idempotent. RFC-0871: --timestamp-assurance distinguishes rfc3161 (default) from eidas-qualified (requires --qualification-evidence-ref). Required flags: `--slug`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -353,7 +358,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0873: Ingest a technical-assessment bundle (AssessmentBundleV1) — validate, hash artifacts, upload to R2, write PBP evidence-source, append Bordbuch entry. Required flags: `--bundle`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -380,7 +385,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0874: Run five sequential canonical Google Lighthouse runs, parse LHR JSON, aggregate categories, build AssessmentBundleV1, and delegate to nachweis.assessment.ingest. Required flags: `--url`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -429,7 +434,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0875: Submit an Unlisted Cloudflare URL Scanner scan with Agent Readiness enabled, poll for completion, parse dimensions, build AssessmentBundleV1, and delegate to nachweis.assessment.ingest. Required flags: `--url`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -474,7 +479,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0715: Verify the Ed25519 operator signature and RFC 3161 timestamp for a Nachweis record. Read-only. Required flags: `--slug`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         cacheable: false,
         flags: {
@@ -493,7 +498,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0886: Upload a website screenshot to R2 and update EvidenceSource.websiteScreenshot. Supports .webp, .png, .jpg, .jpeg. Required flags: `--slug`, `--file`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -522,7 +527,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0890: Ingest a raw full-page screenshot to R2 private storage and cache clone. Detects image metadata via sharp, parses CaptureX filename for capturedAt, idempotent by SHA-256. Required flags: `--slug`, `--file`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {
@@ -560,7 +565,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
         description:
           "RFC-0891: Process a raw full-page screenshot into a 16:9 display variant (1280x720, WebP) and upload to R2 public. Reads rawArtifact from evidence-source, crops from top, resizes, converts. Required flags: `--slug`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         cacheable: false,
         flags: {

@@ -11,6 +11,12 @@ customdomain.register, redirect.register.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0896: initial customdomain module with register and redirect.register commands.</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,7 +36,7 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
         description:
           "Register proxied A record and Workers route for a site apex domain (RFC-0896). Idempotent. Flags: --site.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           site: {
@@ -53,7 +59,7 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
         description:
           "Register proxied CNAME and Redirect Rule (301) for www.{apex} → apex (RFC-0896). Idempotent. Flags: --site.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           site: {

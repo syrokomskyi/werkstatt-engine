@@ -14,6 +14,12 @@ Covers CMD-OUTPUT-01/02/03 rules, helper-exempt returns, and --mode flag.
   <item>ADR-0105 fo-review: regression test for the isHandlerFile detector gap —
         a self-describing KernelCommandDefinition file with a multi-line
         `import type` must be scanned, not skipped.</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -365,7 +371,7 @@ export const testDefCommand: KernelCommandDefinition = {
   description: "test",
   scope: "app",
   flags: {},
-  supportsAllSites: true,
+  acceptsAllFlag: true,
   reads: [],
   cacheable: true,
   modulePaths: ["test-def.ts"],

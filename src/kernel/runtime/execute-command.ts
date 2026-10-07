@@ -14,9 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1126: step 2 — kernel runtime wiring
 
 Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
@@ -25,6 +22,12 @@ Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (
 fo-review REVIEW-CODE-2026-09-22-01 (needs-revision): input.argv now carries the aliased argv so commands inspecting raw argv see canonical flags; config.regenerate reports identical files as unchanged[] instead of dropping them from both generated and skipped.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -539,14 +542,14 @@ function aggregateRemediationHints(data: unknown): RemediationHint[] | undefined
 }
 
 /**
- * RFC-0842: Guard that rejects --all for commands where supportsAllSites is not true.
- * Covers both `false` (explicit opt-out) and `undefined` (safer default — reject).
- * Exported for unit testing.
+ * RFC-0842/RFC-1231: Guard that rejects --all for commands where acceptsAllFlag
+ * is not true. Covers both `false` (explicit opt-out) and `undefined` (safer
+ * default — reject). Exported for unit testing.
  */
-export function assertAllSitesAllowed(command: KernelCommandDefinition, allSites: boolean): void {
-  if (allSites && command.supportsAllSites !== true) {
+export function assertAllFlagAccepted(command: KernelCommandDefinition, allSites: boolean): void {
+  if (allSites && command.acceptsAllFlag !== true) {
     throw new Error(
-      `Command '${command.name}' does not support --all (supportsAllSites is not true). ` +
+      `Command '${command.name}' does not accept --all (acceptsAllFlag is not true). ` +
         `Use --site <siteId> to target a specific site.`,
     );
   }
@@ -616,7 +619,7 @@ export async function executeKernelCommand(
       }
 
       if (wsCommand && wsCommand.scope === "workspace") {
-        assertAllSitesAllowed(wsCommand, options.allSites ?? false);
+        assertAllFlagAccepted(wsCommand, options.allSites ?? false);
         const logger = createKernelLogger(outputFormat);
         const { io, intents } = createDefaultIO();
         const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
@@ -684,7 +687,7 @@ export async function executeKernelCommand(
   // for commands that are already available from the workspace registry (the
   // vast majority of app-scoped commands from createStandardCheckModule).
   if (wsCommand) {
-    assertAllSitesAllowed(wsCommand, options.allSites ?? false);
+    assertAllFlagAccepted(wsCommand, options.allSites ?? false);
     // RFC-1133: one cache layer per invocation, shared across --all sites.
     // Created only when the command can actually cache — non-cacheable,
     // dry-run, and bypassed invocations never touch SQLite.
@@ -772,7 +775,7 @@ export async function executeKernelCommand(
         );
       }
 
-      assertAllSitesAllowed(command, options.allSites ?? false);
+      assertAllFlagAccepted(command, options.allSites ?? false);
 
       if (
         !sharedResultCache &&

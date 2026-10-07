@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0583: add bordbuch.repair command registration.</item>
   <item>RFC-0626: add bordbuch.commit command registration.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -16,6 +15,13 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <history>RFC-0583</history>
 </CHANGE_SUMMARY>
 */
 
@@ -40,7 +46,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         description:
           "Append a single entry to the Bordbuch through the controlled writer-role surface (RFC-0355). Required flags: `--system`, `--kind`, `--summary`, `--writer-role`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           system: { kind: "string", required: true, description: "Sternsystem id." },
@@ -70,7 +76,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         description:
           "Validate the Bordbuch hash-chain, lifecycle pairs, and sensitive payload guards (RFC-0355).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           system: {
             kind: "string",
@@ -88,7 +94,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         description:
           "Read-only Bordbuch status projection: ledger hash, event count, latest event, open escalations (RFC-0473).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           system: {
             kind: "string",
@@ -105,7 +111,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         description:
           "Generate rich public Bordbuch projections (JSON + HTML + YAML) from the unified ledger (RFC-0473).",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           system: {
@@ -158,7 +164,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         description:
           "Repair orphan-mission-close violations by inserting missing mission-open events and recomputing the hash chain (RFC-0583). Required flags: `--system`.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           system: { kind: "string", required: true, description: "Sternsystem id." },
@@ -181,7 +187,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
         description:
           "Auto-commit dirty bordbuch projection files in the cache clone (RFC-0626). Internal pipeline step.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           system: {

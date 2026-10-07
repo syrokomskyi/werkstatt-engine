@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1190: declare --mission and --skip-evidence-sync on leitstand.dev-deploy/propagate/promote — explicit mission-context input plus the sole escape hatch for unresolvable context.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -16,7 +15,13 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1203</history>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 
@@ -71,7 +76,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Deploy workpiece to dev channel with Axiom verification gate (RFC-0628). Flags: --site, [--release].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: {
@@ -134,7 +139,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Deploy a published release with verified Axiom evidence to the alt channel (RFC-0628). Flags: --site, --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           release: {
@@ -197,7 +202,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Promote a verified alt-deployed release to the main channel with live build-identity verification (RFC-0608). Flags: --site, --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           release: {
@@ -264,7 +269,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Print deployment state for all channels (RFC-0627). Flags: --site, [--channel dev|alt|main].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: leitstandStatusFlags,
         reads: leitstandStatusReads,
         cacheable: false,
@@ -277,7 +282,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Alias of leitstand.status (RFC-1203): prints per-channel deployment state and names the canonical command in every response. Flags: --site, [--channel dev|alt|main].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: leitstandStatusFlags,
         reads: leitstandStatusReads,
         cacheable: false,
@@ -290,7 +295,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Rollback a site or service to a previous Cloudflare Worker deployment via native wrangler rollback (RFC-0895, RFC-0926). Flags: --site OR --service (mutually exclusive), [--channel dev|alt|main], [--to-release <releaseId>].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: { kind: "string", description: "Sternsystem id." },
@@ -334,7 +339,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Run health checks against a deployed channel (RFC-0379, RFC-1136). Flags: --site, [--channel dev|alt|main], [--release <id>].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem id." },
           system: { kind: "string", description: "Alias for --site." },
@@ -358,7 +363,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Verify live deployment across channels by fetching build-identity.json (RFC-0930, RFC-0931). Flags: --site, [--channel dev|alt|main], [--no-compare-local], [--timeout-ms N], [--verify-signature].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           site: { kind: "string", required: true, description: "Sternsystem id." },
           system: { kind: "string", description: "Alias for --site." },
@@ -398,7 +403,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Inspect deployment pipeline state for a release (RFC-0842). Flags: --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           release: {
             kind: "string",
@@ -423,7 +428,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Produce a GateDecisionV1 JSON file via certification orchestration (RFC-0866). Gates measure the candidate artifact through a local wrangler-dev preview by default (RFC-1207). Flags: --site, --gate, --release, --artifact-hash, --target, --base-url.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: {
@@ -490,7 +495,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Deploy a shared Cloudflare Worker service to the dev channel with pre-deploy gates, lock, and health check (RFC-0806). Flags: --service.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           service: {
@@ -514,7 +519,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Promote a shared Cloudflare Worker service to production with pre-deploy gates, subdomain validation, lock, and health check (RFC-0806). Flags: --service.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           service: {
@@ -538,7 +543,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "RFC-0899: Set ACCESS_PIN secret on dev and alt channel Workers for Basic Auth access protection. Flags: --site, [--pin].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: {
@@ -569,7 +574,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "RFC-0899: Remove ACCESS_PIN secret from dev and alt channel Workers. Flags: --site.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: {
@@ -596,7 +601,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Hotfix dev deploy: chain commit → validate.postbuild → reconcile → close → release → certify → deploy (RFC-0927). Flags: --site, --mission, [--message], [--force-build].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: {
@@ -641,7 +646,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "RFC-0899: Report access protection status (PIN set or not) for a Sternsystem. Flags: --site.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           site: {
@@ -664,7 +669,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Resumable full-pipeline deployment composite (RFC-0962). Chains preflight → validate → reconcile → close → release → certify → deploy → verify → archive with RFC-0958 operation journal. Flags: --site, --mission, [--until], [--resume], [--force], [--allow-unreconciled].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           site: {
@@ -722,7 +727,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         description:
           "Read-only renderer for ship operation journals (RFC-1168). Resolves systems-cache/<site>/operations/ship-<mission>.jsonl — or the site's newest ship journal — and prints the step table with durations and running state. Flags: --site, --mission, [--follow] (mtime poll, exits on op-done/op-abandoned or journal loss), --json. Emits nothing without a journal — missing journal is informational, not an error.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           site: {

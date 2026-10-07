@@ -13,14 +13,17 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
-
-Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1147/RFC-1148: listStaticCommandSurface — static enumeration over the workspace registry plus SITE_MODULE_MAP replaces listRegisteredKernelCommand*; commandInfo drops the siteName param (provider union narrowed to workspace | site-module).</item>
   <item>RFC-1147: site-module materialization memoized via getOrBuildSiteModuleStates — one materialization per workspaceRoot instead of 18 dynamic imports per call.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
-  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097, RFC-1138</history>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097, RFC-1138, RFC-1144</history>
 </CHANGE_SUMMARY>
 */
 
@@ -167,7 +170,7 @@ function commandInfo(
     ...(command.execOnReadOnly ? { execOnReadOnly: command.execOnReadOnly } : {}),
     ...(command.mutatingFlags ? { mutatingFlags: command.mutatingFlags } : {}),
     requiresNetwork: command.requiresNetwork,
-    supportsAllSites: command.supportsAllSites,
+    acceptsAllFlag: command.acceptsAllFlag,
     timeoutMs: command.timeoutMs,
     expectedDurationMs: command.expectedDurationMs,
     longRunning: command.longRunning,

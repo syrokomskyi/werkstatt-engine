@@ -26,7 +26,7 @@ function makeCommand(
     name,
     description: `Test command ${name}`,
     scope: "workspace",
-    supportsAllSites: false,
+    acceptsAllFlag: false,
     execute: vi.fn(),
     ...(flags ? { flags } : {}),
   } as unknown as KernelCommandDefinition;

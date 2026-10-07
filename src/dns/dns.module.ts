@@ -12,6 +12,12 @@ dns.records.schema.validate.
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial DNS module with upsert, validate, list, delete, schema.validate commands.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -34,7 +40,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         description:
           "Synchronize DNS records from declaration file to Cloudflare (RFC-0753). Idempotent. Flags: --system, --dry-run.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           system: {
@@ -64,7 +70,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         description:
           "Validate live Cloudflare DNS records against declaration file (RFC-0753). Flags: --system.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           system: {
             kind: "string",
@@ -86,7 +92,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         description:
           "List all live DNS records in a zone from Cloudflare (RFC-0753). Flags: --system, --name.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           system: {
             kind: "string",
@@ -108,7 +114,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         description:
           "Delete a DNS record from Cloudflare by ID or name+type (RFC-0753). Flags: --system, --record-id, --name, --type, --dry-run.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: false,
         flags: {
           system: {
@@ -146,7 +152,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
         description:
           "Schema-only validation of DNS record declaration files (RFC-0753). No API calls. Flags: --system.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           system: {
             kind: "string",

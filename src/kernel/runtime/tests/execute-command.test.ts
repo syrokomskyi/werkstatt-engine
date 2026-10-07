@@ -1,5 +1,5 @@
 import { test, expect, describe } from "vitest";
-import { assertAllSitesAllowed, computeOwnershipMap } from "../execute-command.ts";
+import { assertAllFlagAccepted, computeOwnershipMap } from "../execute-command.ts";
 import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel";
 
 const mockCommand: KernelCommandDefinition = {
@@ -9,27 +9,27 @@ const mockCommand: KernelCommandDefinition = {
   execute: async () => ({ exitCode: 0, ok: true, summary: "ok" }),
 };
 
-describe("assertAllSitesAllowed", () => {
+describe("assertAllFlagAccepted", () => {
   test("does not throw when allSites=false", () => {
-    expect(() => assertAllSitesAllowed(mockCommand, false)).not.toThrow();
+    expect(() => assertAllFlagAccepted(mockCommand, false)).not.toThrow();
   });
 
-  test("does not throw when allSites=true and supportsAllSites=true", () => {
-    const cmd = { ...mockCommand, supportsAllSites: true };
-    expect(() => assertAllSitesAllowed(cmd, true)).not.toThrow();
+  test("does not throw when allSites=true and acceptsAllFlag=true", () => {
+    const cmd = { ...mockCommand, acceptsAllFlag: true };
+    expect(() => assertAllFlagAccepted(cmd, true)).not.toThrow();
   });
 
-  test("throws when allSites=true and supportsAllSites is undefined", () => {
-    expect(() => assertAllSitesAllowed(mockCommand, true)).toThrow(/does not support --all/);
+  test("throws when allSites=true and acceptsAllFlag is undefined", () => {
+    expect(() => assertAllFlagAccepted(mockCommand, true)).toThrow(/does not accept --all/);
   });
 
-  test("throws when allSites=true and supportsAllSites=false", () => {
-    const cmd = { ...mockCommand, supportsAllSites: false };
-    expect(() => assertAllSitesAllowed(cmd, true)).toThrow(/does not support --all/);
+  test("throws when allSites=true and acceptsAllFlag=false", () => {
+    const cmd = { ...mockCommand, acceptsAllFlag: false };
+    expect(() => assertAllFlagAccepted(cmd, true)).toThrow(/does not accept --all/);
   });
 
   test("error message includes command name", () => {
-    expect(() => assertAllSitesAllowed(mockCommand, true)).toThrow(/test\.cmd/);
+    expect(() => assertAllFlagAccepted(mockCommand, true)).toThrow(/test\.cmd/);
   });
 });
 

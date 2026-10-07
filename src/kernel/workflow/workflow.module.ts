@@ -17,6 +17,12 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -40,7 +46,7 @@ export async function createWorkflowModule(): Promise<ModuleExport> {
           "and per-chain phase links (RFC-0075 + RFC-0136).",
         scope: "workspace",
         flags: {},
-        supportsAllSites: true,
+        acceptsAllFlag: true,
         reads: [".agents/workflows/**/*.md", ".windsurf/workflows/**/*.md"],
         execute: runWorkflowLint,
       },
@@ -52,7 +58,7 @@ export async function createWorkflowModule(): Promise<ModuleExport> {
           "List .agents/workflows entries with phase, IO summary, and next workflow (RFC-0075).",
         scope: "workspace",
         flags: {},
-        supportsAllSites: true,
+        acceptsAllFlag: true,
         reads: [".agents/workflows/**/*.md", ".windsurf/workflows/**/*.md"],
         execute: runWorkflowList,
       },
@@ -64,7 +70,7 @@ export async function createWorkflowModule(): Promise<ModuleExport> {
           "List .agents/workflows-amend entries with phase, IO summary, and next workflow (RFC-0136).",
         scope: "workspace",
         flags: {},
-        supportsAllSites: true,
+        acceptsAllFlag: true,
         reads: [".agents/workflows-amend/**/*.md"],
         execute: runWorkflowAmendList,
       },

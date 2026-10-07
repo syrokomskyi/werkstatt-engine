@@ -14,6 +14,12 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
+
+Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
+follows the parsed selector. Guard renamed assertAllSitesAllowed ->
+assertAllFlagAccepted, message updated. 417 declaration sites + type
+surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -34,7 +40,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         description:
           "Store a release dist artifact in the content-addressed artifact store (RFC-0363). Flags: --release, --dist, [--site].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           release: { kind: "string", required: true, description: "Release id to store." },
@@ -53,7 +59,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         description:
           "Rehydrate a release dist artifact from the store (RFC-0363). Flags: --release, --output.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           release: { kind: "string", required: true, description: "Release id to rehydrate." },
@@ -72,7 +78,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         description: "Validate a release artifact in the store (RFC-0363). Flags: --release.",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         flags: {
           release: { kind: "string", required: true, description: "Release id to validate." },
         },
@@ -86,7 +92,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         description:
           "Garbage-collect unreferenced release artifacts per retention policy (RFC-0363). Flags: [--system], [--dry-run].",
         scope: "workspace",
-        supportsAllSites: false,
+        acceptsAllFlag: false,
         mutatesState: true,
         flags: {
           system: { kind: "string", description: "Only collect artifacts for this system." },
