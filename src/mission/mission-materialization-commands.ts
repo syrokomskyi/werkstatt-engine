@@ -11,6 +11,7 @@
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>ADR-0096: dedupe CHANGE_SUMMARY item, use SNAPSHOT_FILENAME in CACHE_CLONE_ONLY_PATHS</item>
+  <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -21,6 +22,7 @@ import {
   type WorkspaceIO,
 } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import path from "node:path";
+import picomatch from "picomatch";
 import { parse as yamlParse } from "yaml";
 import type {
   Diagnostic,
@@ -84,6 +86,8 @@ const STERNSYSTEM_DATA_PATHS = [
  * Files that exist only in the cache clone (not in workpiece git).
  * During mission.reconcile merge, these cause modify/delete conflicts.
  * They are auto-resolved by keeping the cache clone version (ours).
+ * Generated-registry paths are the second auto-resolved class — they resolve
+ * theirs (workpiece) per RFC-1218 via the ownershipMap-derived allowlist.
  * Add new cache-clone-only files here instead of modifying isAutoResolvablePath.
  */
 const CACHE_CLONE_ONLY_PATHS: readonly string[] = [
@@ -1903,7 +1907,7 @@ export async function runMissionReconcile(
     const cc = reconcileCtx;
     const autoResolveSuffix =
       cc.autoResolvedPaths.length > 0
-        ? `, ${cc.autoResolvedPaths.length} bordbuch conflict${cc.autoResolvedPaths.length > 1 ? "s" : ""} auto-resolved`
+        ? `, ${cc.autoResolvedPaths.length} conflict${cc.autoResolvedPaths.length > 1 ? "s" : ""} auto-resolved`
         : "";
 
     const mirrorSyncSuffix = cc.mirrorSync.attempted
@@ -2132,6 +2136,16 @@ export async function buildReconcileSteps(
         } catch (err) {
           const isAutoResolvablePath = (p: string) =>
             CACHE_CLONE_ONLY_PATHS.some((pattern) => p.startsWith(pattern));
+          // RFC-1218: generated-path allowlist — the RFC-0960 ownership
+          // registry (generates[] declarations) unioned with the RFC-0913
+          // cache-clone patterns. ownershipMap absent (site plugin not
+          // loaded) degenerates to the RFC-0913 set alone.
+          const generatedPatterns = [
+            ...(cc.context.ownershipMap ?? []).map((e) => e.artifact.path),
+            ...CACHE_CLONE_GENERATED_PATTERNS,
+          ];
+          const isGeneratedPath = (p: string) =>
+            generatedPatterns.some((pattern) => p === pattern || picomatch.isMatch(p, pattern));
           const conflictedPaths: string[] = [];
           const bordbuchDeletedPaths: string[] = [];
           try {
@@ -2159,8 +2173,16 @@ export async function buildReconcileSteps(
           } catch {
             // git status failed
           }
-          const allAutoResolvable =
-            conflictedPaths.length > 0 && conflictedPaths.every(isAutoResolvablePath);
+          // RFC-1218: three classes — clone-only paths resolve ours, generated
+          // allowlist paths resolve theirs (workpiece), anything else aborts.
+          const oursPaths = conflictedPaths.filter(isAutoResolvablePath);
+          const theirsPaths = conflictedPaths.filter(
+            (p) => !isAutoResolvablePath(p) && isGeneratedPath(p),
+          );
+          const unclassifiedPaths = conflictedPaths.filter(
+            (p) => !isAutoResolvablePath(p) && !isGeneratedPath(p),
+          );
+          const allAutoResolvable = conflictedPaths.length > 0 && unclassifiedPaths.length === 0;
           if (allAutoResolvable) {
             try {
               if (bordbuchDeletedPaths.length > 0) {
@@ -2168,38 +2190,55 @@ export async function buildReconcileSteps(
                 await shExec(`git checkout HEAD -- ${delPathArgs}`, cc.systemDir, cc.context.io);
                 await shExec(`git add -- ${delPathArgs}`, cc.systemDir, cc.context.io);
               }
-              const isGeneratedUntracked = (p: string) =>
-                CACHE_CLONE_GENERATED_PATTERNS.some(
-                  (pattern) => p === pattern || p.startsWith(pattern.replace(/\.[^.]+$/, "")),
-                );
-              const trackedConflicted = conflictedPaths.filter((p) => !isGeneratedUntracked(p));
-              const generatedConflicted = conflictedPaths.filter((p) => isGeneratedUntracked(p));
-              if (trackedConflicted.length > 0) {
-                const trackedArgs = trackedConflicted.map((p) => JSON.stringify(p)).join(" ");
-                await shExec(`git checkout HEAD -- ${trackedArgs}`, cc.systemDir, cc.context.io);
-                await shExec(`git add -- ${trackedArgs}`, cc.systemDir, cc.context.io);
+              if (oursPaths.length > 0) {
+                const oursArgs = oursPaths.map((p) => JSON.stringify(p)).join(" ");
+                await shExec(`git checkout HEAD -- ${oursArgs}`, cc.systemDir, cc.context.io);
+                await shExec(`git add -- ${oursArgs}`, cc.systemDir, cc.context.io);
               }
-              if (generatedConflicted.length > 0) {
-                const generatedArgs = generatedConflicted.map((p) => JSON.stringify(p)).join(" ");
-                await shExec(`git add -- ${generatedArgs}`, cc.systemDir, cc.context.io);
+              for (const theirsPath of theirsPaths) {
+                const quoted = JSON.stringify(theirsPath);
+                // Workpiece-side presence decides checkout-vs-remove: UD means
+                // the workpiece deleted the file, so theirs-wins = git rm.
+                const inTheirs = (
+                  await shExec(`git ls-tree FETCH_HEAD -- ${quoted}`, cc.systemDir, cc.context.io)
+                ).trim();
+                if (inTheirs.length > 0) {
+                  await shExec(`git checkout FETCH_HEAD -- ${quoted}`, cc.systemDir, cc.context.io);
+                } else {
+                  await shExec(
+                    `git rm -f --ignore-unmatch -- ${quoted}`,
+                    cc.systemDir,
+                    cc.context.io,
+                  );
+                }
               }
-              await cacheCloneCommit(cc.systemDir, "", { noEdit: true }, cc.context.io);
-              cc.autoResolvedPaths = conflictedPaths;
+              const sortedResolved = [...conflictedPaths].sort();
+              const resolveMessage =
+                `${mergeMessage}\n\nAuto-resolved conflicts:\n` +
+                sortedResolved.map((p) => `- ${p}`).join("\n");
+              await cacheCloneCommit(cc.systemDir, resolveMessage, {}, cc.context.io);
+              cc.autoResolvedPaths = sortedResolved;
               cc.context.logger.info(
-                `  Auto-resolved ${cc.autoResolvedPaths.length} cache-clone-only conflict(s)`,
+                `  Auto-resolved ${cc.autoResolvedPaths.length} conflict(s) ` +
+                  `(${oursPaths.length} clone-only, ${theirsPaths.length} generated)`,
               );
             } catch (resolveErr) {
               await abortMerge(cc.systemDir, cc.context.io);
               throw new Error(
-                `[mission.reconcile] bordbuch auto-resolution failed: ${(resolveErr as Error).message}.\n` +
+                `[mission.reconcile] conflict auto-resolution failed: ${(resolveErr as Error).message}.\n` +
                   `Merge has been aborted. Inspect the cache clone state manually.\n` +
                   `Reconcile is idempotent — it will reset the cache clone to preReconcileSha and re-merge.`,
               );
             }
           } else {
             await abortMerge(cc.systemDir, cc.context.io);
+            const unclassifiedNote =
+              unclassifiedPaths.length > 0
+                ? `\nUnclassified conflicted paths:\n` +
+                  unclassifiedPaths.map((p) => `  - ${p}`).join("\n")
+                : "";
             throw new Error(
-              `[mission.reconcile] git merge --no-ff failed: ${(err as Error).message}.\n` +
+              `[mission.reconcile] git merge --no-ff failed: ${(err as Error).message}.${unclassifiedNote}\n` +
                 `Resolve conflicts in the workpiece (not the cache clone), commit via mission.git.commit, then re-run reconcile.\n` +
                 `Reconcile is idempotent — it will reset the cache clone to preReconcileSha and re-merge.`,
             );
@@ -2358,6 +2397,10 @@ export async function buildReconcileSteps(
               preReconcileSha: cc.preReconcileSha,
               mergedShas: cc.mergedShas,
               transferredCommits: cc.transferredCommits,
+              // RFC-1218: audit trail for auto-resolved merge conflicts.
+              ...(cc.autoResolvedPaths.length > 0
+                ? { autoResolvedPaths: cc.autoResolvedPaths }
+                : {}),
             },
           },
           `Bordbuch: mission-reconcile ${cc.missionId}`,
