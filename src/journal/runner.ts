@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0962 fo-fix: step metadata capture (run returns Record), per-step durationMs timing, StepResult[] in RunOperationResult, step-done meta field populated.</item>
   <item>RFC-1168: onTransition option on runOperation — per-record callback so callers can stream progress (stderr) without waiting for run completion.</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>2026-10-04 recovery fix: buildStepState keys done/crash tracking on step name instead of seq index — a resumed plan with filtered steps (e.g. buildShipPlan missionClosed drops 3 lifecycle steps) shifted every later seq and would skip unexecuted steps or re-run done ones; step names are stable across plan shapes. Also adds getActiveOpIds() — the in-process set of currently-running opIds — so mission.close's ADR-0084 sweep can exclude the journal of the very operation it is invoked from (observed: ship op self-abandoned mid-run, breaking --resume).</item>
@@ -17,7 +16,7 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>RFC-0958</history>
+  <history>RFC-0958, RFC-0962</history>
 </CHANGE_SUMMARY>
 */
 

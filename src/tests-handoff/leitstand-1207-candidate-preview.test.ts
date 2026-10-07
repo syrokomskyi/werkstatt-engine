@@ -48,6 +48,19 @@ vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
     resolveCacheClonePath: vi.fn((workspaceRoot: string, systemId: string) =>
       path.join(workspaceRoot, "systems-cache", systemId),
     ),
+    // readSystemStateSmart resolves the cache-clone path internally (shared
+    // ../systems-cache pool) — mock it so a stale sibling-pool state file
+    // cannot inject a foreign systemState into the certify path.
+    readSystemStateSmart: vi.fn(async (_workspaceRoot: string, systemId: string) => ({
+      schemaVersion: "1.0.0",
+      systemId,
+      currentMission: null,
+      lastRelease: null,
+      lastPropagated: {},
+      accessPin: null,
+      passportRequired: false,
+      ownershipRequired: false,
+    })),
   };
 });
 
