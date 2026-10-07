@@ -6,12 +6,19 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
-  <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>ADR-0096: dedupe CHANGE_SUMMARY item, use SNAPSHOT_FILENAME in CACHE_CLONE_ONLY_PATHS</item>
   <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
-  <history>ADR-0008, ADR-0060, ADR-0093, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149</history>
+  <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
+  <item>RFC-1221: step 1 — derive mergedShas from merge-commit parents
+
+count-transferred-commits computes the folded set as
+rev-list <commitSha>^2 --not <commitSha>^1 filtered by workpiece
+membership, replacing the preReconcileSha..FETCH_HEAD range that the
+journal-resume path leaves uncomputable (preReconcileSha stays null when
+record-pre-reconcile-sha was skipped). preReconcileSha falls back to
+commitSha^1 when null or self-range.</item>
+  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159</history>
 </CHANGE_SUMMARY>
 */
 
@@ -2391,24 +2398,77 @@ export async function buildReconcileSteps(
         cc.mergeCommitSha = (
           await shExec("git rev-parse HEAD^1", cc.systemDir, cc.context.io)
         ).trim();
-        if (cc.preReconcileSha) {
+        // RFC-1221: derive the folded set from the merge commit's own parents
+        // — rev-list <commitSha>^2 --not <commitSha>^1 needs no recorded ctx
+        // state, so the computation survives journal resume (a completed
+        // record-pre-reconcile-sha is skipped, leaving cc.preReconcileSha
+        // null) and the fold path where no new merge was needed alike.
+        if (cc.commitSha) {
           try {
-            // ADR-0093: capture every merged workpiece commit SHA, not just the
-            // count — the bordbuch-append step records them for the
-            // external-edit guard.
-            const shaListOutput = (
+            const secondParent = (
               await shExec(
-                `git rev-list ${cc.preReconcileSha}..FETCH_HEAD`,
+                `git rev-parse --verify -q ${cc.commitSha}^2 || true`,
                 cc.systemDir,
                 cc.context.io,
               )
             ).trim();
-            cc.mergedShas = shaListOutput
-              .split("\n")
-              .map((l) => l.trim())
-              .filter((l) => l.length > 0);
-            cc.transferredCommits = cc.mergedShas.length;
-          } catch {
+            if (secondParent.length > 0) {
+              const firstParent = (
+                await shExec(`git rev-parse ${cc.commitSha}^1`, cc.systemDir, cc.context.io)
+              ).trim();
+              // The merge's first parent IS the head the merge started from —
+              // the truthful preReconcileSha whenever the recorded value was
+              // lost (resume) or degenerate (self-range on the fold path).
+              if (!cc.preReconcileSha || cc.preReconcileSha === cc.commitSha) {
+                cc.preReconcileSha = firstParent;
+              }
+              const shaListOutput = (
+                await shExec(
+                  `git rev-list ${cc.commitSha}^2 --not ${cc.commitSha}^1`,
+                  cc.systemDir,
+                  cc.context.io,
+                )
+              ).trim();
+              const candidates = shaListOutput
+                .split("\n")
+                .map((l) => l.trim())
+                .filter((l) => l.length > 0);
+              // Restrict to SHAs present in the workpiece repo — the folded
+              // ancestry can legitimately contain cache-clone bookkeeping
+              // (workpiece origin is the cache clone); those pass the
+              // subject whitelist anyway, so over-tracing is safe while
+              // under-tracing is not. On any workpiece-repo failure record
+              // the unfiltered set.
+              let workpieceUsable = true;
+              try {
+                await shExec("git rev-parse --git-dir", cc.workpieceDir, cc.context.io);
+              } catch {
+                workpieceUsable = false;
+              }
+              if (!workpieceUsable) {
+                cc.mergedShas = candidates;
+              } else {
+                const kept: string[] = [];
+                for (const sha of candidates) {
+                  try {
+                    await shExec(`git cat-file -e ${sha}`, cc.workpieceDir, cc.context.io);
+                    kept.push(sha);
+                  } catch {
+                    // Absent from the workpiece — cache-clone-side commit, skip.
+                  }
+                }
+                cc.mergedShas = kept;
+              }
+              cc.transferredCommits = cc.mergedShas.length;
+            } else {
+              // Non-merge commitSha — no-op fold: nothing was folded.
+              cc.mergedShas = [];
+              cc.transferredCommits = 0;
+            }
+          } catch (foldErr) {
+            cc.context.logger.warn(
+              `[mission.reconcile] folded-SHA computation failed (non-fatal): ${foldErr instanceof Error ? foldErr.message : String(foldErr)}`,
+            );
             cc.transferredCommits = 0;
             cc.mergedShas = [];
           }
