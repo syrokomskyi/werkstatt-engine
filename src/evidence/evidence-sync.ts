@@ -10,7 +10,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1202: prefix-completion idempotency — {runTimestamp}.upload-manifest.json sibling object written last after a successful upload; matching manifest skips the upload entirely (deduped: true); broad-catch manifest read (absent/corrupt/network → upload); dry-run performs the check when R2 env resolves.</item>
   <item>ADR-0025: add periodic progress logging (30s heartbeat) during R2 upload loop.</item>
   <item>RFC-1190: --site/--system flag — explicit Sternsystem for the R2 key prefix, validated against the resolved systemId (SYSTEM_MISMATCH on contradiction); falls back to the currentMission scan / missionId prefix when absent so leitstand.ship evidence-sync-* steps can pass it explicitly.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
@@ -22,7 +21,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>RFC-0651</history>
+  <history>RFC-0651, RFC-1202</history>
 </CHANGE_SUMMARY>
 */
 

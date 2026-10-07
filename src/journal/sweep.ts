@@ -8,7 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0084: initial sweep — findIncompleteOperationsForMission, abandonIncompleteOperationsForMission. An op belongs to a mission when its op-started record carries the missionId, its opId contains the missionId, or the journal filename contains the missionId (filename inference covers records without mission attribution).</item>
-  <item>2026-10-04 recovery fix: excludeOpIds parameter — callers pass getActiveOpIds() so the sweep cannot abandon an operation that is still executing in this process (mission.close as a ship step was self-abandoning the ship journal, breaking --resume).</item>
+  <item>RECOVERY-2026-10-04: excludeOpIds parameter — callers pass getActiveOpIds() so the sweep cannot abandon an operation that is still executing in this process (mission.close as a ship step was self-abandoning the ship journal, breaking --resume).</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.

@@ -9,7 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RECOVERY-2026-10-04: mission.check invocation now passes --channel=gateChannel — previously the flag was omitted, defaulting the suppression context to "main", so channelNot-scoped axiom suppressions (RFC-0684) never fired on dev/alt certifies. Gate channel is already validated to the same dev|alt|main enum.</item>
-  <item>2026-10-04 recovery fix: mission.check timeouts raised to a shared 25min constant (was inner 5min race + outer 300s orchestrator timeout — a cold ~7-11min capture always exceeded both, racing a fail decision vs an "incomplete" no-decision return while abandoned mission.check processes kept running). Orchestrator timeout derives as +60s so the inner race still produces the diagnostic envelope deterministically.</item>
+  <item>RECOVERY-2026-10-04: mission.check timeouts raised to a shared 25min constant (was inner 5min race + outer 300s orchestrator timeout — a cold ~7-11min capture always exceeded both, racing a fail decision vs an "incomplete" no-decision return while abandoned mission.check processes kept running). Orchestrator timeout derives as +60s so the inner race still produces the diagnostic envelope deterministically.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.

@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1093 (fo-fix): replace inline WG_ADAPTER_BLOCK IIFE with resolveAdapterBlock(stagingDir) from adapter-config.ts.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -16,7 +15,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1199: MATERIALIZATION-IN-PROGRESS sentinel — written in setup-staging into stagingDir/.git (rides atomic-move into workpiece/.git) or inside git-init-commit after git init on the non-git fallback; deleted only after the baseline commit lands; git-init-commit is idempotent on resume (skip commit when HEAD resolves and the staged index is clean); workpiece commit hook installs early in setup-staging</item>
-  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958</history>
+  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958, RFC-1093</history>
 </CHANGE_SUMMARY>
 */
 

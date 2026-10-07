@@ -16,12 +16,12 @@ UnsupportedProtocolVersionError naming the supported list.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0290: initial MCP method handler.</item>
   <item>RFC-0291: add rate limiting, size cap, identity passthrough, freshness _meta.</item>
   <item>RFC-1112: idempotency via params._meta, shared executeAction core, problem-details in error.data.</item>
   <item>RFC-1113: server/discover + per-request protocol-version gate; initialize → UnsupportedProtocolVersionError.</item>
   <item>RFC-1113: align agent discovery surface with RFC 9727 and MCP 2026-07-28 stateless era</item>
   <item>RFC-1211: resources/list + resources/read serve committed ui:// artifacts; ui-capable action results embed a {type:"resource"} block.</item>
+  <history>RFC-0290</history>
 </CHANGE_SUMMARY>
 */
 

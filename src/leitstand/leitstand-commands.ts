@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1203: runLeitstandChannels relabeling wrapper + LeitstandStatusData.aliasedTo — leitstand.channels delegates to runLeitstandStatus and re-labels summary/data so the alias names its canonical command (DNA-82 prefix rule).</item>
   <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures route into the command report via onSigningFailure → logger.warn instead of the default console channel</item>
@@ -16,7 +15,7 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149</history>
+  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 

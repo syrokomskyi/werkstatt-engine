@@ -7,7 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0084: abandon-incomplete-operations step before transition-state — sweeps systems-cache operations/*.jsonl for incomplete ops referencing the closing mission and appends op-abandoned, then commits the journal updates to the cache clone.</item>
-  <item>2026-10-04 recovery fix: sweep passes getActiveOpIds() — ops still executing in this process (the ship journal that mission.close runs inside) are excluded so the live ship op is not self-abandoned mid-run.</item>
+  <item>RECOVERY-2026-10-04: sweep passes getActiveOpIds() — ops still executing in this process (the ship journal that mission.close runs inside) are excluded so the live ship op is not self-abandoned mid-run.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys

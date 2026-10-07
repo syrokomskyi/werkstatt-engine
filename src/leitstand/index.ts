@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1203: export runLeitstandChannels (leitstand.channels alias handler).</item>
   <item>RFC-0842: add leitstand.pipeline.check command for release pipeline state inspection.</item>
   <item>RFC-0866: add leitstand.certify command and shared deploy-execution pipeline.</item>
   <item>RFC-0927: add leitstand.hotfix.dev-deploy composite command export.</item>
@@ -16,7 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0358, RFC-0379, RFC-0608, RFC-0627, RFC-0628, RFC-0751, RFC-0806</history>
+  <history>RFC-0358, RFC-0379, RFC-0608, RFC-0627, RFC-0628, RFC-0751, RFC-0806, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 

@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0921: delegate signing/verification/keygen to shared signing core. Remove node:crypto sign/verify imports and canonicalJson function.</item>
   <item>RFC-0931: add signBuildIdentity, writeReleasePublicKey, verifyBuildIdentitySignature for Ed25519 signing of build-identity.json in deploy pipeline.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -17,6 +16,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1188: fo-review fix — resolvePassportSigningKey single-sources the .env-authoritative + ambient-fallback chain both the WBA resolver and agent-shared used to inline</item>
+  <history>RFC-0921</history>
 </CHANGE_SUMMARY>
 
 /**

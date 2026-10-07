@@ -14,13 +14,12 @@ public/ assets (works identically in dev and on Cloudflare Workers).
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1115: search results flattened to citation shape; tookMs is measured, not hardcoded.</item>
   <item>RFC-1112/1113/1114 gap fix: CORS Allow-Headers gains Idempotency-Key, MCP-Protocol-Version, A2A-Version; Expose-Headers gains X-Agent-Idempotency.</item>
   <item>RFC-1172: closed agent.traffic telemetry — ports.telemetry sink, TrafficRecorder + boundary emit via withTrafficEmit</item>
   <item>RFC-1172: fo-review — extractAgentIdentity on all routes, honest mcpProtocolVersion, top-level import, test header</item>
   <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>
   <item>RFC-1187: fo-review — 503+Retry-After auth-backend-unavailable, streamed 64KiB JWKS cap, keyVersion-fed kid</item>
-  <history>RFC-0290, RFC-0954, RFC-1112, RFC-1114</history>
+  <history>RFC-0290, RFC-0954, RFC-1112, RFC-1114, RFC-1115</history>
 </CHANGE_SUMMARY>
 */
 
