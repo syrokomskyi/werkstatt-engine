@@ -268,6 +268,13 @@ export async function executeRegisteredCommand(
     input.flags.force = true;
   }
 
+  // RFC-1231: inject the consumed --all site selector into input.flags.all —
+  // only for commands that declare the flag in their schema. The acceptsAllFlag
+  // gate (assertAllFlagAccepted) already ran upstream on every CLI path.
+  if (context.allSites && command.flags?.all) {
+    input.flags.all = true;
+  }
+
   // RFC-1133: command-result cache — the single read/write point shared by the
   // direct executeKernelCommand path and both pipeline executors. Runs on the
   // final resolved input (post flag-alias, post pipeline --site/--system
@@ -630,6 +637,7 @@ export async function executeKernelCommand(
           logger,
           dryRun: options.dryRun ?? false,
           force: options.force ?? false,
+          allSites: options.allSites ?? false,
           outputFormat,
           io,
           fileIntents: intents,
@@ -712,6 +720,7 @@ export async function executeKernelCommand(
           logger,
           dryRun: options.dryRun ?? false,
           force: options.force ?? false,
+          allSites: options.allSites ?? false,
           outputFormat,
           io,
           fileIntents: intents,
@@ -799,6 +808,7 @@ export async function executeKernelCommand(
         logger,
         dryRun: options.dryRun ?? false,
         force: options.force ?? false,
+        allSites: options.allSites ?? false,
         outputFormat,
         io,
         fileIntents: intents,
