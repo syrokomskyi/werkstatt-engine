@@ -11,6 +11,7 @@
   <item>RFC-1168: onTransition option on runOperation — per-record callback so callers can stream progress (stderr) without waiting for run completion.</item>
   <item>RFC-1168: ship stderr progress + leitstand.ship.status reader</item>
   <item>2026-10-04 recovery fix: buildStepState keys done/crash tracking on step name instead of seq index — a resumed plan with filtered steps (e.g. buildShipPlan missionClosed drops 3 lifecycle steps) shifted every later seq and would skip unexecuted steps or re-run done ones; step names are stable across plan shapes. Also adds getActiveOpIds() — the in-process set of currently-running opIds — so mission.close's ADR-0084 sweep can exclude the journal of the very operation it is invoked from (observed: ship op self-abandoned mid-run, breaking --resume).</item>
+  <item>RFC-1219: op-interrupted record appended on step failure — explicit non-terminal resumable marker; findIncompleteOperation scans all op-started newest→oldest (a completed later op no longer masks an earlier incomplete one).</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
@@ -212,6 +213,15 @@ export async function runOperation<C>(
           at: nowIso(),
           error: errorMsg,
         });
+        // RFC-1219: explicit interrupted marker — non-terminal, the op stays
+        // resumable; tooling (ship.status, journal.show) can distinguish a
+        // failed-resumable op from an in-flight/crashed one.
+        await append({
+          kind: "op-interrupted",
+          opId,
+          at: nowIso(),
+          failedStep: step.name,
+        });
         stepResults.push({ step: step.name, status: "failed", durationMs });
         return {
           opId,
@@ -234,6 +244,12 @@ export async function runOperation<C>(
             seq,
             at: nowIso(),
             error: `verify returned false after run for step "${step.name}"`,
+          });
+          await append({
+            kind: "op-interrupted",
+            opId,
+            at: nowIso(),
+            failedStep: step.name,
           });
           stepResults.push({
             step: step.name,

@@ -157,7 +157,7 @@ test("findIncompleteOperation detects incomplete op with crash step", () => {
     { kind: "step-started", opId: "op-1", step: "s1", seq: 1, at: "t3" },
   ];
   const result = findIncompleteOperation(records);
-  expect(result).toEqual({ opId: "op-1", op: "mission.close", lastSeq: 1 });
+  expect(result).toEqual({ opId: "op-1", op: "mission.close", lastSeq: 1, status: "running" });
 });
 
 test("findIncompleteOperation uses last op-started when multiple exist", () => {
@@ -182,5 +182,10 @@ test("findIncompleteOperation uses last op-started when multiple exist", () => {
     { kind: "step-started", opId: "op-2", step: "s0", seq: 0, at: "t3" },
   ];
   const result = findIncompleteOperation(records);
-  expect(result).toEqual({ opId: "op-2", op: "mission.reconcile", lastSeq: 0 });
+  expect(result).toEqual({
+    opId: "op-2",
+    op: "mission.reconcile",
+    lastSeq: 0,
+    status: "running",
+  });
 });

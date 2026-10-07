@@ -104,9 +104,16 @@ test("RFC-1168: failing step emits step-failed line with error, no op-done", asy
     },
   );
   const kinds = seen.map((r) => r.kind);
-  expect(kinds[kinds.length - 1]).toBe("step-failed");
-  const line = formatShipTransition(seen[seen.length - 1], 3);
+  // RFC-1219: step-failed is followed by the non-terminal op-interrupted
+  // marker — still no op-done.
+  expect(kinds[kinds.length - 2]).toBe("step-failed");
+  expect(kinds[kinds.length - 1]).toBe("op-interrupted");
+  expect(kinds).not.toContain("op-done");
+  const line = formatShipTransition(seen[seen.length - 2], 3);
   expect(line).toMatch(/^\[ship\] step 2\/3: bad-step — failed — boom/);
+  expect(formatShipTransition(seen[seen.length - 1], 3)).toBe(
+    '[ship] interrupted at step "bad-step" — run with --resume',
+  );
 });
 
 test("RFC-1168 AC-2: preamble lines name journal path and the ship.status watch invocation", async () => {

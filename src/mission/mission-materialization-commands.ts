@@ -97,6 +97,10 @@ const CACHE_CLONE_ONLY_PATHS: readonly string[] = [
   ".materialization-state.json",
   SNAPSHOT_FILENAME,
   ".gitignore",
+  // RFC-1219: operation journals are append-only cache-side state — merge
+  // conflicts on them resolve ours (the workpiece copy is a stale replica),
+  // and the rewind preservation below keeps them across reset --hard.
+  "operations/",
 ];
 
 // RFC-0763: shared helper for bordbuch cleanup on failure paths.
@@ -2074,26 +2078,69 @@ export async function buildReconcileSteps(
         }
         const prevReportPath = path.join(cc.evidenceDir, "reconciliation-report.json");
         if (await cc.context.io.exists(prevReportPath)) {
+          let prevReport: { preReconcileSha?: string };
           try {
-            const prevReport = JSON.parse(await cc.context.io.readFile(prevReportPath)) as {
+            prevReport = JSON.parse(await cc.context.io.readFile(prevReportPath)) as {
               preReconcileSha?: string;
             };
-            if (prevReport.preReconcileSha) {
-              try {
+          } catch {
+            // Unparseable report — continue
+            prevReport = {};
+          }
+          if (prevReport.preReconcileSha) {
+            let rewound = false;
+            try {
+              await shExec(
+                `git reset --hard ${prevReport.preReconcileSha}`,
+                cc.systemDir,
+                cc.context.io,
+              );
+              cc.context.logger.info(
+                `  Reset cache clone to pre-reconcile SHA ${prevReport.preReconcileSha.slice(0, 12)}`,
+              );
+              rewound = true;
+            } catch {
+              // Previous SHA may not exist — continue with current HEAD
+            }
+            // RFC-1219: the rewind deletes every file tracked at the
+            // pre-reset HEAD but absent at the reset target — including
+            // operation journals committed mid-run by
+            // auto-commit-cache-clone (observed: ship journal wiped →
+            // orphan step-failed → "nothing to resume"). Restore
+            // operations/ from the pre-reset HEAD and re-commit so the
+            // merge sees tracked-clean state. Journals are append-only;
+            // restoration is always safe. A failure here is blocking —
+            // continuing silently would lose journal state.
+            if (rewound && cc.preReconcileSha) {
+              const opsInTree = await shExec(
+                `git ls-tree --name-only ${cc.preReconcileSha} -- operations/`,
+                cc.systemDir,
+                cc.context.io,
+              ).catch(() => "");
+              if (opsInTree.trim().length > 0) {
                 await shExec(
-                  `git reset --hard ${prevReport.preReconcileSha}`,
+                  `git checkout ${cc.preReconcileSha} -- operations/`,
                   cc.systemDir,
                   cc.context.io,
                 );
-                cc.context.logger.info(
-                  `  Reset cache clone to pre-reconcile SHA ${prevReport.preReconcileSha.slice(0, 12)}`,
+                const opsStaged = await shExec(
+                  "git status --porcelain -- operations/",
+                  cc.systemDir,
+                  cc.context.io,
                 );
-              } catch {
-                // Previous SHA may not exist — continue with current HEAD
+                if (opsStaged.trim().length > 0) {
+                  await cacheCloneCommit(
+                    cc.systemDir,
+                    "cache-clone: preserve operations journals across reconcile rewind",
+                    {},
+                    cc.context.io,
+                  );
+                  cc.context.logger.info(
+                    "  Preserved operations/ journals across pre-reconcile rewind",
+                  );
+                }
               }
             }
-          } catch {
-            // Unparseable report — continue
           }
         }
       },

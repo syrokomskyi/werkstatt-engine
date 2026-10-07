@@ -906,3 +906,93 @@ test("RFC-1217 degrade: git unreadable (fetch fails) warns but does not block", 
   );
   expect(invoked).toContain("mission.validate");
 });
+
+// ─── RFC-1219: interrupted journal stays resumable ─────────────────────────
+//
+// m000192: a failed ship left an orphan step-failed after the cache-clone
+// rewind wiped the journal. The op-interrupted marker + interrupted status
+// keep the failure explicit and resumable.
+
+test("RFC-1219 AC-1/AC-2: failed ship journals op-interrupted and --resume continues at the failed step", async () => {
+  const journalPath = path.join(operationsDir, "ship-m000001.jsonl");
+
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+  mockPhaseResult("mission.reconcile", 1);
+
+  const result1 = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "closed" }),
+    context,
+  );
+  expect(result1.exitCode).toBe(1);
+  expect(result1.data!.failedStep).toBe("mission-reconcile");
+
+  // AC-2: journal stays open with an explicit interrupted marker naming the
+  // failed step — no op-done for this op.
+  const journalContent = await fs.readFile(journalPath, "utf-8");
+  expect(journalContent).toContain('"kind":"op-interrupted"');
+  expect(journalContent).toContain('"failedStep":"mission-reconcile"');
+  expect(journalContent).not.toContain('"kind":"op-done"');
+
+  vi.clearAllMocks();
+  ioExecOk("");
+
+  // AC-1: --resume reports the failed step and re-executes it — completed
+  // steps are skipped, mission.reconcile is invoked exactly once.
+  mockPhaseResult("mission.reconcile", 0);
+  mockPhaseResult("mission.close", 0);
+
+  const result2 = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "closed", resume: true }),
+    context,
+  );
+
+  expect(result2.exitCode).toBe(0);
+  expect(result2.data!.completed).toBe(true);
+  const invoked = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invoked.filter((n) => n === "mission.reconcile")).toHaveLength(1);
+  expect(invoked).not.toContain("mission.validate");
+  expect(invoked).not.toContain("leitstand.status");
+});
+
+test("RFC-1219 AC-6: a completed later op does not mask an earlier interrupted ship op", async () => {
+  const journalPath = path.join(operationsDir, "ship-m000001.jsonl");
+  await fs.writeFile(
+    journalPath,
+    [
+      '{"kind":"op-started","opId":"ship-old","op":"leitstand.ship","missionId":"m000001","at":"t0","platformVersion":"1"}',
+      '{"kind":"step-started","opId":"ship-old","step":"preflight","seq":0,"at":"t1"}',
+      '{"kind":"step-failed","opId":"ship-old","step":"preflight","seq":0,"at":"t2","error":"boom"}',
+      '{"kind":"op-interrupted","opId":"ship-old","at":"t3","failedStep":"preflight"}',
+      // A later op that ran to completion — previously masked ship-old.
+      '{"kind":"op-started","opId":"ship-new","op":"leitstand.ship","missionId":"m000001","at":"t4","platformVersion":"1"}',
+      '{"kind":"step-started","opId":"ship-new","step":"preflight","seq":0,"at":"t5"}',
+      '{"kind":"step-done","opId":"ship-new","step":"preflight","seq":0,"at":"t6"}',
+      '{"kind":"op-done","opId":"ship-new","at":"t7"}',
+      "",
+    ].join("\n"),
+  );
+
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+  mockPhaseResult("mission.reconcile", 0);
+  mockPhaseResult("mission.close", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "closed", resume: true }),
+    context,
+  );
+
+  // The earlier interrupted op is found and resumed from preflight — not
+  // reported as "nothing to resume".
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  const invoked = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invoked).toContain("leitstand.status");
+});

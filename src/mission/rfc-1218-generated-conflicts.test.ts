@@ -218,7 +218,7 @@ test("authored conflict still aborts with the resolve-in-workpiece diagnostic", 
   editAndCommit(workpieceDir, "src/content/system.md", "# Workpiece\n", "wp edit");
   editAndCommit(cacheDir, "src/content/system.md", "# Cache\n", "cache edit");
 
-  const err = await runReconcile(GENERATED_OWNERSHIP).catch((e: unknown) => e as Error);
+  const err = (await runReconcile(GENERATED_OWNERSHIP).catch((e: unknown) => e)) as Error;
   expect(err).toBeInstanceOf(Error);
   expect(err.message).toMatch(/Resolve conflicts in the workpiece/);
   expect(err.message).toMatch(/src\/content\/system\.md/);

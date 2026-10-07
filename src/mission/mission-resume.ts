@@ -132,7 +132,13 @@ export async function runMissionResume(
     };
   }
 
-  const def = await resolveOperationDefinition(incomplete.op, workspaceRoot, missionId, manifest);
+  const def = await resolveOperationDefinition(
+    incomplete.op,
+    workspaceRoot,
+    missionId,
+    manifest,
+    context,
+  );
   if (!def) {
     return {
       exitCode: 1,
@@ -153,12 +159,11 @@ export async function runMissionResume(
   await acquireLock(workspaceRoot, missionLockKey, operationId, "mission.resume", "agent");
 
   try {
-    const result = await runOperation(
-      journalPath,
-      def,
-      { workspaceRoot, missionId, manifest, context },
-      { resumeOpId: incomplete.opId, missionId, platformVersion: "" },
-    );
+    const result = await runOperation(journalPath, def, def.ctx, {
+      resumeOpId: incomplete.opId,
+      missionId,
+      platformVersion: "",
+    });
 
     if (!result.completed) {
       const nextSteps: KernelNextStep[] = [
@@ -219,13 +224,24 @@ async function resolveOperationDefinition(
   workspaceRoot: string,
   missionId: string,
   manifest: unknown,
-): Promise<OperationDefinition<unknown> | null> {
+  context: KernelRuntimeContext,
+): Promise<(OperationDefinition<unknown> & { ctx: unknown }) | null> {
   try {
     const stepsModule = await import("./steps/index.ts");
     if (typeof stepsModule.resolveOperationSteps === "function") {
-      const steps = await stepsModule.resolveOperationSteps(op, workspaceRoot, missionId, manifest);
-      if (steps) {
-        return { op, steps };
+      const resolved = await stepsModule.resolveOperationSteps(
+        op,
+        workspaceRoot,
+        missionId,
+        manifest,
+        context,
+      );
+      if (resolved) {
+        // RFC-1219: ctx carries the reconstructed per-kind step context —
+        // passing it to runOperation lets resumed steps execute against the
+        // same shape the command handler built (fixes the m000192
+        // "path argument must be of type string" crash).
+        return { op, steps: resolved.steps, ctx: resolved.ctx };
       }
     }
   } catch {

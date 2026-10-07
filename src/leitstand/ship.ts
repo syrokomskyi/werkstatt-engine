@@ -58,13 +58,23 @@ export function shipPreambleLines(
 
 /** One `[ship] step N/M: <name> — <event>` line per journal transition. */
 export function formatShipTransition(
-  record: { kind: string; step?: string; seq?: number; error?: string; reason?: string },
+  record: {
+    kind: string;
+    step?: string;
+    seq?: number;
+    error?: string;
+    reason?: string;
+    failedStep?: string;
+  },
   stepCount: number,
   durationMs?: number,
 ): string | null {
   if (record.seq === undefined) {
     if (record.kind === "op-done") return "[ship] done";
     if (record.kind === "op-abandoned") return `[ship] abandoned — ${record.reason}`;
+    if (record.kind === "op-interrupted") {
+      return `[ship] interrupted at step "${record.failedStep}" — run with --resume`;
+    }
     return null;
   }
   const n = record.seq + 1;
@@ -797,6 +807,9 @@ export async function runLeitstandShip(
   if (!isResume && incomplete && incomplete.op === "leitstand.ship") {
     // Same-kind incomplete operation — auto-resume
     logger.info(`  [ship] incomplete operation found (${incomplete.opId}), resuming`);
+  }
+  if (incomplete?.status === "interrupted" && incomplete.failedStep) {
+    logger.info(`  [ship] resuming interrupted op at failed step "${incomplete.failedStep}"`);
   }
 
   const opResult = await runOperation(journalPath, plan, ctx, {

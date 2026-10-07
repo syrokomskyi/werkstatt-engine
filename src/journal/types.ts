@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial journal type definitions — JournalRecord discriminated union, OperationStep, OperationDefinition.</item>
   <item>RFC-0962 fo-fix: OperationStep.run returns optional metadata, StepResult interface added, RunOperationResult includes stepResults.</item>
+  <item>RFC-1219: op-interrupted record kind — non-terminal resumable-failure marker (additive; older readers ignore it).</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -43,7 +44,11 @@ export type JournalRecord =
       reason: "already-satisfied" | "resume";
     }
   | { kind: "op-done"; opId: string; at: string }
-  | { kind: "op-abandoned"; opId: string; at: string; reason: string };
+  | { kind: "op-abandoned"; opId: string; at: string; reason: string }
+  // RFC-1219: non-terminal marker — the op stopped on a failed step and is
+  // resumable. Older readers ignore the unknown kind and still see the op as
+  // open; findIncompleteOperation treats it as non-terminal either way.
+  | { kind: "op-interrupted"; opId: string; at: string; failedStep: string };
 
 export interface OperationStep<C> {
   name: string;

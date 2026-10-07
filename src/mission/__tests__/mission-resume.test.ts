@@ -132,7 +132,10 @@ test("mission.resume with incomplete operation calls resolveOperationSteps and r
       verify: async () => true,
     },
   ];
-  vi.mocked(resolveOperationSteps).mockResolvedValue(steps);
+  vi.mocked(resolveOperationSteps).mockResolvedValue({
+    steps,
+    ctx: { workspaceRoot: tmpDir, missionId: "m-test" },
+  });
 
   const result = await runMissionResume(
     { argv: [], flags: { mission: "m-test" } },
@@ -158,6 +161,49 @@ test("mission.resume with incomplete operation calls resolveOperationSteps and r
   expect(result.exitCode).toBe(0);
   expect(result.data?.completed).toBe(true);
   expect(result.data?.resumedOp).toBe("mission.close");
+});
+
+test("RFC-1219: real resolveOperationSteps reconstructs the full reconcile ctx (m000192 path-undefined regression)", async () => {
+  // The m000192 defect: resume passed a thin {workspaceRoot, missionId,
+  // manifest, context} ctx into buildReconcileSteps, so fetch-and-merge
+  // crashed with 'The "path" argument must be of type string. Received
+  // undefined'. The resolver must now return a ReconcileStepCtx whose path
+  // fields are all defined.
+  const real = await vi.importActual<typeof import("../steps/index.ts")>("../steps/index.ts");
+
+  const context = {
+    workspaceRoot: tmpDir,
+    logger: {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      success: () => {},
+      section: () => {},
+      event: () => {},
+      getEvents: () => [],
+    } as any,
+    io: createDefaultIO().io,
+  } as any;
+
+  const resolved = await real.resolveOperationSteps(
+    "mission.reconcile",
+    tmpDir,
+    "m-test",
+    { missionId: "m-test", systemId: "test-system", state: "open" },
+    context,
+  );
+
+  expect(resolved).not.toBeNull();
+  const ctx = resolved!.ctx as Record<string, unknown>;
+  for (const field of ["missionDir", "workpieceDir", "evidenceDir", "systemDir"]) {
+    expect(typeof ctx[field], field).toBe("string");
+    expect((ctx[field] as string).length).toBeGreaterThan(0);
+  }
+  expect(ctx.workspaceRoot).toBe(tmpDir);
+  expect(ctx.missionId).toBe("m-test");
+  // Step array is the real reconcile plan — fetch-and-merge must be present.
+  const names = resolved!.steps.map((s) => s.name);
+  expect(names).toContain("fetch-and-merge");
 });
 
 test("mission.resume --abandon without --force returns error", async () => {
@@ -291,6 +337,7 @@ test("mission.journal.show returns records and incomplete operation info", async
     opId: "op-1",
     op: "mission.close",
     lastSeq: 0,
+    status: "running",
   });
 });
 
