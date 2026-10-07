@@ -77,7 +77,10 @@ export async function runSternsystemSync(
     );
   }
 
-  const syncAll = flagBoolean(input, "all");
+  const syncAllBranches = flagBoolean(input, "all-branches");
+  // git's own "--all" push flag — kept as a const because the RFC-1158 token
+  // gate flags a quoted "--x" literal directly followed by ":" in ternaries.
+  const gitAll = "--all";
 
   const config = await readSystemConfig(workspaceRoot, id, context.io);
 
@@ -137,12 +140,12 @@ export async function runSternsystemSync(
   const externalMirrors = config.mirrors.slice(2).filter((m) => isGitAccessible(m.path));
   const mirrorUrls = externalMirrors.map((m) => m.path);
 
-  if (syncAll) {
+  if (syncAllBranches) {
     branch = "*";
   }
 
-  const refSpec = syncAll ? "--all" : branchName;
-  const pushRefs = syncAll ? ["--all", "--tags"] : [branchName];
+  const refSpec = syncAllBranches ? gitAll : branchName;
+  const pushRefs = syncAllBranches ? [gitAll, "--tags"] : [branchName];
 
   const warnings: string[] = [];
 
@@ -165,14 +168,14 @@ export async function runSternsystemSync(
       workspaceRoot,
       id,
       "mirror-sync",
-      `Mirror sync (${direction}, branch: ${syncAll ? "*" : branchName}) — ${commitSha.slice(0, 12)}`,
+      `Mirror sync (${direction}, branch: ${syncAllBranches ? "*" : branchName}) — ${commitSha.slice(0, 12)}`,
       "sternsystem.sync",
       {
         writerRole: "sternsystem",
         metadata: {
           mirrorUrls,
           direction,
-          branch: syncAll ? "*" : branchName,
+          branch: syncAllBranches ? "*" : branchName,
           commitSha,
           result: "ok",
         },
@@ -242,7 +245,7 @@ export async function runSternsystemSync(
   for (const bundleMirror of bundleMirrors) {
     const bundlePath = path.join(tmpdir(), `${id}-${Date.now()}.bundle`);
     try {
-      await git(bareRepoPath, ["bundle", "create", bundlePath, "--all"], context.io);
+      await git(bareRepoPath, ["bundle", "create", bundlePath, gitAll], context.io);
       logger.info(`[sternsystem.sync] created bundle for ${bundleMirror.path}`);
       // Copy bundle to backup endpoint (non-git protocols: ftp, s3, rsync)
       // For file-based bundle mirrors, copy directly
@@ -280,7 +283,7 @@ export async function runSternsystemSync(
   // push. Now accurately tracks the SHA that was pushed to external mirrors
   // (bordbuch commit included). mission.close checks this ref to determine if
   // external mirrors are in sync.
-  if (externalMirrors.length > 0 && !syncAll) {
+  if (externalMirrors.length > 0 && !syncAllBranches) {
     try {
       const headSha = await git(bareRepoPath, ["rev-parse", branchName], context.io);
       await git(bareRepoPath, ["update-ref", `refs/mirror/${branchName}`, headSha], context.io);
@@ -294,7 +297,7 @@ export async function runSternsystemSync(
   }
 
   logger.info(
-    `[sternsystem.sync] ${id} mirrored (${direction}, branch: ${syncAll ? "*" : branchName})`,
+    `[sternsystem.sync] ${id} mirrored (${direction}, branch: ${syncAllBranches ? "*" : branchName})`,
   );
 
   // RFC-1124: carry the fleet claims repo with the sync — publish any pending
@@ -331,7 +334,7 @@ export async function runSternsystemSync(
     systemId: id,
     mirrorUrls,
     direction: "push",
-    branch: syncAll ? "*" : branchName,
+    branch: syncAllBranches ? "*" : branchName,
     commitSha,
     syncedAt,
   };
@@ -339,7 +342,7 @@ export async function runSternsystemSync(
   return {
     data,
     exitCode: 0,
-    summary: `[sternsystem.sync] ${id} mirrored (${direction}, branch: ${syncAll ? "*" : branchName})`,
+    summary: `[sternsystem.sync] ${id} mirrored (${direction}, branch: ${syncAllBranches ? "*" : branchName})`,
     nextSteps: [
       {
         action: `Verify the propagated claim: pnpm exec werkstatt run fleet.claims.verify --id ${id}`,

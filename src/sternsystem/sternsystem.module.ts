@@ -179,7 +179,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
         description:
-          "Push a Sternsystem's local bare repo to an external mirror (RFC-0472, RFC-0480). Push-only — pull and both are removed. Flags: --id, [--all].",
+          "Push a Sternsystem's local bare repo to an external mirror (RFC-0472, RFC-0480). Push-only — pull and both are removed. Flags: --id, [--all-branches].",
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
@@ -189,7 +189,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
             kind: "string",
             description: "Sync direction: push (default, only allowed value).",
           },
-          all: {
+          "all-branches": {
             kind: "boolean",
             description: "Sync all branches + tags instead of current branch only.",
           },
@@ -205,7 +205,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         description:
           "Read-only synchronization state inspection for a Sternsystem (RFC-0477). Flags: --id, [--all].",
         scope: "workspace",
-        acceptsAllFlag: false,
+        acceptsAllFlag: true,
         mutatesState: false,
         execOnReadOnly: true,
         flags: {
