@@ -15,6 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1223: gate the push-preceding rebase on real divergence — fetch, compare merge-base to remote head, skip rebase when origin is an ancestor or absent, use rebase --rebase-merges on true divergence so merge-commit topology survives the push.</item>
   <history>RFC-0355, RFC-0473, RFC-0477, RFC-0574, RFC-0580, RFC-0583, RFC-0706, RFC-0715</history>
 </CHANGE_SUMMARY>
 */
@@ -507,7 +508,26 @@ export async function commitAndPushBordbuch(
     } catch {
       // No changes to stash — proceed with pull
     }
-    await gitExec(systemDir, `pull --rebase origin ${branch}`);
+    // RFC-1223: fetch without a refspec — `fetch origin <branch>` fatals
+    // with "couldn't find remote ref" on a fresh mirror lacking the branch.
+    await gitExec(systemDir, "fetch origin");
+    // gitExec returns "" under allowNonZero, so observe the remote ref via
+    // stdout: empty means `origin/<branch>` does not exist yet (first push).
+    const remoteHead = await gitExec(systemDir, `rev-parse --verify -q origin/${branch}`, {
+      allowNonZero: true,
+    });
+    // merge-base == origin head ⇔ origin is an ancestor of HEAD. An empty
+    // merge-base (unrelated histories) counts as diverged — the rebase decides.
+    const mergeBase = remoteHead
+      ? await gitExec(systemDir, `merge-base origin/${branch} HEAD`, { allowNonZero: true })
+      : "";
+    if (remoteHead && mergeBase !== remoteHead) {
+      // Genuine divergence — rebase replaying merge commits (equivalent to
+      // `pull --rebase=merges`, minus pull's redundant second fetch).
+      await gitExec(systemDir, `rebase --rebase-merges origin/${branch}`);
+    }
+    // No remote ref yet or remote strictly behind → nothing to integrate →
+    // straight to push; merge topology preserved.
     if (stashed) {
       try {
         await gitExec(systemDir, "stash pop");
