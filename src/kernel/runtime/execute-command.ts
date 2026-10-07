@@ -28,6 +28,9 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1231: step 2 — allSites context carrier + flags.all injection
+
+KernelRuntimeContext.allSites populated from options.allSites at all three executor context sites (workspace path, app-scope fast path, fallback registry path). executeRegisteredCommand injects input.flags.all = true when context.allSites and the command declares the flag — after flag resolution, before the RFC-1133 cache-key computation so cached and fresh executions see identical flags.</item>
   <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097</history>
 </CHANGE_SUMMARY>
 */

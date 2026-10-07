@@ -22,6 +22,9 @@ fo-review finding (axis E): docstrings did not mention the new bypassCache skip 
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1231: allSites context carrier on pipeline contexts
+
+Both pipeline context-construction sites (site fan-out and workspace) populate KernelRuntimeContext.allSites from options.allSites so the executor's flags.all injection sees the consumed --all selector for steps declaring it.</item>
   <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097, RFC-1126, RFC-1130</history>
 </CHANGE_SUMMARY>
 */

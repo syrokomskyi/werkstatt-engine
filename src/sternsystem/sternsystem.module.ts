@@ -23,6 +23,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1231: sternsystem.status opts into --all (acceptsAllFlag: true — selector lands in flags.all); sternsystem.sync flag renamed all -> all-branches so the reserved token stays gated off.</item>
   <history>RFC-0477, RFC-0966, RFC-0968</history>
 </CHANGE_SUMMARY>
 */
