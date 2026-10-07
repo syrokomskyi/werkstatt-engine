@@ -2504,7 +2504,9 @@ export async function buildReconcileSteps(
             metadata: {
               commitSha: cc.commitSha,
               preReconcileSha: cc.preReconcileSha,
-              mergedShas: cc.mergedShas,
+              // RFC-1221: omit the field when nothing was folded — an absent
+              // mergedShas is the precise "no folded commits" signal.
+              ...(cc.mergedShas.length > 0 ? { mergedShas: cc.mergedShas } : {}),
               transferredCommits: cc.transferredCommits,
               // RFC-1218: audit trail for auto-resolved merge conflicts.
               ...(cc.autoResolvedPaths.length > 0
