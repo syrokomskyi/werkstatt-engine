@@ -142,8 +142,8 @@ test("ancestor remote skips pull and preserves merge topology", async () => {
   expect(result.error).toBeNull();
   expect(result.pushed).toBe(true);
 
-  // No pull/rebase step ran: reflog carries no rebase entries.
-  expect(await localReflogSubjects()).not.toMatch(/rebase/);
+  // No pull/rebase step ran: reflog carries no rebase or pull entries.
+  expect(await localReflogSubjects()).not.toMatch(/rebase|pull/);
 });
 
 test("reconcile merge commit stays reachable in pushed history", async () => {
@@ -255,7 +255,7 @@ test("missing remote ref skips rebase and pushes directly", async () => {
   const result = await pushBordbuch();
   expect(result.error).toBeNull();
   expect(result.pushed).toBe(true);
-  expect(await localReflogSubjects()).not.toMatch(/rebase/);
+  expect(await localReflogSubjects()).not.toMatch(/rebase|pull/);
 
   const remoteHead = await git(remote, "rev-parse", "main");
   expect(remoteHead).toBe(result.commitSha);
