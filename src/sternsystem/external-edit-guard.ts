@@ -6,8 +6,8 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0520: initial extraction of Bordbuch-vs-git-log guard as pure function.</item>
   <item>ADR-0091: add externalEditBaselineSha input — positional grandfathering of pre-baseline rev-list commits and external-edit-baseline-missing violation.</item>
+  <item>ADR-0086 follow-up: whitelist deployment-operations:, gate-decisions:, journal: subjects — ship ops journals, gate decision records, and journal-abandon sweeps are committed into the cache clone by commitCacheCloneIfDirty and the ship journal machinery, so they are pipeline-authored bookkeeping like the existing entries.</item>
   <item>RFC-0520 follow-up: read bordbuch `kind` field (the `type` field never existed — guard was silently dead) and whitelist pipeline bookkeeping subject prefixes so machine-authored commits pass.</item>
   <item>ADR-0093: trace metadata.mergedShas[] from mission-reconcile entries — every merged workpiece commit counts as pipeline-authored, not just the merge head in commitSha.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
@@ -36,6 +36,9 @@ const PIPELINE_SUBJECT_PREFIXES = [
   "rescue:",
   "restore cache-clone",
   "cache-clone:",
+  "deployment-operations:",
+  "gate-decisions:",
+  "journal:",
 ];
 
 export interface ExternalEditGuardInput {
