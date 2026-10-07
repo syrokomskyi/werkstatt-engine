@@ -17,7 +17,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168</history>
+  <item>RFC-1217: preflight unreconciled-workpiece gate — cache-side `git fetch <workpieceDir> <branch>` + `rev-list HEAD..FETCH_HEAD` blocks ship when the workpiece carries commits the cache clone has not merged (the exact range fetch-and-merge would pull). Open missions only (closed-mission plans skip reconcile, so there is no merge to predict); git-unreadable degrades to a warning; --allow-unreconciled is the manual-merge escape hatch.</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1217</history>
 </CHANGE_SUMMARY>
 */
 
@@ -108,6 +109,8 @@ export interface ShipContext {
   releaseId: string | null;
   /** True when mission.yaml declares `state: closed` — lifecycle steps are skipped. */
   missionClosed: boolean;
+  /** RFC-1217: --allow-unreconciled downgrades the unreconciled-workpiece gate to a warning. */
+  allowUnreconciled: boolean;
   logger: KernelRuntimeContext["logger"];
   io: KernelRuntimeContext["io"];
 }
@@ -173,6 +176,37 @@ async function runShipPhase(
 }
 
 // ─── Step implementations ────────────────────────────────────────────────────
+
+/**
+ * RFC-1217: count workpiece commits the cache clone has not merged — cache-side,
+ * the exact range fetch-and-merge will pull. `ok: false` means git was
+ * unreadable (caller warn-skips rather than blocking on "cannot determine").
+ */
+async function countUnreconciledWorkpieceCommits(
+  ctx: ShipContext,
+): Promise<{ ok: true; count: number; oneline: string } | { ok: false; reason: string }> {
+  const io = ctx.io;
+  const gitAt = (dir: string, args: string[]) => io.exec("git", args, { cwd: dir });
+  const branchRes = await gitAt(ctx.workpieceDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branch = branchRes.exitCode === 0 ? branchRes.stdout.trim() : "";
+  if (!branch || branch === "HEAD") {
+    return { ok: false, reason: "workpiece branch unreadable (detached HEAD or not a git repo)" };
+  }
+  const fetchRes = await gitAt(ctx.cacheCloneDir, ["fetch", ctx.workpieceDir, branch]);
+  if (fetchRes.exitCode !== 0) {
+    return { ok: false, reason: `git fetch from workpiece failed: ${fetchRes.stderr.trim()}` };
+  }
+  const countRes = await gitAt(ctx.cacheCloneDir, ["rev-list", "HEAD..FETCH_HEAD", "--count"]);
+  if (countRes.exitCode !== 0 || countRes.stdout.trim() === "") {
+    return { ok: false, reason: `rev-list failed: ${countRes.stderr.trim() || "empty output"}` };
+  }
+  const listRes = await gitAt(ctx.cacheCloneDir, ["rev-list", "HEAD..FETCH_HEAD", "--oneline"]);
+  return {
+    ok: true,
+    count: parseInt(countRes.stdout.trim(), 10),
+    oneline: listRes.exitCode === 0 ? listRes.stdout.trim() : "",
+  };
+}
 
 function buildPreflightStep(): OperationStep<ShipContext> {
   return {
@@ -271,6 +305,42 @@ function buildPreflightStep(): OperationStep<ShipContext> {
           } else {
             ctx.logger.info("  [ship] preflight: cache-clone git divergence check ok");
           }
+        }
+      }
+
+      // 7. Unreconciled-workpiece gate (RFC-1217) — open missions only: closed
+      // missions never run mission-reconcile, so there is no merge to predict
+      // and no remedy to prescribe. Git-unreadable degrades to a warning (same
+      // posture as the divergence check above); a non-zero count blocks.
+      if (ctx.missionClosed) {
+        ctx.logger.info(
+          "  [ship] preflight: unreconciled-commit gate skipped (mission closed — no reconcile in plan)",
+        );
+      } else {
+        const unreconciled = await countUnreconciledWorkpieceCommits(ctx);
+        if (!unreconciled.ok) {
+          ctx.logger.info(
+            `  [ship] preflight: WARN unreconciled-commit gate indeterminate (${unreconciled.reason}) — continuing`,
+          );
+        } else if (unreconciled.count > 0) {
+          const listing = unreconciled.oneline
+            ? `\n${unreconciled.oneline
+                .split("\n")
+                .map((l) => `  ${l}`)
+                .join("\n")}`
+            : "";
+          const msg =
+            `preflight: ${unreconciled.count} unreconciled workpiece commit(s) not present ` +
+            `in the cache clone:${listing}\n` +
+            `Run \`pnpm exec werkstatt run mission.reconcile --mission ${ctx.missionId}\` first, ` +
+            `or pass --allow-unreconciled for a deliberate manual-merge workflow.`;
+          if (ctx.allowUnreconciled) {
+            ctx.logger.info(`  [ship] preflight: WARN ${msg}`);
+          } else {
+            throw new Error(msg);
+          }
+        } else {
+          ctx.logger.info("  [ship] preflight: unreconciled-commit gate ok");
         }
       }
     },
@@ -655,6 +725,7 @@ export async function runLeitstandShip(
     cacheCloneDir,
     releaseId: null,
     missionClosed,
+    allowUnreconciled: input.flags["allow-unreconciled"] === true,
     logger,
     io: context.io,
   };

@@ -57,9 +57,6 @@ const mockIoExec = vi.fn();
 function ioExecOk(stdout: string): void {
   mockIoExec.mockResolvedValue({ exitCode: 0, stdout, stderr: "" });
 }
-function ioExecOkOnce(stdout: string): void {
-  mockIoExec.mockResolvedValueOnce({ exitCode: 0, stdout, stderr: "" });
-}
 const mockExecuteKernelCommand = executeKernelCommand as unknown as ReturnType<typeof vi.fn>;
 
 const PHASE_FLAGS: Record<string, string[]> = {
@@ -352,7 +349,13 @@ test("self-healing: dirty workpiece after validate triggers auto-commit + re-val
   mockPhaseResult("leitstand.status", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
-  ioExecOkOnce("M generated.ts\n");
+  // RFC-1217's gate consumes io.exec calls before mission-validate — dispatch on
+  // args so the dirty-status stub lands on `git status` regardless of ordering.
+  mockIoExec.mockImplementation(async (_cmd: string, args: string[]) => ({
+    exitCode: 0,
+    stdout: args.join(" ") === "status --porcelain" ? "M generated.ts\n" : "",
+    stderr: "",
+  }));
   mockPhaseResult("mission.git.commit", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -768,4 +771,138 @@ test("mission not found — clear error instead of misleading .env failure", asy
   await expect(
     runLeitstandShip(makeInput({ site: "test-sys", mission: "m000001" }), context),
   ).rejects.toThrow("mission m000001 not found");
+});
+
+// ─── RFC-1217: unreconciled-workpiece preflight gate ─────────────────────────
+//
+// The gate resolves the workpiece branch, fetches it into the cache clone, and
+// counts HEAD..FETCH_HEAD — the exact range fetch-and-merge would pull. All
+// git goes through the mocked ctx.io.exec; dispatch on args to script the
+// sequence. Any unhandled call returns the default ok/"" (which itself drives
+// the warn-skip path — empty branch output => indeterminate).
+
+type ExecOut = { exitCode: number; stdout: string; stderr: string };
+function stubGateExec(opts: { count: string; oneline?: string; fetchFails?: boolean }): void {
+  mockIoExec.mockImplementation(
+    async (_cmd: string, args: string[], o?: { cwd?: string }): Promise<ExecOut> => {
+      const key = args.join(" ");
+      if (key === "rev-parse --abbrev-ref HEAD") {
+        return { exitCode: 0, stdout: "main\n", stderr: "" };
+      }
+      if (key.startsWith("fetch ") && o?.cwd?.includes("systems-cache")) {
+        return opts.fetchFails
+          ? { exitCode: 1, stdout: "", stderr: "fetch exploded" }
+          : { exitCode: 0, stdout: "", stderr: "" };
+      }
+      if (key === "rev-list HEAD..FETCH_HEAD --count") {
+        return { exitCode: 0, stdout: `${opts.count}\n`, stderr: "" };
+      }
+      if (key === "rev-list HEAD..FETCH_HEAD --oneline") {
+        return { exitCode: 0, stdout: opts.oneline ?? "", stderr: "" };
+      }
+      return { exitCode: 0, stdout: "", stderr: "" };
+    },
+  );
+}
+
+test("RFC-1217 AC-1+AC-4: unreconciled workpiece commits block at preflight before mission.validate", async () => {
+  stubGateExec({ count: "2", oneline: "fba300a1 regenerate docs\n641165e8 touch readme" });
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "closed" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.data!.completed).toBe(false);
+  expect(result.data!.failedStep).toBe("preflight");
+  expect(result.summary).toContain("unreconciled workpiece commit");
+  expect(result.summary).toContain("mission.reconcile");
+  // AC-4: mission.validate never ran — the gate fired before any real work.
+  const invoked = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invoked).not.toContain("mission.validate");
+});
+
+test("RFC-1217 AC-2: fully merged workpiece — gate passes, ship proceeds to mission-validate", async () => {
+  stubGateExec({ count: "0" });
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "validated" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  const invoked = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invoked).toContain("mission.validate");
+});
+
+test("RFC-1217 AC-3: --allow-unreconciled degrades the gate to a warning", async () => {
+  stubGateExec({ count: "3", oneline: "abc1234 x\ndef5678 y\naaa9999 z" });
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({
+      site: "test-sys",
+      mission: "m000001",
+      until: "validated",
+      "allow-unreconciled": true,
+    }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  const invoked = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invoked).toContain("mission.validate");
+});
+
+test("RFC-1217 AC-5: closed mission skips the gate entirely — no workpiece fetch", async () => {
+  await fs.writeFile(path.join(tmpDir, "missions", "m000001", "mission.yaml"), "state: closed\n");
+  stubGateExec({ count: "9" }); // would block if the gate ran
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "closed" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.data!.completed).toBe(true);
+  const fetchCalls = mockIoExec.mock.calls.filter(
+    (c) => Array.isArray(c[1]) && (c[1] as string[])[0] === "fetch",
+  );
+  expect(fetchCalls.length).toBe(0);
+});
+
+test("RFC-1217 degrade: git unreadable (fetch fails) warns but does not block", async () => {
+  stubGateExec({ count: "0", fetchFails: true });
+  mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("agent.search.warm", 0);
+  mockPhaseResult("mission.validate", 0);
+
+  const result = await runLeitstandShip(
+    makeInput({ site: "test-sys", mission: "m000001", until: "validated" }),
+    context,
+  );
+
+  expect(result.exitCode).toBe(0);
+  const invoked = mockExecuteKernelCommand.mock.calls.map(
+    (c) => (c[0] as { commandName: string }).commandName,
+  );
+  expect(invoked).toContain("mission.validate");
 });

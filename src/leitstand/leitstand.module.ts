@@ -662,7 +662,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:
-          "Resumable full-pipeline deployment composite (RFC-0962). Chains preflight → validate → reconcile → close → release → certify → deploy → verify → archive with RFC-0958 operation journal. Flags: --site, --mission, [--until], [--resume].",
+          "Resumable full-pipeline deployment composite (RFC-0962). Chains preflight → validate → reconcile → close → release → certify → deploy → verify → archive with RFC-0958 operation journal. Flags: --site, --mission, [--until], [--resume], [--force], [--allow-unreconciled].",
         scope: "workspace",
         supportsAllSites: false,
         mutatesState: true,
@@ -694,6 +694,11 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             kind: "boolean",
             description:
               "Delete stale ship journal and start a fresh operation instead of resuming.",
+          },
+          "allow-unreconciled": {
+            kind: "boolean",
+            description:
+              "Downgrade the workpiece-ahead-of-cache-clone preflight gate (RFC-1217) to a warning — manual-merge escape hatch.",
           },
         },
         writes: [
