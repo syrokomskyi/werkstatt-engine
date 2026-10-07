@@ -76,6 +76,16 @@ function lastReconcileEntry(): ReconcileEntry {
   return last;
 }
 
+interface ReconcileReport {
+  mergeCommitSha?: string | null;
+}
+
+function readReconcileReport(): ReconcileReport {
+  return JSON.parse(
+    readFileSync(join(missionDir, "evidence", "reconciliation-report.json"), "utf-8"),
+  ) as ReconcileReport;
+}
+
 function workpieceCommit(file: string, content: string, subject: string): string {
   const abs = join(workpieceDir, file);
   mkdirSync(join(abs, ".."), { recursive: true });
@@ -222,6 +232,9 @@ test("records every folded workpiece commit on a plain merge", async () => {
   expect(entry.metadata?.preReconcileSha).toBe(cacheHeadBefore);
   // The merge's first parent IS the cache-clone head the merge started from.
   expect(git(cacheDir, `rev-parse ${data.commitSha}^1`)).toBe(cacheHeadBefore);
+  // mergeCommitSha records the merge commit itself — commitSha — not the
+  // parent of whatever post-merge commit happens to be HEAD.
+  expect(readReconcileReport().mergeCommitSha).toBe(data.commitSha);
 });
 
 // AC-1 + AC-2: the m000192 fold path — the workpiece already contains the
@@ -330,6 +343,8 @@ test("no-op reconcile writes the entry without mergedShas", async () => {
   expect(entry.metadata?.mergedShas).toBeUndefined();
   expect(entry.metadata?.transferredCommits).toBe(0);
   expect(entry.metadata?.commitSha).toBeTruthy();
+  // No merge commit was created — mergeCommitSha stays null.
+  expect(readReconcileReport().mergeCommitSha).toBeNull();
 });
 
 // AC-3 (failure leg): folded-SHA computation failure is non-fatal — the

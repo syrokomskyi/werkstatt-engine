@@ -10,6 +10,7 @@
   <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
   <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
+  <item>RFC-1221 follow-up: mergeCommitSha now records commitSha itself when commitSha is a merge commit (null otherwise) — the previous HEAD^1 capture ran after post-merge steps could commit, storing a post-merge parent instead of the merge commit.</item>
   <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159</history>
 </CHANGE_SUMMARY>
 */
@@ -2387,9 +2388,6 @@ export async function buildReconcileSteps(
         const cc = c as ReconcileStepCtx;
         const gitDir = path.join(cc.systemDir, ".git");
         if (!(await cc.context.io.exists(gitDir))) return;
-        cc.mergeCommitSha = (
-          await shExec("git rev-parse HEAD^1", cc.systemDir, cc.context.io)
-        ).trim();
         // RFC-1221: derive the folded set from the merge commit's own parents
         // — rev-list <commitSha>^2 --not <commitSha>^1 needs no recorded ctx
         // state, so the computation survives journal resume (a completed
@@ -2405,6 +2403,10 @@ export async function buildReconcileSteps(
               )
             ).trim();
             if (secondParent.length > 0) {
+              // commitSha IS the merge commit — record it under its own name.
+              // The previous `HEAD^1` capture ran after post-merge steps could
+              // already have committed, storing a post-merge parent instead.
+              cc.mergeCommitSha = cc.commitSha;
               const firstParent = (
                 await shExec(`git rev-parse ${cc.commitSha}^1`, cc.systemDir, cc.context.io)
               ).trim();
