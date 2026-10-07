@@ -10,14 +10,6 @@
   <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
   <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
-  <item>RFC-1221: step 1 — derive mergedShas from merge-commit parents
-
-count-transferred-commits computes the folded set as
-rev-list <commitSha>^2 --not <commitSha>^1 filtered by workpiece
-membership, replacing the preReconcileSha..FETCH_HEAD range that the
-journal-resume path leaves uncomputable (preReconcileSha stays null when
-record-pre-reconcile-sha was skipped). preReconcileSha falls back to
-commitSha^1 when null or self-range.</item>
   <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159</history>
 </CHANGE_SUMMARY>
 */
@@ -2631,6 +2623,9 @@ export async function buildReconcileSteps(
           reconciledAt: cc.now,
           mergeCommitSha: cc.mergeCommitSha,
           transferredCommits: cc.transferredCommits,
+          // Unlike the bordbuch entry (which omits the field when empty —
+          // absence is the "no folded commits" signal, RFC-1221), the report
+          // is a flat diagnostic shape and always records the array.
           mergedShas: cc.mergedShas,
           zeroTransferWarning: cc.transferredCommits === 0,
           message: cc.message,
