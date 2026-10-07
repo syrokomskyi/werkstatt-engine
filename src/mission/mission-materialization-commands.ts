@@ -12,6 +12,7 @@
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
   <item>ADR-0096: dedupe CHANGE_SUMMARY item, use SNAPSHOT_FILENAME in CACHE_CLONE_ONLY_PATHS</item>
   <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
+  <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
   <history>ADR-0008, ADR-0060, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -2112,11 +2113,14 @@ export async function buildReconcileSteps(
             // restoration is always safe. A failure here is blocking —
             // continuing silently would lose journal state.
             if (rewound && cc.preReconcileSha) {
+              // Probe failure is blocking too — "can't inspect the tree" must
+              // not silently degrade to "nothing to restore" (that path is
+              // exactly how the journal was lost in m000192).
               const opsInTree = await shExec(
                 `git ls-tree --name-only ${cc.preReconcileSha} -- operations/`,
                 cc.systemDir,
                 cc.context.io,
-              ).catch(() => "");
+              );
               if (opsInTree.trim().length > 0) {
                 await shExec(
                   `git checkout ${cc.preReconcileSha} -- operations/`,

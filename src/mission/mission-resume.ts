@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial mission.resume command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1219: resolveOperationDefinition passes the reconstructed per-kind ctx into runOperation (fixes m000192 "path argument" crash); catch narrowed to the dynamic import so ctx-factory IO errors surface with real messages (REVIEW-CODE-2026-10-07-16 F-1).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -226,26 +227,33 @@ async function resolveOperationDefinition(
   manifest: unknown,
   context: KernelRuntimeContext,
 ): Promise<(OperationDefinition<unknown> & { ctx: unknown }) | null> {
+  // RFC-1219 (REVIEW-CODE-2026-10-07-16 F-1): the catch covers ONLY the
+  // dynamic import — ctx-factory IO errors (readSystemState, resolveMissionDir,
+  // a throwing build*Steps) must propagate with their real message instead of
+  // being masked as "no step resolver for operation kind".
+  let stepsModule: typeof import("./steps/index.ts");
   try {
-    const stepsModule = await import("./steps/index.ts");
-    if (typeof stepsModule.resolveOperationSteps === "function") {
-      const resolved = await stepsModule.resolveOperationSteps(
-        op,
-        workspaceRoot,
-        missionId,
-        manifest,
-        context,
-      );
-      if (resolved) {
-        // RFC-1219: ctx carries the reconstructed per-kind step context —
-        // passing it to runOperation lets resumed steps execute against the
-        // same shape the command handler built (fixes the m000192
-        // "path argument must be of type string" crash).
-        return { op, steps: resolved.steps, ctx: resolved.ctx };
-      }
-    }
+    stepsModule = await import("./steps/index.ts");
   } catch {
     // Steps module not yet available
+    return null;
   }
-  return null;
+  if (typeof stepsModule.resolveOperationSteps !== "function") {
+    return null;
+  }
+  const resolved = await stepsModule.resolveOperationSteps(
+    op,
+    workspaceRoot,
+    missionId,
+    manifest,
+    context,
+  );
+  if (!resolved) {
+    return null;
+  }
+  // ctx carries the reconstructed per-kind step context — passing it to
+  // runOperation lets resumed steps execute against the same shape the
+  // command handler built (fixes the m000192 "path argument must be of type
+  // string" crash).
+  return { op, steps: resolved.steps, ctx: resolved.ctx };
 }
