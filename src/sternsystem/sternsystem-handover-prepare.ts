@@ -13,7 +13,6 @@ builds HandoverAuthorizationV1, signs it, and writes handover-authorization.json
   <item>RFC-0968: initial handover prepare command handler.</item>
   <item>RFC-0988: add --dry-run flag — sign authorization in memory, return SignedHandoverAuthorization in result, skip writeAuthorization.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
-  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
 </CHANGE_SUMMARY>
 */
 
