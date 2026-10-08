@@ -153,6 +153,40 @@ describe("resolveCommandFlags (schema-driven parser)", () => {
     expect(flags["tag"]).toEqual(["a", "b"]);
   });
 
+  test("string[] flag consumes consecutive bare tokens as a value list", () => {
+    const { flags, diagnostics } = resolveCommandFlags(
+      ["--id", "x", "--tag", "a", "b", "c"],
+      mockDefinition,
+    );
+    expect(flags["tag"]).toEqual(["a", "b", "c"]);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  test("string[] greedy consumption stops at the next --flag", () => {
+    const { flags, diagnostics } = resolveCommandFlags(
+      ["--id", "x", "--tag", "a", "b", "--verbose"],
+      mockDefinition,
+    );
+    expect(flags["tag"]).toEqual(["a", "b"]);
+    expect(flags["verbose"]).toBe(true);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  test("string[] flag with no value still emits KERNEL-FLAG-02", () => {
+    const { diagnostics } = resolveCommandFlags(
+      ["--id", "x", "--tag", "--verbose"],
+      mockDefinition,
+    );
+    expect(diagnostics.some((d) => d.ruleId === "KERNEL-FLAG-02")).toBe(true);
+  });
+
+  test("single string flag does NOT consume extra bare tokens — they stay KERNEL-ARG-01", () => {
+    const { flags, diagnostics } = resolveCommandFlags(["--id", "a", "b"], mockDefinition);
+    expect(flags["id"]).toBe("a");
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.ruleId).toBe("KERNEL-ARG-01");
+  });
+
   test("boolean flag with inline false value resolves to false", () => {
     const { flags } = resolveCommandFlags(["--verbose=false"], mockDefinition);
     expect(flags["verbose"]).toBe(false);

@@ -22,6 +22,10 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>Repeated kind-"string" flags now emit KERNEL-FLAG-02 instead of silently promoting to an array that crashes `as string` handler reads (the rfc.validate --id TypeError class); inline values containing "=" are preserved via indexOf split instead of split("=", 2) truncation.</item>
+  <item>Session-retro 2026-10-08: kind-"string[]" flags greedily consume consecutive
+bare tokens until the next --flag, so `--files a b` resolves to ["a","b"]
+instead of KERNEL-ARG-01 on `b`; a bare positional not preceded by a string[]
+flag still diagnoses.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -282,11 +286,25 @@ export function resolveCommandFlags(
       continue;
     }
 
-    const next = rawArgv[index + 1];
-    if (typeof next === "string" && !next.startsWith("--")) {
-      addFlagValue(flags, flagName, next);
-      index += 1;
-      continue;
+    // string[] flags consume every following bare token â€” positional args are
+    // never valid (KERNEL-ARG-01), so `--files a b` unambiguously means the
+    // value list [a, b]. Bare `--` still switches to passthrough.
+    if (spec.kind === "string[]") {
+      let consumed = 0;
+      while (index + 1 < rawArgv.length && !rawArgv[index + 1]!.startsWith("--")) {
+        addFlagValue(flags, flagName, rawArgv[index + 1]!);
+        index += 1;
+        consumed += 1;
+      }
+      if (consumed > 0) continue;
+      // fall through to the missing-value diagnostic
+    } else {
+      const next = rawArgv[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        addFlagValue(flags, flagName, next);
+        index += 1;
+        continue;
+      }
     }
 
     diagnostics.push({
