@@ -16,6 +16,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
 </CHANGE_SUMMARY>
 */
 
@@ -61,7 +63,7 @@ export async function runNachweisIngest(
   const titleUk = flagString(input, "title-uk");
   const titleEn = flagString(input, "title-en");
   const qualityStatus = flagString(input, "quality-status") ?? "unverified";
-  const dryRun = flagBool(input, "dry-run");
+  const dryRun = context.dryRun === true || flagBool(input, "dry-run");
 
   if (!systemId) throw new Error("[nachweis.ingest] --system is required");
   if (!filePath) throw new Error("[nachweis.ingest] --file is required");

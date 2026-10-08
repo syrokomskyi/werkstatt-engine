@@ -12,6 +12,8 @@ the authorization file.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover complete command handler.</item>
   <item>RFC-0988: add --dry-run and --authorization-data flags — verify authorization in memory, return preview data, skip all writes.</item>
+  <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
 </CHANGE_SUMMARY>
 */
 
@@ -84,7 +86,7 @@ export async function runSternsystemHandoverComplete(
 ): Promise<KernelCommandResult<SternsystemHandoverCompleteData>> {
   const { workspaceRoot, logger } = context;
   const systemId = flagString(input, "id");
-  const dryRun = flagBool(input, "dry-run");
+  const dryRun = context.dryRun === true || flagBool(input, "dry-run");
   const authorizationDataJson = flagString(input, "authorization-data");
   const sourceLocator = flagString(input, "source-locator");
 

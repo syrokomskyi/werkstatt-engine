@@ -11,10 +11,12 @@ Supports --dry-run to preview changes without making API calls.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0753: initial dns.record.upsert command handler.</item>
   <item>RFC-0812: export toApiRecord for unit testing.</item>
   <item>RFC-0817: graceful skip when dns-records.yaml is absent instead of throwing.</item>
   <item>RECOVERY-2026-10-04: upsert matches via pickBestLiveMatch + consumed-live tracking (same as dns.record.validate) — naive find(type+name) compared every declaration against the first same-identity record, misbinding parallel MX / dual apex TXT and producing bogus update/create calls (CF 1046 on Email-Routing MX, 81058 duplicate-TXT). Cloudflare codes 1046/81058 now classify as skipped (goal state externally owned or already satisfied) instead of errors.</item>
+  <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
+  <history>RFC-0753</history>
 </CHANGE_SUMMARY>
 */
 
@@ -68,7 +70,7 @@ export async function runDnsRecordUpsert(
   const systemId = flagString(input, "system") ?? context.site?.name;
   if (!systemId)
     throw new Error("[dns.record.upsert] --system is required (or run in site-scoped context)");
-  const dryRun = flagBoolean(input, "dry-run") ?? false;
+  const dryRun = context.dryRun === true || flagBoolean(input, "dry-run") === true;
 
   const declaration = await loadDnsRecordFile(workspaceRoot, systemId);
   if (!declaration) {

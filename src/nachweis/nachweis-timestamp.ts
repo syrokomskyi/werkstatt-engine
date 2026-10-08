@@ -9,8 +9,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0715: initial nachweis.timestamp command handler.</item>
-  <item>RFC-0715 review fix: use HttpTsaAdapter for custom TSA URLs. Import flagString/flagBool from nachweis-n3-types.ts.</item>
   <item>RFC-0871: add --timestamp-assurance and --qualification-evidence-ref flags, default rfc3161, fail eidas-qualified without evidence.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -18,6 +16,9 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
+  <history>RFC-0715</history>
 </CHANGE_SUMMARY>
 */
 
@@ -47,7 +48,7 @@ export async function runNachweisTimestamp(
   const systemId = flagString(input, "system") ?? context.site?.name;
   const slug = flagString(input, "slug");
   const tsaUrl = flagString(input, "tsa-url");
-  const dryRun = flagBool(input, "dry-run");
+  const dryRun = context.dryRun === true || flagBool(input, "dry-run");
   const timestampAssuranceRaw = flagString(input, "timestamp-assurance") ?? "rfc3161";
   const qualificationEvidenceRef = flagString(input, "qualification-evidence-ref");
 

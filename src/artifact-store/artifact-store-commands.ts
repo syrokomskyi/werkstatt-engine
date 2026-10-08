@@ -9,6 +9,8 @@
   <item>RFC-0363: initial artifact store command handlers.</item>
   <item>RFC-0587: tar.gz archive creation, idempotent manifest storage, rehydrate extraction.</item>
   <item>RFC-0596: extract lock-free storeArtifactCore from runArtifactStorePut; fix systemId derivation bug (split("-m") → release manifest systemId).</item>
+  <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
 </CHANGE_SUMMARY>
 */
 
@@ -517,7 +519,7 @@ export async function runArtifactStoreGc(
 ): Promise<KernelCommandResult<ArtifactStoreGcData>> {
   const { workspaceRoot, logger } = context;
   const systemFilter = flagString(input, "system");
-  const dryRun = flagBool(input, "dry-run");
+  const dryRun = context.dryRun === true || flagBool(input, "dry-run");
 
   const storeBase = path.join(workspaceRoot, ARTIFACTS_DIR, "sha256");
   if (!(await context.io.exists(storeBase))) {

@@ -12,6 +12,8 @@ from Cloudflare by record ID or by name+type. Requires --record-id or
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial dns.record.delete command handler.</item>
+  <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1237: honor dry-run via context.dryRun across kernel commands; verification envelopes keep emit-canonical ownership</item>
 </CHANGE_SUMMARY>
 */
 
@@ -53,7 +55,7 @@ export async function runDnsRecordDelete(
   const recordId = flagString(input, "record-id");
   const name = flagString(input, "name");
   const recordType = flagString(input, "type");
-  const dryRun = flagBoolean(input, "dry-run") ?? false;
+  const dryRun = context.dryRun === true || flagBoolean(input, "dry-run") === true;
 
   if (!recordId && !(name && recordType)) {
     throw new Error(
