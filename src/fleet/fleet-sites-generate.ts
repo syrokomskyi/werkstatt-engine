@@ -16,6 +16,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0378: initial implementation of fleet.sites.generate command (in werkstatt-site).</item>
   <item>RFC-0964: moved from werkstatt-site to werkstatt-engine, repointed from discoverSiteWorkspaces to discoverSystems, enriched output with platformVersion, channels, mirrors, activeMission, canary, path fields.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -150,7 +151,7 @@ export async function runFleetSitesGenerate(
 
   return {
     exitCode: 0,
-    summary: `fleet.sites.generate: wrote ${records.length} site(s) to ${FLEET_SITES_FILE}`,
+    summary: `[fleet.sites.generate] wrote ${records.length} site(s) to ${FLEET_SITES_FILE}`,
     data: {
       command: "fleet.sites.generate",
       sites: records,

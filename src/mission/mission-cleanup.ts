@@ -11,6 +11,7 @@
   <item>RFC-0652: replace unconditional evidence preservation with age-based Axiom evidence cleanup; add --evidence-retention-days flag.</item>
   <item>RFC-0985: add --stale-dirs mode to archive aborted missions and remove stub directories.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -93,6 +94,7 @@ export async function runMissionCleanup(
           archived: [],
           warnings: [],
         },
+        exitCode: 0,
         summary: `[mission.cleanup] no missions directory found`,
         nextSteps: [],
       };
@@ -153,6 +155,7 @@ export async function runMissionCleanup(
         archived,
         warnings,
       },
+      exitCode: 0,
       summary: `[mission.cleanup] stale-dirs: archived ${archived.length}, removed ${removedPaths.length}, warnings ${warnings.length}`,
       nextSteps: [],
     };
@@ -225,6 +228,7 @@ export async function runMissionCleanup(
 
     return {
       data: { missionId, removedPaths, skipped, evidenceCleaned, evidenceRetentionDays },
+      exitCode: 0,
       summary: `[mission.cleanup] ${missionId} removed: ${removedPaths.join(", ") || "nothing"}`,
       nextSteps: [
         {
@@ -246,6 +250,7 @@ export async function runMissionCleanup(
     if (!(await context.io.exists(missionsDir))) {
       return {
         data: { missionId: "*", removedPaths, skipped, evidenceCleaned, evidenceRetentionDays },
+        exitCode: 0,
         summary: `[mission.cleanup] no missions directory found`,
         nextSteps: [
           {
@@ -328,6 +333,7 @@ export async function runMissionCleanup(
 
   return {
     data: { missionId: "*", removedPaths, skipped, evidenceCleaned, evidenceRetentionDays },
+    exitCode: 0,
     summary: `[mission.cleanup] removed: ${removedPaths.length}, skipped: ${skipped.length}`,
     nextSteps: [
       {

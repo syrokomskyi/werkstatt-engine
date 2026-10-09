@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0354: initial pin command handler.</item>
   <item>RFC-0381: use shared pin-helpers for highestRfcId and snapshotCapabilities; case-insensitive RFC regex.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -125,6 +126,7 @@ export async function runSternsystemPin(
   logger.success(`[sternsystem.pin] pinned '${id}' to platform ${platform} (${rfcHead})`);
   return {
     data: { systemId: id, platform, pinPath },
+    exitCode: 0,
     summary: `[sternsystem.pin] ${id} pinned to platform ${platform}`,
   };
 }

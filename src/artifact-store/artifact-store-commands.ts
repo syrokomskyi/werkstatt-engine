@@ -10,6 +10,7 @@
   <item>RFC-0587: tar.gz archive creation, idempotent manifest storage, rehydrate extraction.</item>
   <item>RFC-0596: extract lock-free storeArtifactCore from runArtifactStorePut; fix systemId derivation bug (split("-m") → release manifest systemId).</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -25,6 +26,7 @@ import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -263,6 +265,7 @@ export async function runArtifactStorePut(
         uri: result.uri,
         createdAt: result.createdAt,
       },
+      exitCode: 0,
       summary: `[artifact.store.put] ${releaseId} artifact stored (${result.distArtifactHash.slice(0, 16)}...)`,
       nextSteps: [
         {
@@ -344,6 +347,7 @@ export async function runArtifactStoreGet(
       verified: true,
       output: outputDir,
     },
+    exitCode: 0,
     summary: `[artifact.store.get] ${releaseId} artifact rehydrated to ${outputDir}`,
   };
 }
@@ -392,14 +396,15 @@ export async function runArtifactStoreValidate(
   if (!manifestFound) {
     logger.error(`[artifact.store.validate] no artifact found for release ${releaseId}`);
     return {
+      ...failResult("artifact.store.commands", ["artifact.store.commands failed"]),
       data: { releaseId, manifestFound, hashVerified, treeHashVerified },
-      exitCode: 1,
     };
   }
 
   logger.success(`[artifact.store.validate] ${releaseId} artifact valid`);
   return {
     data: { releaseId, manifestFound, hashVerified, treeHashVerified },
+    exitCode: 0,
     summary: `[artifact.store.validate] ${releaseId} artifact valid`,
   };
 }
@@ -524,6 +529,7 @@ export async function runArtifactStoreGc(
   if (!(await context.io.exists(storeBase))) {
     return {
       data: { dryRun, examined: 0, deleted: 0, retained: 0, candidates: [] },
+      exitCode: 0,
       summary: `[artifact.store.gc] no artifacts found`,
     };
   }
@@ -553,6 +559,7 @@ export async function runArtifactStoreGc(
   logger.info(`[artifact.store.gc] examined ${examined}, retained ${retained}, deleted ${deleted}`);
   return {
     data: { dryRun, examined, deleted, retained, candidates },
+    exitCode: 0,
     summary: `[artifact.store.gc] examined ${examined}, retained ${retained}, deleted ${deleted}`,
   };
 }

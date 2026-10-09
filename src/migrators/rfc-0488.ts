@@ -11,6 +11,7 @@ Makes existing sidecars compatible with the extended materialCreditSchema.</purp
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0488: initial migrator — add status, usageBasis, aiUsage to existing credit sidecars.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -129,6 +130,7 @@ function transformRecord(record: CreditRecord): CreditRecord {
 async function findCreditsFiles(rootPath: string): Promise<string[]> {
   const results: string[] = [];
 
+  // fs.walk.lint: allow — walks via WorkspaceIO abstraction (io.readdir) — collectFiles has no io contract
   async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {

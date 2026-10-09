@@ -6,6 +6,7 @@ verifies idempotency f(f(x))==f(x) on synthetic fixture data.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0500: initial PBT for topics→articles migrator.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -35,6 +36,7 @@ async function createWorkpiece(): Promise<string> {
 
 async function snapshotDir(dir: string): Promise<Map<string, string>> {
   const snapshot = new Map<string, string>();
+  // fs.walk.lint: allow — test snapshot helper collects file contents into a Map, not a path list
   async function walk(d: string) {
     const entries = await fs.readdir(d, { withFileTypes: true });
     for (const entry of entries) {

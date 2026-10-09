@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -34,6 +35,7 @@ import {
 import { filterEnv, sourceDotenv } from "../leitstand/adapters/index.ts";
 import { LAGEBILD_SECRET_NAMES, resolveWorkerName } from "./lagebild-helpers.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, name: string): string | undefined {
   const v = input.flags[name];
@@ -66,9 +68,19 @@ async function runWranglerSecretList(
       ["--yes", "wrangler", "secret", "list", "--name", workerName],
       { cwd, env: envFiltered },
     );
-    return { exitCode: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
+    const listed: { exitCode: number; stdout: string; stderr: string } = {
+      exitCode: result.exitCode ?? 1,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+    return listed;
   } catch {
-    return { exitCode: 1, stdout: "", stderr: "Failed to spawn wrangler" };
+    const failed: { exitCode: number; stdout: string; stderr: string } = {
+      exitCode: 1,
+      stdout: "",
+      stderr: "Failed to spawn wrangler",
+    };
+    return failed;
   }
 }
 
@@ -180,6 +192,12 @@ export async function runLagebildValidate(
 
   if (!allSecretsPresent) {
     return {
+      ...failResult("lagebild.validate", [
+        `Missing secrets: ${secretChecks
+          .filter((s) => !s.present)
+          .map((s) => s.name)
+          .join(", ")}`,
+      ]),
       data: {
         site: systemId,
         channel,
@@ -194,11 +212,6 @@ export async function runLagebildValidate(
           channel: lagebildState?.channel,
         },
       },
-      exitCode: 1,
-      summary: `Missing secrets: ${secretChecks
-        .filter((s) => !s.present)
-        .map((s) => s.name)
-        .join(", ")}`,
     };
   }
 

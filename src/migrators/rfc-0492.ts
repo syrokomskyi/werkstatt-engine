@@ -15,6 +15,7 @@ Does NOT set notdienst (operator-authored content).</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0492: initial migrator — copy deprecated fields to new dossier equivalents.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -48,6 +49,7 @@ function transformFrontmatter(data: Record<string, unknown>): Record<string, unk
 async function findIndustryFiles(rootPath: string): Promise<string[]> {
   const results: string[] = [];
 
+  // fs.walk.lint: allow — walks via WorkspaceIO abstraction (io.readdir) — collectFiles has no io contract
   async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {

@@ -9,10 +9,11 @@ Wraps executeKernelCommand calls to test.evidence.verify, eliminating duplicated
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0829: extracted shared gate helper from duplicated blocks in leitstand-commands.ts and service-promote.ts.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
-import { executeKernelCommand } from "../kernel/index.js";
+import { executeKernelCommand } from "../kernel/index.ts";
 
 export const GRACE_PERIOD_END = "2026-09-10";
 

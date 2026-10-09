@@ -12,6 +12,7 @@
   <item>RFC-0477: initial sternsystem.status command handler.</item>
   <item>RFC-1063: add currentMission from system-state.yaml to status output.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -274,6 +275,7 @@ export async function runSternsystemStatus(
     }
     return {
       data: results,
+      exitCode: 0,
       summary: `[sternsystem.status] reported ${results.length} system(s)`,
       nextSteps: [
         {
@@ -296,6 +298,7 @@ export async function runSternsystemStatus(
     : "no active mission";
   return {
     data: status,
+    exitCode: 0,
     summary: `[sternsystem.status] ${id}: ${missionInfo}, HEAD=${status.git.headVsOrigin} origin, ${mirrorInfo}`,
     nextSteps:
       status.git.headVsOrigin !== "sync" || status.git.originVsMirror !== "sync"

@@ -15,6 +15,7 @@ Idempotent: running twice produces no changes on already-migrated files.</purpos
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0500: initial migrator — topics→articles collection rename + sections→prose conversion.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -78,6 +79,7 @@ function sectionsToProse(sections: Section[]): string {
 async function findMarkdownFiles(dir: string): Promise<string[]> {
   const results: string[] = [];
 
+  // fs.walk.lint: allow — walks via WorkspaceIO abstraction (io.readdir) — collectFiles has no io contract
   async function walk(d: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: string[];
     try {
@@ -114,7 +116,10 @@ async function dirExists(dir: string, io: WorkspaceIO = createDefaultIO().io): P
   }
 }
 
-async function fileExists(file: string, io: WorkspaceIO = createDefaultIO().io): Promise<boolean> {
+async function ioFileExists(
+  file: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<boolean> {
   try {
     const stat = await io.stat(file);
     return stat.isFile;
@@ -281,7 +286,7 @@ async function transformTopicsToArticles(
       await io.mkdir(destLangPath);
 
       const kostenPath = path.join(destLangPath, "kosten.md");
-      if (!(await fileExists(kostenPath))) {
+      if (!(await ioFileExists(kostenPath))) {
         await io.writeFile(kostenPath, CATEGORY_KOSTEN);
         ctx.logger.info(
           `[migrator rfc-0500] created category: ${path.relative(data.rootPath, kostenPath)}`,
@@ -289,7 +294,7 @@ async function transformTopicsToArticles(
       }
 
       const sichtbarkeitPath = path.join(destLangPath, "sichtbarkeit.md");
-      if (!(await fileExists(sichtbarkeitPath))) {
+      if (!(await ioFileExists(sichtbarkeitPath))) {
         await io.writeFile(sichtbarkeitPath, CATEGORY_SICHTBARKEIT);
         ctx.logger.info(
           `[migrator rfc-0500] created category: ${path.relative(data.rootPath, sichtbarkeitPath)}`,

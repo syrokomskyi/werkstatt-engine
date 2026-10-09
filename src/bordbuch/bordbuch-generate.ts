@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0473: initial bordbuch.generate command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -220,6 +221,7 @@ export async function runBordbuchGenerate(
     logger.success(`[bordbuch.generate] wrote projections for ${systemId}`);
 
     return {
+      exitCode: 0,
       summary: `[bordbuch.generate] wrote bordbuch.json, bordbuch/index.html, status.generated.yaml for ${systemId}`,
       nextSteps: [
         {

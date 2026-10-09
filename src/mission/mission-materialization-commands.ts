@@ -6,11 +6,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0096: dedupe CHANGE_SUMMARY item, use SNAPSHOT_FILENAME in CACHE_CLONE_ONLY_PATHS</item>
   <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
   <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
   <item>RFC-1221 follow-up: mergeCommitSha now records commitSha itself when commitSha is a merge commit (null otherwise) — the previous HEAD^1 capture ran after post-merge steps could commit, storing a post-merge parent instead of the merge commit.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159</history>
 </CHANGE_SUMMARY>
 */
@@ -490,7 +490,7 @@ export interface ValidateStepCtx {
 
 // RFC-1086: create a minimally valid KernelPipelineReport for skipped phases
 function makeSkippedPipelineReport(pipelineName: string): KernelPipelineReport {
-  return {
+  const report: KernelPipelineReport = {
     pipelineName,
     exitCode: 0,
     ok: true,
@@ -504,6 +504,7 @@ function makeSkippedPipelineReport(pipelineName: string): KernelPipelineReport {
       warningCount: 0,
     },
   };
+  return report;
 }
 
 // RFC-0958: buildValidateSteps — journaled steps for mission.validate build cycle
@@ -911,6 +912,14 @@ export async function runMissionValidate(
   const force = input.flags.force === true;
   if (fast && force) {
     return {
+      exitCode: 1,
+      summary: "[mission.validate] --fast and --force are mutually exclusive",
+      nextSteps: [
+        {
+          action: "[mission.validate] --fast and --force are mutually exclusive",
+          kind: "required" as const,
+        },
+      ],
       data: {
         missionId,
         contractFull: { passed: false, validators: [] },
@@ -920,8 +929,6 @@ export async function runMissionValidate(
         fullBuildRan: false,
         validatedAt: new Date().toISOString(),
       } as unknown as MissionValidateData,
-      exitCode: 1,
-      summary: "[mission.validate] --fast and --force are mutually exclusive",
     };
   }
 
@@ -959,6 +966,7 @@ export async function runMissionValidate(
           ...previousReport,
           staleEntryWarnings,
         } as unknown as MissionValidateData,
+        exitCode: 0,
         summary: `[mission.validate] ${missionId} validation passed (all phases passed in previous report — skipped)`,
       };
     }
@@ -1095,6 +1103,7 @@ export async function runMissionValidate(
 
         return {
           data: { ...reusedReport, staleEntryWarnings } as unknown as MissionValidateData,
+          exitCode: 0,
           summary: `[mission.validate] ${missionId} validation passed (distribution reused, build-input-hash matched)`,
           nextSteps: reuseNextSteps,
         };
@@ -1319,6 +1328,14 @@ export async function runMissionValidate(
     // build.prepare failure writes its own report before throwing
     if (failedStep === "build-prepare") {
       return {
+        exitCode: 1,
+        summary: `[mission.validate] ${missionId} build.prepare FAILED: ${detail}`,
+        nextSteps: [
+          {
+            action: `[mission.validate] ${missionId} build.prepare FAILED: ${detail}`,
+            kind: "required" as const,
+          },
+        ],
         data: {
           schemaVersion: "1.0.0",
           missionId,
@@ -1329,8 +1346,6 @@ export async function runMissionValidate(
           fullBuildRan: true,
           validatedAt: new Date().toISOString(),
         } as unknown as MissionValidateData,
-        exitCode: 1,
-        summary: `[mission.validate] ${missionId} build.prepare FAILED: ${detail}`,
       };
     }
     throw new Error(
@@ -1486,6 +1501,7 @@ export async function runMissionValidate(
 
   return {
     data: { ...report, staleEntryWarnings } as unknown as MissionValidateData,
+    exitCode: 0,
     summary: `[mission.validate] ${missionId} validation passed (${validateCtx.stepCount} steps, ${validateCtx.routeCount} routes built)`,
     nextSteps: passNextSteps,
   };
@@ -1660,6 +1676,7 @@ export async function runMissionBuild(
 
   return {
     data: { missionId, distributionPath: distDest, buildSucceeded: true, builtAt: now },
+    exitCode: 0,
     summary: `[mission.build] ${missionId} distribution built`,
     nextSteps: [
       {
@@ -1736,6 +1753,7 @@ export async function runMissionDiff(
   logger.info(`  Added: ${added.length}, Modified: ${modified.length}, Removed: ${removed.length}`);
   return {
     data: { missionId, added, modified, removed },
+    exitCode: 0,
     summary: `[mission.diff] ${missionId}: ${added.length} added, ${modified.length} modified, ${removed.length} removed`,
     nextSteps: [
       {
@@ -1933,6 +1951,7 @@ export async function runMissionReconcile(
         ...(cc.mirrorSync.attempted ? { mirrorSync: cc.mirrorSync } : {}),
         divergenceWarning: cc.divergenceWarning,
       },
+      exitCode: 0,
       summary: `[mission.reconcile] ${missionId} reconciled (${cc.commitSha ? `${cc.commitSha.slice(0, 8)}, ${cc.transferredCommits} commits merged` : "no git"}${autoResolveSuffix}${cc.workpieceCommit.committed ? `, workpiece auto-committed ${cc.workpieceCommit.commitSha?.slice(0, 8)}` : ""}${mirrorSyncSuffix})`,
       nextSteps: [
         {

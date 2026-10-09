@@ -11,6 +11,7 @@ and an authored/derived manifest. No packages/, node_modules/, dist/, or *.gener
 <CHANGE_SUMMARY>
   <item>RFC-0221: initial thin-bundle packer.</item>
   <item>RFC-0221: Compass-complete authored partition (consumed-subset capability narrowing is follow-up).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -185,6 +186,7 @@ export async function runHandoffPack(
   if (dryRun) {
     return {
       data: { bundleDir, site: siteName, fileCount: partition.authored.length },
+      exitCode: 0,
       summary: `[handoff.pack] dry-run — would pack ${partition.authored.length} authored file(s) for ${siteName} → ${bundleDir}`,
     };
   }
@@ -278,6 +280,7 @@ export async function runHandoffPack(
   logger.success(`[handoff.pack] packed ${entries.length} authored file(s) → ${bundleDir}`);
   return {
     data: { bundleDir, site: siteName, fileCount: entries.length },
+    exitCode: 0,
     summary: `[handoff.pack] ${siteName}: ${entries.length} authored files → ${bundleDir}`,
     nextSteps: [
       {

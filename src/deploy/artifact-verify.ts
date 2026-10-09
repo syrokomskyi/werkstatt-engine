@@ -15,6 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -47,9 +48,15 @@ export async function runDeployArtifactVerify(
   if (!(await context.io.exists(dir))) {
     logger.error(`[deploy.artifact.verify] artifact ${hash} not found`);
     return {
-      data: { verified: false, hash, expectedHash: hash, signatureVerified: false },
       exitCode: 1,
       summary: `[deploy.artifact.verify] artifact ${hash} not found`,
+      nextSteps: [
+        {
+          action: `[deploy.artifact.verify] artifact ${hash} not found`,
+          kind: "required" as const,
+        },
+      ],
+      data: { verified: false, hash, expectedHash: hash, signatureVerified: false },
     };
   }
 
@@ -59,9 +66,15 @@ export async function runDeployArtifactVerify(
   if (!(await context.io.exists(distDir))) {
     logger.error(`[deploy.artifact.verify] dist directory missing for artifact ${hash}`);
     return {
-      data: { verified: false, hash, expectedHash: manifest.hash, signatureVerified: false },
       exitCode: 1,
       summary: `[deploy.artifact.verify] dist directory missing for ${hash}`,
+      nextSteps: [
+        {
+          action: `[deploy.artifact.verify] dist directory missing for ${hash}`,
+          kind: "required" as const,
+        },
+      ],
+      data: { verified: false, hash, expectedHash: manifest.hash, signatureVerified: false },
     };
   }
 
@@ -97,15 +110,22 @@ export async function runDeployArtifactVerify(
       `[deploy.artifact.verify] verification failed for ${hash} (hash: ${hashMatches}, sig: ${signatureVerified})`,
     );
     return {
-      data: { verified: false, hash: treeHash, expectedHash: manifest.hash, signatureVerified },
       exitCode: 1,
       summary: `[deploy.artifact.verify] ${hash} verification failed (hash-mismatch)`,
+      nextSteps: [
+        {
+          action: `[deploy.artifact.verify] ${hash} verification failed (hash-mismatch)`,
+          kind: "required" as const,
+        },
+      ],
+      data: { verified: false, hash: treeHash, expectedHash: manifest.hash, signatureVerified },
     };
   }
 
   logger.success(`[deploy.artifact.verify] artifact ${hash} verified`);
   return {
     data: { verified: true, hash: treeHash, expectedHash: manifest.hash, signatureVerified },
+    exitCode: 0,
     summary: `[deploy.artifact.verify] ${hash} verified (hash: ok, sig: ${signatureVerified})`,
     nextSteps: [
       {

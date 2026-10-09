@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy unit tests.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -153,7 +154,7 @@ test("deploy.artifact.verify: passes for valid artifact", async () => {
 
   const result = await runDeployArtifactVerify(mockInput({ hash }), mockContext(tmpDir));
   expect(result.data?.verified).toBe(true);
-  expect(result.exitCode).toBeUndefined();
+  expect(result.exitCode).toBe(0);
 });
 
 test("deploy.artifact.verify: fails for corrupted artifact", async () => {

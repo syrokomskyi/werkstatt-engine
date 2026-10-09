@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0355: initial bordbuch.append command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -114,6 +115,7 @@ export async function runBordbuchAppend(
         kind,
         hash: entry.hash,
       },
+      exitCode: 0,
       summary: `[bordbuch.append] appended ${entry.id} to ${systemId} Bordbuch`,
       nextSteps: [
         {

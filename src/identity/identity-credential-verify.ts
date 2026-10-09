@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0558: initial identity.credential.verify command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -48,7 +49,7 @@ export async function runIdentityCredentialVerify(
     return {
       data: { credentialId, valid: false, error: "not-found" },
       exitCode: 0,
-      summary: "identity.credential.verify: credential not found",
+      summary: "[identity.credential.verify] credential not found",
     };
   }
 
@@ -56,7 +57,7 @@ export async function runIdentityCredentialVerify(
     return {
       data: { credentialId, valid: false, error: "revoked" },
       exitCode: 0,
-      summary: "identity.credential.verify: credential revoked",
+      summary: "[identity.credential.verify] credential revoked",
     };
   }
 
@@ -66,7 +67,7 @@ export async function runIdentityCredentialVerify(
       return {
         data: { credentialId, valid: false, error: "expired", expiredAt: expiresAt },
         exitCode: 0,
-        summary: "identity.credential.verify: credential expired",
+        summary: "[identity.credential.verify] credential expired",
       };
     }
   }
@@ -81,13 +82,13 @@ export async function runIdentityCredentialVerify(
     return {
       data: { credentialId, valid: false, error: "signature-invalid" },
       exitCode: 0,
-      summary: "identity.credential.verify: signature invalid",
+      summary: "[identity.credential.verify] signature invalid",
     };
   }
 
   return {
     data: { credentialId, valid: true },
     exitCode: 0,
-    summary: "identity.credential.verify: credential valid",
+    summary: "[identity.credential.verify] credential valid",
   };
 }

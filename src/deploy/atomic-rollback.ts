@@ -15,6 +15,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -45,14 +46,17 @@ export async function runDeployAtomicRollback(
   if (!previousHash) {
     logger.error("[deploy.atomic.rollback] no previous artifact to roll back to");
     return {
+      exitCode: 1,
+      summary: "[deploy.atomic.rollback] no-previous-artifact",
+      nextSteps: [
+        { action: "[deploy.atomic.rollback] no-previous-artifact", kind: "required" as const },
+      ],
       data: {
         swapped: false,
         previousHash: null,
         newHash: "",
         swapTimeMs: 0,
       },
-      exitCode: 1,
-      summary: "[deploy.atomic.rollback] no-previous-artifact",
     };
   }
 
@@ -60,14 +64,20 @@ export async function runDeployAtomicRollback(
   if (!(await context.io.exists(dir))) {
     logger.error(`[deploy.atomic.rollback] previous artifact ${previousHash} directory missing`);
     return {
+      exitCode: 1,
+      summary: `[deploy.atomic.rollback] previous artifact ${previousHash} missing`,
+      nextSteps: [
+        {
+          action: `[deploy.atomic.rollback] previous artifact ${previousHash} missing`,
+          kind: "required" as const,
+        },
+      ],
       data: {
         swapped: false,
         previousHash,
         newHash: "",
         swapTimeMs: 0,
       },
-      exitCode: 1,
-      summary: `[deploy.atomic.rollback] previous artifact ${previousHash} missing`,
     };
   }
 
@@ -101,6 +111,7 @@ export async function runDeployAtomicRollback(
       newHash: previousHash,
       swapTimeMs,
     },
+    exitCode: 0,
     summary: `[deploy.atomic.rollback] rolled back to ${previousHash.slice(0, 16)}... in ${swapTimeMs}ms`,
     nextSteps: [
       {

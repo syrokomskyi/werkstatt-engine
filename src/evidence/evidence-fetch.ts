@@ -16,6 +16,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -106,9 +107,12 @@ export async function runEvidenceFetch(
   } catch (err) {
     if (err instanceof MissingEnvError) {
       return {
-        data: { missionId, runs: [] },
         exitCode: 1,
         summary: `[evidence.fetch] MISSING_ENV: ${err.message}`,
+        nextSteps: [
+          { action: `[evidence.fetch] MISSING_ENV: ${err.message}`, kind: "required" as const },
+        ],
+        data: { missionId, runs: [] },
       };
     }
     throw err;
@@ -124,9 +128,15 @@ export async function runEvidenceFetch(
       objects = await client.listObjectsV2(listPrefix);
     } catch (err) {
       return {
-        data: { missionId, runs: [] },
         exitCode: 1,
         summary: `[evidence.fetch] R2_LIST_ERROR: failed to list objects with prefix '${listPrefix}': ${err}`,
+        nextSteps: [
+          {
+            action: `[evidence.fetch] R2_LIST_ERROR: failed to list objects with prefix '${listPrefix}': ${err}`,
+            kind: "required" as const,
+          },
+        ],
+        data: { missionId, runs: [] },
       };
     }
 
@@ -188,6 +198,14 @@ export async function runEvidenceFetch(
     objects = await client.listObjectsV2(runPrefix);
   } catch (err) {
     return {
+      exitCode: 1,
+      summary: `[evidence.fetch] R2_LIST_ERROR: failed to list objects with prefix '${runPrefix}': ${err}`,
+      nextSteps: [
+        {
+          action: `[evidence.fetch] R2_LIST_ERROR: failed to list objects with prefix '${runPrefix}': ${err}`,
+          kind: "required" as const,
+        },
+      ],
       data: {
         missionId,
         runTimestamp,
@@ -196,13 +214,19 @@ export async function runEvidenceFetch(
         totalBytes: 0,
         outputDir,
       },
-      exitCode: 1,
-      summary: `[evidence.fetch] R2_LIST_ERROR: failed to list objects with prefix '${runPrefix}': ${err}`,
     };
   }
 
   if (objects.length === 0) {
     return {
+      exitCode: 1,
+      summary: `[evidence.fetch] NOT_FOUND: no evidence found for mission '${missionId}' run '${runTimestamp}'`,
+      nextSteps: [
+        {
+          action: `[evidence.fetch] NOT_FOUND: no evidence found for mission '${missionId}' run '${runTimestamp}'`,
+          kind: "required" as const,
+        },
+      ],
       data: {
         missionId,
         runTimestamp,
@@ -211,8 +235,6 @@ export async function runEvidenceFetch(
         totalBytes: 0,
         outputDir,
       },
-      exitCode: 1,
-      summary: `[evidence.fetch] NOT_FOUND: no evidence found for mission '${missionId}' run '${runTimestamp}'`,
     };
   }
 
@@ -239,6 +261,14 @@ export async function runEvidenceFetch(
       totalBytes += result.body.byteLength;
     } catch (err) {
       return {
+        exitCode: 1,
+        summary: `[evidence.fetch] R2_DOWNLOAD_ERROR: failed to download '${relPath}': ${err}`,
+        nextSteps: [
+          {
+            action: `[evidence.fetch] R2_DOWNLOAD_ERROR: failed to download '${relPath}': ${err}`,
+            kind: "required" as const,
+          },
+        ],
         data: {
           missionId,
           runTimestamp,
@@ -247,8 +277,6 @@ export async function runEvidenceFetch(
           totalBytes,
           outputDir,
         },
-        exitCode: 1,
-        summary: `[evidence.fetch] R2_DOWNLOAD_ERROR: failed to download '${relPath}': ${err}`,
       };
     }
   }

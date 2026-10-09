@@ -8,15 +8,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0818: reorder external push + bundle creation to after bordbuch commit so bordbuch entry reaches external mirrors.</item>
-  <item>ADR-0073: Use --force-with-lease on external mirror push (fetch first for lease baseline) — eliminates non-fast-forward errors on diverged mirrors.</item>
   <item>ADR-0086: commit all dirty operational files (operations journals, status files) via commitCacheCloneIfDirty before pushing — closed missions never reconcile again, so sync is the last chance for their operational state to reach mirrors.</item>
   <item>RFC-1139: CLI hint accuracy and agent-safety hygiene — rfc.create hint, EC-14-PARTIAL, amend delegation, ledger scope, sync footer, mission.open remnants</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1231: rename --all to --all-branches in sternsystem.sync
 
 'all branches + tags' is not a site selector — the reserved --all token stays gated off for this command (acceptsAllFlag: false), so the domain flag moved to a non-colliding name. Handler reads flags.all-branches via flagBoolean; git's own --all push flag extracted to a gitAll const to satisfy the RFC-1158 token gate on quoted '--x:' patterns.</item>
-  <history>RFC-0472, RFC-0477, RFC-0480</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>ADR-0073, RFC-0472, RFC-0477, RFC-0480, RFC-0818</history>
 </CHANGE_SUMMARY>
 */
 

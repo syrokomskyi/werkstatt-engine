@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0958: initial mission.journal.show command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -46,6 +47,9 @@ export async function runMissionJournalShow(
     return {
       exitCode: 1,
       summary: "[mission.journal.show] --mission is required",
+      nextSteps: [
+        { action: "Pass --mission <missionId> to select the mission journal", kind: "required" },
+      ],
     };
   }
 

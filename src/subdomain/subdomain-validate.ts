@@ -13,6 +13,7 @@ not errors).
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0752: initial subdomain.validate command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -135,6 +136,7 @@ export async function runSubdomainValidate(
       },
       state,
     },
+    exitCode: 0,
     summary: `[subdomain.validate] ${subdomain.domain}: ${state}`,
     nextSteps: [],
   };

@@ -12,6 +12,7 @@ permissions needed.
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial dns.record.list command handler.</item>
   <item>RFC-0753: project live ttl in the output record shape — it was silently dropped even though the Cloudflare API returns it, hiding ttl drift evidence from operators.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -82,6 +83,7 @@ export async function runDnsRecordList(
         ttl: r.ttl,
       })),
     },
+    exitCode: 0,
     summary: `[dns.record.list] ${systemId}: ${records.length} records in zone ${zoneDomain}`,
     nextSteps: [
       {

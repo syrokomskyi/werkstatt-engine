@@ -8,6 +8,7 @@ Thin wrappers around ownership-registry.ts client logic.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0967: initial command handlers for fleet.ownership.register/verify/transfer.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -22,6 +23,7 @@ import {
   transferOwnership,
   OwnershipError,
 } from "./ownership-registry.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -35,8 +37,7 @@ export async function runFleetOwnershipRegister(
   const systemId = flagString(input, "id");
   if (!systemId) {
     return {
-      exitCode: 1,
-      summary: "fleet.ownership.register: --id flag is required",
+      ...failResult("fleet.ownership.register", ["--id flag is required"]),
       data: { error: "missing --id flag" },
     };
   }
@@ -49,8 +50,9 @@ export async function runFleetOwnershipRegister(
 
     if (!result.registered && result.conflict) {
       return {
-        exitCode: 1,
-        summary: `[fleet.ownership.register] ${systemId} conflict: already claimed by ${result.conflict.existingClaim?.instanceId ?? "unknown"}`,
+        ...failResult("ownership.commands", [
+          `[fleet.ownership.register] ${systemId} conflict: already claimed by ${result.conflict.existingClaim?.instanceId ?? "unknown"}`,
+        ]),
         data: {
           command: "fleet.ownership.register",
           systemId,
@@ -71,8 +73,9 @@ export async function runFleetOwnershipRegister(
   } catch (err) {
     if (err instanceof OwnershipError) {
       return {
-        exitCode: 1,
-        summary: `[fleet.ownership.register] ${err.code}: ${err.message}`,
+        ...failResult("ownership.commands", [
+          `[fleet.ownership.register] ${err.code}: ${err.message}`,
+        ]),
         data: {
           command: "fleet.ownership.register",
           systemId,
@@ -82,8 +85,9 @@ export async function runFleetOwnershipRegister(
       };
     }
     return {
-      exitCode: 1,
-      summary: `[fleet.ownership.register] error: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("ownership.commands", [
+        `[fleet.ownership.register] error: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { command: "fleet.ownership.register", systemId, error: String(err) },
     };
   }
@@ -96,8 +100,7 @@ export async function runFleetOwnershipVerify(
   const systemId = flagString(input, "id");
   if (!systemId) {
     return {
-      exitCode: 1,
-      summary: "fleet.ownership.verify: --id flag is required",
+      ...failResult("fleet.ownership.verify", ["--id flag is required"]),
       data: { error: "missing --id flag" },
     };
   }
@@ -132,8 +135,9 @@ export async function runFleetOwnershipVerify(
   } catch (err) {
     if (err instanceof OwnershipError) {
       return {
-        exitCode: 1,
-        summary: `[fleet.ownership.verify] ${err.code}: ${err.message}`,
+        ...failResult("ownership.commands", [
+          `[fleet.ownership.verify] ${err.code}: ${err.message}`,
+        ]),
         data: {
           command: "fleet.ownership.verify",
           systemId,
@@ -143,8 +147,9 @@ export async function runFleetOwnershipVerify(
       };
     }
     return {
-      exitCode: 1,
-      summary: `[fleet.ownership.verify] error: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("ownership.commands", [
+        `[fleet.ownership.verify] error: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { command: "fleet.ownership.verify", systemId, error: String(err) },
     };
   }
@@ -159,15 +164,13 @@ export async function runFleetOwnershipTransfer(
 
   if (!systemId) {
     return {
-      exitCode: 1,
-      summary: "fleet.ownership.transfer: --id flag is required",
+      ...failResult("fleet.ownership.transfer", ["--id flag is required"]),
       data: { error: "missing --id flag" },
     };
   }
   if (!authorization) {
     return {
-      exitCode: 1,
-      summary: "fleet.ownership.transfer: --authorization flag is required",
+      ...failResult("fleet.ownership.transfer", ["--authorization flag is required"]),
       data: { error: "missing --authorization flag" },
     };
   }
@@ -192,8 +195,9 @@ export async function runFleetOwnershipTransfer(
   } catch (err) {
     if (err instanceof OwnershipError) {
       return {
-        exitCode: 1,
-        summary: `[fleet.ownership.transfer] ${err.code}: ${err.message}`,
+        ...failResult("ownership.commands", [
+          `[fleet.ownership.transfer] ${err.code}: ${err.message}`,
+        ]),
         data: {
           command: "fleet.ownership.transfer",
           systemId,
@@ -203,8 +207,9 @@ export async function runFleetOwnershipTransfer(
       };
     }
     return {
-      exitCode: 1,
-      summary: `[fleet.ownership.transfer] error: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("ownership.commands", [
+        `[fleet.ownership.transfer] error: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { command: "fleet.ownership.transfer", systemId, error: String(err) },
     };
   }

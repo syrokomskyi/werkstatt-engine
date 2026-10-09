@@ -13,10 +13,6 @@ producing a KernelPipelineReport with a timing summary (slowest steps, timeout c
   <item>Pipeline steps run in order — a failing step halts the pipeline unless marked non-blocking.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1130: document bypassCache in tryCacheRead/tryCacheWrite docstrings
-
-fo-review finding (axis E): docstrings did not mention the new bypassCache skip condition. Review report persisted.</item>
-  <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
 
@@ -25,7 +21,8 @@ Scheduler: collectErrors option on executeScheduledSteps — read-only steps (Sc
   <item>RFC-1231: allSites context carrier on pipeline contexts
 
 Both pipeline context-construction sites (site fan-out and workspace) populate KernelRuntimeContext.allSites from options.allSites so the executor's flags.all injection sees the consumed --all selector for steps declaring it.</item>
-  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097, RFC-1126, RFC-1130</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>ADR-0022, ADR-0023, ADR-0087, RFC-0303, RFC-0326, RFC-0390, RFC-0637, RFC-0686, RFC-0687, RFC-0809, RFC-1028, RFC-1097, RFC-1126, RFC-1130, RFC-1133</history>
 </CHANGE_SUMMARY>
 */
 
@@ -100,11 +97,12 @@ export function aggregateCollectErrors(
   if (!collectErrors) return undefined;
   const failedResults = sortedResults.filter((r) => !r.report.ok && !r.dependencySkipped);
   if (failedResults.length === 0) return undefined;
-  return {
+  const collected: { failedSteps: string[]; exitCode: number; ok: false } = {
     failedSteps: failedResults.map((r) => r.report.commandName),
     exitCode: failedResults[0]!.report.exitCode,
     ok: false,
   };
+  return collected;
 }
 
 /**
@@ -127,7 +125,7 @@ function buildCollectErrorsReport(
   progressLine(
     `${prefix} pipeline ${pipelineName} — FAILED (${collected.failedSteps.length} step(s) failed, ${formatDuration(timing.totalDurationMs)})`,
   );
-  return {
+  const report: KernelPipelineReport = {
     ...(siteName ? { siteName } : {}),
     pipelineName,
     exitCode: collected.exitCode,
@@ -137,6 +135,7 @@ function buildCollectErrorsReport(
     filesModified: aggregateFilesModified(reports),
     failedSteps: collected.failedSteps,
   };
+  return report;
 }
 
 // RFC-0732: convert pipeline-level flags record to CLI args for step execution.
@@ -714,7 +713,7 @@ async function executePipelineForSite(
       progressLine(
         `[${site.name}] pipeline ${options.pipelineName} — FAILED at step ${failed.commandName} (${formatDuration(timing.totalDurationMs)})`,
       );
-      return {
+      const failedReport: KernelPipelineReport = {
         siteName: site.name,
         pipelineName: options.pipelineName,
         exitCode: failed.exitCode,
@@ -723,13 +722,14 @@ async function executePipelineForSite(
         timing,
         filesModified: aggregateFilesModified(reports),
       };
+      return failedReport;
     }
 
     progressLine(
       `[${site.name}] pipeline ${options.pipelineName} — DONE ${formatDuration(timing.totalDurationMs)} (${timing.stepCount} step(s), ${timing.timeoutCount} timeout(s))`,
     );
 
-    return {
+    const doneReport: KernelPipelineReport = {
       siteName: site.name,
       pipelineName: options.pipelineName,
       exitCode: 0,
@@ -738,6 +738,7 @@ async function executePipelineForSite(
       timing,
       filesModified: aggregateFilesModified(reports),
     };
+    return doneReport;
   } finally {
     // ADR-0023: close the shared CacheLayer SQLite connection after pipeline completion.
     await cache.close();
@@ -941,7 +942,7 @@ async function executePipelineForWorkspace(
       progressLine(
         `[workspace] pipeline ${options.pipelineName} — FAILED at step ${failed.commandName} (${formatDuration(timing.totalDurationMs)})`,
       );
-      return {
+      const failedReport: KernelPipelineReport = {
         pipelineName: options.pipelineName,
         exitCode: failed.exitCode,
         ok: false,
@@ -949,13 +950,14 @@ async function executePipelineForWorkspace(
         timing,
         filesModified: aggregateFilesModified(reports),
       };
+      return failedReport;
     }
 
     progressLine(
       `[workspace] pipeline ${options.pipelineName} — DONE ${formatDuration(timing.totalDurationMs)} (${timing.stepCount} step(s), ${timing.timeoutCount} timeout(s))`,
     );
 
-    return {
+    const doneReport: KernelPipelineReport = {
       pipelineName: options.pipelineName,
       exitCode: 0,
       ok: true,
@@ -963,6 +965,7 @@ async function executePipelineForWorkspace(
       timing,
       filesModified: aggregateFilesModified(reports),
     };
+    return doneReport;
   } finally {
     // ADR-0023: close the shared CacheLayer SQLite connection after pipeline completion.
     await cache.close();

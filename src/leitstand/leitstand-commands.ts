@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-01-01: extract nullAdapter + resolveAdapter to adapters/null-adapter.ts + adapters/resolve.ts (registry barrel) so capability queries don't route through the command module.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures route into the command report via onSigningFailure → logger.warn instead of the default console channel</item>
   <item>RFC-1190: resolveMissionContext precedence chain — --mission flag → releases/&lt;id&gt;/dist build-identity.json → system-state.currentMission, MISSION_CONTEXT_MISMATCH on flag/identity contradiction; dev-deploy, propagate, and promote block with MISSION_CONTEXT_UNRESOLVED when nothing resolves unless --skip-evidence-sync is passed; resolved context + axiom.status + evidence-sync outcome propagated into result data and executeDeployPhases.</item>
@@ -15,7 +14,8 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149, RFC-1203</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>REVIEW-CODE-2026, RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 
@@ -68,6 +68,7 @@ import {
 import { buildAuthHeader } from "./deploy-execution.ts";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -836,6 +837,9 @@ export async function runLeitstandDevDeploy(
 
   if (!authResult.ok) {
     return {
+      ...failResult("leitstand.commands", [
+        `[leitstand.dev-deploy] denied: ${authResult.outcome.ruleId} — ${authResult.outcome.message}`,
+      ]),
       data: {
         systemId,
         channel: "dev",
@@ -845,8 +849,6 @@ export async function runLeitstandDevDeploy(
         buildIdentityVerified: false,
         testEvidenceVerified: false,
       },
-      summary: `[leitstand.dev-deploy] denied: ${authResult.outcome.ruleId} — ${authResult.outcome.message}`,
-      exitCode: 1,
       diagnostics: [
         {
           ruleId: authResult.outcome.ruleId,
@@ -1010,6 +1012,9 @@ export async function runLeitstandPropagate(
   });
   if (!missionCtx.missionId && !skipEvidenceSync) {
     return {
+      ...failResult("leitstand.commands", [
+        `[leitstand.propagate] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
+      ]),
       data: {
         releaseId,
         systemId,
@@ -1022,8 +1027,6 @@ export async function runLeitstandPropagate(
         testEvidenceVerified: false,
         missionContext: missionCtx,
       },
-      summary: `[leitstand.propagate] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
-      exitCode: 1,
       diagnostics: [
         {
           ruleId: "MISSION_CONTEXT_UNRESOLVED",
@@ -1078,6 +1081,9 @@ export async function runLeitstandPropagate(
 
   if (!authResult.ok) {
     return {
+      ...failResult("leitstand.commands", [
+        `[leitstand.propagate] denied: ${authResult.outcome.ruleId} — ${authResult.outcome.message}`,
+      ]),
       data: {
         releaseId,
         systemId,
@@ -1087,8 +1093,6 @@ export async function runLeitstandPropagate(
         releaseState: "",
         devBuildIdentityVerified: false,
       },
-      summary: `[leitstand.propagate] denied: ${authResult.outcome.ruleId} — ${authResult.outcome.message}`,
-      exitCode: 1,
       diagnostics: [
         {
           ruleId: authResult.outcome.ruleId,
@@ -1280,6 +1284,9 @@ export async function runLeitstandPromote(
   });
   if (!missionCtx.missionId && !skipEvidenceSync) {
     return {
+      ...failResult("leitstand.commands", [
+        `[leitstand.promote] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
+      ]),
       data: {
         releaseId,
         systemId,
@@ -1292,8 +1299,6 @@ export async function runLeitstandPromote(
         releaseState: "promoted",
         missionContext: missionCtx,
       },
-      summary: `[leitstand.promote] MISSION_CONTEXT_UNRESOLVED: no mission resolvable via --mission, releases/${releaseId} build-identity, or system-state.currentMission — pass --mission or --skip-evidence-sync`,
-      exitCode: 1,
       diagnostics: [
         {
           ruleId: "MISSION_CONTEXT_UNRESOLVED",
@@ -1355,6 +1360,9 @@ export async function runLeitstandPromote(
 
   if (!authorization.ok) {
     return {
+      ...failResult("leitstand.commands", [
+        `[leitstand.promote] denied: ${authorization.outcome.ruleId} — ${authorization.outcome.message}`,
+      ]),
       data: {
         releaseId,
         systemId,
@@ -1366,8 +1374,6 @@ export async function runLeitstandPromote(
         healthState: "unknown",
         releaseState: "promoted",
       },
-      summary: `[leitstand.promote] denied: ${authorization.outcome.ruleId} — ${authorization.outcome.message}`,
-      exitCode: 1,
       diagnostics: [
         {
           ruleId: authorization.outcome.ruleId,
@@ -1420,6 +1426,9 @@ export async function runLeitstandPromote(
     await runRedirectRegister(customdomainInput, context);
   } catch (err) {
     return {
+      ...failResult("leitstand.commands", [
+        `[leitstand.promote] custom domain setup failed: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: {
         releaseId,
         systemId,
@@ -1432,8 +1441,6 @@ export async function runLeitstandPromote(
         releaseState: "promoted",
         failingPhase: "custom-domain-setup",
       },
-      summary: `[leitstand.promote] custom domain setup failed: ${err instanceof Error ? err.message : String(err)}`,
-      exitCode: 1,
     } as unknown as KernelCommandResult<LeitstandPromoteData>;
   }
 
@@ -1920,6 +1927,7 @@ async function runSiteRollback(
 
     return {
       data,
+      exitCode: 0,
       summary: `[leitstand.rollback] ${systemId}: rolled back to ${rollbackTarget.releaseId ?? "previous deployment"}${rollbackTarget.versionId ? ` (version ${rollbackTarget.versionId})` : ""}`,
       nextSteps: [
         {
@@ -2025,6 +2033,7 @@ async function runServiceRollback(
         completedAt,
         operationId,
       },
+      exitCode: 0,
       summary: `[leitstand.rollback] ${serviceId}: rolled back to previous deployment`,
       nextSteps: [
         {
@@ -2288,7 +2297,11 @@ async function runPhase(
       if (flagName && !validFlags.has(flagName)) {
         const msg = `Unknown flag "--${flagName}" for command "${commandName}" (called from leitstand.hotfix.dev-deploy). Valid flags: ${[...validFlags].sort().join(", ")}`;
         logger.info(`  [hotfix] ${msg}`);
-        return { exitCode: 1, summary: msg };
+        const failed: { exitCode: number; data?: Record<string, unknown>; summary?: string } = {
+          exitCode: 1,
+          summary: msg,
+        };
+        return failed;
       }
     }
   }

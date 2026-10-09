@@ -14,6 +14,7 @@ and overall state. Exit code 0 for all validation states.
   <item>RFC-0753: initial dns.record.validate command handler.</item>
   <item>RFC-0753: live lookup falls back to the HTTPS wire-alias record for declared SVCB when no exact-type match exists at the name.</item>
   <item>RFC-0753: best-fit declared→live matching with consumed-live tracking — duplicate type+name identities (parallel MX, dual apex TXT) validate correctly, and unconsumed same-identity live records surface as extra instead of being hidden by the identity set.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -136,6 +137,7 @@ export async function runDnsRecordValidate(
       state,
       counts: { match, mismatch, missing, extra },
     },
+    exitCode: state === "valid" ? 0 : 1,
     summary: `[dns.record.validate] ${systemId}: ${state} (${match} match, ${mismatch} mismatch, ${missing} missing, ${extra} extra)`,
     nextSteps:
       state === "valid"

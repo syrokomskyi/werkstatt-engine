@@ -11,6 +11,7 @@
   <item>RFC-0626: initial bordbuch.commit command handler.</item>
   <item>RFC-0646: replace all gitExec calls with gitExecWithRetry for transient-failure resilience.</item>
   <item>RFC-0702: wrap all gitExecWithRetry calls in try/catch — git failures return error result instead of throwing; add error field to BordbuchCommitResult; add logger.warn in runBordbuchCommit on git failure.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -110,6 +111,7 @@ export async function runBordbuchCommit(
 
   if (!systemId) {
     return {
+      exitCode: 0,
       summary: "[bordbuch.commit] no system id — skipping",
     };
   }
@@ -122,6 +124,7 @@ export async function runBordbuchCommit(
     );
     return {
       data: result,
+      exitCode: 0,
       summary: `[bordbuch.commit] committed ${result.filesCommitted.length} bordbuch projection files for ${systemId}`,
       nextSteps: [
         {
@@ -136,6 +139,7 @@ export async function runBordbuchCommit(
     logger.warn(`[bordbuch.commit] git operation failed for ${systemId}: ${result.error}`);
     return {
       data: result,
+      exitCode: 1,
       summary: `[bordbuch.commit] git operation failed for ${systemId}: ${result.error}`,
       nextSteps: [
         {
@@ -148,6 +152,7 @@ export async function runBordbuchCommit(
 
   return {
     data: result,
+    exitCode: 0,
     summary: `[bordbuch.commit] no dirty bordbuch files for ${systemId}`,
   };
 }

@@ -11,6 +11,7 @@ to build.prepare/build.check. Red-tier requires --force; --report-only stops bef
 <CHANGE_SUMMARY>
   <item>RFC-0221: report-only path + downgrade gate.</item>
   <item>RFC-0221: materialization write-path — inject (migrators applied) + delegated regen; --as/--regen/--force.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -35,6 +36,7 @@ import { buildValidationPack, diffValidationPacks } from "./validation-pack.ts";
 import { reportDerivedEdits } from "./derived-edits.ts";
 import type { CatchupReport } from "./types.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface HandoffAbsorbData {
   bundleDir: string;
@@ -113,15 +115,22 @@ export async function runHandoffAbsorb(
   // Downgrade gate (RFC-0221 §4.1): never absorb a bundle from a newer ecosystem.
   if (report.comparison.verdict === "refuse-downgrade") {
     return {
-      data: { bundleDir, report, materialized: false },
       exitCode: 1,
       summary: `[handoff.absorb] refused — ${report.comparison.message}`,
+      nextSteps: [
+        {
+          action: `[handoff.absorb] refused — ${report.comparison.message}`,
+          kind: "required" as const,
+        },
+      ],
+      data: { bundleDir, report, materialized: false },
     };
   }
 
   if (reportOnly) {
     return {
       data: { bundleDir, report, materialized: false },
+      exitCode: 0,
       summary: `[handoff.absorb] report-only — overall tier ${report.overallTier}`,
     };
   }
@@ -133,9 +142,10 @@ export async function runHandoffAbsorb(
         "Resolve them, or pass --force to materialize anyway.",
     );
     return {
+      ...failResult("handoff.absorb", [
+        "[handoff.absorb] refused — red-tier decisions unresolved (use --force to override)",
+      ]),
       data: { bundleDir, report, materialized: false },
-      exitCode: 1,
-      summary: "[handoff.absorb] refused — red-tier decisions unresolved (use --force to override)",
     };
   }
 
@@ -162,9 +172,10 @@ export async function runHandoffAbsorb(
         "Review them, resolve, or pass --force to regenerate anyway.",
     );
     return {
+      ...failResult("handoff.absorb", [
+        `[handoff.absorb] refused — ${derivedEdits.length} derived-file edit(s) detected (use --force to overwrite)`,
+      ]),
       data: { bundleDir, report, materialized: false },
-      exitCode: 1,
-      summary: `[handoff.absorb] refused — ${derivedEdits.length} derived-file edit(s) detected (use --force to overwrite)`,
     };
   }
 
@@ -185,6 +196,7 @@ export async function runHandoffAbsorb(
     logger.info(`[handoff.absorb] regeneration delegated — run: ${steps}`);
     return {
       data: { bundleDir, report, materialized: true, targetApp, filesInjected, regenerated: false },
+      exitCode: 0,
       summary: `[handoff.absorb] materialized apps/${targetApp} (${filesInjected} files); regenerate with build.prepare${isNewApp ? " (after pnpm install)" : ""}`,
     };
   }
@@ -196,9 +208,10 @@ export async function runHandoffAbsorb(
   const regenerated = installCode === 0 && prepareCode === 0 && checkCode === 0;
   if (!regenerated) {
     return {
+      ...failResult("handoff.absorb", [
+        `[handoff.absorb] materialized apps/${targetApp}, but regeneration/validation failed (install=${installCode}, prepare=${prepareCode}, check=${checkCode})`,
+      ]),
       data: { bundleDir, report, materialized: true, targetApp, filesInjected, regenerated: false },
-      exitCode: 1,
-      summary: `[handoff.absorb] materialized apps/${targetApp}, but regeneration/validation failed (install=${installCode}, prepare=${prepareCode}, check=${checkCode})`,
     };
   }
 
@@ -217,6 +230,7 @@ export async function runHandoffAbsorb(
       regenerated: true,
       validationClean: validationClean ?? undefined,
     },
+    exitCode: 0,
     summary: `[handoff.absorb] absorbed apps/${targetApp} — overall tier ${report.overallTier}${
       validationClean === false ? " (golden-pack drift — see report)" : ""
     }`,

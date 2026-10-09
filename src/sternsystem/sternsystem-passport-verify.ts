@@ -12,6 +12,7 @@ resource inventory against live state.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0966: initial passport verify command handler.</item>
   <item>ADR-0094: apply the post-handover drift tolerance from passport-staleness.ts — a recorded bordbuchHead pointing at the entry just before the latest handover event is legitimate, trailing bookkeeping entries stripped. Verify now agrees with PASSPORT-03 on freshness verdicts.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -27,6 +28,7 @@ import {
 } from "./passport-staleness.ts";
 import { readPassport } from "./registry-io.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface SternsystemPassportVerifyData {
   command: "sternsystem.passport.verify";
@@ -69,6 +71,9 @@ export async function runSternsystemPassportVerify(
     const errors = [`passport.json not found for system '${systemId}'`];
     logger.error(`[sternsystem.passport.verify] ${systemId}: passport.json not found`);
     return {
+      ...failResult("sternsystem.passport.verify", [
+        `[sternsystem.passport.verify] ${systemId} passport missing`,
+      ]),
       data: {
         command: "sternsystem.passport.verify",
         systemId,
@@ -78,8 +83,6 @@ export async function runSternsystemPassportVerify(
         staleness: { bordbuchHeadMatches: false, resourcesMatch: false },
         errors,
       },
-      exitCode: 1,
-      summary: `[sternsystem.passport.verify] ${systemId} passport missing`,
     };
   }
 

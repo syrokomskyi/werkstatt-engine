@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0084: abandon-incomplete-operations step before transition-state — sweeps systems-cache operations/*.jsonl for incomplete ops referencing the closing mission and appends op-abandoned, then commits the journal updates to the cache clone.</item>
   <item>RECOVERY-2026-10-04: sweep passes getActiveOpIds() — ops still executing in this process (the ship journal that mission.close runs inside) are excluded so the live ship op is not self-abandoned mid-run.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
@@ -15,7 +14,8 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
-  <history>ADR-0010, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>ADR-0010, ADR-0084, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -377,6 +377,7 @@ export async function runMissionClose(
         evidenceSyncResult: cc.evidenceSyncResult,
         bordbuchValidation: { violations: [], checked: true },
       },
+      exitCode: 0,
       summary: `[mission.close] closed mission ${missionId}`,
       nextSteps: [
         {

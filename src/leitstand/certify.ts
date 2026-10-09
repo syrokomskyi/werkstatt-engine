@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RECOVERY-2026-10-04: mission.check invocation now passes --channel=gateChannel — previously the flag was omitted, defaulting the suppression context to "main", so channelNot-scoped axiom suppressions (RFC-0684) never fired on dev/alt certifies. Gate channel is already validated to the same dev|alt|main enum.</item>
   <item>RECOVERY-2026-10-04: mission.check timeouts raised to a shared 25min constant (was inner 5min race + outer 300s orchestrator timeout — a cold ~7-11min capture always exceeded both, racing a fail decision vs an "incomplete" no-decision return while abandoned mission.check processes kept running). Orchestrator timeout derives as +60s so the inner race still produces the diagnostic envelope deterministically.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
@@ -17,6 +16,7 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RECOVERY-2026-10-05: stale-channel detection — resolveDevDeploymentRecord captures the releaseId of the latest succeeded dev record; detectMeasuredReleaseMismatch flags when a remote (non---base-url) certify would measure a different artifact than the candidate. Upfront logger.warn, measured-release reason in the gate decision, and a fail-summary hint pointing at the --base-url recovery path (warpgogol r000028 dev gate measured stale r000027).</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -311,7 +311,7 @@ export async function runLeitstandCertify(
     const earlyIo = context.io;
     if (!(await earlyIo.exists(candidateServerDir))) {
       const msg =
-        `[leitstand.certify] candidate artifact missing: ${candidateServerDir} not found. ` +
+        `candidate artifact missing: ${candidateServerDir} not found. ` +
         `The gate measures the candidate artifact through a local preview (RFC-1207) — build it first.`;
       return {
         data: {
@@ -326,7 +326,7 @@ export async function runLeitstandCertify(
           measurementTarget: "candidate-preview",
           measuredReleaseId: releaseId,
         } as CertifyResult,
-        summary: msg,
+        summary: `[leitstand.certify] ${msg}`,
         exitCode: 2,
         nextSteps: [
           {
@@ -370,6 +370,9 @@ export async function runLeitstandCertify(
         `[leitstand.certify] failed to auto-remove access PIN for site '${systemId}'. ` +
         `The PIN is still active. Run: pnpm exec werkstatt run leitstand.access.unprotect --site ${systemId}`;
       return {
+        exitCode: 1,
+        summary: msg,
+        nextSteps: [{ action: msg, kind: "required" as const }],
         data: {
           command: "leitstand.certify",
           systemId,
@@ -386,8 +389,6 @@ export async function runLeitstandCertify(
             restoreError: null,
           },
         },
-        summary: msg,
-        exitCode: 1,
       } as unknown as KernelCommandResult<CertifyResult>;
     }
     pinRemoved = true;
@@ -403,6 +404,9 @@ export async function runLeitstandCertify(
       `[leitstand.certify] site '${systemId}' has access PIN protection active. ` +
       `Run: pnpm exec werkstatt run leitstand.access.unprotect --site ${systemId}`;
     return {
+      exitCode: 1,
+      summary: msg,
+      nextSteps: [{ action: msg, kind: "required" as const }],
       data: {
         command: "leitstand.certify",
         systemId,
@@ -419,8 +423,6 @@ export async function runLeitstandCertify(
           restoreError: null,
         },
       },
-      summary: msg,
-      exitCode: 1,
     } as unknown as KernelCommandResult<CertifyResult>;
   }
 
@@ -479,6 +481,14 @@ export async function runLeitstandCertify(
     const plan = planProducers(producerNodes);
     if (!plan.ok) {
       return {
+        exitCode: 1,
+        summary: `[leitstand.certify] producer planning failed: ${plan.ruleId} — ${plan.message}`,
+        nextSteps: [
+          {
+            action: `[leitstand.certify] producer planning failed: ${plan.ruleId} — ${plan.message}`,
+            kind: "required" as const,
+          },
+        ],
         data: {
           command: "leitstand.certify",
           systemId,
@@ -489,8 +499,6 @@ export async function runLeitstandCertify(
           producerCount: 0,
           evidenceCount: 0,
         },
-        summary: `[leitstand.certify] producer planning failed: ${plan.ruleId} — ${plan.message}`,
-        exitCode: 1,
         diagnostics: [
           { ruleId: plan.ruleId, severity: "error", message: plan.message, evidence: [] },
         ],
@@ -766,6 +774,14 @@ export async function runLeitstandCertify(
 
         if (!execResult.ok) {
           return {
+            exitCode: 1,
+            summary: `[leitstand.certify] producer execution failed: ${execResult.ruleId} — ${execResult.message}`,
+            nextSteps: [
+              {
+                action: `[leitstand.certify] producer execution failed: ${execResult.ruleId} — ${execResult.message}`,
+                kind: "required" as const,
+              },
+            ],
             data: {
               command: "leitstand.certify",
               systemId,
@@ -778,8 +794,6 @@ export async function runLeitstandCertify(
               measurementTarget,
               measuredReleaseId,
             } as CertifyResult,
-            summary: `[leitstand.certify] producer execution failed: ${execResult.ruleId} — ${execResult.message}`,
-            exitCode: 1,
             diagnostics: [
               {
                 ruleId: execResult.ruleId,
@@ -829,6 +843,14 @@ export async function runLeitstandCertify(
 
     if (!evaluationResult.ok) {
       return {
+        exitCode: 1,
+        summary: `[leitstand.certify] evaluation failed: ${evaluationResult.code} — ${evaluationResult.message}`,
+        nextSteps: [
+          {
+            action: `[leitstand.certify] evaluation failed: ${evaluationResult.code} — ${evaluationResult.message}`,
+            kind: "required" as const,
+          },
+        ],
         data: {
           command: "leitstand.certify",
           systemId,
@@ -841,8 +863,6 @@ export async function runLeitstandCertify(
           measurementTarget,
           measuredReleaseId,
         } as CertifyResult,
-        summary: `[leitstand.certify] evaluation failed: ${evaluationResult.code} — ${evaluationResult.message}`,
-        exitCode: 1,
         diagnostics: [
           {
             ruleId: evaluationResult.code,
@@ -1049,6 +1069,9 @@ export async function runLeitstandCertify(
       `[leitstand.certify] CRITICAL: access PIN restore failed: ${pinRestoreError}. ` +
       `Site '${systemId}' is UNPROTECTED. Run: pnpm exec werkstatt run leitstand.access.protect --site ${systemId} --pin ${recordedPin}`;
     return {
+      exitCode: 1,
+      summary: msg,
+      nextSteps: [{ action: msg, kind: "required" as const }],
       data: {
         ...(result.data ?? {}),
         command: "leitstand.certify",
@@ -1061,8 +1084,6 @@ export async function runLeitstandCertify(
           restoreError: pinRestoreError,
         },
       } as CertifyResult,
-      summary: msg,
-      exitCode: 1,
     } as unknown as KernelCommandResult<CertifyResult>;
   }
 

@@ -10,6 +10,7 @@ by cross-referencing DNS records with Workers routes.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0752: initial subdomain.list command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -133,6 +134,7 @@ export async function runSubdomainList(
       zone: zoneDomain,
       subdomains,
     },
+    exitCode: 0,
     summary: `[subdomain.list] Zone '${zoneDomain}': ${subdomains.length} subdomain(s) found`,
     nextSteps: [],
   };

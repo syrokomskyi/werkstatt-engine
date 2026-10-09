@@ -10,6 +10,7 @@
   <item>RFC-0958: initial mission.resume command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1219: resolveOperationDefinition passes the reconstructed per-kind ctx into runOperation (fixes m000192 "path argument" crash); catch narrowed to the dynamic import so ctx-factory IO errors surface with real messages (REVIEW-CODE-2026-10-07-16 F-1).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -36,6 +37,7 @@ import {
 } from "../journal/index.ts";
 import type { OperationDefinition } from "../journal/index.ts";
 import path from "node:path";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface MissionResumeData {
   missionId: string;
@@ -175,6 +177,9 @@ export async function runMissionResume(
         { action: `Re-run mission.resume --mission ${missionId}`, kind: "required" },
       ];
       return {
+        ...failResult("mission.resume", [
+          `[mission.resume] failed at step "${result.failedStep}" (${result.skipped.length} skipped, ${result.executed.length} executed)`,
+        ]),
         data: {
           missionId,
           resumedOp: incomplete.op,
@@ -184,8 +189,6 @@ export async function runMissionResume(
           completed: false,
           failedStep: result.failedStep,
         },
-        exitCode: 1,
-        summary: `[mission.resume] failed at step "${result.failedStep}" (${result.skipped.length} skipped, ${result.executed.length} executed)`,
         nextSteps,
       };
     }

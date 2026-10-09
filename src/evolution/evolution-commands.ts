@@ -10,6 +10,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1031: initial implementation — 9 evolution command handlers.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -23,6 +24,7 @@ import type { CapabilityCandidateV1, CandidateEvidenceV1 } from "./contracts.ts"
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
 import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import { applyOverlay, removeOverlay } from "../runtime/overlay-store.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 let controller: EvolutionControllerV1 | null = null;
 
@@ -110,9 +112,10 @@ export async function runCandidateDefine(
 
   if (!componentId || !version || !artifact) {
     return {
+      ...failResult("evolution.commands", [
+        "EVOLUTION-CMD-01: --component-id, --version, and --artifact are required",
+      ]),
       data: { candidateId: "", stage: "" },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-01: --component-id, --version, and --artifact are required",
     };
   }
 
@@ -139,9 +142,8 @@ export async function runCandidateDefine(
 
   if (!result.ok) {
     return {
+      ...failResult("evolution.commands", [`${result.ruleId}: ${result.message}`]),
       data: { candidateId: "", stage: "" },
-      exitCode: 1,
-      summary: `${result.ruleId}: ${result.message}`,
     };
   }
 
@@ -155,7 +157,7 @@ export async function runCandidateDefine(
   return {
     data: { candidateId: result.candidate.candidateId, stage: result.candidate.stage },
     exitCode: 0,
-    summary: `Candidate ${result.candidate.candidateId} defined in stage ${result.candidate.stage}`,
+    summary: `[evolution.commands] Candidate ${result.candidate.candidateId} defined in stage ${result.candidate.stage}`,
   };
 }
 
@@ -169,9 +171,8 @@ export async function runCandidateShadow(
 
   if (!candidateId) {
     return {
+      ...failResult("evolution.commands", ["EVOLUTION-CMD-02: --candidate-id is required"]),
       data: { evidence: null },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-02: --candidate-id is required",
     };
   }
 
@@ -187,13 +188,12 @@ export async function runCandidateShadow(
     return {
       data: { evidence },
       exitCode: 0,
-      summary: `Shadow execution completed for candidate ${candidateId}`,
+      summary: `[evolution.commands] Shadow execution completed for candidate ${candidateId}`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Shadow execution failed: ${(err as Error).message}`]),
       data: { evidence: null },
-      exitCode: 1,
-      summary: `Shadow execution failed: ${(err as Error).message}`,
     };
   }
 }
@@ -208,9 +208,8 @@ export async function runCandidateTest(
 
   if (!candidateId) {
     return {
+      ...failResult("evolution.commands", ["EVOLUTION-CMD-03: --candidate-id is required"]),
       data: { evidenceCount: 0 },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-03: --candidate-id is required",
     };
   }
 
@@ -226,13 +225,12 @@ export async function runCandidateTest(
     return {
       data: { evidenceCount: evidence.length },
       exitCode: 0,
-      summary: `Test execution completed for candidate ${candidateId} (${evidence.length} scenarios)`,
+      summary: `[evolution.commands] Test execution completed for candidate ${candidateId} (${evidence.length} scenarios)`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Test execution failed: ${(err as Error).message}`]),
       data: { evidenceCount: 0 },
-      exitCode: 1,
-      summary: `Test execution failed: ${(err as Error).message}`,
     };
   }
 }
@@ -247,9 +245,8 @@ export async function runCandidateCanary(
 
   if (!candidateId) {
     return {
+      ...failResult("evolution.commands", ["EVOLUTION-CMD-04: --candidate-id is required"]),
       data: { trafficPercent: 0 },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-04: --candidate-id is required",
     };
   }
 
@@ -265,13 +262,12 @@ export async function runCandidateCanary(
     return {
       data: { trafficPercent },
       exitCode: 0,
-      summary: `Canary routing at ${trafficPercent}% for candidate ${candidateId}`,
+      summary: `[evolution.commands] Canary routing at ${trafficPercent}% for candidate ${candidateId}`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Canary activation failed: ${(err as Error).message}`]),
       data: { trafficPercent: 0 },
-      exitCode: 1,
-      summary: `Canary activation failed: ${(err as Error).message}`,
     };
   }
 }
@@ -285,9 +281,8 @@ export async function runCandidateActivate(
 
   if (!candidateId) {
     return {
+      ...failResult("evolution.commands", ["EVOLUTION-CMD-05: --candidate-id is required"]),
       data: { candidateId: "", stage: "" },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-05: --candidate-id is required",
     };
   }
 
@@ -311,13 +306,12 @@ export async function runCandidateActivate(
     return {
       data: { candidateId, stage: "active" },
       exitCode: 0,
-      summary: `Candidate ${candidateId} activated`,
+      summary: `[evolution.commands] Candidate ${candidateId} activated`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Activation failed: ${(err as Error).message}`]),
       data: { candidateId, stage: "" },
-      exitCode: 1,
-      summary: `Activation failed: ${(err as Error).message}`,
     };
   }
 }
@@ -332,9 +326,10 @@ export async function runCandidatePromote(
 
   if (!candidateId || !missionId) {
     return {
+      ...failResult("evolution.commands", [
+        "EVOLUTION-CMD-06: --candidate-id and --mission-id are required",
+      ]),
       data: { missionId: "", stage: "" },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-06: --candidate-id and --mission-id are required",
     };
   }
 
@@ -350,13 +345,12 @@ export async function runCandidatePromote(
     return {
       data: { missionId, stage: "promoted" },
       exitCode: 0,
-      summary: `Candidate ${candidateId} promoted via mission ${missionId}`,
+      summary: `[evolution.commands] Candidate ${candidateId} promoted via mission ${missionId}`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Promotion failed: ${(err as Error).message}`]),
       data: { missionId, stage: "" },
-      exitCode: 1,
-      summary: `Promotion failed: ${(err as Error).message}`,
     };
   }
 }
@@ -370,9 +364,8 @@ export async function runCandidateRollback(
 
   if (!componentId) {
     return {
+      ...failResult("evolution.commands", ["EVOLUTION-CMD-07: --component-id is required"]),
       data: { componentId: "", stage: "" },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-07: --component-id is required",
     };
   }
 
@@ -383,13 +376,12 @@ export async function runCandidateRollback(
     return {
       data: { componentId, stage: "rolled-back" },
       exitCode: 0,
-      summary: `Component ${componentId} rolled back`,
+      summary: `[evolution.commands] Component ${componentId} rolled back`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Rollback failed: ${(err as Error).message}`]),
       data: { componentId, stage: "" },
-      exitCode: 1,
-      summary: `Rollback failed: ${(err as Error).message}`,
     };
   }
 }
@@ -404,9 +396,8 @@ export async function runCandidateQuarantine(
 
   if (!candidateId) {
     return {
+      ...failResult("evolution.commands", ["EVOLUTION-CMD-08: --candidate-id is required"]),
       data: { candidateId: "", stage: "", reason: "" },
-      exitCode: 1,
-      summary: "EVOLUTION-CMD-08: --candidate-id is required",
     };
   }
 
@@ -422,13 +413,12 @@ export async function runCandidateQuarantine(
     return {
       data: { candidateId, stage: "quarantined", reason },
       exitCode: 0,
-      summary: `Candidate ${candidateId} quarantined: ${reason}`,
+      summary: `[evolution.commands] Candidate ${candidateId} quarantined: ${reason}`,
     };
   } catch (err) {
     return {
+      ...failResult("evolution.commands", [`Quarantine failed: ${(err as Error).message}`]),
       data: { candidateId, stage: "", reason },
-      exitCode: 1,
-      summary: `Quarantine failed: ${(err as Error).message}`,
     };
   }
 }
@@ -442,6 +432,6 @@ export async function runCandidateInspect(
   return {
     data: { candidates },
     exitCode: 0,
-    summary: `${candidates.length} candidate(s) registered`,
+    summary: `[evolution.commands] ${candidates.length} candidate(s) registered`,
   };
 }

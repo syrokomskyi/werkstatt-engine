@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0354: initial list command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -62,6 +63,7 @@ export async function runSternsystemList(
 
   return {
     data: { systems, count: systems.length },
+    exitCode: 0,
     summary: `[sternsystem.list] ${systems.length} system${systems.length === 1 ? "" : "s"} registered`,
     nextSteps:
       systems.length === 0

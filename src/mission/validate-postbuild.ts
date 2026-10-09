@@ -12,6 +12,7 @@
 
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -102,6 +103,15 @@ export async function runValidatePostbuild(
   const distPath = path.join(siteWorkspace.directory, "dist");
   if (!(await context.io.exists(distPath))) {
     return {
+      exitCode: 1,
+      summary:
+        "[validate.postbuild] No dist/ found — run mission.validate first to build the site.",
+      nextSteps: [
+        {
+          action: "Run: pnpm exec werkstatt run mission.validate --mission <mission-id>",
+          kind: "required",
+        },
+      ],
       data: {
         command: "validate.postbuild",
         status: "fail",
@@ -109,14 +119,6 @@ export async function runValidatePostbuild(
         totalDurationMs: 0,
         distPath,
       },
-      exitCode: 1,
-      summary: "No dist/ found — run mission.validate first to build the site.",
-      nextSteps: [
-        {
-          action: "Run: pnpm exec werkstatt run mission.validate --mission <mission-id>",
-          kind: "required",
-        },
-      ],
     };
   }
 
@@ -149,8 +151,8 @@ export async function runValidatePostbuild(
       },
       exitCode: report.ok ? 0 : 1,
       summary: report.ok
-        ? "All post-build validators passed."
-        : `Post-build validation failed: ${report.timing.failedStep ?? "unknown step"}`,
+        ? "[validate.postbuild] All post-build validators passed."
+        : `[validate.postbuild] Post-build validation failed: ${report.timing.failedStep ?? "unknown step"}`,
       nextSteps: report.ok
         ? undefined
         : [
@@ -227,8 +229,8 @@ export async function runValidatePostbuild(
     },
     exitCode: allOk ? 0 : 1,
     summary: allOk
-      ? "All post-build validators passed (slow steps skipped)."
-      : "Post-build validation failed.",
+      ? `[validate.postbuild] All post-build validators passed (slow steps skipped).`
+      : `[validate.postbuild] Post-build validation failed.`,
     nextSteps: allOk
       ? undefined
       : [

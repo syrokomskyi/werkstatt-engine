@@ -18,6 +18,7 @@ covered by MAT-CONFIG-02 — optional files legitimately exist on no site.
   <item>RFC-0840: initial materialize.config.validate command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>warpgogol-m000170: OPTIONAL_OPERATOR_CONFIG_FILES joined into the MAT-CONFIG-01 whitelist; MAT-CONFIG-02 intentionally still scans only the required OPERATOR_CONFIG_FILES.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -193,6 +194,6 @@ export async function runMaterializeConfigValidate(
       summary,
     },
     exitCode: summary.error > 0 ? 1 : 0,
-    summary: `materialize.config.validate: ${summary.error} error${summary.error === 1 ? "" : "s"}, ${summary.warning} warning${summary.warning === 1 ? "" : "s"}`,
+    summary: `[materialize.config.validate] ${summary.error} error${summary.error === 1 ? "" : "s"}, ${summary.warning} warning${summary.warning === 1 ? "" : "s"}`,
   };
 }

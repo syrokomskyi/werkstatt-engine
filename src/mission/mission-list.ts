@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0355: initial mission.list command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -74,6 +75,7 @@ export async function runMissionList(
 
   return {
     data: { missions, count: missions.length },
+    exitCode: 0,
     summary: `[mission.list] ${missions.length} mission${missions.length === 1 ? "" : "s"} found`,
     nextSteps:
       missions.length === 0

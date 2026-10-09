@@ -15,6 +15,7 @@ Supports --dry-run to preview changes without making API calls.
   <item>RFC-0817: graceful skip when dns-records.yaml is absent instead of throwing.</item>
   <item>RECOVERY-2026-10-04: upsert matches via pickBestLiveMatch + consumed-live tracking (same as dns.record.validate) — naive find(type+name) compared every declaration against the first same-identity record, misbinding parallel MX / dual apex TXT and producing bogus update/create calls (CF 1046 on Email-Routing MX, 81058 duplicate-TXT). Cloudflare codes 1046/81058 now classify as skipped (goal state externally owned or already satisfied) instead of errors.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <history>RFC-0753</history>
 </CHANGE_SUMMARY>
 */
@@ -82,6 +83,7 @@ export async function runDnsRecordUpsert(
         results: [],
         summary: { created: 0, updated: 0, skipped: 0, total: 0, errors: 0 },
       },
+      exitCode: 0,
       summary: `[dns.record.upsert] ${systemId}: skipped — no dns-records.yaml found`,
       nextSteps: [
         {
@@ -106,6 +108,7 @@ export async function runDnsRecordUpsert(
         results: [],
         summary: { created: 0, updated: 0, skipped: 0, total: 0, errors: 0 },
       },
+      exitCode: 1,
       summary: `[dns.record.upsert] ${systemId}: skipped — zone '${declaration.zone}' not found in system-config.yaml`,
       nextSteps: [
         {
@@ -194,6 +197,7 @@ export async function runDnsRecordUpsert(
       results,
       summary: { created, updated, skipped, total, errors },
     },
+    exitCode: errors > 0 ? 1 : 0,
     summary: `[dns.record.upsert] ${systemId}: ${created} created, ${updated} updated, ${skipped} skipped, ${errors} error${errors === 1 ? "" : "s"} (${total} total)${dryRun ? " [dry-run]" : ""}`,
     nextSteps:
       errors > 0

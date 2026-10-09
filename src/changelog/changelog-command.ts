@@ -13,6 +13,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -34,6 +35,7 @@ import { groupCommits } from "./changelog/agents/grouper-agent.ts";
 import { writeChangelog } from "./changelog/agents/writer-agent.ts";
 import { calculateNextVersion } from "./changelog/core/version-bumper.ts";
 import { writeVersionedFile, rebuildIndex } from "./changelog/core/index-rebuilder.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 // START_BLOCK_STATE
 async function loadState(ctx: ChangelogCtx): Promise<SystemState> {
@@ -73,7 +75,11 @@ export async function runChangelogGenerate(
     context.logger.info(
       `[CL-MAIN][runChangelogGenerate][SKIPPED] Not a release day. Use --force to override.`,
     );
-    return { data: null, summary: `${ctx.appName}: skipped — not a release day` };
+    return {
+      data: null,
+      exitCode: 0,
+      summary: `[changelog.command] ${ctx.appName}: skipped — not a release day`,
+    };
   }
 
   const { from, to } = getPeriodWindow(schedule, ctx.timezone);
@@ -83,14 +89,22 @@ export async function runChangelogGenerate(
   const state = await loadState(ctx);
   if (!ctx.force && state.processedWindows.some((w) => w.from === fromISO && w.to === toISO)) {
     context.logger.info("[CL-MAIN][runChangelogGenerate][SKIPPED] Window already processed.");
-    return { data: null, summary: `${ctx.appName}: skipped — window already processed` };
+    return {
+      data: null,
+      exitCode: 0,
+      summary: `[changelog.command] ${ctx.appName}: skipped — window already processed`,
+    };
   }
 
   const rawCommits = await collectCommits(fromISO, toISO, ctx);
   context.logger.info(`[CL-MAIN][runChangelogGenerate][COLLECTED] count=${rawCommits.length}`);
 
   if (rawCommits.length === 0) {
-    return { data: null, summary: `${ctx.appName}: no commits in window` };
+    return {
+      data: null,
+      exitCode: 0,
+      summary: `[changelog.command] ${ctx.appName}: no commits in window`,
+    };
   }
 
   const sanitized = rawCommits.map(sanitizeCommit);
@@ -98,7 +112,11 @@ export async function runChangelogGenerate(
   const nonSkip = classified.filter((c) => c.type !== "skip");
 
   if (nonSkip.length === 0) {
-    return { data: null, summary: `${ctx.appName}: all commits are noise` };
+    return {
+      data: null,
+      exitCode: 0,
+      summary: `[changelog.command] ${ctx.appName}: all commits are noise`,
+    };
   }
 
   const grouped = await groupCommits(classified, ctx);
@@ -121,7 +139,8 @@ export async function runChangelogGenerate(
     context.logger.info("--- DRY RUN OUTPUT ---\n" + content);
     return {
       data: null,
-      summary: `${ctx.appName}: dry-run complete — version would be ${bump.version}`,
+      exitCode: 0,
+      summary: `[changelog.command] ${ctx.appName}: dry-run complete — version would be ${bump.version}`,
     };
   }
 
@@ -146,7 +165,8 @@ export async function runChangelogGenerate(
   );
   return {
     data: { version: bump.version, filename },
-    summary: `${ctx.appName}: changelog generated → ${bump.version} (${filename})`,
+    exitCode: 0,
+    summary: `[changelog.command] ${ctx.appName}: changelog generated → ${bump.version} (${filename})`,
   };
 }
 // END_BLOCK_GENERATE
@@ -164,7 +184,8 @@ export async function runChangelogRebuildIndex(
   await rebuildIndex(date, version, filename, ctx);
   return {
     data: { indexFile: ctx.indexFile },
-    summary: `${ctx.appName}: index rebuilt at ${ctx.indexFile}`,
+    exitCode: 0,
+    summary: `[changelog.command] ${ctx.appName}: index rebuilt at ${ctx.indexFile}`,
   };
 }
 // END_BLOCK_REBUILD
@@ -179,9 +200,10 @@ export async function runChangelogBackfill(
   const end = readFlag(input, "end");
   if (!start || !end) {
     return {
+      ...failResult("changelog.command", [
+        "backfill requires --start and --end flags (YYYY-MM-DD)",
+      ]),
       data: null,
-      exitCode: 1,
-      summary: "backfill requires --start and --end flags (YYYY-MM-DD)",
     };
   }
 
@@ -201,7 +223,8 @@ export async function runChangelogBackfill(
     context.logger.info(content);
     return {
       data: null,
-      summary: `${ctx.appName}: backfill dry-run — version would be ${bump.version}`,
+      exitCode: 0,
+      summary: `[changelog.command] ${ctx.appName}: backfill dry-run — version would be ${bump.version}`,
     };
   }
 
@@ -209,7 +232,8 @@ export async function runChangelogBackfill(
   await rebuildIndex(start, bump.version, filename, ctx);
   return {
     data: { version: bump.version },
-    summary: `${ctx.appName}: backfill complete → ${bump.version}`,
+    exitCode: 0,
+    summary: `[changelog.command] ${ctx.appName}: backfill complete → ${bump.version}`,
   };
 }
 // END_BLOCK_BACKFILL

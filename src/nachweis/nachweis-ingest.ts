@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -38,6 +39,7 @@ import {
   type NachweisIngestResult,
 } from "./nachweis-io.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -130,6 +132,11 @@ export async function runNachweisIngest(
     } catch (err) {
       if (isMissingEnvError(err)) {
         return {
+          exitCode: 1,
+          summary: `[nachweis.ingest] MISSING_ENV: ${err.message}`,
+          nextSteps: [
+            { action: `[nachweis.ingest] MISSING_ENV: ${err.message}`, kind: "required" as const },
+          ],
           data: {
             recordId,
             systemId,
@@ -139,11 +146,12 @@ export async function runNachweisIngest(
             dryRun: false,
             bordbuchEventId: null,
           },
-          exitCode: 1,
-          summary: `[nachweis.ingest] MISSING_ENV: ${err.message}`,
         };
       }
       return {
+        ...failResult("nachweis.ingest", [
+          `[nachweis.ingest] R2_UPLOAD_ERROR: failed to upload '${filePath}': ${err}`,
+        ]),
         data: {
           recordId,
           systemId,
@@ -153,8 +161,6 @@ export async function runNachweisIngest(
           dryRun: false,
           bordbuchEventId: null,
         },
-        exitCode: 1,
-        summary: `[nachweis.ingest] R2_UPLOAD_ERROR: failed to upload '${filePath}': ${err}`,
       };
     }
   } finally {
@@ -198,6 +204,9 @@ export async function runNachweisIngest(
       `[nachweis.ingest] Bordbuch append failed — R2 object at ${r2Path} needs manual cleanup: ${err}`,
     );
     return {
+      ...failResult("nachweis.ingest", [
+        `[nachweis.ingest] BORDBUCH_ERROR: R2 upload succeeded but Bordbuch append failed — manual cleanup needed for ${r2Path}`,
+      ]),
       data: {
         recordId,
         systemId,
@@ -207,8 +216,6 @@ export async function runNachweisIngest(
         dryRun: false,
         bordbuchEventId: null,
       },
-      exitCode: 1,
-      summary: `[nachweis.ingest] BORDBUCH_ERROR: R2 upload succeeded but Bordbuch append failed — manual cleanup needed for ${r2Path}`,
     };
   } finally {
     await releaseLock(workspaceRoot, `bordbuch:${systemId}`);

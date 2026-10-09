@@ -11,6 +11,7 @@
   <item>RFC-0359: initial notausgang command handlers.</item>
   <item>RFC-0380: deep integrity verification, @warpgogol/fingerprint hashing, YAML artifacts, refined secret scanning, CheckStatus enum types.</item>
   <item>RFC-0381: fix bordbuch field names (id, kind, occurredAt), nested pin access (platform.version), optional artifact manifest, fix timestamp validation logic.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -417,6 +418,7 @@ The \`bordbuch/events.ndjson\` file contains the complete mission and release hi
         features,
         verifier: NOTAUSGANG_VERIFIER,
       },
+      exitCode: 0,
       summary: `[notausgang.export] ${systemId} exported to ${outputFlag} (${nulled.length} integrations nulled, ${exceptions.length} exceptions)`,
       nextSteps: [
         {

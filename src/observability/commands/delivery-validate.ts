@@ -1,16 +1,18 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Maintains packages/os/site-kernel-observability/src/commands/delivery-validate.ts as an authored site-kernel-observability authored module so agents can evolve it without rediscovering local boundaries.</purpose>
+<purpose>Maintains the observability.delivery.validate command — validates the cf-analytics-poller zones.yaml zone map against registered Sternsystemen and service ownerApps, and enforces the poller's apps/*-free boundary.</purpose>
 <non-goals>
   <item>Do not introduce app-specific runtime composition or deployment behavior into this reusable package source file.</item>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0343: initial implementation.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
 import { join } from "node:path";
+import { parse as yamlParse } from "yaml";
 import type {
   CheckResult,
   Diagnostic,
@@ -19,6 +21,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { diagnosticsResult } from "@warpgogol/werkstatt-shared/checks";
+import { discoverSystems } from "../../sternsystem/registry-io.ts";
 
 interface ZoneEntry {
   siteId: string;
@@ -26,8 +29,26 @@ interface ZoneEntry {
   workerScripts: string[];
 }
 
-function stripJsoncComments(text: string): string {
-  return text.replace(/\/\/.*$/gm, "");
+const ZONES_FILE = "services/cf-analytics-poller/zones.yaml";
+
+async function collectKnownSiteIds(
+  root: string,
+  context: KernelRuntimeContext,
+): Promise<Set<string>> {
+  const known = new Set<string>();
+  const { systems } = await discoverSystems(root, context.io);
+  for (const system of systems) known.add(system.id);
+  const serviceConfigs = await context.io.glob("*/service.config.yaml", {
+    cwd: join(root, "services"),
+  });
+  for (const rel of serviceConfigs) {
+    const text = await context.io.readFile(join(root, "services", rel));
+    const owner = yamlParse(text) as { ownerApp?: unknown };
+    if (typeof owner.ownerApp === "string" && owner.ownerApp.length > 0) {
+      known.add(owner.ownerApp);
+    }
+  }
+  return known;
 }
 
 export async function runObservabilityDeliveryValidate(
@@ -36,15 +57,15 @@ export async function runObservabilityDeliveryValidate(
 ): Promise<KernelCommandResult<CheckResult>> {
   const diagnostics: Diagnostic[] = [];
   const root = context.workspaceRoot;
-  const zonesPath = join(root, "services", "cf-analytics-poller", "zones.jsonc");
+  const zonesPath = join(root, ZONES_FILE);
 
   if (!(await context.io.exists(zonesPath))) {
     diagnostics.push({
       ruleId: "OBS-DLV-01",
       severity: "error",
-      file: "services/cf-analytics-poller/zones.jsonc",
-      message: "zones.jsonc does not exist.",
-      fixHint: "Create services/cf-analytics-poller/zones.jsonc with the zone map.",
+      file: ZONES_FILE,
+      message: "zones.yaml does not exist.",
+      fixHint: "Create services/cf-analytics-poller/zones.yaml with the zone map.",
     });
     return diagnosticsResult("observability.delivery.validate", diagnostics);
   }
@@ -52,14 +73,24 @@ export async function runObservabilityDeliveryValidate(
   let zones: ZoneEntry[];
   try {
     const raw = await context.io.readFile(zonesPath);
-    zones = JSON.parse(stripJsoncComments(raw)) as ZoneEntry[];
+    zones = yamlParse(raw) as ZoneEntry[];
   } catch {
     diagnostics.push({
       ruleId: "OBS-DLV-01",
       severity: "error",
-      file: "services/cf-analytics-poller/zones.jsonc",
-      message: "zones.jsonc is not valid JSON.",
-      fixHint: "Fix the JSON syntax in zones.jsonc.",
+      file: ZONES_FILE,
+      message: "zones.yaml is not valid YAML.",
+      fixHint: "Fix the YAML syntax in zones.yaml.",
+    });
+    return diagnosticsResult("observability.delivery.validate", diagnostics);
+  }
+  if (!Array.isArray(zones)) {
+    diagnostics.push({
+      ruleId: "OBS-DLV-01",
+      severity: "error",
+      file: ZONES_FILE,
+      message: "zones.yaml must contain a top-level array of zone entries.",
+      fixHint: "Rewrite zones.yaml as a YAML array of {siteId, zoneId, workerScripts} entries.",
     });
     return diagnosticsResult("observability.delivery.validate", diagnostics);
   }
@@ -71,16 +102,16 @@ export async function runObservabilityDeliveryValidate(
       diagnostics.push({
         ruleId: "OBS-DLV-01",
         severity: "error",
-        file: "services/cf-analytics-poller/zones.jsonc",
+        file: ZONES_FILE,
         message: "Zone entry missing required field: siteId.",
-        fixHint: "Add a siteId that matches an apps/* workspace directory name.",
+        fixHint: "Add a siteId that matches a registered Sternsystem id or a service ownerApp.",
       });
     }
     if (!zone.zoneId) {
       diagnostics.push({
         ruleId: "OBS-DLV-01",
         severity: "error",
-        file: "services/cf-analytics-poller/zones.jsonc",
+        file: ZONES_FILE,
         message: `Zone entry for "${zone.siteId}" has empty zoneId.`,
         fixHint: "Add the Cloudflare zone ID from the CF dashboard.",
       });
@@ -89,7 +120,7 @@ export async function runObservabilityDeliveryValidate(
       diagnostics.push({
         ruleId: "OBS-DLV-01",
         severity: "error",
-        file: "services/cf-analytics-poller/zones.jsonc",
+        file: ZONES_FILE,
         message: `Duplicate siteId: "${zone.siteId}".`,
         fixHint: "Remove or rename the duplicate zone entry.",
       });
@@ -97,19 +128,17 @@ export async function runObservabilityDeliveryValidate(
     seenSiteIds.add(zone.siteId);
   }
 
-  // OBS-DLV-02: siteId must match an apps/* directory
-  const appsDir = join(root, "apps");
-  const appDirs = await context.io.glob("*/", { cwd: appsDir });
-  const appNames = new Set(appDirs.map((d) => d.replace(/\/$/, "")));
-
+  // OBS-DLV-02: siteId must match a registered Sternsystem or a service ownerApp
+  const knownSiteIds = await collectKnownSiteIds(root, context);
   for (const zone of zones) {
-    if (zone.siteId && !appNames.has(zone.siteId)) {
+    if (zone.siteId && !knownSiteIds.has(zone.siteId)) {
       diagnostics.push({
         ruleId: "OBS-DLV-02",
         severity: "error",
-        file: "services/cf-analytics-poller/zones.jsonc",
-        message: `siteId "${zone.siteId}" does not match any apps/* workspace directory.`,
-        fixHint: "Rename siteId to match an apps/* directory, or create the app.",
+        file: ZONES_FILE,
+        message: `siteId "${zone.siteId}" matches no registered Sternsystem or service ownerApp.`,
+        fixHint:
+          "Rename siteId to a Sternsystem id (systems-cache/<id>) or a services/*/service.config.yaml ownerApp.",
       });
     }
   }
@@ -186,14 +215,14 @@ export async function runObservabilityDeliveryValidate(
     }
   }
 
-  // OBS-DLV-04: warn for apps without zone entries
-  for (const appName of appNames) {
-    if (!seenSiteIds.has(appName)) {
+  // OBS-DLV-04: warn for registered sites without zone entries
+  for (const siteId of knownSiteIds) {
+    if (!seenSiteIds.has(siteId)) {
       diagnostics.push({
         ruleId: "OBS-DLV-04",
         severity: "warning",
-        file: "services/cf-analytics-poller/zones.jsonc",
-        message: `App "${appName}" has no zone entry in zones.jsonc.`,
+        file: ZONES_FILE,
+        message: `Site "${siteId}" has no zone entry in zones.yaml.`,
         fixHint:
           "Add a zone entry for this site, or mark it as excluded if intentionally unmapped.",
       });

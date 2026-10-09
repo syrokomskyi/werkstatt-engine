@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0338: initial implementation.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -98,6 +99,6 @@ export async function runObservabilityStackHealth(
       checks,
     },
     exitCode: allOk ? 0 : 1,
-    summary: `observability.stack.health: ${checks.filter((c) => c.ok).length}/${checks.length} checks passed`,
+    summary: `[observability.stack.health] ${checks.filter((c) => c.ok).length}/${checks.length} checks passed`,
   };
 }

@@ -9,6 +9,7 @@ status. Thin wrappers around claims-repo.ts pure functions.</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1124: initial command handlers for fleet.claims.* surface.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,6 +30,7 @@ import {
   type FleetClaimsConfig,
 } from "./claims-repo.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -52,8 +54,7 @@ export async function runFleetClaimsInit(
   const remote = flagString(input, "remote");
   if (!remote) {
     return {
-      exitCode: 1,
-      summary: "fleet.claims.init: --remote flag is required",
+      ...failResult("fleet.claims.init", ["--remote flag is required"]),
       data: { error: "missing --remote flag" },
     };
   }
@@ -84,8 +85,9 @@ export async function runFleetClaimsInit(
     };
   } catch (err) {
     return {
-      exitCode: 1,
-      summary: `[fleet.claims.init] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("claims.commands", [
+        `[fleet.claims.init] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { error: err instanceof Error ? err.message : String(err) },
     };
   }
@@ -102,8 +104,7 @@ export async function runFleetClaimsPublish(
   const systemId = flagString(input, "id");
   if (!systemId) {
     return {
-      exitCode: 1,
-      summary: "fleet.claims.publish: --id flag is required",
+      ...failResult("fleet.claims.publish", ["--id flag is required"]),
       data: { error: "missing --id flag" },
     };
   }
@@ -111,9 +112,9 @@ export async function runFleetClaimsPublish(
   const key = await loadSigningKeyFromEnv();
   if (!key) {
     return {
-      exitCode: 1,
-      summary:
-        "fleet.claims.publish: no signing key — set SIGNING_PRIVATE_KEY or SIGNING_PRIVATE_KEY_PATH",
+      ...failResult("fleet.claims.publish", [
+        "no signing key — set SIGNING_PRIVATE_KEY or SIGNING_PRIVATE_KEY_PATH",
+      ]),
       data: { error: "no signing key configured" },
     };
   }
@@ -146,8 +147,9 @@ export async function runFleetClaimsPublish(
     };
   } catch (err) {
     return {
-      exitCode: 1,
-      summary: `[fleet.claims.publish] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("claims.commands", [
+        `[fleet.claims.publish] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { error: err instanceof Error ? err.message : String(err) },
     };
   }
@@ -183,8 +185,9 @@ export async function runFleetClaimsSync(
     };
   } catch (err) {
     return {
-      exitCode: 1,
-      summary: `[fleet.claims.sync] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("claims.commands", [
+        `[fleet.claims.sync] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { error: err instanceof Error ? err.message : String(err) },
     };
   }
@@ -201,8 +204,7 @@ export async function runFleetClaimsVerify(
   const systemId = flagString(input, "id");
   if (!systemId) {
     return {
-      exitCode: 1,
-      summary: "fleet.claims.verify: --id flag is required",
+      ...failResult("fleet.claims.verify", ["--id flag is required"]),
       data: { error: "missing --id flag" },
     };
   }
@@ -224,8 +226,9 @@ export async function runFleetClaimsVerify(
     };
   } catch (err) {
     return {
-      exitCode: 1,
-      summary: `[fleet.claims.verify] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("claims.commands", [
+        `[fleet.claims.verify] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { error: err instanceof Error ? err.message : String(err) },
     };
   }
@@ -250,8 +253,9 @@ export async function runFleetClaimsStatus(
     };
   } catch (err) {
     return {
-      exitCode: 1,
-      summary: `[fleet.claims.status] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ...failResult("claims.commands", [
+        `[fleet.claims.status] failed: ${err instanceof Error ? err.message : String(err)}`,
+      ]),
       data: { error: err instanceof Error ? err.message : String(err) },
     };
   }

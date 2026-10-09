@@ -14,6 +14,7 @@ compensation-verifier.ts and wraps the result in KernelCommandResult.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1037: initial implementation — 3 effect command handlers.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -48,7 +49,7 @@ export function runEffectClassify(
   return {
     data: { operation, effectClass },
     exitCode: 0,
-    summary: `Operation "${operation}" classified as ${effectClass}`,
+    summary: `[effect.commands] Operation "${operation}" classified as ${effectClass}`,
   };
 }
 
@@ -103,8 +104,8 @@ export async function runEffectCompensationVerify(
         data: result,
         exitCode: result.verified ? 0 : 1,
         summary: result.verified
-          ? `Compensation verified for ${operationHash}`
-          : `Compensation verification failed for ${operationHash}: ${result.failureReason ?? "unknown"}`,
+          ? `[effect.commands] Compensation verified for ${operationHash}`
+          : `[effect.commands] Compensation verification failed for ${operationHash}: ${result.failureReason ?? "unknown"}`,
       };
     })
     .catch((err) => {
@@ -139,7 +140,7 @@ export async function runEffectCompensationInspect(
     data: result,
     exitCode: 0,
     summary: result
-      ? `Compensation evidence found for ${operationHash}: verified=${result.verified}`
-      : `No compensation evidence found for ${operationHash}`,
+      ? `[effect.commands] Compensation evidence found for ${operationHash}: verified=${result.verified}`
+      : `[effect.commands] No compensation evidence found for ${operationHash}`,
   };
 }

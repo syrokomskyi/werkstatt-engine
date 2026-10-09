@@ -20,6 +20,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <history>RFC-0874</history>
 </CHANGE_SUMMARY>
 */
@@ -41,6 +42,7 @@ import {
 } from "./nachweis-io.ts";
 import { runNachweisAssessmentIngest } from "./nachweis-assessment-ingest.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -590,6 +592,7 @@ function makeErrorMeasureResult(
   summary: string,
 ): KernelCommandResult<LighthouseMeasureResult> {
   return {
+    ...failResult("nachweis.lighthouse.measure", ["nachweis.lighthouse.measure failed"]),
     data: {
       command: "nachweis.measure.lighthouse",
       status: "error",
@@ -601,7 +604,6 @@ function makeErrorMeasureResult(
       aggregation: "median",
       code,
     },
-    exitCode: 1,
     summary,
   };
 }

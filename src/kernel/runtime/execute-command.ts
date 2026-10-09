@@ -14,12 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1126: step 2 — kernel runtime wiring
-
-Populate KernelRuntimeContext.workpieceEnv at all 5 context construction sites (execute-command + execute-pipeline); add resolveSiteFlagAlias rewriting --site into --mission/--id/--system for workspace-scoped commands with KERNEL-FLAG-02 conflict diagnostics.</item>
-  <item>RFC-1126: review findings — aliased argv in input, unchanged reporting
-
-fo-review REVIEW-CODE-2026-09-22-01 (needs-revision): input.argv now carries the aliased argv so commands inspecting raw argv see canonical flags; config.regenerate reports identical files as unchanged[] instead of dropping them from both generated and skipped.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
@@ -31,7 +25,8 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
   <item>RFC-1231: step 2 — allSites context carrier + flags.all injection
 
 KernelRuntimeContext.allSites populated from options.allSites at all three executor context sites (workspace path, app-scope fast path, fallback registry path). executeRegisteredCommand injects input.flags.all = true when context.allSites and the command declares the flag — after flag resolution, before the RFC-1133 cache-key computation so cached and fresh executions see identical flags.</item>
-  <history>ADR-0022, ADR-0087, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126</history>
 </CHANGE_SUMMARY>
 */
 
@@ -633,7 +628,12 @@ export async function executeKernelCommand(
         assertAllFlagAccepted(wsCommand, options.allSites ?? false);
         const logger = createKernelLogger(outputFormat);
         const { io, intents } = createDefaultIO();
-        const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
+        // Ownership spans every workspace generator — always compute from the
+        // full workspace registry, not the module-scoped wsRegistry that may
+        // have resolved this command (ecosystem.manifest parity, RFC-1249).
+        const ownershipMap = await computeOwnershipMap(
+          (await getOrBuildWorkspaceRegistry(options.workspaceRoot)) ?? wsRegistry!,
+        );
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
           site: undefined,
@@ -716,7 +716,12 @@ export async function executeKernelCommand(
       for (const site of targetSites) {
         const logger = createKernelLogger(outputFormat);
         const { io, intents } = createDefaultIO();
-        const ownershipMap = wsRegistry ? await computeOwnershipMap(wsRegistry) : undefined;
+        // Ownership spans every workspace generator — always compute from the
+        // full workspace registry, not the module-scoped wsRegistry that may
+        // have resolved this command (ecosystem.manifest parity, RFC-1249).
+        const ownershipMap = await computeOwnershipMap(
+          (await getOrBuildWorkspaceRegistry(options.workspaceRoot)) ?? wsRegistry!,
+        );
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
           site,
@@ -813,7 +818,9 @@ export async function executeKernelCommand(
 
       const logger = createKernelLogger(outputFormat);
       const { io, intents } = createDefaultIO();
-      const ownershipMap = siteRegistry ? await computeOwnershipMap(siteRegistry) : undefined;
+      const ownershipMap = await computeOwnershipMap(
+        (await getOrBuildWorkspaceRegistry(options.workspaceRoot)) ?? siteRegistry!,
+      );
       const context: KernelRuntimeContext = {
         workspaceRoot: options.workspaceRoot,
         site,

@@ -9,7 +9,8 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-1036: initial implementation — 3 scope command handlers.</item>
+  <item>RFC-1036: initial implementation — 3 scope command handlers.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -25,6 +26,7 @@ import type {
   ScopeContext,
 } from "@warpgogol/werkstatt-shared/component";
 import { getDefaultScopeManager } from "./scope.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, name: string): string {
   const v = input.flags[name];
@@ -60,7 +62,8 @@ export async function runScopeInspect(
         components: s.componentIds,
       })),
     },
-    summary: `${scopes.length} active scope(s)`,
+    exitCode: 0,
+    summary: `[scope.commands] ${scopes.length} active scope(s)`,
   };
 }
 
@@ -70,17 +73,11 @@ export async function runScopeResolve(
 ): Promise<KernelCommandResult> {
   const capability = flagString(input, "capability") as CapabilityId;
   if (!capability) {
-    return {
-      exitCode: 1,
-      summary: "Missing required flag: --capability",
-    };
+    return failResult("scope.commands", ["Missing required flag: --capability"]);
   }
   const scope = flagString(input, "scope") as ComponentScope;
   if (!scope) {
-    return {
-      exitCode: 1,
-      summary: "Missing required flag: --scope",
-    };
+    return failResult("scope.commands", ["Missing required flag: --scope"]);
   }
 
   const ctx = buildScopeContext(input, scope);
@@ -90,7 +87,8 @@ export async function runScopeResolve(
   if (!resolved) {
     return {
       data: { resolved: null },
-      summary: `No provider found for capability '${capability}' in any visible scope`,
+      exitCode: 0,
+      summary: `[scope.commands] No provider found for capability '${capability}' in any visible scope`,
     };
   }
 
@@ -102,7 +100,8 @@ export async function runScopeResolve(
         scope: resolvedScope,
       },
     },
-    summary: `Resolved '${capability}' to '${resolved.componentId}' in scope '${resolvedScope}'`,
+    exitCode: 0,
+    summary: `[scope.commands] Resolved '${capability}' to '${resolved.componentId}' in scope '${resolvedScope}'`,
   };
 }
 
@@ -112,17 +111,11 @@ export async function runScopeLifecycleAdopt(
 ): Promise<KernelCommandResult> {
   const componentId = flagString(input, "component-id") as ComponentId;
   if (!componentId) {
-    return {
-      exitCode: 1,
-      summary: "Missing required flag: --component-id",
-    };
+    return failResult("scope.commands", ["Missing required flag: --component-id"]);
   }
   const scope = flagString(input, "scope") as ComponentScope;
   if (!scope) {
-    return {
-      exitCode: 1,
-      summary: "Missing required flag: --scope",
-    };
+    return failResult("scope.commands", ["Missing required flag: --scope"]);
   }
 
   const ctx = buildScopeContext(input, scope);
@@ -135,9 +128,6 @@ export async function runScopeLifecycleAdopt(
       summary: `Adopted '${componentId}' into scope '${scope}'`,
     };
   } catch (err) {
-    return {
-      exitCode: 1,
-      summary: `Adoption failed: ${(err as Error).message}`,
-    };
+    return failResult("scope.commands", [`Adoption failed: ${(err as Error).message}`]);
   }
 }

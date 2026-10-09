@@ -28,6 +28,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -49,6 +50,7 @@ import type {
   ModuleExport,
 } from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface CommandManifestEntry {
   name: string;
@@ -371,14 +373,15 @@ export async function runCommandManifestGenerate(
   } catch (err) {
     if (err instanceof CommandManifestDedupError) {
       return {
+        ...failResult("command.manifest.generate", [
+          `aborted — ${err.diagnostics.length} dedup conflict(s) (CMD-MAN-04)`,
+        ]),
         data: {
           command: "command.manifest.generate",
           commandCount: 0,
           written: false,
           diagnostics: err.diagnostics,
         },
-        exitCode: 1,
-        summary: `command.manifest.generate: aborted — ${err.diagnostics.length} dedup conflict(s) (CMD-MAN-04)`,
       };
     }
     throw err;
@@ -401,8 +404,8 @@ export async function runCommandManifestGenerate(
     },
     exitCode: 0,
     summary: dryRun
-      ? `command.manifest.generate: dry-run — ${manifest.commands.length} command(s)`
-      : `command.manifest.generate: wrote ${manifest.commands.length} command(s)`,
+      ? `[command.manifest.generate] dry-run — ${manifest.commands.length} command(s)`
+      : `[command.manifest.generate] wrote ${manifest.commands.length} command(s)`,
   };
 }
 
@@ -442,6 +445,6 @@ function diagnosticsResultLocal(diagnostics: Diagnostic[]): KernelCommandResult<
   return {
     data: { command: "command.manifest.validate", status, diagnostics, summary },
     exitCode: summary.error > 0 ? 1 : 0,
-    summary: `command.manifest.validate: ${summary.error} error${summary.error === 1 ? "" : "s"}, ${summary.warning} warning${summary.warning === 1 ? "" : "s"}`,
+    summary: `[command.manifest.validate] ${summary.error} error${summary.error === 1 ? "" : "s"}, ${summary.warning} warning${summary.warning === 1 ? "" : "s"}`,
   };
 }

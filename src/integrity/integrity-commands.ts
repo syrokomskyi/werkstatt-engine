@@ -13,6 +13,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
   <item>RFC-1097: sweep â€” werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -64,11 +65,15 @@ export async function runIntegrityInit(
 ): Promise<KernelCommandResult> {
   const app = requireApp(context);
   if (context.dryRun) {
-    return { summary: `[integrity.init] dry-run: would initialize integrity for ${app.name}` };
+    return {
+      exitCode: 0,
+      summary: `[integrity.init] dry-run: would initialize integrity for ${app.name}`,
+    };
   }
 
   await runInit({ cwd: app.directory });
   return {
+    exitCode: 0,
     summary: `[integrity.init] complete for ${app.name}`,
     nextSteps: [
       {
@@ -86,12 +91,14 @@ export async function runIntegrityUpdate(
   const app = requireApp(context);
   if (context.dryRun) {
     return {
+      exitCode: 0,
       summary: `[integrity.update] dry-run: would update integrity manifests for ${app.name}`,
     };
   }
 
   await runUpdate({ cwd: app.directory, baseRef: getStringArg(input, 0) });
   return {
+    exitCode: 0,
     summary: `[integrity.update] complete for ${app.name}`,
     nextSteps: [
       { action: `Verify integrity: pnpm exec werkstatt run integrity.verify`, kind: "optional" },
@@ -108,7 +115,9 @@ export async function runIntegrityVerify(
   return {
     data: { ok: report.ok },
     exitCode: report.ok ? 0 : 1,
-    summary: report.ok ? "Integrity verification passed." : undefined,
+    summary: report.ok
+      ? `[integrity.commands] Integrity verification passed.`
+      : `[integrity.commands] Integrity verification failed.`,
     nextSteps: report.ok
       ? undefined
       : [
@@ -128,12 +137,14 @@ export async function runIntegrityBuildRecord(
   const distDir = getStringArg(input, 0, "dist") ?? "dist";
   if (context.dryRun) {
     return {
+      exitCode: 0,
       summary: `[integrity.build-record] dry-run: would record build outputs from ${distDir}`,
     };
   }
 
   await runRecordBuild({ cwd: app.directory, builder: "local", distDir });
   return {
+    exitCode: 0,
     summary: `[integrity.build-record] complete for ${app.name}`,
     nextSteps: [
       { action: `Sign the build: pnpm exec werkstatt run integrity.sign`, kind: "optional" },
@@ -166,7 +177,10 @@ export async function runIntegritySign(
 ): Promise<KernelCommandResult<{ reusedExistingSignature: boolean }>> {
   const app = requireApp(context);
   if (context.dryRun) {
-    return { summary: `[integrity.sign] dry-run: would sign ${buildLatestDir(app.directory)}` };
+    return {
+      exitCode: 0,
+      summary: `[integrity.sign] dry-run: would sign ${buildLatestDir(app.directory)}`,
+    };
   }
 
   const privateKeyPem = await loadPrivateKeyPem(app.directory);
@@ -192,6 +206,7 @@ export async function runIntegritySign(
 
   return {
     data: { reusedExistingSignature: result.reusedExistingSignature },
+    exitCode: 0,
     summary: result.reusedExistingSignature
       ? "Release signature already matched the current build artifacts. Existing signed files were kept unchanged."
       : "Release signed successfully. Anyone holding your public key can verify this release independently.",
@@ -287,6 +302,7 @@ export async function runIntegrityGenerateSigningKeypair(
   if (context.dryRun) {
     return {
       data: { privateKeyTarget, publicKeyTarget },
+      exitCode: 0,
       summary: `[integrity.keys.generate] dry-run: would write ${privateKeyTarget} and ${publicKeyTarget}`,
     };
   }
@@ -303,7 +319,8 @@ export async function runIntegrityGenerateSigningKeypair(
   context.logger.info(`Public key: ${publicKeyTarget}`);
   return {
     data: { privateKeyTarget, publicKeyTarget },
-    summary: "Ed25519 key pair generated.",
+    exitCode: 0,
+    summary: "[integrity.commands] Ed25519 key pair generated.",
   };
 }
 
@@ -314,10 +331,11 @@ export async function runIntegrityBackfillRevisions(
   const app = requireApp(context);
   if (context.dryRun) {
     return {
+      exitCode: 0,
       summary: `[integrity.backfill-revisions] dry-run: would update revision counters for ${app.name}`,
     };
   }
 
   await runBackfillRevisions({ cwd: app.directory });
-  return { summary: `[integrity.backfill-revisions] complete for ${app.name}` };
+  return { exitCode: 0, summary: `[integrity.backfill-revisions] complete for ${app.name}` };
 }

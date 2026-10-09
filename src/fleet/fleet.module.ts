@@ -12,6 +12,7 @@
   <item>RFC-0964: initial fleet module — fleet.sites.generate (moved from werkstatt-site), fleet.apply (wave orchestration).</item>
   <item>RFC-0967: add fleet.ownership.register, fleet.ownership.verify, fleet.ownership.transfer commands.</item>
   <item>RFC-1124: add fleet.claims.* commands — git-native claims registry as permissioned-era ownership authority.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -159,6 +160,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       {
         name: "fleet.claims.init",
         coverage: "operator" as const,
+        cacheable: false,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Point this workshop at the per-fleet claims repository (RFC-1124). Writes werkstatt.fleet.json and clones/inits the local claims repo. Idempotent. Required flags: `--remote`.",

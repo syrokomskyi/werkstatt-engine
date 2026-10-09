@@ -9,11 +9,12 @@ With --amend: update pin and open amend mission without creating a new registry 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0354: initial register command handler.</item>
   <item>RFC-0532: extend with pin creation, content stubs, mission.open, mission.materialize, --amend/--amend-id flags, and atomic rollback.</item>
   <item>RFC-0561: add --owner flag for VC subject id (did:web) on new registration and amend backfill.</item>
   <item>RFC-0902: reject TLD-suffixed IDs before writing any files.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>RFC-0354</history>
 </CHANGE_SUMMARY>
 */
 
@@ -41,6 +42,7 @@ import { runMissionOpen } from "../mission/mission-open.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface SternsystemRegisterData {
   command: "sternsystem.register";
@@ -229,6 +231,7 @@ export async function runSternsystemRegister(
         firstMissionId: missionId,
         diagnostics,
       },
+      exitCode: 0,
       summary: `[sternsystem.register] amended '${id}' — mission ${missionId} opened and materialized`,
       nextSteps: [
         {
@@ -411,6 +414,7 @@ export async function runSternsystemRegister(
         firstMissionId: missionId,
         diagnostics,
       },
+      exitCode: 0,
       summary: `[sternsystem.register] ${id} registered with cosmicStar ${cosmicStar} — mission ${missionId} materialized`,
       nextSteps: [
         {
@@ -450,14 +454,15 @@ export async function runSternsystemRegister(
     );
 
     return {
+      ...failResult("sternsystem.register", [
+        `[sternsystem.register] ${id} failed and rolled back: ${error instanceof Error ? error.message : String(error)}`,
+      ]),
       data: {
         command: "sternsystem.register",
         system: id,
         status: "fail",
         diagnostics,
       },
-      exitCode: 1,
-      summary: `[sternsystem.register] ${id} failed and rolled back: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }

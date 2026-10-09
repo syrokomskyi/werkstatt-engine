@@ -12,6 +12,7 @@ per-validator status for a mission.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1028: initial implementation — readValidationState + cache list() for inspection.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -63,6 +64,7 @@ export async function runValidationStateInspect(
     return {
       data,
       exitCode: 0,
+      summary: "[validation.state.inspect] Done",
     };
   } finally {
     await cache.close();

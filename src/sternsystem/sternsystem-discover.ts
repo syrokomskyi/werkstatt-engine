@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0790: initial discover command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -56,6 +57,7 @@ export async function runSternsystemDiscover(
 
   return {
     data: { systems: summary, errors, count: summary.length },
+    exitCode: 0,
     summary: `[sternsystem.discover] ${summary.length} system${summary.length === 1 ? "" : "s"} discovered${errors.length > 0 ? `, ${errors.length} error${errors.length === 1 ? "" : "s"}` : ""}`,
     nextSteps: [
       {

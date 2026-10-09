@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0473: initial bordbuch.status command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -64,6 +65,7 @@ export async function runBordbuchStatus(
       openEscalations,
       latestDeploy,
     },
+    exitCode: 0,
     summary: `[bordbuch.status] ${systemId}: ${entries.length} entries, ${openEscalations.length} open escalation(s)`,
     nextSteps:
       openEscalations.length > 0

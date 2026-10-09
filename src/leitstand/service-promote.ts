@@ -9,11 +9,12 @@ lock, wrangler deploy, health check, and prod state recording.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0806: initial promote command handler (replaces leitstand.service.deploy).</item>
   <item>RFC-0829: add test evidence gate (L1+L2+L5) via shared runTestEvidenceGate helper; throw after grace period if git HEAD unresolvable.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures surface through logger.warn via onSigningFailure</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>RFC-0806</history>
 </CHANGE_SUMMARY>
 */
 
@@ -186,7 +187,7 @@ export async function runLeitstandServicePromote(
         commitSha = headResult.stdout.trim();
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        const { GRACE_PERIOD_END } = await import("./test-evidence-gate.js");
+        const { GRACE_PERIOD_END } = await import("./test-evidence-gate.ts");
         if (new Date().toISOString() < GRACE_PERIOD_END) {
           logger.warn(
             `[leitstand.service.promote] could not resolve git HEAD — skipping test evidence gate: ${errMsg}`,
@@ -198,7 +199,7 @@ export async function runLeitstandServicePromote(
         }
       }
       if (commitSha) {
-        const { runTestEvidenceGate } = await import("./test-evidence-gate.js");
+        const { runTestEvidenceGate } = await import("./test-evidence-gate.ts");
         await runTestEvidenceGate({
           workspaceRoot,
           commandName: "leitstand.service.promote",

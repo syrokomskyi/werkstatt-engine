@@ -9,6 +9,7 @@ registry for id uniqueness, RFC-id ordering, and test coverage.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0479: initial migrator.registry.validate command.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -19,6 +20,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { migratorRegistry, numericRfcId, allMigratorIds } from "../migrators/registry.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface MigratorRegistryValidateData {
   migratorCount: number;
@@ -71,15 +73,17 @@ export async function runMigratorRegistryValidate(
       logger.error(`  ${v}`);
     }
     return {
+      ...failResult("migrator.registry.validate", [
+        `[migrator.registry.validate] ${violations.length} violation${violations.length === 1 ? "" : "s"}`,
+      ]),
       data: { migratorCount: migratorRegistry.length, violations },
-      exitCode: 1,
-      summary: `[migrator.registry.validate] ${violations.length} violation${violations.length === 1 ? "" : "s"}`,
     };
   }
 
   logger.success("[migrator.registry.validate] OK — no violations");
   return {
     data: { migratorCount: migratorRegistry.length, violations: [] },
+    exitCode: 0,
     summary: "[migrator.registry.validate] OK — no violations",
   };
 }

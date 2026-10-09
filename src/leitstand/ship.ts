@@ -8,7 +8,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>warpgogol-m000175 fo-fix: archive-aware mission resolution via resolveMissionDir (deferred-release flow — ship works on missions/archive/&lt;state&gt;/&lt;id&gt;); closed-state env check accepts cache-clone .env (RFC-0822); stripped-node_modules preflight warning; explicit mission-not-found error replaces misleading .env failure.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
@@ -17,7 +16,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1217: preflight unreconciled-workpiece gate — cache-side `git fetch <workpieceDir> <branch>` + `rev-list HEAD..FETCH_HEAD` blocks ship when the workpiece carries commits the cache clone has not merged (the exact range fetch-and-merge would pull). Open missions only (closed-mission plans skip reconcile, so there is no merge to predict); git-unreadable degrades to a warning; --allow-unreconciled is the manual-merge escape hatch.</item>
   <item>RFC-1219: --resume logs the interrupted failed step (status/failedStep from findIncompleteOperation); formatShipTransition renders op-interrupted as "[ship] interrupted at step — run with --resume" for live followers.</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, warpgogol-m000175</history>
 </CHANGE_SUMMARY>
 */
 
@@ -165,7 +165,11 @@ async function runShipPhase(
       if (flagName && !validFlags.has(flagName)) {
         const msg = `Unknown flag "--${flagName}" for command "${commandName}" (called from leitstand.ship). Valid flags: ${[...validFlags].sort().join(", ")}`;
         ctx.logger.info(`  [ship] ${msg}`);
-        return { exitCode: 1, summary: msg };
+        const failed: { exitCode: number; data?: Record<string, unknown>; summary?: string } = {
+          exitCode: 1,
+          summary: msg,
+        };
+        return failed;
       }
     }
   }

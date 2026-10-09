@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0558: initial identity.bootstrap command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -106,6 +107,6 @@ export async function runIdentityBootstrap(
       privateKeyHex: keypair.privateKeyHex,
     },
     exitCode: 0,
-    summary: "identity.bootstrap: keypair generated, self-ownership VC issued",
+    summary: "[identity.bootstrap] keypair generated, self-ownership VC issued",
   };
 }

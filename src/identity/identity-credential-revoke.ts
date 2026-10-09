@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0558: initial identity.credential.revoke command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -23,6 +24,7 @@ import {
   findCredential,
   isRevoked,
 } from "./identity-io.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface IdentityCredentialRevokeData {
   credentialId: string;
@@ -48,9 +50,8 @@ export async function runIdentityCredentialRevoke(
 
   if (!credential) {
     return {
+      ...failResult("identity.credential.revoke", [`credential '${credentialId}' not found`]),
       data: { credentialId, revoked: false },
-      exitCode: 1,
-      summary: `identity.credential.revoke: credential '${credentialId}' not found`,
     };
   }
 
@@ -58,7 +59,7 @@ export async function runIdentityCredentialRevoke(
     return {
       data: { credentialId, revoked: true },
       exitCode: 0,
-      summary: `identity.credential.revoke: credential '${credentialId}' already revoked`,
+      summary: `[identity.credential.revoke] credential '${credentialId}' already revoked`,
     };
   }
 
@@ -68,6 +69,6 @@ export async function runIdentityCredentialRevoke(
   return {
     data: { credentialId, revoked: true },
     exitCode: 0,
-    summary: `identity.credential.revoke: credential '${credentialId}' revoked`,
+    summary: `[identity.credential.revoke] credential '${credentialId}' revoked`,
   };
 }

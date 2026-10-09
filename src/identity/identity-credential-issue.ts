@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0558: initial identity.credential.issue command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -115,6 +116,6 @@ export async function runIdentityCredentialIssue(
       siteId,
     },
     exitCode: 0,
-    summary: `identity.credential.issue: ${credentialType} issued for ${subjectId}`,
+    summary: `[identity.credential.issue] ${credentialType} issued for ${subjectId}`,
   };
 }

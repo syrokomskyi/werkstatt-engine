@@ -24,6 +24,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -64,6 +65,7 @@ export async function buildWorkspaceTreeIndex(
   const exclude = new Set(excludeDirs ?? DEFAULT_EXCLUDE_DIRS);
   const index: WorkspaceTreeIndex = new Map();
 
+  // fs.walk.lint: allow â€” walks via WorkspaceIO abstraction (io.readdir) and builds a DirEntry tree index, not a path list
   async function walk(dir: string, io: WorkspaceIO = createDefaultIO().io): Promise<void> {
     let entries: DirEntry[];
     try {

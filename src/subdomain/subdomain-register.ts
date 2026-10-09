@@ -12,6 +12,7 @@ correct records, errors on mismatched records.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0752: initial subdomain.register command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -191,6 +192,7 @@ export async function runSubdomainRegister(
       workersRoute: routeResult,
       state,
     },
+    exitCode: 0,
     summary: `[subdomain.register] ${subdomain.domain}: ${state} (dns: ${dnsCreated ? "created" : "exists"}, route: ${routeCreated ? "created" : "exists"})`,
     nextSteps: [],
   };

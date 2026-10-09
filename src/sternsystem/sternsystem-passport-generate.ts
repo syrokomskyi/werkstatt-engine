@@ -11,6 +11,7 @@ signs with the creator's Ed25519 key (SIGNING_PRIVATE_KEY env var).</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0966: initial passport generate command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -129,6 +130,7 @@ export async function runSternsystemPassportGenerate(
         creator: creatorIdentity,
         generated: false,
       },
+      exitCode: 0,
       summary: `[sternsystem.passport.generate] ${systemId} passport unchanged — skipped (DNA-58 byte-stability)`,
     };
   }
@@ -159,6 +161,7 @@ export async function runSternsystemPassportGenerate(
       creator: creatorIdentity,
       generated: true,
     },
+    exitCode: 0,
     summary: `[sternsystem.passport.generate] ${systemId} passport signed by ${creatorIdentity}`,
   };
 }

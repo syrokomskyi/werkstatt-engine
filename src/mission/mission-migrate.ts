@@ -13,6 +13,7 @@ the cursor, and writes a migration report to evidence/.</purpose>
   <item>RFC-0479: initial mission.migrate command handler.</item>
   <item>RFC-0580: auto-commit werkstatt side-effects (mission.yaml) after writeMissionManifest.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -126,6 +127,7 @@ export async function runMissionMigrate(
           blockReason: null,
           migratedAt: new Date().toISOString(),
         },
+        exitCode: 0,
         summary: `[mission.migrate] ${missionId} report-only: ${toApply.length} pending`,
         nextSteps: [
           {
@@ -277,6 +279,7 @@ export async function runMissionMigrate(
         blockReason: null,
         migratedAt: now,
       },
+      exitCode: 0,
       summary: `[mission.migrate] ${missionId} — ${appliedMigrators.length} migrator(s) applied`,
       nextSteps: [
         {

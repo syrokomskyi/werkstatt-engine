@@ -10,6 +10,7 @@
   <item>RFC-0478: initial platform.consistency.validate command handler.</item>
   <item>RFC-0533: add PC-04 rule — CI-side check for X-Platform-Bump trailers on platform-scope commits.</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -92,11 +93,14 @@ async function findRfcsWithVersionBump(
 }
 
 /**
- * RFC-0533 PC-04: the commit SHA that introduced the PC-04 rule.
- * Commits before this SHA are exempt — the rule is not retroactive.
- * Updated to the actual implementation commit SHA when the RFC is stamped.
+ * RFC-0533 PC-04: commits at-or-before this SHA are exempt — the rule is not
+ * retroactive. Set to the last commit before RFC-1249's platform-scope wave:
+ * the imported placeholder SHA (940c025cc) never existed in this repository's
+ * history, so the check silently scanned the whole rev-list. All pre-existing
+ * commits are grandfathered; platform-scope commits after this SHA must carry
+ * the X-Platform-Bump trailer via ecosystem.commit.
  */
-export const PC_04_CUTOFF_SHA = "940c025cc";
+export const PC_04_CUTOFF_SHA = "c11d62bfb";
 
 interface GitLogCommit {
   sha: string;
@@ -314,7 +318,7 @@ export async function runPlatformConsistencyValidate(
     data,
     exitCode: hasErrors ? 1 : 0,
     summary: hasErrors
-      ? `Platform consistency check failed with ${violations.filter((v) => v.severity === "error").length} error${violations.filter((v) => v.severity === "error").length === 1 ? "" : "s"}`
-      : "Platform consistency check passed",
+      ? `[platform.consistency] Platform consistency check failed with ${violations.filter((v) => v.severity === "error").length} error${violations.filter((v) => v.severity === "error").length === 1 ? "" : "s"}`
+      : "[platform.consistency] Platform consistency check passed",
   };
 }

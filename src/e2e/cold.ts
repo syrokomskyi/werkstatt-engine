@@ -20,6 +20,7 @@ members) to materialCreditLabelsSchema plus labelForMaterialCreditKind
 helper, so the public credits page renders localized kind labels instead
 of raw enum tokens. Seed the e2e cold-test labels fixture and cover the
 completeness gate with schema tests.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -33,6 +34,7 @@ import type {
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -144,7 +146,7 @@ async function runSubCommand(
   if (exitCode !== 0) {
     throw new Error(`${commandName} failed: ${result.summary ?? "unknown error"}`);
   }
-  return { exitCode, summary: result.summary };
+  return { exitCode: exitCode, summary: result.summary };
 }
 
 /**
@@ -190,6 +192,13 @@ export async function runColdE2e(
     if (statusOutput.stdout.trim().length > 0) {
       return {
         exitCode: 1,
+        summary: "[werkstatt.e2e.cold] preflight failed: dirty working tree",
+        nextSteps: [
+          {
+            action: "[werkstatt.e2e.cold] preflight failed: dirty working tree",
+            kind: "required" as const,
+          },
+        ],
         data: {
           command: "werkstatt.e2e.cold",
           coldRoot: "",
@@ -202,12 +211,18 @@ export async function runColdE2e(
           summary:
             "[werkstatt.e2e.cold] preflight failed: working tree is dirty — commit or stash changes before running",
         },
-        summary: "[werkstatt.e2e.cold] preflight failed: dirty working tree",
       };
     }
   } catch (err) {
     return {
       exitCode: 1,
+      summary: "[werkstatt.e2e.cold] preflight failed: git status error",
+      nextSteps: [
+        {
+          action: "[werkstatt.e2e.cold] preflight failed: git status error",
+          kind: "required" as const,
+        },
+      ],
       data: {
         command: "werkstatt.e2e.cold",
         coldRoot: "",
@@ -219,7 +234,6 @@ export async function runColdE2e(
         withDeploy,
         summary: `[werkstatt.e2e.cold] preflight failed: git status check error — ${err instanceof Error ? err.message : String(err)}`,
       },
-      summary: "[werkstatt.e2e.cold] preflight failed: git status error",
     };
   }
 
@@ -818,9 +832,8 @@ legalJurisdiction: DE
     if (!allOk || interventions > 0) {
       // Keep temp dir on failure for debugging
       return {
-        exitCode: 1,
+        ...failResult("cold", ["cold failed"]),
         data: report,
-        summary: report.summary,
       };
     }
 
@@ -853,9 +866,8 @@ legalJurisdiction: DE
     };
 
     return {
-      exitCode: 1,
+      ...failResult("cold", ["cold failed"]),
       data: report,
-      summary: report.summary,
     };
   }
 }

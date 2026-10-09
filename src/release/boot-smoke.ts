@@ -8,12 +8,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0978: extract detectBootSmokeLanguages helper for dynamic language detection from dist/client/.</item>
   <item>RFC-0979: add --wrangler-config and --languages flags to runBootSmokeCommand, implement wrangler config fallback resolution, write boot-smoke.json to dist directory.</item>
   <item>ADR-0067: extract buildMiniflareOptions from runBootSmoke for unit testability of Miniflare options construction without a real runtime.</item>
   <item>ADR-0068: remove unused resolvedWorkerPath field from MiniflareOptionsResult interface and buildMiniflareOptions return value — the field was never consumed by the caller.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>RFC-0961</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>RFC-0961, RFC-0978</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
@@ -628,6 +628,9 @@ export async function runBootSmokeCommand(
 
   if (!siteId) {
     return {
+      exitCode: 1,
+      summary: "[release.boot-smoke] --site is required",
+      nextSteps: [{ action: "[release.boot-smoke] --site is required", kind: "required" as const }],
       data: {
         booted: false,
         requests: 0,
@@ -636,8 +639,6 @@ export async function runBootSmokeCommand(
         missingBindings: [],
         bootError: "--site is required",
       },
-      exitCode: 1,
-      summary: "[release.boot-smoke] --site is required",
     };
   }
 
@@ -657,6 +658,14 @@ export async function runBootSmokeCommand(
 
   if (!(await context.io.exists(distDir))) {
     return {
+      exitCode: 1,
+      summary: `[release.boot-smoke] dist directory not found: ${distDir}`,
+      nextSteps: [
+        {
+          action: `[release.boot-smoke] dist directory not found: ${distDir}`,
+          kind: "required" as const,
+        },
+      ],
       data: {
         booted: false,
         requests: 0,
@@ -665,8 +674,6 @@ export async function runBootSmokeCommand(
         missingBindings: [],
         bootError: `dist directory not found: ${distDir}`,
       },
-      exitCode: 1,
-      summary: `[release.boot-smoke] dist directory not found: ${distDir}`,
     };
   }
 
@@ -679,6 +686,11 @@ export async function runBootSmokeCommand(
   );
   if (!wranglerResolution) {
     return {
+      exitCode: 1,
+      summary: `[release.boot-smoke] wrangler config not found`,
+      nextSteps: [
+        { action: `[release.boot-smoke] wrangler config not found`, kind: "required" as const },
+      ],
       data: {
         booted: false,
         requests: 0,
@@ -687,8 +699,6 @@ export async function runBootSmokeCommand(
         missingBindings: [],
         bootError: `wrangler config not found — tried ${path.join(distDir, "server", "wrangler.json")}, ${path.join(distDir, "..", "wrangler.jsonc")}, ${path.join(workspaceRoot, "missions", "workpiece", "wrangler.jsonc")}`,
       },
-      exitCode: 1,
-      summary: `[release.boot-smoke] wrangler config not found`,
     };
   }
   const { wranglerConfigPath, bootSmokeDistDir } = wranglerResolution;
@@ -764,6 +774,7 @@ export async function runBootSmokeCommand(
 
   return {
     data,
+    exitCode: 0,
     summary: `[release.boot-smoke] worker booted, ${result.requests.length}/${result.requests.length} representative requests ok, egress clean`,
   };
 }

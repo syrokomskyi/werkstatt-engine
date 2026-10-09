@@ -13,6 +13,7 @@ from Cloudflare by record ID or by name+type. Requires --record-id or
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial dns.record.delete command handler.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -98,6 +99,7 @@ export async function runDnsRecordDelete(
           deleted: [],
           state: "not-found",
         },
+        exitCode: 0,
         summary: `[dns.record.delete] ${systemId}: no records found for ${recordType}:${name}`,
         nextSteps: [
           {
@@ -127,6 +129,7 @@ export async function runDnsRecordDelete(
       deleted,
       state: dryRun ? "dry-run" : "deleted",
     },
+    exitCode: 0,
     summary: `[dns.record.delete] ${systemId}: ${deleted.length} record(s) ${dryRun ? "would be deleted" : "deleted"} in zone ${zoneDomain}`,
     nextSteps: dryRun
       ? [

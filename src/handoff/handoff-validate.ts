@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0221: initial bundle validator.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -90,5 +91,9 @@ export async function runHandoffValidate(
   }
 
   logger.success("[handoff.validate] bundle integrity OK");
-  return { data, summary: `[handoff.validate] OK — ${manifest.entries.length} entries verified` };
+  return {
+    data,
+    exitCode: 0,
+    summary: `[handoff.validate] OK — ${manifest.entries.length} entries verified`,
+  };
 }

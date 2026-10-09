@@ -9,6 +9,7 @@ handover by removing the authorization file and clearing the HANDOVER-01 block.<
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover cancel command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -73,6 +74,7 @@ export async function runSternsystemHandoverCancel(
         systemId,
         cancelled,
       },
+      exitCode: 0,
       summary: cancelled
         ? `[sternsystem.handover.cancel] ${systemId} handover cancelled`
         : `[sternsystem.handover.cancel] ${systemId} no pending handover`,

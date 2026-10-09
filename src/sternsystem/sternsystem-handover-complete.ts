@@ -13,6 +13,7 @@ the authorization file.</purpose>
   <item>RFC-0968: initial handover complete command handler.</item>
   <item>RFC-0988: add --dry-run and --authorization-data flags — verify authorization in memory, return preview data, skip all writes.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -243,6 +244,7 @@ export async function runSternsystemHandoverComplete(
             newOwner: authorization.payload.recipient.identity,
           },
         },
+        exitCode: 0,
         summary: `[sternsystem.handover.complete] ${systemId} dry-run: handover verified (no files written)`,
       };
     }
@@ -387,6 +389,7 @@ export async function runSternsystemHandoverComplete(
         ...result,
         dryRun: false,
       },
+      exitCode: 0,
       summary: `[sternsystem.handover.complete] ${systemId} handed over from ${result.previousCreator} to ${result.newCreator}, passport regenerated, bordbuch updated, ownership registry synced`,
     };
   } finally {

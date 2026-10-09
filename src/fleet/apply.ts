@@ -16,6 +16,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0964: initial fleet.apply implementation — wave orchestration, concurrency, stop-threshold, journal, report.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,6 +38,7 @@ import {
 import { appendRecord, readJournal } from "../journal/jsonl.ts";
 import type { FleetSiteRecord } from "./fleet-sites-generate.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 const FLEET_SITES_FILE = "fleet/fleet.sites.yaml";
 const FLEET_OPERATIONS_DIR = "fleet/operations";
@@ -176,7 +178,11 @@ async function runOneSite(
     if (requiresMission) {
       const missionId = await resolveMissionForSite(workspaceRoot, siteId);
       if (!missionId) {
-        return { exitCode: -1, error: "skipped(precondition): no active mission" };
+        const skipped: { exitCode: number; error?: string } = {
+          exitCode: -1,
+          error: "skipped(precondition): no active mission",
+        };
+        return skipped;
       }
       baseFlags.mission = missionId;
     }
@@ -203,7 +209,11 @@ async function runOneSite(
       return { exitCode };
     }
   } catch (err) {
-    return { exitCode: 1, error: err instanceof Error ? err.message : String(err) };
+    const failed: { exitCode: number; error?: string } = {
+      exitCode: 1,
+      error: err instanceof Error ? err.message : String(err),
+    };
+    return failed;
   }
 }
 
@@ -295,6 +305,7 @@ async function runWave(
           exitCode: result.exitCode,
           durationMs,
           error: result.error,
+          summary: "[apply] Done",
         } as FleetApplyReportEntry;
       }),
     );
@@ -348,8 +359,7 @@ export async function runFleetApply(
   const runSpec = flagString(input, "run");
   if (!runSpec) {
     return {
-      exitCode: 1,
-      summary: "fleet.apply: --run flag is required",
+      ...failResult("fleet.apply", ["--run flag is required"]),
       data: { error: "missing --run flag" },
     };
   }
@@ -380,8 +390,7 @@ export async function runFleetApply(
     sites = sites.filter((s) => requested.has(s.id));
   } else if (!allSites) {
     return {
-      exitCode: 1,
-      summary: "fleet.apply: must specify --all-sites or --sites <list>",
+      ...failResult("fleet.apply", ["must specify --all-sites or --sites <list>"]),
       data: { error: "no site selection" },
     };
   }
@@ -402,7 +411,7 @@ export async function runFleetApply(
     };
     return {
       exitCode: 0,
-      summary: "fleet.apply: 0 sites",
+      summary: "[fleet.apply] 0 sites",
       data: result,
     };
   }
@@ -439,7 +448,7 @@ export async function runFleetApply(
     };
     return {
       exitCode: 0,
-      summary: "fleet.apply: 0 canary sites",
+      summary: "[fleet.apply] 0 canary sites",
       data: result,
     };
   }
@@ -578,7 +587,7 @@ export async function runFleetApply(
 
   return {
     exitCode: result.exitCode,
-    summary: `fleet.apply: ${ok} ok, ${failed} failed, ${skipped} skipped (opId: ${opId})`,
+    summary: `[fleet.apply] ${ok} ok, ${failed} failed, ${skipped} skipped (opId: ${opId})`,
     data: result,
   };
 }

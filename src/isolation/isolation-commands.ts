@@ -9,7 +9,8 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-1035: initial implementation — 6 isolation command handlers.</item>
+  <item>RFC-1035: initial implementation — 6 isolation command handlers.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -31,6 +32,7 @@ import {
 import type { IsolationManager, IsolationPolicy, SandboxHandle } from "./contracts.ts";
 import { createFakeSandboxAdapter } from "./providers/fake-sandbox.ts";
 import { appendBordbuchEntry } from "../bordbuch/bordbuch-io.ts";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 let manager: IsolationManager | null = null;
 
@@ -120,12 +122,14 @@ export async function runTierInspect(
     const tier = mgr.getTier(componentId);
     return {
       data: { components: [{ componentId, tier }] },
-      summary: `Component ${componentId} is at tier ${tier}`,
+      exitCode: 0,
+      summary: `[isolation.commands] Component ${componentId} is at tier ${tier}`,
     };
   }
   return {
     data: { components: [] },
-    summary: "No components registered",
+    exitCode: 0,
+    summary: "[isolation.commands] No components registered",
   };
 }
 
@@ -144,10 +148,7 @@ export async function runTierAssign(
       summary: `Assigned ${componentId} to tier ${tier}`,
     };
   } catch (err) {
-    return {
-      exitCode: 1,
-      summary: `Failed to assign tier: ${(err as Error).message}`,
-    };
+    return failResult("isolation.commands", [`Failed to assign tier: ${(err as Error).message}`]);
   }
 }
 
@@ -173,10 +174,7 @@ export async function runSandboxSpawn(
       summary: `Spawned sandbox ${handle.sandboxId} at tier ${tier}`,
     };
   } catch (err) {
-    return {
-      exitCode: 1,
-      summary: `Spawn failed: ${(err as Error).message}`,
-    };
+    return failResult("isolation.commands", [`Spawn failed: ${(err as Error).message}`]);
   }
 }
 
@@ -188,14 +186,12 @@ export async function runSandboxInspect(
   const sandboxId = flagString(input, "sandbox-id");
   const handle = mgr.inspect(sandboxId);
   if (!handle) {
-    return {
-      exitCode: 1,
-      summary: `Sandbox ${sandboxId} not found`,
-    };
+    return failResult("isolation.commands", [`Sandbox ${sandboxId} not found`]);
   }
   return {
     data: handle as SandboxHandle,
-    summary: `Sandbox ${sandboxId}: state=${handle.state}, tier=${handle.tier}`,
+    exitCode: 0,
+    summary: `[isolation.commands] Sandbox ${sandboxId}: state=${handle.state}, tier=${handle.tier}`,
   };
 }
 
@@ -210,10 +206,7 @@ export async function runSandboxTerminate(
   try {
     const handle = mgr.inspect(sandboxId);
     if (!handle) {
-      return {
-        exitCode: 1,
-        summary: `Sandbox ${sandboxId} not found`,
-      };
+      return failResult("isolation.commands", [`Sandbox ${sandboxId} not found`]);
     }
     await mgr.terminate(sandboxId, reason);
     recordIsolationEvent(context, {
@@ -228,10 +221,7 @@ export async function runSandboxTerminate(
       summary: `Terminated sandbox ${sandboxId}`,
     };
   } catch (err) {
-    return {
-      exitCode: 1,
-      summary: `Terminate failed: ${(err as Error).message}`,
-    };
+    return failResult("isolation.commands", [`Terminate failed: ${(err as Error).message}`]);
   }
 }
 
@@ -243,13 +233,11 @@ export async function runCapabilityBridge(
   const mgr = getManager();
   const handle = mgr.inspect(sandboxId);
   if (!handle) {
-    return {
-      exitCode: 1,
-      summary: `Sandbox ${sandboxId} not found`,
-    };
+    return failResult("isolation.commands", [`Sandbox ${sandboxId} not found`]);
   }
   return {
     data: { sandboxId, bridgeId: `bridge-${sandboxId}` },
-    summary: `Capability bridge created for ${sandboxId}`,
+    exitCode: 0,
+    summary: `[isolation.commands] Capability bridge created for ${sandboxId}`,
   };
 }

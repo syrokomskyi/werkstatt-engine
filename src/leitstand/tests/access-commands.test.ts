@@ -4,6 +4,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0899: Initial access status command tests.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -16,7 +17,7 @@ vi.mock("../../sternsystem/registry-io.ts", () => ({
   writeSystemState: vi.fn(),
 }));
 
-const { runLeitstandAccessStatus } = await import("../access-commands");
+const { runLeitstandAccessStatus } = await import("../access-commands.ts");
 const { readSystemStateSmart } = await import("../../sternsystem/registry-io.ts");
 
 function makeInput(flags: Record<string, unknown>) {

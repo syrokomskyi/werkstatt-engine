@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0356: initial sternsystem.extract command handler.</item>
   <item>RFC-0381: schema-compliant pin generation using shared pin-helpers; case-insensitive RFC regex; resolve ecosystem metadata.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -171,6 +172,7 @@ export async function runSternsystemExtract(
 
     return {
       data: { appId: siteId, systemId: siteId, mirrors, extractedAt: now, pinVersion },
+      exitCode: 0,
       summary: `[sternsystem.extract] extracted ${siteId} to ${mirrors[0].path}`,
     };
   } finally {

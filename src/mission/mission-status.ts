@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0355: initial mission.status command handler.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -58,6 +59,7 @@ export async function runMissionStatus(
       bordbuchEntries: missionEntries.length,
       bordbuch: missionEntries as Array<Record<string, unknown>>,
     },
+    exitCode: 0,
     summary: `[mission.status] ${missionId}: state=${manifest.state}, ${missionEntries.length} Bordbuch entries`,
     nextSteps:
       manifest.state === "open"

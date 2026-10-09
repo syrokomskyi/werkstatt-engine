@@ -10,6 +10,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1030: initial implementation — 5 reflection command handlers.</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -58,7 +59,7 @@ export function runReflectGraph(
   return {
     data: reflection,
     exitCode: 0,
-    summary: `Reflected ${reflection.components.length} components`,
+    summary: `[reflection.commands] Reflected ${reflection.components.length} components`,
   };
 }
 
@@ -69,7 +70,11 @@ export function runReflectCapabilities(
   const { reflectionInput } = parseContext(context);
   const catalog = createCapabilityCatalog(reflectionInput);
   assertNoForbiddenFields(catalog);
-  return { data: catalog, exitCode: 0, summary: `Catalog has ${catalog.entries.length} entries` };
+  return {
+    data: catalog,
+    exitCode: 0,
+    summary: `[reflection.commands] Catalog has ${catalog.entries.length} entries`,
+  };
 }
 
 export function runReflectHealth(
@@ -85,7 +90,7 @@ export function runReflectHealth(
   return {
     data: { ...reflection, components: healthResults as never },
     exitCode: 0,
-    summary: `Health checked ${healthResults.length} components`,
+    summary: `[reflection.commands] Health checked ${healthResults.length} components`,
   };
 }
 
@@ -99,7 +104,11 @@ export function runReflectFibers(
     componentId: c.componentId,
     fiberState: c.fiberState,
   }));
-  return { data: fibers, exitCode: 0, summary: `${fibers.length} fiber states` };
+  return {
+    data: fibers,
+    exitCode: 0,
+    summary: `[reflection.commands] ${fibers.length} fiber states`,
+  };
 }
 
 export async function runReflectCatalogGenerate(
@@ -117,7 +126,7 @@ export async function runReflectCatalogGenerate(
   return {
     data: { path: "docs/runtime-catalog.generated.yaml" },
     exitCode: 0,
-    summary: `Catalog written to docs/runtime-catalog.generated.yaml (${catalog.entries.length} entries)`,
+    summary: `[reflection.commands] Catalog written to docs/runtime-catalog.generated.yaml (${catalog.entries.length} entries)`,
   };
 }
 

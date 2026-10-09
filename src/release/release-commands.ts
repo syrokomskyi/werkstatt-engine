@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0948: add entitlement diff logging — compares workpiece entitlements against previous release and logs added/removed features.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: bootSmokeAppliesToAdapter resolves the adapter and reads bootSmokeCapable() — new static adapters opt out in their own file; unknown names keep boot-smoke (strict default).</item>
-  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931</history>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931, RFC-0948</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
@@ -106,6 +106,7 @@ import {
 } from "@warpgogol/werkstatt-shared/ontology/operations";
 import type { ReleaseArtifactRef } from "@warpgogol/werkstatt-shared/ontology/operations";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -861,6 +862,7 @@ export async function runReleasePrepare(
           buildReused,
           bootSmokeVerdict,
         },
+        exitCode: 0,
         summary: `[release.prepare] ${releaseId} prepared (snapshot diff: ${snapshotDiffVerdict}, C-surface: ${cSurfaceVerdict}, boot-smoke: ${bootSmokeVerdict})`,
         nextSteps: [
           {
@@ -1026,6 +1028,7 @@ export async function runReleaseReady(
         distArtifactHash: manifest.distArtifactHash ?? null,
         distVerified: true,
       },
+      exitCode: 0,
       summary: `[release.ready] ${releaseId} marked ready`,
       nextSteps: [
         {
@@ -1063,6 +1066,7 @@ export async function runReleaseValidate(
   if (!manifestFound) {
     logger.error(`[release.validate] release '${releaseId}' not found`);
     return {
+      ...failResult("release.commands", ["release.commands failed"]),
       data: {
         releaseId,
         manifestFound,
@@ -1070,7 +1074,6 @@ export async function runReleaseValidate(
         snapshotDiffVerdict: "fail",
         artifactPresent: false,
       },
-      exitCode: 1,
     };
   }
 
@@ -1100,6 +1103,7 @@ export async function runReleaseValidate(
       snapshotDiffVerdict: manifest.snapshotDiffVerdict,
       artifactPresent,
     },
+    exitCode: 0,
     summary: `[release.validate] ${releaseId} valid (state: ${manifest.state})`,
     nextSteps:
       manifest.state === "prepared"
@@ -1138,6 +1142,7 @@ export async function runReleaseList(
   if (!(await context.io.exists(releasesDir))) {
     return {
       data: { releases: [], count: 0, legacyInvalid: [] },
+      exitCode: 0,
       summary: `[release.list] 0 releases`,
     };
   }
@@ -1172,6 +1177,7 @@ export async function runReleaseList(
   logger.info(`  Found ${releases.length} valid releases, ${legacyInvalid.length} legacy invalid`);
   return {
     data: { releases, count: releases.length, legacyInvalid },
+    exitCode: 0,
     summary: `[release.list] ${releases.length} releases (${legacyInvalid.length} legacy invalid)`,
   };
 }
@@ -1539,6 +1545,9 @@ export async function runDistDeterminismValidate(
       distPath = distributionDist;
     } else {
       return {
+        ...failResult("release.commands", [
+          `[dist.determinism.validate] no dist directory found for mission '${missionId}'`,
+        ]),
         data: {
           distPath: "",
           stableHash: "",
@@ -1547,14 +1556,15 @@ export async function runDistDeterminismValidate(
           nonDeterministicFiles: [],
           totalFiles: 0,
         },
-        exitCode: 1,
-        summary: `[dist.determinism.validate] no dist directory found for mission '${missionId}'`,
       };
     }
   }
 
   if (!(await context.io.exists(distPath))) {
     return {
+      ...failResult("release.commands", [
+        `[dist.determinism.validate] dist directory does not exist: ${distPath}`,
+      ]),
       data: {
         distPath,
         stableHash: "",
@@ -1563,8 +1573,6 @@ export async function runDistDeterminismValidate(
         nonDeterministicFiles: [],
         totalFiles: 0,
       },
-      exitCode: 1,
-      summary: `[dist.determinism.validate] dist directory does not exist: ${distPath}`,
     };
   }
 
@@ -1729,6 +1737,7 @@ export async function runReleaseSign(
 
   return {
     data,
+    exitCode: 0,
     summary: `[release.sign] ${releaseId}: build-identity.json signed${signResult.reusedExistingSignature ? " (reused existing signature)" : ""}, release-pubkey.json written${signedManifestProduced ? ", signed-manifest.json produced" : ""}`,
   };
 }

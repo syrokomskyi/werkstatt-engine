@@ -15,6 +15,7 @@ pass/fail status with restore commands for missing files.
 <CHANGE_SUMMARY>
   <item>RFC-0844: initial workpiece.config.presence.check command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
 </CHANGE_SUMMARY>
 */
 
@@ -72,6 +73,14 @@ export async function runWorkpieceConfigPresenceCheck(
 
   if (!(await context.io.exists(workpieceDir))) {
     return {
+      exitCode: 1,
+      summary: `[workpiece.config.presence.check] Workpiece directory not found: missions/${missionId}/workpiece/`,
+      nextSteps: [
+        {
+          action: `[workpiece.config.presence.check] Workpiece directory not found: missions/${missionId}/workpiece/`,
+          kind: "required" as const,
+        },
+      ],
       data: {
         command: "workpiece.config.presence.check",
         status: "fail",
@@ -79,8 +88,6 @@ export async function runWorkpieceConfigPresenceCheck(
         missing: [],
         present: [],
       },
-      exitCode: 1,
-      summary: `Workpiece directory not found: missions/${missionId}/workpiece/`,
     };
   }
 
@@ -113,7 +120,7 @@ export async function runWorkpieceConfigPresenceCheck(
     exitCode: missing.length > 0 ? 1 : 0,
     summary:
       missing.length > 0
-        ? `Missing operator config files: ${missing.map((m) => m.file).join(", ")}`
-        : "All operator config files present",
+        ? `[workpiece.config.presence.check] Missing operator config files: ${missing.map((m) => m.file).join(", ")}`
+        : "[workpiece.config.presence.check] All operator config files present",
   };
 }
