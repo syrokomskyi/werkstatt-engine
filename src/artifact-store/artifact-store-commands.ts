@@ -6,11 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0363: initial artifact store command handlers.</item>
   <item>RFC-0587: tar.gz archive creation, idempotent manifest storage, rehydrate extraction.</item>
   <item>RFC-0596: extract lock-free storeArtifactCore from runArtifactStorePut; fix systemId derivation bug (split("-m") → release manifest systemId).</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
+  <history>RFC-0363</history>
 </CHANGE_SUMMARY>
 */
 
@@ -25,7 +26,7 @@ import type {
 import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
@@ -396,7 +397,7 @@ export async function runArtifactStoreValidate(
   if (!manifestFound) {
     logger.error(`[artifact.store.validate] no artifact found for release ${releaseId}`);
     return {
-      ...failResult("artifact.store.commands", ["artifact.store.commands failed"]),
+      ...failResult("artifact.store.commands", [`no artifact found for release ${releaseId}`]),
       data: { releaseId, manifestFound, hashVerified, treeHashVerified },
     };
   }

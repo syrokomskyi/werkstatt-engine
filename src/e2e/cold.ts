@@ -21,6 +21,7 @@ helper, so the public credits page renders localized kind labels instead
 of raw enum tokens. Seed the e2e cold-test labels fixture and cover the
 completeness gate with schema tests.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -832,7 +833,7 @@ legalJurisdiction: DE
     if (!allOk || interventions > 0) {
       // Keep temp dir on failure for debugging
       return {
-        ...failResult("cold", ["cold failed"]),
+        ...failResult("cold", [report.summary]),
         data: report,
       };
     }
@@ -866,7 +867,7 @@ legalJurisdiction: DE
     };
 
     return {
-      ...failResult("cold", ["cold failed"]),
+      ...failResult("cold", [errorMsg]),
       data: report,
     };
   }
