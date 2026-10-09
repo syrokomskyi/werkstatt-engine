@@ -126,6 +126,8 @@ export async function createDhtModule(): Promise<ModuleExport> {
       },
       {
         name: "dht.capacity.publish",
+        coverage: "operator",
+        coverageNote: "DHT capacity publication",
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
         generates: [],

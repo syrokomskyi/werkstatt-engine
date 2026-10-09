@@ -286,6 +286,66 @@ test("CMD-MAN-04: identical declarations across providers dedup to one entry", a
   }
 });
 
+test("RFC-1243: coverage/coverageNote project into the manifest entry", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    const manifest = await buildCommandManifest(root, {
+      "fixture-site": async () =>
+        siteModuleFixture({
+          commands: [
+            {
+              name: "site.covered.command",
+              modulePath: "test-site-module",
+              description: "coverage-declared command",
+              scope: "app",
+              coverage: "operator",
+              coverageNote: "runbook: operator-triggered repair",
+              execute() {
+                return { exitCode: 0 };
+              },
+            },
+          ],
+        }),
+    });
+    const entry = manifest.commands.find((c) => c.name === "site.covered.command");
+    expect(entry?.coverage).toBe("operator");
+    expect(entry?.coverageNote).toBe("runbook: operator-triggered repair");
+    const plain = manifest.commands.find((c) => c.name === "fixture.validate");
+    expect(plain?.coverage).toBeNull();
+    expect(plain?.coverageNote).toBeNull();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CMD-MAN-05: committed manifest with out-of-enum coverage fails", async () => {
+  const { root } = await fixtureWorkspace();
+  try {
+    await runCommandManifestGenerate(input, ctx(root));
+    const raw = await readFile(manifestFilePath(root), "utf8");
+    const mutated = yamlParse(raw);
+    // Simulate a hand-authored declaration carrying an illegal value — the
+    // committed YAML is untyped, so legality must be enforced at validate time.
+    mutated.commands[0].coverage = "internal-only";
+    await writeFile(manifestFilePath(root), yamlStringify(mutated), "utf8");
+
+    const result = await runCommandManifestValidate(input, ctx(root));
+    const diags = (result.data as { diagnostics: Array<{ ruleId: string; message: string }> })
+      .diagnostics;
+    expect(
+      diags.some(
+        (d) =>
+          d.ruleId === "CMD-MAN-05" &&
+          d.message.includes("internal-only") &&
+          d.message.includes(mutated.commands[0].name),
+      ),
+    ).toBeTruthy();
+    expect(result.exitCode).toBe(1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CMD-MAN-04: divergent same-name declarations fail closed", async () => {
   const { root } = await fixtureWorkspace();
   try {

@@ -38,6 +38,8 @@ export async function createHandoffModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "handoff.validate",
+        coverage: "operator",
+        coverageNote: "handoff bundle inspection — requires --bundle",
         mutatesState: false,
         contract: "handoff",
         rules: [],

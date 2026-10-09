@@ -64,6 +64,8 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.stack.health",
+        coverage: "operator",
+        coverageNote: "live SigNoz stack probe",
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
@@ -107,6 +109,8 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.probe.targets.generate",
+        coverage: "operator",
+        coverageNote: "fleet probe target regeneration",
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
           "Generate services/fleet-probe-runner/targets.generated.yaml from the workspace app origins and authored overrides (RFC-0341).",
@@ -141,6 +145,8 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.alerts.generate",
+        coverage: "operator",
+        coverageNote: "alert-rule regeneration for the observability stack",
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
           "Render authored alert rules and channels to docs/observability/alerts.generated.yaml (RFC-0342).",

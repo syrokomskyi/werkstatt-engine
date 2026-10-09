@@ -179,6 +179,8 @@ function commandInfo(
     ...(command.reads ? { reads: command.reads } : {}),
     ...(command.writes ? { writes: command.writes } : {}),
     ...(command.cacheable !== undefined ? { cacheable: command.cacheable } : {}),
+    ...(command.coverage ? { coverage: command.coverage } : {}),
+    ...(command.coverageNote ? { coverageNote: command.coverageNote } : {}),
     ...(command.gate ? { gate: command.gate } : {}),
     ...(command.validatesOutputs ? { validatesOutputs: command.validatesOutputs } : {}),
     ...(command.generates ? { generates: command.generates } : {}),

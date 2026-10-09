@@ -108,6 +108,8 @@ export async function createDeployModule(): Promise<ModuleExport> {
       },
       {
         name: "deploy.artifact.gc",
+        coverage: "operator",
+        coverageNote: "deploy artifact housekeeping",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
         description:

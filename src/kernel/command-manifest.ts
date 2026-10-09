@@ -40,6 +40,7 @@ import { listStaticCommandSurface } from "./runtime.ts";
 import type {
   CheckResult,
   Diagnostic,
+  KernelCommandCoverage,
   KernelCommandInput,
   KernelCommandResult,
   KernelFlagSpec,
@@ -61,6 +62,10 @@ export interface CommandManifestEntry {
   mutatesState: boolean;
   requiresNetwork: boolean;
   timeoutMs: number | null;
+  /** RFC-1243: reachability class declaration, null when undeclared. */
+  coverage: KernelCommandCoverage | null;
+  /** RFC-1243: invocation-surface note paired with `coverage`, null when absent. */
+  coverageNote: string | null;
   flags: Record<string, KernelFlagSpec>;
   reads: string[];
   writes: string[];
@@ -146,8 +151,39 @@ export function collectCommandManifestDiagnostics(
     }
   }
 
+  // RFC-1243 (CMD-MAN-05): coverage declarations must stay inside the enum.
+  // Checked on the committed file — it is the parsed (untyped) "manifest
+  // declaration"; code-side illegal values land here via generation anyway.
+  for (const entry of (committed.commands ?? []).map((command) => ({
+    command: command.name,
+    coverage: (command as { coverage?: unknown }).coverage,
+  }))) {
+    if (
+      entry.coverage !== null &&
+      entry.coverage !== undefined &&
+      !COMMAND_COVERAGE_VALUES.has(entry.coverage as KernelCommandCoverage)
+    ) {
+      diagnostics.push({
+        ruleId: "CMD-MAN-05",
+        severity: "error",
+        message:
+          `Command "${entry.command}" declares coverage "${String(entry.coverage)}" — ` +
+          `legal values are: ${[...COMMAND_COVERAGE_VALUES].join(", ")}.`,
+        fixHint:
+          "Set coverage to one of operator | ci | delegated, or remove it and wire the command into a reachable surface (RFC-1243).",
+        data: { command: entry.command, coverage: entry.coverage },
+      });
+    }
+  }
+
   return diagnostics;
 }
+
+const COMMAND_COVERAGE_VALUES: ReadonlySet<KernelCommandCoverage> = new Set([
+  "operator",
+  "ci",
+  "delegated",
+]);
 
 /** Builds the deterministic CommandManifest from the static command surface (RFC-1147). */
 export async function buildCommandManifest(
@@ -189,6 +225,8 @@ const SEMANTIC_FIELDS = [
   "mutatesState",
   "requiresNetwork",
   "timeoutMs",
+  "coverage",
+  "coverageNote",
   "flags",
   "reads",
   "writes",
@@ -218,6 +256,10 @@ function semanticFieldValue(command: KernelRegisteredCommandInfo, field: Semanti
       return command.requiresNetwork === true;
     case "timeoutMs":
       return command.timeoutMs ?? null;
+    case "coverage":
+      return command.coverage ?? null;
+    case "coverageNote":
+      return command.coverageNote ?? null;
     case "flags":
       return command.flags ?? {};
     case "reads":
@@ -292,6 +334,8 @@ function dedupCommandEntries(
       mutatesState: representative.mutatesState === true,
       requiresNetwork: representative.requiresNetwork === true,
       timeoutMs: representative.timeoutMs ?? null,
+      coverage: representative.coverage ?? null,
+      coverageNote: representative.coverageNote ?? null,
       flags: representative.flags ?? {},
       reads: representative.reads ?? [],
       writes: representative.writes ?? [],
