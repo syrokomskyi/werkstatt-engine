@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1190: declare --mission and --skip-evidence-sync on leitstand.dev-deploy/propagate/promote — explicit mission-context input plus the sole escape hatch for unresolvable context.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
@@ -21,6 +20,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
@@ -39,9 +39,9 @@ const leitstandStatusFlags: Record<string, KernelFlagSpec> = {
 };
 
 const leitstandStatusReads: string[] = [
-  "systems-cache/{system}/system-config.yaml",
-  "systems-cache/{system}/system-state.yaml",
-  "systems-cache/{system}/system.pin.json",
+  "../systems-cache/{system}/system-config.yaml",
+  "../systems-cache/{system}/system-state.yaml",
+  "../systems-cache/{system}/system.pin.json",
 ];
 
 export async function createLeitstandModule(): Promise<ModuleExport> {
@@ -124,8 +124,8 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         },
         writes: ["missions/{mission}/evidence/axiom/**"],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
           "missions/{mission}/workpiece/**",
           "releases/{release}/**",
         ],
@@ -183,14 +183,14 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           },
         },
         writes: [
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
           "releases/{release}/release.yaml",
         ],
         reads: [
           "releases/{release}/**",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runLeitstandPropagate,
@@ -250,14 +250,14 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           },
         },
         writes: [
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
           "releases/{release}/release.yaml",
         ],
         reads: [
           "releases/{release}/**",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runLeitstandPromote,
@@ -316,15 +316,15 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           },
         },
         writes: [
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
-          "systems-cache/{system}/deployment-operations/",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/deployment-operations/",
           "services/registry.yaml",
         ],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/deployment-operations/",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/deployment-operations/",
           "services/registry.yaml",
           "services/{service}/**",
         ],
@@ -388,8 +388,8 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runLeitstandVerify,
@@ -415,8 +415,8 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         },
         reads: [
           "releases/{release}/**",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runLeitstandPipelineCheck,
@@ -479,11 +479,11 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
               "RFC-0938: Auto-remove access PIN before certification and restore after. Default: true. Set to false to preserve RFC-0929 fail-early behavior.",
           },
         },
-        writes: ["systems-cache/{system}/gate-decisions/**"],
+        writes: ["../systems-cache/{system}/gate-decisions/**"],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/gate-decisions/**",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/gate-decisions/**",
         ],
         cacheable: false,
         execute: runLeitstandCertify,
@@ -560,10 +560,10 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             description: "4-digit PIN. Auto-generated if omitted.",
           },
         },
-        writes: ["systems-cache/{system}/system-state.yaml"],
+        writes: ["../systems-cache/{system}/system-state.yaml"],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         execute: runLeitstandAccessProtect,
       },
@@ -587,10 +587,10 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             description: "Alias for --site.",
           },
         },
-        writes: ["systems-cache/{system}/system-state.yaml"],
+        writes: ["../systems-cache/{system}/system-state.yaml"],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         execute: runLeitstandAccessUnprotect,
       },
@@ -630,11 +630,11 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         writes: [
           "missions/{mission}/**",
           "releases/{release}/**",
-          "systems-cache/{system}/gate-decisions/**",
+          "../systems-cache/{system}/gate-decisions/**",
         ],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
           "missions/{mission}/workpiece/**",
         ],
         cacheable: false,
@@ -659,7 +659,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
             description: "Alias for --site.",
           },
         },
-        reads: ["systems-cache/{system}/system-state.yaml"],
+        reads: ["../systems-cache/{system}/system-state.yaml"],
         execute: runLeitstandAccessStatus,
       },
       {
@@ -709,12 +709,12 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         writes: [
           "missions/{mission}/**",
           "releases/{release}/**",
-          "systems-cache/{system}/gate-decisions/**",
-          "systems-cache/{system}/operations/**",
+          "../systems-cache/{system}/gate-decisions/**",
+          "../systems-cache/{system}/operations/**",
         ],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
           "missions/{mission}/workpiece/**",
         ],
         cacheable: false,
@@ -751,7 +751,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           },
         },
         writes: [],
-        reads: ["systems-cache/{system}/operations/ship-*.jsonl"],
+        reads: ["../systems-cache/{system}/operations/ship-*.jsonl"],
         cacheable: true,
         execute: runLeitstandShipStatus,
       },

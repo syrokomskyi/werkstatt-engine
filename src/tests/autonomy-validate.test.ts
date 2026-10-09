@@ -9,7 +9,7 @@ function makeTmpDir() {
 }
 
 function makeWorkspace(tmpDir: string) {
-  const engineSrc = join(tmpDir, "packages", "werkstatt", "src");
+  const engineSrc = join(tmpDir, "packages", "werkstatt-engine", "src");
   mkdirSync(engineSrc, { recursive: true });
   return engineSrc;
 }

@@ -8,6 +8,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0337: initial implementation — registers observability.conventions.validate.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -42,7 +43,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
           "Offline lint: every metric name/label key is declared in WARPGOGOL_METRIC_REGISTRY, naming grammar is valid, no forbidden label keys, no duplicate names, no direct OTLP env reads outside @warpgogol/werkstatt-shared/observability (RFC-0337).",
         scope: "workspace",
         reads: [
-          "packages/observability/src/metric-registry.ts",
+          "packages/werkstatt-shared/src/observability/metric-registry.ts",
           "packages/**/*.ts",
           "services/**/*.ts",
         ],
@@ -87,9 +88,9 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
           'Offline lint: every wrangler config with a main entry has observability.traces.enabled: true with destinations exactly ["signoz"] (RFC-0339).',
         scope: "workspace",
         reads: [
-          "apps/*/wrangler.jsonc",
+          "apps/*/wrangler.jsonc", // scan-coverage: consumer-workshop root — apps/ exists in consumer workshops, not this monorepo
           "services/*/wrangler.jsonc",
-          "packages/os/site-kernel-onboarding/src/templates/wrangler.template.jsonc",
+          "packages/werkstatt-site/src/onboarding/templates/wrangler.template.jsonc",
         ],
         flags: {},
         execute: runObservabilityWorkersValidate,
@@ -138,7 +139,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
           "services/fleet-probe-runner/targets.generated.yaml",
           "services/fleet-probe-runner/targets.overrides.yaml",
           "services/fleet-probe-runner/src/**/*.ts",
-          "apps/*/astro.config.mjs",
+          "apps/*/astro.config.mjs", // scan-coverage: consumer-workshop root — apps/ exists in consumer workshops, not this monorepo
         ],
         flags: {},
         execute: runFleetProbeValidate,
@@ -154,7 +155,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
         mutatesState: true,
         writes: ["docs/observability/alerts.generated.yaml"],
         generates: [{ path: "docs/observability/alerts.generated.yaml", phase: "build.prepare" }],
-        reads: ["packages/os/site-kernel-observability/src/alert-rules.ts"],
+        reads: ["packages/werkstatt-engine/src/observability/alert-rules.ts"],
         cacheable: false,
         flags: {},
         execute: runObservabilityAlertsGenerate,
@@ -170,7 +171,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
         scope: "workspace",
         reads: [
           "docs/observability/alerts.generated.yaml",
-          "packages/os/site-kernel-observability/src/alert-rules.ts",
+          "packages/werkstatt-engine/src/observability/alert-rules.ts",
         ],
         flags: {},
         execute: runObservabilityAlertsValidate,

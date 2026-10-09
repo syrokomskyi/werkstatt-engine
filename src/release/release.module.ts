@@ -7,9 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -21,7 +18,8 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
-  <history>RFC-0655, RFC-0656, RFC-0931</history>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <history>RFC-0655, RFC-0656, RFC-0931, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -57,7 +55,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
           semver: { kind: "string", default: "0.1.0", description: "Release semantic version." },
         },
         writes: ["releases/{release}/**"],
-        reads: ["missions/{mission}/**", "systems-cache/{system}/system-config.yaml"],
+        reads: ["missions/{mission}/**", "../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runReleasePrepare,
       },
@@ -75,13 +73,13 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         },
         writes: [
           "releases/{release}/release.yaml",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
         ],
         reads: [
           "releases/{release}/**",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runReleaseReady,
@@ -111,7 +109,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         flags: {
           site: { kind: "string", description: "Filter by Sternsystem id." },
         },
-        reads: ["releases/*/release.yaml", "systems-cache/*/system-config.yaml"],
+        reads: ["releases/*/release.yaml", "../systems-cache/*/system-config.yaml"],
         execute: runReleaseList,
       },
       {
@@ -133,12 +131,12 @@ export async function createReleaseModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "missions/{mission}/mission.yaml",
-          "missions/{mission}/evidence/close-report.json",
+          "missions/{mission}/mission.yaml", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
+          "missions/{mission}/evidence/close-report.json", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
           "releases/{release}/release.yaml",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
         ],
         execute: runReleaseStateValidate,
       },
@@ -161,8 +159,8 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         },
         reads: [
           "releases/{release}/dist/**",
-          "missions/{mission}/workpiece/dist/**",
-          "missions/{mission}/distribution/dist/**",
+          "missions/{mission}/workpiece/dist/**", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
+          "missions/{mission}/distribution/dist/**", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
         ],
         execute: runDistDeterminismValidate,
       },

@@ -9,7 +9,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1190: declare --site/--system on evidence.sync so leitstand.ship evidence-sync-* steps pass flag validation.</item>
   <item>RFC-1202: evidence.sync description documents the upload-manifest dedup (repeated runs against an unchanged prefix become manifest-check no-ops).</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -23,7 +22,8 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
-  <history>RFC-0651, RFC-1097</history>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <history>RFC-0651, RFC-1097, RFC-1173</history>
 </CHANGE_SUMMARY>
 */
 
@@ -81,8 +81,8 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
         },
         reads: [
           "missions/{mission}/evidence/axiom/**",
-          "systems-cache/*/system-config.yaml",
-          "systems-cache/*/system-state.yaml",
+          "../systems-cache/*/system-config.yaml",
+          "../systems-cache/*/system-state.yaml",
         ],
         writes: [],
         execute: runEvidenceSync,
@@ -125,7 +125,7 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
           },
           json: { kind: "boolean", description: "Output JSON result." },
         },
-        reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system-state.yaml"],
+        reads: ["../systems-cache/*/system-config.yaml", "../systems-cache/*/system-state.yaml"],
         writes: ["{--output-dir}/**"],
         execute: runEvidenceFetch,
       },

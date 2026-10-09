@@ -17,6 +17,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -46,7 +47,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
             description: "Service id from services/registry.yaml services[].",
           },
         },
-        reads: ["services/registry.yaml", "systems-cache/{system}/system-config.yaml"],
+        reads: ["services/registry.yaml", "../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainRegister,
       },
@@ -67,7 +68,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
             description: "Service id from services/registry.yaml services[].",
           },
         },
-        reads: ["services/registry.yaml", "systems-cache/{system}/system-config.yaml"],
+        reads: ["services/registry.yaml", "../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainValidate,
       },
@@ -86,7 +87,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
             description: "Zone domain name (e.g. warpgogol.com).",
           },
         },
-        reads: ["systems-cache/*/system-config.yaml"],
+        reads: ["../systems-cache/*/system-config.yaml"],
         cacheable: false,
         execute: runSubdomainList,
       },

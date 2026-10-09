@@ -17,6 +17,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -49,7 +50,7 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
             description: "Legacy alias for --site (flagSite fallback).",
           },
         },
-        reads: ["systems-cache/{system}/system-config.yaml"],
+        reads: ["../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runCustomdomainRegister,
       },
@@ -72,7 +73,7 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
             description: "Legacy alias for --site (flagSite fallback).",
           },
         },
-        reads: ["systems-cache/{system}/system-config.yaml"],
+        reads: ["../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runRedirectRegister,
       },

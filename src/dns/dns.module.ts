@@ -18,6 +18,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -55,8 +56,8 @@ export async function createDnsModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/dns-records.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/dns-records.yaml",
         ],
         cacheable: false,
         execute: runDnsRecordUpsert,
@@ -79,8 +80,8 @@ export async function createDnsModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/dns-records.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/dns-records.yaml",
         ],
         cacheable: false,
         execute: runDnsRecordValidate,
@@ -104,7 +105,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
             description: "Filter by record name (e.g. warpgogol.com).",
           },
         },
-        reads: ["systems-cache/{system}/system-config.yaml"],
+        reads: ["../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runDnsRecordList,
       },
@@ -139,7 +140,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
             description: "Preview deletion without making API calls.",
           },
         },
-        reads: ["systems-cache/{system}/system-config.yaml"],
+        reads: ["../systems-cache/{system}/system-config.yaml"],
         cacheable: false,
         execute: runDnsRecordDelete,
       },
@@ -159,7 +160,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
             description: "System ID. If omitted, validates all systems with dns-records.yaml.",
           },
         },
-        reads: ["systems-cache/{system}/dns-records.yaml"],
+        reads: ["../systems-cache/{system}/dns-records.yaml"],
         cacheable: true,
         execute: runDnsRecordsSchemaValidate,
       },

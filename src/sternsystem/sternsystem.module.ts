@@ -7,12 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1141: KERNEL-FLAG-07 helper-mediated flag reads in kernel.flags.lint
 
 FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
@@ -24,7 +18,8 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1231: sternsystem.status opts into --all (acceptsAllFlag: true — selector lands in flags.all); sternsystem.sync flag renamed all -> all-branches so the reserved token stays gated off.</item>
-  <history>RFC-0477, RFC-0966, RFC-0968</history>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -92,12 +87,12 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           },
         },
         writes: [
-          "systems-cache/{id}/system-config.yaml",
-          "systems-cache/{id}/system-state.yaml",
-          "systems-cache/{id}/system.pin.json",
-          "systems-cache/{id}/src/content/system.md",
+          "../systems-cache/{id}/system-config.yaml",
+          "../systems-cache/{id}/system-state.yaml",
+          "../systems-cache/{id}/system.pin.json",
+          "../systems-cache/{id}/src/content/system.md",
         ],
-        reads: ["systems-cache/*/system-config.yaml", "onboarding/{id}/.input/00-brief.md"],
+        reads: ["../systems-cache/*/system-config.yaml", "onboarding/{id}/.input/00-brief.md"],
         cacheable: false,
         execute: runSternsystemRegister,
       },
@@ -110,7 +105,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         scope: "workspace",
         acceptsAllFlag: false,
         flags: {},
-        reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system.pin.json"],
+        reads: ["../systems-cache/*/system-config.yaml", "../systems-cache/*/system.pin.json"],
         execute: runSternsystemList,
       },
       {
@@ -127,7 +122,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         flags: {
           id: { kind: "string", description: "Optional Sternsystem id to validate." },
         },
-        reads: ["systems-cache/*/system-config.yaml", "systems-cache/*/system.pin.json"],
+        reads: ["../systems-cache/*/system-config.yaml", "../systems-cache/*/system.pin.json"],
         execute: runSternsystemValidate,
         gate: {
           severity: "error",
@@ -148,8 +143,8 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           id: { kind: "string", required: true, description: "Sternsystem id." },
           platform: { kind: "string", description: "Pinned platform version." },
         },
-        writes: ["systems-cache/{id}/system.pin.json", "systems-cache/{id}/system-config.yaml"],
-        reads: ["systems-cache/{id}/system-config.yaml", "systems-cache/{id}/system.pin.json"],
+        writes: ["../systems-cache/{id}/system.pin.json", "../systems-cache/{id}/system-config.yaml"],
+        reads: ["../systems-cache/{id}/system-config.yaml", "../systems-cache/{id}/system.pin.json"],
         cacheable: false,
         execute: runSternsystemPin,
       },
@@ -170,8 +165,8 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
             description: "Comma-separated mirror specs read via flagString (RFC-1141).",
           },
         },
-        writes: ["systems-cache/{site}/**", "systems-cache/{site}/system-config.yaml"],
-        reads: ["systems-cache/*/system-config.yaml", "missions/*/workpiece/**"],
+        writes: ["../systems-cache/{site}/**", "../systems-cache/{site}/system-config.yaml"],
+        reads: ["../systems-cache/*/system-config.yaml", "missions/*/workpiece/**"],
         cacheable: false,
         execute: runSternsystemExtract,
       },
@@ -195,8 +190,8 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
             description: "Sync all branches + tags instead of current branch only.",
           },
         },
-        writes: ["systems-cache/{id}/bordbuch/events.ndjson"],
-        reads: ["systems-cache/{id}/system-config.yaml"],
+        writes: ["../systems-cache/{id}/bordbuch/events.ndjson"],
+        reads: ["../systems-cache/{id}/system-config.yaml"],
         cacheable: false,
         execute: runSternsystemSync,
       },
@@ -214,9 +209,9 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           all: { kind: "boolean", description: "Show status for all registered systems." },
         },
         reads: [
-          "systems-cache/*/system-config.yaml",
-          "systems-cache/{id}/system-state.yaml",
-          "systems-cache/{id}/bordbuch/events.ndjson",
+          "../systems-cache/*/system-config.yaml",
+          "../systems-cache/{id}/system-state.yaml",
+          "../systems-cache/{id}/bordbuch/events.ndjson",
           "missions/*/mission.yaml",
         ],
         execute: runSternsystemStatus,
@@ -237,12 +232,12 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
             description: "Creator identity handle (e.g. human:andrii-syrokomskyi).",
           },
         },
-        writes: ["systems-cache/{id}/passport.json", "systems-cache/{id}/system-state.yaml"],
+        writes: ["../systems-cache/{id}/passport.json", "../systems-cache/{id}/system-state.yaml"],
         reads: [
-          "systems-cache/{id}/system-config.yaml",
-          "systems-cache/{id}/system.pin.json",
-          "systems-cache/{id}/.env.example",
-          "systems-cache/{id}/bordbuch/events.ndjson",
+          "../systems-cache/{id}/system-config.yaml",
+          "../systems-cache/{id}/system.pin.json",
+          "../systems-cache/{id}/.env.example",
+          "../systems-cache/{id}/bordbuch/events.ndjson",
         ],
         cacheable: false,
         execute: runSternsystemPassportGenerate,
@@ -263,11 +258,11 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "systems-cache/{id}/passport.json",
-          "systems-cache/{id}/system-config.yaml",
-          "systems-cache/{id}/system.pin.json",
-          "systems-cache/{id}/.env.example",
-          "systems-cache/{id}/bordbuch/events.ndjson",
+          "../systems-cache/{id}/passport.json",
+          "../systems-cache/{id}/system-config.yaml",
+          "../systems-cache/{id}/system.pin.json",
+          "../systems-cache/{id}/.env.example",
+          "../systems-cache/{id}/bordbuch/events.ndjson",
         ],
         execute: runSternsystemPassportVerify,
       },
@@ -288,9 +283,9 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "systems-cache/{id}/src/surface.generated.json",
-          "systems-cache/{id}/src/content/**",
-          "systems-cache/{id}/dist/sitemap.xml",
+          "../systems-cache/{id}/src/surface.generated.json",
+          "../systems-cache/{id}/src/content/**",
+          "../systems-cache/{id}/dist/sitemap.xml",
         ],
         execute: runSurfaceContractValidate,
         gate: {

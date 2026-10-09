@@ -20,6 +20,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -55,7 +56,7 @@ describe("runCommandsValidate", () => {
   it("CMD-OUTPUT-01: flags return missing exitCode", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -70,13 +71,13 @@ export async function execute(): Promise<KernelCommandResult> {
     const violations = result.data?.diagnostics ?? [];
     const cmd01 = violations.find((d) => d.ruleId === "CMD-OUTPUT-01");
     expect(cmd01).toBeDefined();
-    expect(cmd01?.file).toBe("packages/werkstatt/src/test-cmd.ts");
+    expect(cmd01?.file).toBe("packages/werkstatt-engine/src/test-cmd.ts");
   });
 
   it("CMD-OUTPUT-02: flags return missing summary", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -96,7 +97,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("CMD-OUTPUT-02: flags summary without [command.name] prefix", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -119,7 +120,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("CMD-OUTPUT-03: flags exitCode: 1 with no nextSteps", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -140,7 +141,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("CMD-OUTPUT-03: flags exitCode: 1 with empty nextSteps: []", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -162,7 +163,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("helper-exempt: passResult returns are not flagged", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return passResult("test.cmd");
@@ -181,7 +182,7 @@ function passResult(command: string): KernelCommandResult {
   it("helper-exempt: failResult returns are not flagged", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return failResult("test.cmd", ["error 1"]);
@@ -200,7 +201,7 @@ function failResult(command: string, violations: string[]): KernelCommandResult 
   it("helper-exempt: diagnosticsResult returns are not flagged", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return diagnosticsResult("test.cmd", []);
@@ -219,7 +220,7 @@ function diagnosticsResult(command: string, diags: unknown[]): KernelCommandResu
   it("helper-exempt: buildAuditResult returns are not flagged", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return buildAuditResult({ command: "test.cmd", findings: [] });
@@ -238,7 +239,7 @@ function buildAuditResult(params: { command: string; findings: unknown[] }): Ker
   it("--mode=warning: violations are warnings, exitCode is 0", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -259,7 +260,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("--mode=error: violations are errors, exitCode is 1", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -279,7 +280,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("compliant success return: no violations", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -299,7 +300,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("compliant failure return with nextSteps: no violations", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return {
@@ -319,7 +320,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("summary is [command.name]-prefixed on result", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return { exitCode: 0, summary: "[test.cmd] OK" };
@@ -336,7 +337,7 @@ export async function execute(): Promise<KernelCommandResult> {
   it("nextSteps present on failure result", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export async function execute(): Promise<KernelCommandResult> {
   return { exitCode: 1, summary: "failed" };
@@ -356,7 +357,7 @@ export async function execute(): Promise<KernelCommandResult> {
     // definition file like this one escaped the gate entirely.
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/checks/test-def.ts",
+      "packages/werkstatt-engine/src/checks/test-def.ts",
       `import type {
   KernelCommandDefinition,
   KernelCommandResult,
@@ -367,7 +368,7 @@ export const testDefCommand: KernelCommandDefinition = {
   mutatesState: false,
   contract: "dist",
   rules: ["TEST-DEF-01"],
-  modulePath: "packages/werkstatt/src/checks/test-def.ts",
+  modulePath: "packages/werkstatt-engine/src/checks/test-def.ts",
   description: "test",
   scope: "app",
   flags: {},
@@ -385,7 +386,7 @@ export const testDefCommand: KernelCommandDefinition = {
     const result = await runCommandsValidate(workspaceRoot, "error");
     const violations = result.data?.diagnostics ?? [];
     expect(violations.length).toBeGreaterThan(0);
-    expect(violations.some((d) => d.file === "packages/werkstatt/src/checks/test-def.ts")).toBe(
+    expect(violations.some((d) => d.file === "packages/werkstatt-engine/src/checks/test-def.ts")).toBe(
       true,
     );
   });
@@ -393,7 +394,7 @@ export const testDefCommand: KernelCommandDefinition = {
   it("non-command-result returns are not flagged (module descriptors, internal objects)", async () => {
     writeHandlerFile(
       workspaceRoot,
-      "packages/werkstatt/src/test-cmd.ts",
+      "packages/werkstatt-engine/src/test-cmd.ts",
       `${HANDLER_HEADER}
 export function createModule() {
   return {

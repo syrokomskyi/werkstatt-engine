@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1176 follow-up: drop duplicated writes[] on mission.validate — the contract sweep's narrower evidence/** entry shadowed the existing evidence+distribution declaration (TS1117).</item>
   <item>RFC-1199: mission.git.commit description documents the MATERIALIZATION_IN_PROGRESS fail-closed guard</item>
@@ -17,7 +16,8 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
-  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146</history>
+  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173</history>
 </CHANGE_SUMMARY>
 */
 
@@ -75,12 +75,12 @@ export async function createMissionModule(): Promise<ModuleExport> {
         },
         writes: [
           "missions/{mission}/**",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
         ],
         reads: [
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system.pin.json",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system.pin.json",
         ],
         cacheable: false,
         execute: runMissionOpen,
@@ -158,13 +158,13 @@ export async function createMissionModule(): Promise<ModuleExport> {
           "missions/{mission}/mission.yaml",
           "missions/{mission}/evidence/close-report.json",
           "missions/{mission}/workpiece/behavior.snapshot.generated.yaml",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
         ],
         reads: [
           "missions/{mission}/mission.yaml",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runMissionClose,
@@ -196,13 +196,13 @@ export async function createMissionModule(): Promise<ModuleExport> {
           "missions/{mission}/mission.yaml",
           "missions/{mission}/workpiece/**",
           "missions/{mission}/distribution/**",
-          "systems-cache/{system}/system-state.yaml",
-          "systems-cache/{system}/bordbuch/events.ndjson",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
         ],
         reads: [
           "missions/{mission}/mission.yaml",
-          "systems-cache/{system}/system-config.yaml",
-          "systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
         ],
         cacheable: false,
         execute: runMissionAbort,
@@ -217,7 +217,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         flags: {
           system: { kind: "string", description: "Filter by Sternsystem id." },
         },
-        reads: ["missions/*/mission.yaml", "systems-cache/*/system-config.yaml"],
+        reads: ["missions/*/mission.yaml", "../systems-cache/*/system-config.yaml"],
         execute: runMissionList,
       },
       {
@@ -317,7 +317,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
           },
         },
         writes: ["missions/{mission}/evidence/**", "missions/{mission}/distribution/**"],
-        reads: ["missions/{mission}/**"],
+        reads: ["missions/{mission}/**"], // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
         cacheable: false,
         execute: runMissionValidate,
         gate: {
@@ -531,7 +531,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         scope: "workspace",
         acceptsAllFlag: true,
         flags: {},
-        reads: ["missions/*/workpiece/*", "missions/*/workpiece/src/*", "systems-cache/*/"],
+        reads: ["missions/*/workpiece/*", "missions/*/workpiece/src/*", "../systems-cache/*/"], // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
         cacheable: false,
         execute: runMaterializeConfigValidate,
       },
@@ -548,7 +548,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
         flags: {
           mission: { kind: "string", required: true, description: "Mission id." },
         },
-        reads: ["missions/{mission}/workpiece/*", "missions/{mission}/workpiece/src/*"],
+        reads: ["missions/{mission}/workpiece/*", "missions/{mission}/workpiece/src/*"], // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
         cacheable: false,
         execute: runWorkpieceConfigPresenceCheck,
       },
@@ -628,7 +628,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
           system: { kind: "string", required: true, description: "Sternsystem id." },
         },
         writes: [],
-        reads: ["systems-cache/{system}/public/**"],
+        reads: ["../systems-cache/{system}/public/**"],
         cacheable: false,
         execute: runMissionPreflight,
       },
