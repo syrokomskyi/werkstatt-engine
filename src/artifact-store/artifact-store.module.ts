@@ -20,6 +20,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1248: suppress transient releases/.werkstatt/ validator reads + complete PIPELINE-LOG rules declaration (RFC-1248 review r2)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -82,7 +83,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
         flags: {
           release: { kind: "string", required: true, description: "Release id to validate." },
         },
-        reads: [".werkstatt/artifacts/releases/{release}/**"],
+        reads: [".werkstatt/artifacts/releases/{release}/**"], // scan-coverage: transient artifact root — .werkstatt/ is gitignored, absent on clean checkouts
         execute: runArtifactStoreValidate,
       },
       {

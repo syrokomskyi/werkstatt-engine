@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1190: declare --mission and --skip-evidence-sync on leitstand.dev-deploy/propagate/promote — explicit mission-context input plus the sole escape hatch for unresolvable context.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
@@ -21,7 +20,8 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1203</history>
+  <item>RFC-1248: suppress transient releases/.werkstatt/ validator reads + complete PIPELINE-LOG rules declaration (RFC-1248 review r2)</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1190, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 
@@ -414,7 +414,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           system: { kind: "string", description: "Alias for --site." },
         },
         reads: [
-          "releases/{release}/**",
+          "releases/{release}/**", // scan-coverage: transient release root — releases/ is gitignored, absent on clean checkouts
           "../systems-cache/{system}/system-config.yaml",
           "../systems-cache/{system}/system-state.yaml",
         ],

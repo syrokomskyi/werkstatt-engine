@@ -7,9 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
@@ -19,6 +16,7 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <item>RFC-1248: suppress transient releases/.werkstatt/ validator reads + complete PIPELINE-LOG rules declaration (RFC-1248 review r2)</item>
   <history>RFC-0655, RFC-0656, RFC-0931, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -96,7 +94,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         flags: {
           release: { kind: "string", required: true, description: "Release id to validate." },
         },
-        reads: ["releases/{release}/**"],
+        reads: ["releases/{release}/**"], // scan-coverage: transient release root — releases/ is gitignored, absent on clean checkouts
         execute: runReleaseValidate,
       },
       {
@@ -133,7 +131,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         reads: [
           "missions/{mission}/mission.yaml", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
           "missions/{mission}/evidence/close-report.json", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
-          "releases/{release}/release.yaml",
+          "releases/{release}/release.yaml", // scan-coverage: transient release root — releases/ is gitignored, absent on clean checkouts
           "../systems-cache/{system}/system-config.yaml",
           "../systems-cache/{system}/system-state.yaml",
           "../systems-cache/{system}/bordbuch/events.ndjson",
@@ -158,7 +156,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
           },
         },
         reads: [
-          "releases/{release}/dist/**",
+          "releases/{release}/dist/**", // scan-coverage: transient release root — releases/ is gitignored, absent on clean checkouts
           "missions/{mission}/workpiece/dist/**", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
           "missions/{mission}/distribution/dist/**", // scan-coverage: transient workpiece root — missions/ is gitignored, absent on clean checkouts
         ],
