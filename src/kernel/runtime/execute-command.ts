@@ -52,6 +52,7 @@ import {
 import type {
   CheckResult,
   ExecuteKernelCommandOptions,
+  KernelAppConfig,
   KernelCommandDefinition,
   KernelCommandInput,
   KernelExecutionReport,
@@ -768,7 +769,16 @@ export async function executeKernelCommand(
     for (const site of targetSites) {
       let command: KernelCommandDefinition | undefined;
       let siteRegistry: ActualState | undefined;
-      const siteConfig = await loadKernelAppConfig(site);
+      let siteConfig: KernelAppConfig;
+      try {
+        siteConfig = await loadKernelAppConfig(site);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Kernel command \`${options.commandName}\` could not be resolved for site \`${site.name}\`: ${detail}${pipelineHint(options.commandName)}`,
+          { cause: error },
+        );
+      }
 
       if (siteConfig.moduleLoaders && siteManifestModule) {
         siteRegistry = await buildRegistryForModule(siteConfig, siteManifestModule);

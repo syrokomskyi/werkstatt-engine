@@ -112,7 +112,16 @@ export async function loadKernelAppConfig(site: DiscoveredSiteWorkspace): Promis
   }
 
   process.stderr.write(`  [config] loading ${site.configPath} …\n`);
-  const moduleNamespace = await importConfigModule(pathToFileURL(site.configPath).href);
+  let moduleNamespace: Record<string, unknown>;
+  try {
+    moduleNamespace = await importConfigModule(pathToFileURL(site.configPath).href);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to load kernel config \`${site.configPath}\` for site \`${site.name}\`: ${detail}`,
+      { cause: error },
+    );
+  }
   process.stderr.write(`  [config] loaded ${site.configPath}\n`);
   const candidate = unwrapConfig(moduleNamespace);
 
@@ -141,7 +150,15 @@ export async function loadWorkspaceConfig(
   }
 
   process.stderr.write(`  [config] loading ${configPath} …\n`);
-  const moduleNamespace = await importConfigModule(pathToFileURL(configPath).href);
+  let moduleNamespace: Record<string, unknown>;
+  try {
+    moduleNamespace = await importConfigModule(pathToFileURL(configPath).href);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to load workspace kernel config \`${configPath}\`: ${detail}`, {
+      cause: error,
+    });
+  }
   process.stderr.write(`  [config] loaded ${configPath}\n`);
   const candidate = unwrapConfig(moduleNamespace);
 
