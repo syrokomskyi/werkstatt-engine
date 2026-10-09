@@ -31,6 +31,7 @@ export async function createChangeImpactModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "change.impact.derive",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/kernel/change-impact.module.ts",
         description:
           "RFC-0332: classify changed paths into none/low/medium/high impact, derive impacted " +

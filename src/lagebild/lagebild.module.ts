@@ -112,6 +112,7 @@ export async function createLagebildModule(): Promise<ModuleExport> {
       },
       {
         name: "lagebild.referral.issue",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
           "Register a referral-partner slug via POST /v1/referrals and return the shareable <site-origin>/r/<slug> link (RFC-1198). The public page also needs the site-side partners.yaml entry. Required flags: `--site`, `--slug`, `--name`.",
@@ -155,6 +156,7 @@ export async function createLagebildModule(): Promise<ModuleExport> {
       },
       {
         name: "lagebild.referral.list",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/lagebild/lagebild.module.ts",
         description:
           "List the Lagebild referral registry rows via GET /v1/referrals (RFC-1191). Required flags: `--site`.",

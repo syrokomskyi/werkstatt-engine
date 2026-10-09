@@ -37,6 +37,7 @@ export async function createRemediationModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "remediation.catalog.generate",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/remediation/remediation.module.ts",
         description:
           "Emit docs/remediation-catalog.generated.yaml from REMEDIATION_CATALOG, " +
@@ -76,6 +77,7 @@ export async function createRemediationModule(): Promise<ModuleExport> {
       },
       {
         name: "remediation.signal.ingest",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/remediation/remediation.module.ts",
         description:
           "Normalize and route a remediation signal (RFC-1210): --source is gated against the site's remediation.signalSources allowlist (SIG-02 blocking), unknown --class rejected (SIG-01), then dedup + daily rate cap decide between auto-mission | action-pack | suppressed-autonomy-off | deduped | rate-capped. Auto-missions open via the internal openRemediationMission step composing mission.open — there is intentionally no remediation.mission.open command. Required flags: --site, --class, --source.",

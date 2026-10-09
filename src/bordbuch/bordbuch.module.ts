@@ -89,6 +89,7 @@ export async function createBordbuchModule(): Promise<ModuleExport> {
       },
       {
         name: "bordbuch.status",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/bordbuch/bordbuch.module.ts",
         description:

@@ -150,6 +150,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       },
       {
         name: "sternsystem.extract",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
         description:
@@ -197,6 +198,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       },
       {
         name: "sternsystem.status",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
           "Read-only synchronization state inspection for a Sternsystem (RFC-0477). Flags: --id, [--all].",
@@ -218,6 +220,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
       },
       {
         name: "sternsystem.passport.generate",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
         description:

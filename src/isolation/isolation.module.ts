@@ -34,6 +34,7 @@ export async function createIsolationModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "isolation.tier.inspect",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Inspect the isolation tier of registered components. " +
@@ -49,6 +50,7 @@ export async function createIsolationModule(): Promise<ModuleExport> {
       },
       {
         name: "isolation.tier.assign",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Assign an isolation tier to a component. " +
@@ -66,6 +68,7 @@ export async function createIsolationModule(): Promise<ModuleExport> {
       },
       {
         name: "isolation.sandbox.spawn",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Spawn a sandbox for a component at the specified isolation tier. " +
@@ -107,6 +110,7 @@ export async function createIsolationModule(): Promise<ModuleExport> {
       },
       {
         name: "isolation.sandbox.inspect",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Inspect a sandbox's health, resource usage, and state. " +
@@ -122,6 +126,7 @@ export async function createIsolationModule(): Promise<ModuleExport> {
       },
       {
         name: "isolation.sandbox.terminate",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Terminate a sandbox and release its resources. " +
@@ -138,6 +143,7 @@ export async function createIsolationModule(): Promise<ModuleExport> {
       },
       {
         name: "isolation.capability.bridge",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Create a capability bridge for a sandbox, enabling policy-enforced " +

@@ -40,6 +40,7 @@ export async function createGitmeshModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "gitmesh.sync",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
         generates: [],
@@ -58,6 +59,7 @@ export async function createGitmeshModule(): Promise<ModuleExport> {
       },
       {
         name: "gitmesh.status",
+        coverage: "operator" as const,
         mutatesState: false,
         execOnReadOnly: true,
         modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
@@ -73,6 +75,7 @@ export async function createGitmeshModule(): Promise<ModuleExport> {
       },
       {
         name: "gitmesh.verify",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/gitmesh/gitmesh-module.ts",
         generates: [],

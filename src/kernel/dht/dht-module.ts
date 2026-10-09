@@ -44,6 +44,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "dht.node.init",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
         generates: [],
@@ -67,6 +68,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
       },
       {
         name: "dht.lookup",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
         generates: [],
@@ -93,6 +95,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
       },
       {
         name: "dht.register",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
         generates: [],
@@ -126,7 +129,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
       },
       {
         name: "dht.capacity.publish",
-        coverage: "operator",
+        coverage: "operator" as const,
         coverageNote: "DHT capacity publication",
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
@@ -165,6 +168,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
       },
       {
         name: "dht.placement",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
         generates: [],
@@ -193,6 +197,7 @@ export async function createDhtModule(): Promise<ModuleExport> {
       },
       {
         name: "dht.status",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/kernel/dht/dht-module.ts",
         generates: [],

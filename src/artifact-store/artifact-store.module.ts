@@ -36,6 +36,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "artifact.store.put",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
         description:
@@ -55,6 +56,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
       },
       {
         name: "artifact.store.get",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
         description:
@@ -73,6 +75,8 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
       },
       {
         name: "artifact.store.validate",
+        coverage: "operator" as const,
+        coverageNote: "requires --release",
         mutatesState: false,
         contract: "artifact",
         rules: [],
@@ -88,6 +92,7 @@ export async function createArtifactStoreModule(): Promise<ModuleExport> {
       },
       {
         name: "artifact.store.gc",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/artifact-store/artifact-store.module.ts",
         generates: [],
         description:

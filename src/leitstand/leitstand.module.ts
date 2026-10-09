@@ -277,6 +277,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.channels",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
@@ -290,6 +291,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.rollback",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:
@@ -333,6 +335,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.health",
+        coverage: "operator" as const,
         mutatesState: false,
         execOnReadOnly: true,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
@@ -358,6 +361,8 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.verify",
+        coverage: "operator" as const,
+        coverageNote: "post-deploy verification — requires --site",
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
@@ -596,6 +601,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.hotfix.dev-deploy",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:
@@ -642,6 +648,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.access.status",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
           "RFC-0899: Report access protection status (PIN set or not) for a Sternsystem. Flags: --site.",
@@ -722,6 +729,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
       },
       {
         name: "leitstand.ship.status",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:

@@ -39,6 +39,7 @@ export async function createSwimModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "swim.join",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
         generates: [],
@@ -60,6 +61,7 @@ export async function createSwimModule(): Promise<ModuleExport> {
       },
       {
         name: "swim.leave",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
         generates: [],
@@ -76,6 +78,7 @@ export async function createSwimModule(): Promise<ModuleExport> {
       },
       {
         name: "swim.members",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
         description:
@@ -90,6 +93,7 @@ export async function createSwimModule(): Promise<ModuleExport> {
       },
       {
         name: "swim.status",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/kernel/swim/swim-module.ts",
         description:

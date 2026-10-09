@@ -65,7 +65,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.stack.health",
-        coverage: "operator",
+        coverage: "operator" as const,
         coverageNote: "live SigNoz stack probe",
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
@@ -97,6 +97,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.factory.smoke",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
@@ -110,7 +111,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.probe.targets.generate",
-        coverage: "operator",
+        coverage: "operator" as const,
         coverageNote: "fleet probe target regeneration",
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
@@ -146,7 +147,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.alerts.generate",
-        coverage: "operator",
+        coverage: "operator" as const,
         coverageNote: "alert-rule regeneration for the observability stack",
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:
@@ -178,6 +179,7 @@ export async function createObservabilityModule(): Promise<ModuleExport> {
       },
       {
         name: "observability.alerts.apply",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/observability/module.ts",
         description:

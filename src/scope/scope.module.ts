@@ -28,6 +28,7 @@ export async function createScopeModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "scope.inspect",
+        coverage: "operator" as const,
         modulePath,
         description: "Inspect all active scopes and their component counts and IDs (RFC-1036).",
         scope: "workspace",
@@ -39,6 +40,7 @@ export async function createScopeModule(): Promise<ModuleExport> {
       },
       {
         name: "scope.resolve",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Resolve the active component for a capability in a given scope context. " +
@@ -67,6 +69,7 @@ export async function createScopeModule(): Promise<ModuleExport> {
       },
       {
         name: "scope.lifecycle.adopt",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Adopt a component into a manual scope (per-fleet or per-session only). " +

@@ -89,6 +89,7 @@ export async function createEvidenceModule(): Promise<ModuleExport> {
       },
       {
         name: "evidence.fetch",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/evidence/evidence-module.ts",
         generates: [],
         description:

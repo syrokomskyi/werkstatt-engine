@@ -30,6 +30,7 @@ export async function createEffectsModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "effect.classify",
+        coverage: "operator" as const,
         modulePath,
         description:
           "RFC-1037: Classify an operation into one of four effect classes (revertible, " +
@@ -53,6 +54,7 @@ export async function createEffectsModule(): Promise<ModuleExport> {
       },
       {
         name: "effect.compensation.verify",
+        coverage: "operator" as const,
         modulePath,
         description:
           "RFC-1037: Verify that a compensating action restored the system to an equivalent " +
@@ -93,6 +95,7 @@ export async function createEffectsModule(): Promise<ModuleExport> {
       },
       {
         name: "effect.compensation.inspect",
+        coverage: "operator" as const,
         modulePath,
         description:
           "RFC-1037: Inspect stored compensation evidence for a given operation hash. " +

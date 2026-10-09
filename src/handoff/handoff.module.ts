@@ -39,7 +39,7 @@ export async function createHandoffModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "handoff.validate",
-        coverage: "operator",
+        coverage: "operator" as const,
         coverageNote: "handoff bundle inspection — requires --bundle",
         mutatesState: false,
         contract: "handoff",
@@ -71,6 +71,7 @@ export async function createHandoffModule(): Promise<ModuleExport> {
       },
       {
         name: "handoff.pack",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         generates: [],
         description:
@@ -87,6 +88,7 @@ export async function createHandoffModule(): Promise<ModuleExport> {
       },
       {
         name: "handoff.absorb",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/handoff/handoff.module.ts",
         generates: [],
         description:

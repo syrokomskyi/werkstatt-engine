@@ -36,6 +36,7 @@ export async function createCacheModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "kernel.cache.status",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/kernel/cache/cache-module.ts",
         description:
@@ -48,6 +49,7 @@ export async function createCacheModule(): Promise<ModuleExport> {
       },
       {
         name: "kernel.cache.clear",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/kernel/cache/cache-module.ts",
         generates: [],
         description:

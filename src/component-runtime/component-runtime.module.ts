@@ -32,6 +32,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "runtime.reflect.graph",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Reflect the live component graph: all components, their fiber states, dependencies, " +
@@ -51,6 +52,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
       },
       {
         name: "runtime.reflect.capabilities",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Reflect the live capability catalog: all capability IDs, their providers, " +
@@ -64,6 +66,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
       },
       {
         name: "runtime.reflect.health",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Reflect health check results for all components with health checks defined. " +
@@ -83,6 +86,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
       },
       {
         name: "runtime.reflect.fibers",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Reflect a lightweight view of component fiber states only: " +
@@ -96,6 +100,7 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
       },
       {
         name: "runtime.reflect.catalog.generate",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Generate a freshness-gated capability catalog and write it to " +

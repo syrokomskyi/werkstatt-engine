@@ -36,6 +36,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "deploy.artifact.build",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
         description:
@@ -60,6 +61,8 @@ export async function createDeployModule(): Promise<ModuleExport> {
       },
       {
         name: "deploy.artifact.verify",
+        coverage: "operator" as const,
+        coverageNote: "requires --hash",
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         description: "Verify an artifact's content hash and signature (RFC-0566). Flags: --hash.",
@@ -74,6 +77,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
       },
       {
         name: "deploy.atomic.swap",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
         description: "Atomic symlink swap to deploy a new artifact (RFC-0566). Flags: --hash.",
@@ -90,6 +94,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
       },
       {
         name: "deploy.atomic.rollback",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
         description:
@@ -108,7 +113,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
       },
       {
         name: "deploy.artifact.gc",
-        coverage: "operator",
+        coverage: "operator" as const,
         coverageNote: "deploy artifact housekeeping",
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",
         generates: [],
@@ -128,6 +133,7 @@ export async function createDeployModule(): Promise<ModuleExport> {
       },
       {
         name: "deploy.status",
+        coverage: "operator" as const,
         mutatesState: false,
         execOnReadOnly: true,
         modulePath: "packages/werkstatt-engine/src/deploy/deploy.module.ts",

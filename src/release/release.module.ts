@@ -84,6 +84,8 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.validate",
+        coverage: "operator" as const,
+        coverageNote: "requires --release",
         mutatesState: false,
         contract: "release",
         rules: [],
@@ -99,6 +101,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.list",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         description: "List releases, optionally filtered by site (RFC-0357). Flags: [--site].",
@@ -112,6 +115,8 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.state.validate",
+        coverage: "operator" as const,
+        coverageNote: "requires --mission, --release, or --site",
         mutatesState: false,
         contract: "release",
         rules: [],
@@ -140,6 +145,8 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "dist.determinism.validate",
+        coverage: "operator" as const,
+        coverageNote: "requires --release or --mission",
         contract: "dist",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
@@ -164,6 +171,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.sign",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         generates: [],
         description:
@@ -185,6 +193,7 @@ export async function createReleaseModule(): Promise<ModuleExport> {
       },
       {
         name: "release.boot-smoke",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/release/release.module.ts",
         generates: [],
         description:

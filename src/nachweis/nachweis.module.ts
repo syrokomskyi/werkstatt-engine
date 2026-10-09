@@ -353,6 +353,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
       },
       {
         name: "nachweis.assessment.ingest",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
         description:
@@ -380,6 +381,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
       },
       {
         name: "nachweis.measure.lighthouse",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
         description:
@@ -429,6 +431,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
       },
       {
         name: "nachweis.measure.cloudflare-agent-readiness",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
         description:
@@ -493,6 +496,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
       },
       {
         name: "nachweis.screenshot.upload",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
         description:
@@ -522,6 +526,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
       },
       {
         name: "nachweis.screenshot.ingest",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [],
         description:
@@ -558,6 +563,7 @@ export async function createNachweisModule(): Promise<ModuleExport> {
       },
       {
         name: "nachweis.screenshot.process",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/nachweis/nachweis.module.ts",
         generates: [
           { path: "public/nachweis-screenshots/*.webp", phase: "build.post", conditional: true },

@@ -33,6 +33,7 @@ export async function createPipelineBudgetModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "pipeline.budget.generate",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/kernel/pipeline-budget.module.ts",
         description:
           "Aggregate the local pipeline step telemetry history into docs/pipeline-budgets.generated.yaml " +

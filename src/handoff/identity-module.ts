@@ -59,6 +59,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
       },
       {
         name: "identity.credential.issue",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
         description:
@@ -98,6 +99,8 @@ export async function createIdentityModule(): Promise<ModuleExport> {
       },
       {
         name: "identity.credential.verify",
+        coverage: "operator" as const,
+        coverageNote: "requires --credential-id",
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         description:
@@ -117,6 +120,7 @@ export async function createIdentityModule(): Promise<ModuleExport> {
       },
       {
         name: "identity.credential.revoke",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/handoff/identity-module.ts",
         generates: [],
         description:

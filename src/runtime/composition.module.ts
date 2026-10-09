@@ -244,6 +244,7 @@ export const compositionModule: ModuleExport = {
   commands: [
     {
       name: "composition.desired-state.inspect",
+      coverage: "operator" as const,
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
         "RFC-1038: Inspect current desired and actual state. Returns JSON with desired components, actual components, and their states.",
@@ -255,6 +256,7 @@ export const compositionModule: ModuleExport = {
     },
     {
       name: "composition.reconcile",
+      coverage: "operator" as const,
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
         "RFC-1038: Reconcile desired state with actual state. Computes delta and applies changes transactionally.",
@@ -266,6 +268,7 @@ export const compositionModule: ModuleExport = {
     },
     {
       name: "composition.overlay.apply",
+      coverage: "operator" as const,
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description:
         "RFC-1038: Apply an overlay to the desired state and trigger reconciliation. Required flags: `--overlay-id`, `--scope`.",
@@ -296,6 +299,7 @@ export const compositionModule: ModuleExport = {
     },
     {
       name: "composition.overlay.inspect",
+      coverage: "operator" as const,
       modulePath: "packages/werkstatt-engine/src/runtime/composition.module.ts",
       description: "RFC-1038: Inspect active overlays and their effects on the desired state.",
       scope: "workspace",

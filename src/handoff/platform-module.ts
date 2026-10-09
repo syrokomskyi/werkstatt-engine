@@ -67,6 +67,7 @@ export async function createPlatformModule(): Promise<ModuleExport> {
       },
       {
         name: "werkstatt.platform.update",
+        coverage: "operator" as const,
         contract: "platform",
         rules: [],
         modulePath: "packages/werkstatt-engine/src/handoff/platform-module.ts",

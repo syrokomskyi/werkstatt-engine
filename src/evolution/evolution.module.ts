@@ -38,6 +38,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "evolution.candidate.define",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Register a new capability candidate in the defined state. " +
@@ -63,6 +64,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.shadow",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Run candidate alongside active component in shadow mode. " +
@@ -79,6 +81,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.test",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Run held-out evaluation scenarios against the candidate. " +
@@ -98,6 +101,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.canary",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Route a percentage of traffic to the candidate via deterministic hash routing. " +
@@ -117,6 +121,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.activate",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Atomically replace the active component with the candidate. " +
@@ -132,6 +137,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.promote",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Promote the candidate to permanent status via the mission/release pipeline. " +
@@ -148,6 +154,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.rollback",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Reactivate the previous component and transition the candidate to rolled-back. " +
@@ -163,6 +170,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.quarantine",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Transition candidate to quarantined state. " +
@@ -179,6 +187,7 @@ export async function createEvolutionModule(): Promise<ModuleExport> {
       },
       {
         name: "evolution.candidate.inspect",
+        coverage: "operator" as const,
         modulePath,
         description:
           "Inspect all registered candidates with their states and transition history. " +

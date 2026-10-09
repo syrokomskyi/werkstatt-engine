@@ -74,6 +74,7 @@ export async function createSubdomainModule(): Promise<ModuleExport> {
       },
       {
         name: "subdomain.list",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/subdomain/subdomain.module.ts",
         description:

@@ -64,6 +64,8 @@ export async function createDnsModule(): Promise<ModuleExport> {
       },
       {
         name: "dns.record.validate",
+        coverage: "operator" as const,
+        coverageNote: "requires --system",
         mutatesState: false,
         contract: "dns",
         rules: [],
@@ -88,6 +90,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
       },
       {
         name: "dns.record.list",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
@@ -111,6 +114,7 @@ export async function createDnsModule(): Promise<ModuleExport> {
       },
       {
         name: "dns.record.delete",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/dns/dns.module.ts",
         description:
           "Delete a DNS record from Cloudflare by ID or name+type (RFC-0753). Flags: --system, --record-id, --name, --type, --dry-run.",

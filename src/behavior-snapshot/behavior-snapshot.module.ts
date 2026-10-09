@@ -35,6 +35,7 @@ export async function createBehaviorSnapshotModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "behavior.snapshot.capture",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:
@@ -57,6 +58,7 @@ export async function createBehaviorSnapshotModule(): Promise<ModuleExport> {
       },
       {
         name: "behavior.snapshot.diff",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/behavior-snapshot/behavior-snapshot.module.ts",
         description:

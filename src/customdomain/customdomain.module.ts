@@ -33,6 +33,7 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "customdomain.register",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
           "Register proxied A record and Workers route for a site apex domain (RFC-0896). Idempotent. Flags: --site.",
@@ -56,6 +57,7 @@ export async function createCustomdomainModule(): Promise<ModuleExport> {
       },
       {
         name: "redirect.register",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/customdomain/customdomain.module.ts",
         description:
           "Register proxied CNAME and Redirect Rule (301) for www.{apex} → apex (RFC-0896). Idempotent. Flags: --site.",

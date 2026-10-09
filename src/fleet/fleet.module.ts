@@ -36,6 +36,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
     commands: [
       {
         name: "fleet.sites.generate",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Generate fleet/fleet.sites.yaml from RFC-0790 convention-based discovery (systems-cache). Enriched with platformVersion, channels, mirrors, activeMission, canary fields (RFC-0964).",
@@ -53,6 +54,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.apply",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Cross-site wave orchestration: run a command or pipeline across fleet sites with canary-first waves, concurrency, stop-threshold, and journal-backed resume (RFC-0964). Required flags: `--run`.",
@@ -96,6 +98,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.ownership.register",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Register a site's ownership claim in the fleet ownership registry (RFC-0967). Reads passport from cache clone and sends it to the registry Worker. Required flags: `--id`.",
@@ -113,6 +116,8 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.ownership.verify",
+        coverage: "operator" as const,
+        coverageNote: "requires --id",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Verify a site's ownership claim in the fleet ownership registry (RFC-0967). Returns the current claim or not-registered status. Required flags: `--id`.",
@@ -130,6 +135,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.ownership.transfer",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Transfer ownership of a site to a new instance after a handover (RFC-0967, RFC-0968). Requires a signed handover authorization file. Required flags: `--id`, `--authorization`.",
@@ -152,6 +158,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.claims.init",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Point this workshop at the per-fleet claims repository (RFC-1124). Writes werkstatt.fleet.json and clones/inits the local claims repo. Idempotent. Required flags: `--remote`.",
@@ -180,6 +187,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.claims.publish",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Publish or refresh the signed ownership claim for a system into the fleet claims repo (RFC-1124). Called automatically by mission.close / sternsystem.register / sternsystem.handover.complete; manual use for repair. Required flags: `--id`.",
@@ -208,6 +216,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.claims.sync",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Fetch all claims remotes, fast-forward the local clone, verify all claim signatures, and push pending claims (RFC-1124). Non-fast-forward divergence is a manual-resolution diagnostic — never auto-merged.",
@@ -224,6 +233,8 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.claims.verify",
+        coverage: "operator" as const,
+        coverageNote: "requires --id",
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Resolve the current ownership claim for a system entirely offline (RFC-1124): signature + legitimacy (self-claim vs transfer claim via bordbuch handover event) + LWW. Exits 1 on invalid-signature or stale; no-claim is informational. Required flags: `--id`.",
@@ -246,6 +257,7 @@ export async function createFleetModule(): Promise<ModuleExport> {
       },
       {
         name: "fleet.claims.status",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/fleet/fleet.module.ts",
         description:
           "Show local claims clone vs remote state, pending unpushed claims, and last sync time (RFC-1124). Fully offline.",

@@ -209,6 +209,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.list",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description: "List missions, optionally filtered by system (RFC-0355).",
@@ -251,6 +252,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.migrate",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
@@ -371,6 +373,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.diff",
+        coverage: "operator" as const,
         mutatesState: true,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
@@ -451,6 +454,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.cleanup",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
@@ -487,6 +491,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "workpiece.read",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
@@ -503,6 +508,8 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "workpiece.write",
+        coverage: "operator" as const,
+        coverageNote: "requires --mission + --stdin — workpiece write tool",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
@@ -554,6 +561,8 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "validate.postbuild",
+        coverage: "operator" as const,
+        coverageNote: "requires --mission or --site",
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
@@ -574,6 +583,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.resume",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
@@ -599,6 +609,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.journal.show",
+        coverage: "operator" as const,
         mutatesState: false,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         description:
@@ -616,6 +627,8 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "mission.preflight",
+        coverage: "operator" as const,
+        coverageNote: "requires --system",
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
@@ -634,6 +647,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
       },
       {
         name: "validation.state.inspect",
+        coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
         generates: [],
         description:
