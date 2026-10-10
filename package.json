@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "description": "Werkstatt engine \u2014 stack-agnostic lifecycle platform (RFC-0769/0772).",
+  "description": "Werkstatt engine — stack-agnostic lifecycle platform (RFC-0769/0772).",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/syrokomskyi/werkstatt-engine.git"
@@ -449,9 +449,8 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/picomatch": "^4.0.3",
     "@typescript-eslint/typescript-estree": "^8.70.0",
-    "@warpgogol/forge": "workspace:*",
-    "@warpgogol/pbp": "workspace:*",
-    "@warpgogol/werkstatt-shared": "workspace:*",
+    "@warpgogol/forge": "^6.3.2",
+    "@warpgogol/werkstatt-shared": "^0.17.0",
     "ai": "^7.0.99",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
@@ -499,5 +498,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "8.70.0",
     "vitest": "^5.0.0"
-  }
+  },
+  "packageManager": "pnpm@11.10.0"
 }
