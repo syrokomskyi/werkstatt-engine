@@ -55,6 +55,29 @@ describe("buildRegistry", () => {
     expect(state.commands.size).toBe(2);
   });
 
+  test("throws a descriptive error when a module loader returns undefined", async () => {
+    const config: KernelAppConfig = {
+      moduleLoaders: {
+        "forge-rfc": async () => undefined as unknown as ModuleExport,
+        "lazy-mod": async () => mockModule,
+      },
+    };
+    await expect(buildRegistry(config)).rejects.toThrow(
+      /Module loader `forge-rfc` did not return a module.*stale/,
+    );
+  });
+
+  test("throws a descriptive error when a module loader returns a non-module value", async () => {
+    const config: KernelAppConfig = {
+      moduleLoaders: {
+        "bad-mod": async () => "not-a-module" as unknown as ModuleExport,
+      },
+    };
+    await expect(buildRegistry(config)).rejects.toThrow(
+      /Module loader `bad-mod` did not return a module/,
+    );
+  });
+
   test("builds empty actual state when no modules or loaders", async () => {
     const config: KernelAppConfig = {};
     const state = await buildRegistry(config);
@@ -77,6 +100,15 @@ describe("buildRegistryForModule", () => {
   test("throws when module name not found in modules array", async () => {
     await expect(buildRegistryForModule(mockConfig, "nonexistent")).rejects.toThrow(
       /No module named.*nonexistent/,
+    );
+  });
+
+  test("throws a descriptive error when the resolved loader returns undefined", async () => {
+    const config: KernelAppConfig = {
+      moduleLoaders: { "mod-a": async () => undefined as unknown as ModuleExport },
+    };
+    await expect(buildRegistryForModule(config, "mod-a")).rejects.toThrow(
+      /Module loader `mod-a` did not return a module/,
     );
   });
 

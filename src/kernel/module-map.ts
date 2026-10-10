@@ -308,6 +308,17 @@ export function workshopModuleLoaders(): Record<string, () => Promise<ModuleExpo
 }
 
 /**
+ * Materialize only the forge bucket of WORKSHOP_MODULE_MAP — the forge-only
+ * command surface (governance modules without engine/site-plugin extras).
+ * Consumed by the forge-profile scaffolded kernel.config.ts templates, which
+ * load forge modules plus profile-specific extras (e.g. typescript-checks)
+ * but not the full workshop engine set.
+ */
+export function forgeModuleLoaders(): Record<string, () => Promise<ModuleExport>> {
+  return materializeDescriptors([WORKSHOP_MODULE_MAP.forge]);
+}
+
+/**
  * Materialize SITE_MODULE_MAP into the `moduleLoaders` record shape — the
  * canonical site command surface (RFC-1148). Consumed by
  * kernel.config.template.ts (generated site configs) and by

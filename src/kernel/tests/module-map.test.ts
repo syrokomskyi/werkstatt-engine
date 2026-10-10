@@ -2,6 +2,7 @@ import { test, expect } from "vitest";
 import {
   SITE_MODULE_MAP,
   WORKSHOP_MODULE_MAP,
+  forgeModuleLoaders,
   siteModuleLoaders,
   workshopModuleLoaders,
 } from "../module-map.ts";
@@ -65,4 +66,12 @@ test("workshopModuleLoaders: unchanged — still materializes WORKSHOP_MODULE_MA
     ...Object.keys(WORKSHOP_MODULE_MAP.forge),
   ].sort();
   expect(Object.keys(loaders).sort()).toEqual(expected);
+});
+
+test("forgeModuleLoaders: materializes exactly the forge bucket", () => {
+  const loaders = forgeModuleLoaders();
+  expect(Object.keys(loaders).sort()).toEqual(Object.keys(WORKSHOP_MODULE_MAP.forge).sort());
+  for (const loader of Object.values(loaders)) {
+    expect(typeof loader).toBe("function");
+  }
 });

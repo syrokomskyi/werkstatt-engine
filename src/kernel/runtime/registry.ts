@@ -59,6 +59,7 @@ export async function buildRegistry(config: KernelAppConfig): Promise<ActualStat
     for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
       process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
       const mod = await loader();
+      assertModuleExport(mod, moduleName);
       exports.push(mod);
     }
   }
@@ -74,6 +75,25 @@ export async function buildRegistry(config: KernelAppConfig): Promise<ActualStat
   return actualState;
 }
 
+/**
+ * Fail fast when a module loader resolves to something that is not a
+ * ModuleExport — a renamed/removed export surfaces as `undefined` and would
+ * otherwise crash later with an opaque TypeError (or silently drop the
+ * module's whole command surface).
+ */
+function assertModuleExport(
+  mod: ModuleExport | undefined | null,
+  loaderKey: string,
+): asserts mod is ModuleExport {
+  if (mod === undefined || mod === null || typeof mod !== "object" || typeof mod.name !== "string") {
+    throw new Error(
+      `Module loader \`${loaderKey}\` did not return a module (got ${
+        mod === null ? "null" : typeof mod
+      }) — the loader's import specifier or export name is likely stale.`,
+    );
+  }
+}
+
 export async function buildRegistryForModule(
   config: KernelAppConfig,
   moduleName: string,
@@ -84,6 +104,7 @@ export async function buildRegistryForModule(
       throw new Error(`No module loader registered for module \`${moduleName}\`.`);
     }
     const mod = await loader();
+    assertModuleExport(mod, moduleName);
     const actualState = buildActualState([mod]);
     return actualState;
   } else if (config.modules) {
