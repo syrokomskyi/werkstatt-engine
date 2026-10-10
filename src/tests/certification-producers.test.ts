@@ -392,7 +392,11 @@ describe("normalizeDiagnostics", () => {
   });
 
   it("fails on missing ruleId", () => {
-    const diagnostics = [{ ruleId: "", severity: "error" as const, message: "msg", evidence: [] }];
+    // RFC-1251: intentionally invalid fixture ids bind via variable, never a `ruleId:`-keyed literal.
+    const missingRuleId = "";
+    const diagnostics = [
+      { ruleId: missingRuleId, severity: "error" as const, message: "msg", evidence: [] },
+    ];
     const result = normalizeDiagnostics(diagnostics as unknown as Diagnostic[], "p1");
     expect(result.ok).toBe(false);
     if (!result.ok) {
