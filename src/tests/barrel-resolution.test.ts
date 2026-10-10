@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1104: initial barrel-resolution test covering kernel, kernel/types, kernel/workspace-io, runtime/desired-state, schemas, signing, fingerprint, component specifiers.</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -18,7 +19,6 @@ import * as schemasBarrel from "@warpgogol/werkstatt-engine/schemas";
 import * as signingBarrel from "@warpgogol/werkstatt-engine/signing";
 import * as fingerprintBarrel from "@warpgogol/werkstatt-engine/fingerprint";
 import * as componentBarrel from "@warpgogol/werkstatt-engine/component";
-import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 test("engine/kernel resolves sunk contract cluster", () => {
   expect(kernelBarrel.writeFileAtomic).toBeTypeOf("function");

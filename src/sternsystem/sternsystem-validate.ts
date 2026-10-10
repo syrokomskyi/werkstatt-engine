@@ -6,17 +6,17 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0088: add JRN-01 rule — op-started records in cache-clone operations/*.jsonl must carry non-empty missionId.</item>
   <item>ADR-0082: add COMMITTED_GENERATED_ALLOWED — exempt shrink-only baselines (list-punctuation.baseline.generated.yaml) from bundle-contract without requiring HEAD persistence, unlike COMMITTED_MANIFEST_PATHS entries.</item>
   <item>ADR-0091: pass externalEditBaselineSha from collectExternalEditInputs into evaluateExternalEditGate.</item>
   <item>RFC-1149: phase 1b — DRIFT-02 diagnostics promoted from warnings to violations (blocking); DRIFT-01 stays warning per ADR-0082 cleanup caveat.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
-  <history>ADR-0082, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>ADR-0082, ADR-0088, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { parse as parseYaml } from "yaml";
 import type {
   KernelCommandInput,

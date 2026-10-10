@@ -11,13 +11,14 @@
 <CHANGE_SUMMARY>
   <item>RFC-0658: initial installBordbuchPreCommitHook implementation.</item>
   <item>RFC-0821: add cache-clone commit guard to block direct git commit in cache clones.</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
 import path from "node:path";
 import { writeFileIfChanged } from "@warpgogol/werkstatt-engine/kernel";
 import { CACHE_CLONE_COMMIT_GUARD_SCRIPT } from "../mission/cache-clone-commit-guard.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface BordbuchHookResult {
   installed: boolean;

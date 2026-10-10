@@ -14,7 +14,6 @@ time) without performing any network I/O. Safe to run frequently.
   <item>Status is a local-only query — it never touches remotes.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0563: initial implementation — gitmesh.status local-only query handler.</item>
   <item>RFC-0563 fix: add diagnostics array on error return (RFC-0086).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -23,6 +22,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0563</history>
 </CHANGE_SUMMARY>
 */
 
@@ -40,7 +41,6 @@ import {
   gitRevParseHead,
   gitRevParseRemote,
 } from "./git-ops.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const LAST_SYNC_FILE = ".git/gitmesh.last-sync";
 

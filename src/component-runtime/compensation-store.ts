@@ -12,6 +12,7 @@ evidence survives process restarts and can be re-verified later.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1037: initial implementation — CompensationStore with SQLite-backed persistence.</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -20,7 +21,7 @@ import { createRequire } from "node:module";
 
 import type { CompensationResult, ProbeResult } from "@warpgogol/werkstatt-shared/component";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const require_ = createRequire(import.meta.url);
 

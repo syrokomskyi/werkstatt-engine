@@ -10,6 +10,7 @@ cross-referencing validator rules[] declarations to identify uncovered ruleIds.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1027: initial implementation.</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -23,7 +24,6 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-shared/kernel";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const CATALOG_RELATIVE_PATH = join("docs", "remediation-catalog.generated.yaml");
 

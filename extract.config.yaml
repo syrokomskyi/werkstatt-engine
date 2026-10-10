@@ -2,6 +2,7 @@ forgePlugin: false
 # extract.config.yaml — repo-extract standalone package export for @warpgogol/werkstatt-engine
 # Extracts packages/werkstatt from the werkstatt monorepo into a standalone private repo.
 # RFC-0773: Engine publication pipeline via repo-extract to private npm.
+# RFC-1254: standalone test classification — monorepo-only exclusions with justifications.
 
 projectDir: packages/werkstatt-engine
 destName: werkstatt-engine
@@ -33,8 +34,20 @@ ignoreDirs:
 excludePathSegments:
   - .npmrc
   - src/tests
+  # monorepo-only: runProbe end-to-end reads the monorepo repo outside package
   - src/kernel/tests/rfc-acceptance.test.ts
+  # monorepo-only: reads docs/architecture-dna.md outside package
   - src/kernel/tests/rfc-create.test.ts
+  # monorepo-only: loads @warpgogol/werkstatt-site module surface (stubbed in extract)
+  - src/kernel/tests/command-manifest.test.ts
+  # monorepo-only: loads @warpgogol/werkstatt-site module surface (stubbed in extract)
+  - src/kernel/workflow/tests/handlers.test.ts
+  # monorepo-only: reads src/tests-handoff/helpers/ (absent via src/tests segment match)
+  - src/mission/rfc-1218-generated-conflicts.test.ts
+  # monorepo-only: reads src/tests-handoff/helpers/ (absent via src/tests segment match)
+  - src/mission/rfc-1219-rewind-preservation.test.ts
+  # monorepo-only: reads src/tests-handoff/helpers/ (absent via src/tests segment match)
+  - src/mission/rfc-1221-fold-merged-shas.test.ts
   - pnpm-lock.yaml
 
 postProcess:

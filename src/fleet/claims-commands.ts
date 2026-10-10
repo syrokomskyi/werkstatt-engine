@@ -10,6 +10,7 @@ status. Thin wrappers around claims-repo.ts pure functions.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-1124: initial command handlers for fleet.claims.* surface.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -29,7 +30,6 @@ import {
   verifyClaimOffline,
   type FleetClaimsConfig,
 } from "./claims-repo.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {

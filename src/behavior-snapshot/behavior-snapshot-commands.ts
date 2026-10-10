@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0592: fix wildcard matching so /de/* matches /de (directory root without trailing slash).</item>
   <item>RFC-0595: detect redirect pages, set contentHash: null + redirectTarget.</item>
   <item>RFC-1097: step 6 â€” compass.migrate codemod run
 
@@ -15,7 +14,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>RFC-0357, RFC-0379, RFC-0585, RFC-0588</history>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0357, RFC-0379, RFC-0585, RFC-0588, RFC-0592</history>
 </CHANGE_SUMMARY>
 */
 
@@ -35,7 +35,7 @@ import {
 import { isHtmlRedirectPage } from "@warpgogol/werkstatt-shared/semantic";
 import { hashHtml } from "@warpgogol/werkstatt-engine/fingerprint";
 import type { RouteFact } from "@warpgogol/werkstatt-engine/schemas";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];

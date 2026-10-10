@@ -20,6 +20,7 @@
   <item>RFC-0971: initial implementation.</item>
   <item>RFC-0972: removed handler-local isJson exit code workaround — CLI layer now handles --json exit code globally.</item>
   <item>RFC-1157: resolve check commands from site-module ActualStates; merge computeOwnershipMap output deduped by (command, artifact.path).</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,7 +38,6 @@ import { executeRegisteredCommand, siteModuleLoaders } from "@warpgogol/werkstat
 import { computeOwnershipMap } from "../kernel/runtime/execute-command.ts";
 import { getOrBuildSiteModuleStates } from "../kernel/runtime/registry-cache.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const PREFLIGHT_CHECKS = ["ownership.sync.validate", "generated.stale.validate"] as const;
 

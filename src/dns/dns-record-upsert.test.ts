@@ -13,6 +13,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0812: initial unit tests for toApiRecord.</item>
   <item>RFC-0817: add graceful skip test for missing dns-records.yaml.</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -21,7 +22,7 @@ import { toApiRecord, runDnsRecordUpsert } from "./dns-record-upsert.ts";
 import type { DnsRecordDeclaration } from "@warpgogol/werkstatt-shared/ontology/schemas";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
-import { loadDnsRecordFile, resolveDnsZoneId, resolveDnsEnv } from "./dns-helpers.ts";
+import { loadDnsRecordFile } from "./dns-helpers.ts";
 import {
   listDnsRecords,
   createDnsRecord,

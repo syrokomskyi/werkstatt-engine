@@ -7,12 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1185: shared.context.validate joins the commit gate — unscoped over pages/ and system.md because collision groups are whole-site per language</item>
   <item>RFC-1189: material.credits.public-text.validate joins the commit gate — unscoped over src/content/prose/ and src/content/site/ so generated-credits public-text leaks fail at commit time</item>
   <item>RFC-1199: fail-closed materialization preflight — MATERIALIZATION_IN_PROGRESS result when workpiece/.git/MATERIALIZATION-IN-PROGRESS exists or manifest.materializedAt is null; runs before the .git check, staging, and commit-gate validators</item>
   <item>RFC-1204: trigger effects.contract.validate unscoped on pages/prose staging</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>ADR-0096, ADR-0104, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149, RFC-1159, RFC-1160</history>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>ADR-0096, ADR-0104, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149, RFC-1159, RFC-1160, RFC-1185</history>
 </CHANGE_SUMMARY>
 */
 
@@ -290,23 +290,21 @@ export async function countOperatorCommits(
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
   }
 
-  let rootSha: string;
   const rootResult = await io.exec("git", ["rev-list", "--max-parents=0", "HEAD"], {
     cwd: workpieceDir,
   });
   if (rootResult.exitCode !== 0) {
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
   }
-  rootSha = rootResult.stdout.trim();
+  const rootSha = rootResult.stdout.trim();
 
-  let output: string;
   const listResult = await io.exec("git", ["rev-list", `${rootSha}..HEAD`, "--oneline"], {
     cwd: workpieceDir,
   });
   if (listResult.exitCode !== 0) {
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
   }
-  output = listResult.stdout.trim();
+  const output = listResult.stdout.trim();
 
   const allCommits = output ? output.split("\n") : [];
   const baselineCount = migratedAt ? 1 : 0;

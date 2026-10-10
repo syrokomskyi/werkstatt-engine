@@ -20,7 +20,6 @@ single source of truth for its documentation, IO, and pipeline membership.
   <item>Deduplication is fail-closed (CMD-MAN-04): same-name commands across providers merge only when semantic fields agree.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0266: initial implementation.</item>
   <item>RFC-1147: static command surface — providers[]/siteScope schema, fail-closed CMD-MAN-04 dedup, runtimeState removed.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
@@ -29,6 +28,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0266</history>
 </CHANGE_SUMMARY>
 */
 
@@ -49,7 +50,6 @@ import type {
   KernelRuntimeContext,
   ModuleExport,
 } from "@warpgogol/werkstatt-shared/kernel";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface CommandManifestEntry {

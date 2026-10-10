@@ -9,12 +9,12 @@ lock, wrangler deploy, health check, and prod state recording.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0829: add test evidence gate (L1+L2+L5) via shared runTestEvidenceGate helper; throw after grace period if git HEAD unresolvable.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures surface through logger.warn via onSigningFailure</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>RFC-0806</history>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0806, RFC-0829</history>
 </CHANGE_SUMMARY>
 */
 
@@ -40,7 +40,6 @@ import {
   type ServicePromoteData,
   type KernelRuntimeContext,
 } from "./service-deploy-helpers.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export async function runLeitstandServicePromote(
   input: KernelCommandInput,

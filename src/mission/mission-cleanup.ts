@@ -7,11 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0480: initial mission.cleanup command handler.</item>
   <item>RFC-0652: replace unconditional evidence preservation with age-based Axiom evidence cleanup; add --evidence-retention-days flag.</item>
   <item>RFC-0985: add --stale-dirs mode to archive aborted missions and remove stub directories.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0480</history>
 </CHANGE_SUMMARY>
 */
 
@@ -22,7 +23,6 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface MissionCleanupData {
   missionId: string;

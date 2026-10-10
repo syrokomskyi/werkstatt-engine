@@ -9,6 +9,7 @@
   <item>RFC-0354: initial pin command handler.</item>
   <item>RFC-0381: use shared pin-helpers for highestRfcId and snapshotCapabilities; case-insensitive RFC regex.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -28,7 +29,6 @@ import {
   resolveCacheClonePath,
 } from "./registry-io.ts";
 import { highestRfcId, snapshotCapabilities } from "./pin-helpers.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface SternsystemPinData {
   systemId: string;

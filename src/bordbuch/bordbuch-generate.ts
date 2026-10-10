@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0473: initial bordbuch.generate command handler.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -28,7 +29,7 @@ import {
 } from "@warpgogol/werkstatt-shared/surface/io";
 import type { SurfaceModuleContext } from "@warpgogol/werkstatt-shared/surface";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const FREEZE_FILE = "src/surface/freeze.generated.yaml";
 

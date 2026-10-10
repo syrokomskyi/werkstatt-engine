@@ -9,7 +9,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0872: add technical-assessment kind, include observation identity fields in manifest entries.</item>
   <item>RFC-0886: include display and websiteUrl fields in manifest entries.</item>
   <item>RFC-0888: append sichtpass Bordbuch entry after manifest file is written (unless --skip-bordbuch is set).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -18,7 +17,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0707, RFC-0871</history>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0707, RFC-0871, RFC-0872</history>
 </CHANGE_SUMMARY>
 */
 
@@ -43,7 +43,6 @@ import {
   type NachweisManifest,
   type NachweisManifestEntry,
 } from "./nachweis-io.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const NACHWEIS_EVIDENCE_KINDS = new Set([
   "client-statement",

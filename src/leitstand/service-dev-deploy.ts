@@ -12,6 +12,7 @@ health check, and dev state recording.</purpose>
   <item>RFC-0806: initial dev-deploy command handler.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures surface through logger.warn via onSigningFailure</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -38,7 +39,6 @@ import {
   type ServiceDevDeployData,
   type KernelRuntimeContext,
 } from "./service-deploy-helpers.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export async function runLeitstandServiceDevDeploy(
   input: KernelCommandInput,

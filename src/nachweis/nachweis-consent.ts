@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0707: initial nachweis.consent.update command handler.</item>
   <item>RFC-0885: update consentScope instead of consentStatus (document aspect only).</item>
   <item>RFC-0886: add --scope flag for granular per-aspect consent (document|screenshot|websiteLink).</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -17,6 +16,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
+  <history>RFC-0707</history>
 </CHANGE_SUMMARY>
 */
 
@@ -30,7 +31,6 @@ import {
   parseMarkdownFrontmatter,
   stringifyMarkdownFrontmatter,
 } from "@warpgogol/werkstatt-shared/content";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { acquireLock, releaseLock, generateOperationId } from "../werkstatt/index.ts";
 import {

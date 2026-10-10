@@ -16,6 +16,7 @@ pass/fail status with restore commands for missing files.
   <item>RFC-0844: initial workpiece.config.presence.check command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -27,7 +28,6 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { OPERATOR_CONFIG_FILES } from "./operator-config-files.ts";
 import { resolveMissionDir } from "./mission-io.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkpieceConfigPresenceResult {
   command: "workpiece.config.presence.check";

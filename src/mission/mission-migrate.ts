@@ -14,6 +14,7 @@ the cursor, and writes a migration report to evidence/.</purpose>
   <item>RFC-0580: auto-commit werkstatt side-effects (mission.yaml) after writeMissionManifest.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,7 +31,6 @@ import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { migratorsToApply } from "../migrators/registry.ts";
 import type { SternsystemData, MigrationContext, MigrationViolation } from "../migrators/types.ts";
 import { MigrationError } from "../migrators/types.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface MissionMigrateData {
   missionId: string;

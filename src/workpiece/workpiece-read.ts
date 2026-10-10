@@ -15,6 +15,7 @@ returns the file content.
   <item>RFC-0555: initial workpiece.read command handler.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1254: drop unused io-migration leftovers</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,7 +27,6 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { readMissionManifest, resolveMissionDir } from "../mission/mission-io.ts";
 import { isClientEditable } from "./dna-22-checker.ts";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface WorkpieceReadResult {
   path: string;
