@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0580: initial integration test for clean working tree after mission.open.</item>
+  <item>RFC-1254: drain latent lint debt — dead imports/vars, no-as-any casts, restricted imports</item>
 </CHANGE_SUMMARY>
 */
 
@@ -22,17 +23,14 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io
 vi.mock("../mission/mission-materialize.ts", () => ({
   runMissionMaterializeInternal: vi.fn(
     async (workspaceRoot: string, manifest: { missionId: string }) => {
-      const { execSync: exec } = await import("node:child_process");
+      const { execFileSync: execFile } = await import("node:child_process");
       const { join: joinPath } = await import("node:path");
       try {
-        exec(
-          `git add ${JSON.stringify(joinPath("missions", manifest.missionId, "mission.yaml"))}`,
-          {
-            cwd: workspaceRoot,
-            stdio: "pipe",
-          },
-        );
-        exec('git commit -m "werkstatt: mission.materialize (mock)"', {
+        execFile("git", ["add", joinPath("missions", manifest.missionId, "mission.yaml")], {
+          cwd: workspaceRoot,
+          stdio: "pipe",
+        });
+        execFile("git", ["commit", "-m", "werkstatt: mission.materialize (mock)"], {
           cwd: workspaceRoot,
           stdio: "pipe",
         });
