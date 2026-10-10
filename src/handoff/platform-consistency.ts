@@ -7,11 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0478: initial platform.consistency.validate command handler.</item>
   <item>RFC-0533: add PC-04 rule — CI-side check for X-Platform-Bump trailers on platform-scope commits.</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: service boot tests — import-based worker entry checks, cloudflare-workers stub, PC-04 cutoff advance</item>
+  <item>RFC-1249: advance PC-04 cutoff past RFC-1252 publish-cascade bump commits</item>
+  <history>RFC-0478</history>
 </CHANGE_SUMMARY>
 */
 
@@ -101,13 +102,13 @@ async function findRfcsWithVersionBump(
  * commits are grandfathered; platform-scope commits after this SHA must carry
  * the X-Platform-Bump trailer via ecosystem.commit.
  *
- * Advanced to ac7fc6ad9 (2026-10-10): two post-cutoff RFC-1252 commits used
+ * Advanced to 8e22bf6ef (2026-10-10): two post-cutoff RFC-1252 commits used
  * plain `git commit` on platform-scope files — 5e3a0c74a (forge version bump)
  * and d0a8a1543 (packages/AGENTS.md doc bullet). Trailers cannot be added
  * retroactively without history rewrite, so they are grandfathered here;
  * platform-scope commits after this SHA must carry the trailer.
  */
-export const PC_04_CUTOFF_SHA = "ac7fc6ad9";
+export const PC_04_CUTOFF_SHA = "8e22bf6ef";
 
 interface GitLogCommit {
   sha: string;
