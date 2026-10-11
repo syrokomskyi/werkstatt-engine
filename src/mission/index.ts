@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0355: initial mission command module.</item>
   <item>ADR-0041: removed duplicate command registrations; mission.module.ts is the single source of truth for flag schemas. This file is now a pure re-export barrel.</item>
+  <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
 </CHANGE_SUMMARY>
 */
 
@@ -77,6 +78,12 @@ export {
   type PreflightCheckResult,
   type MissionPreflightData,
 } from "./mission-preflight.ts";
+export {
+  runMissionDeployPreflight,
+  DEPLOY_PREFLIGHT_CHECKS,
+  type DeployPreflightStepResult,
+  type MissionDeployPreflightData,
+} from "./mission-deploy-preflight.ts";
 export {
   type ValidationState,
   type ValidatorState,

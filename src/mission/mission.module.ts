@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1176 follow-up: drop duplicated writes[] on mission.validate — the contract sweep's narrower evidence/** entry shadowed the existing evidence+distribution declaration (TS1117).</item>
   <item>RFC-1199: mission.git.commit description documents the MATERIALIZATION_IN_PROGRESS fail-closed guard</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
@@ -17,6 +16,7 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173</history>
 </CHANGE_SUMMARY>
 */
@@ -44,6 +44,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
   const { runMaterializeConfigValidate } = await import("./materialize-config-validate.ts");
   const { runWorkpieceConfigPresenceCheck } = await import("./workpiece-config-presence-check.ts");
   const { runMissionPreflight } = await import("./mission-preflight.ts");
+  const { runMissionDeployPreflight } = await import("./mission-deploy-preflight.ts");
   const { runValidationStateInspect } = await import("./validation-state-inspect.ts");
   return {
     name: "mission",
@@ -644,6 +645,27 @@ export async function createMissionModule(): Promise<ModuleExport> {
         reads: ["../systems-cache/{system}/public/**"],
         cacheable: false,
         execute: runMissionPreflight,
+      },
+      {
+        name: "mission.deploy-preflight",
+        coverage: "operator" as const,
+        coverageNote: "requires --mission",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
+        description:
+          "Deploy-readiness probe (RFC-1256): runs the historically fragile non-build validators against the mission workpiece in one aggregated pass before mission.reconcile. Advisory — mission.validate remains the gate. Required flags: `--mission`.",
+        scope: "workspace",
+        acceptsAllFlag: false,
+        mutatesState: false,
+        execOnReadOnly: true,
+        flags: {
+          mission: { kind: "string", required: true, description: "Mission id." },
+          json: { kind: "boolean", description: "Output as JSON." },
+        },
+        writes: [],
+        reads: ["missions/{mission}/workpiece/**"],
+        cacheable: false,
+        execute: runMissionDeployPreflight,
       },
       {
         name: "validation.state.inspect",

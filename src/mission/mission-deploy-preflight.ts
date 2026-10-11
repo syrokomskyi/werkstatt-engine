@@ -1,0 +1,236 @@
+/*
+<MODULE_CONTRACT>
+<purpose>
+  RFC-1256: mission.deploy-preflight — deploy-readiness probe. Runs the
+  historically fragile non-build validators (DEPLOY_PREFLIGHT_CHECKS) against
+  a mission workpiece in one aggregated pass before mission.reconcile, so
+  latent deploy blockers surface in a single report instead of across serial
+  full-validation cycles. Read-only per K-0004; dispatches to registered check
+  commands via executeRegisteredCommand with a KernelRuntimeContext whose
+  site.directory points at the workpiece.
+</purpose>
+<non-goals>
+  <item>Do not replace mission.validate — it remains the reconcile gate; this probe is advisory and never wired into reconcile/ship (superseding RFC required for gating).</item>
+  <item>Do not run build pipelines — every step is a non-build validator; the probe stays inside the RFC-0963 time budget.</item>
+  <item>Do not mutate the workpiece — no commits, no artifact regeneration; workpieceDirty is informational only.</item>
+  <item>Do not evaluate the cache clone — mission.preflight owns the cache-clone subject; this command only reads missions/{id}/workpiece.</item>
+</non-goals>
+</MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1256: initial implementation — mirrors mission-preflight.ts dispatch (RFC-1157 site-module resolution), aggregates all steps, warning-only steps report pass, workpieceDirty informational.</item>
+  <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
+</CHANGE_SUMMARY>
+*/
+
+import { join } from "node:path";
+import type {
+  CheckResult,
+  KernelCommandInput,
+  KernelCommandResult,
+  KernelExecutionReport,
+  KernelNextStep,
+  KernelRuntimeContext,
+  DiscoveredSiteWorkspace,
+} from "@warpgogol/werkstatt-engine/kernel";
+import { executeRegisteredCommand, siteModuleLoaders } from "@warpgogol/werkstatt-engine/kernel";
+import { computeOwnershipMap } from "../kernel/runtime/execute-command.ts";
+import { getOrBuildSiteModuleStates } from "../kernel/runtime/registry-cache.ts";
+import { resolveMissionDir } from "../kernel/mission-resolver.ts";
+import { isWorkpieceDirty } from "./mission-git-commit.ts";
+
+/**
+ * Deploy-blocker families observed in warpgogol-m000196 plus their fragile
+ * neighbors. Mirrors DEPLOY_PREFLIGHT_STEPS in
+ * packages/werkstatt-site/src/checks/pipelines/deploy-preflight.ts — the two
+ * lists exist on opposite sides of the engine↛site package boundary; the
+ * resolution test asserts every name here resolves to a registered command.
+ */
+export const DEPLOY_PREFLIGHT_CHECKS = [
+  "semantic.parity",
+  "feature.links.validate",
+  "nachweis.validate",
+  "generated.drift.validate",
+  "a11y.contrast.lint",
+  "ratgeber.claim.validate",
+  "ratgeber.policy.validate",
+  "typography.validate",
+  "list.punctuation.validate",
+  "shared.context.validate",
+  "page.block.validate",
+  "cosmic.catalog.validate",
+] as const;
+
+export interface DeployPreflightStepResult {
+  command: string;
+  status: "pass" | "fail" | "unavailable";
+  violations: number;
+  durationMs: number;
+}
+
+export interface MissionDeployPreflightData {
+  command: "mission.deploy-preflight";
+  mission: string;
+  status: "pass" | "fail";
+  steps: DeployPreflightStepResult[];
+  totalViolations: number;
+  totalDurationMs: number;
+  workpieceDirty: boolean;
+}
+
+function countViolations(report: KernelExecutionReport): number {
+  const data = report.data as CheckResult | undefined;
+  if (!data || !data.diagnostics) return report.exitCode !== 0 ? 1 : 0;
+  const errors = data.diagnostics.filter((d) => d.severity === "error").length;
+  return errors > 0 ? errors : report.exitCode !== 0 ? 1 : 0;
+}
+
+function buildNextSteps(steps: DeployPreflightStepResult[]): KernelNextStep[] {
+  const failed = steps.filter((s) => s.status !== "pass");
+  if (failed.length === 0) return [];
+  return [
+    {
+      action: `Fix deploy blockers reported by: ${failed.map((s) => s.command).join(", ")} — re-run an individual validator for detail, then mission.deploy-preflight`,
+      kind: "required",
+    },
+  ];
+}
+
+export async function runMissionDeployPreflight(
+  input: KernelCommandInput,
+  context: KernelRuntimeContext,
+): Promise<KernelCommandResult<MissionDeployPreflightData>> {
+  const missionId = input.flags.mission as string | undefined;
+  if (!missionId) {
+    return {
+      data: {
+        command: "mission.deploy-preflight",
+        mission: "",
+        status: "fail",
+        steps: [],
+        totalViolations: 0,
+        totalDurationMs: 0,
+        workpieceDirty: false,
+      },
+      exitCode: 1,
+      summary: "[mission.deploy-preflight] missing required --mission flag",
+      nextSteps: [{ action: "Provide --mission <id> flag", kind: "required" }],
+    };
+  }
+
+  const missionDir = await resolveMissionDir(context.workspaceRoot, missionId, context.io);
+  const workpieceDir = missionDir ? join(missionDir, "workpiece") : undefined;
+  if (!workpieceDir || !(await context.io.exists(workpieceDir))) {
+    return {
+      data: {
+        command: "mission.deploy-preflight",
+        mission: missionId,
+        status: "fail",
+        steps: [],
+        totalViolations: 0,
+        totalDurationMs: 0,
+        workpieceDirty: false,
+      },
+      exitCode: 1,
+      summary: `[mission.deploy-preflight] no workpiece at missions/${missionId}/workpiece — the probe has no subject. Open or materialize the mission first.`,
+      nextSteps: [
+        {
+          action: `Run: pnpm exec werkstatt run mission.materialize --mission ${missionId}`,
+          kind: "required",
+        },
+      ],
+    };
+  }
+
+  const workpieceSite: DiscoveredSiteWorkspace = {
+    name: missionId,
+    directory: workpieceDir,
+    toolsDirectory: join(workpieceDir, "tools"),
+  };
+
+  // RFC-1157: check commands live in site-module ActualStates — materialize
+  // the canonical site module set once and merge its generator ownership into
+  // the dispatch context (same pattern as mission.preflight).
+  let siteStates: Awaited<ReturnType<typeof getOrBuildSiteModuleStates>> = new Map();
+  try {
+    siteStates = await getOrBuildSiteModuleStates(context.workspaceRoot, siteModuleLoaders());
+  } catch (err) {
+    context.logger.warn(
+      `[mission.deploy-preflight] site-module states unavailable: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const ownershipMap = [...(context.ownershipMap ?? [])];
+  const seenOwnership = new Set(ownershipMap.map((e) => `${e.command}:${e.artifact.path}`));
+  for (const state of siteStates.values()) {
+    const siteMap = await computeOwnershipMap(state);
+    if (!siteMap) continue;
+    for (const entry of siteMap) {
+      const key = `${entry.command}:${entry.artifact.path}`;
+      if (seenOwnership.has(key)) continue;
+      seenOwnership.add(key);
+      ownershipMap.push(entry);
+    }
+  }
+
+  const workpieceContext: KernelRuntimeContext = {
+    ...context,
+    site: workpieceSite,
+    ownershipMap,
+  };
+
+  const steps: DeployPreflightStepResult[] = [];
+  let totalViolations = 0;
+  let totalDurationMs = 0;
+
+  for (const stepName of DEPLOY_PREFLIGHT_CHECKS) {
+    const started = Date.now();
+    let command = context.actualState.commands.get(stepName);
+    if (!command) {
+      for (const state of siteStates.values()) {
+        command = state.commands.get(stepName);
+        if (command) break;
+      }
+    }
+    if (!command) {
+      steps.push({ command: stepName, status: "unavailable", violations: 0, durationMs: 0 });
+      totalViolations += 1;
+      context.logger.warn(`[mission.deploy-preflight] Command ${stepName} is not registered`);
+      continue;
+    }
+
+    const report = await executeRegisteredCommand(command, workpieceContext, []);
+    const durationMs = Date.now() - started;
+    totalDurationMs += durationMs;
+    const violations = countViolations(report);
+    // Q-2 (AUDIT-RFC-1256-01): warning-only results count as pass — identical
+    // to mission.validate semantics where advisory diagnostics do not block.
+    const status = violations > 0 ? "fail" : "pass";
+    steps.push({ command: stepName, status, violations, durationMs });
+    totalViolations += violations;
+  }
+
+  const dirty = await isWorkpieceDirty(workpieceDir, context.io);
+
+  const overallStatus = totalViolations > 0 ? "fail" : "pass";
+  const data: MissionDeployPreflightData = {
+    command: "mission.deploy-preflight",
+    mission: missionId,
+    status: overallStatus,
+    steps,
+    totalViolations,
+    totalDurationMs,
+    workpieceDirty: dirty.dirty,
+  };
+
+  const summary =
+    overallStatus === "pass"
+      ? `[mission.deploy-preflight] ${missionId}: all ${steps.length} deploy checks passed in ${(totalDurationMs / 1000).toFixed(1)}s${dirty.dirty ? " (workpiece dirty — informational)" : ""}`
+      : `[mission.deploy-preflight] ${missionId}: ${totalViolations} violation(s) across ${steps.filter((s) => s.status !== "pass").length} step(s)`;
+
+  return {
+    data,
+    exitCode: totalViolations > 0 ? 1 : 0,
+    summary,
+    nextSteps: buildNextSteps(steps),
+  };
+}
