@@ -17,6 +17,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>warpgogol-m000196: layout.rhythm.validate appended — post-hero density rhythm gate (mirrors DEPLOY_PREFLIGHT_STEPS in werkstatt-site).</item>
   <item>RFC-1256: initial implementation — mirrors mission-preflight.ts dispatch (RFC-1157 site-module resolution), aggregates all steps, warning-only steps report pass, workpieceDirty informational.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
@@ -60,6 +61,7 @@ export const DEPLOY_PREFLIGHT_CHECKS = [
   "shared.context.validate",
   "page.block.validate",
   "cosmic.catalog.validate",
+  "layout.rhythm.validate",
 ] as const;
 
 export interface DeployPreflightStepResult {

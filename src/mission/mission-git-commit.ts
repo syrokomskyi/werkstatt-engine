@@ -7,6 +7,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>warpgogol-m000196: layout.rhythm.validate joins the commit gate — unscoped over src/content/pages/ so post-hero density violations fail at commit time</item>
   <item>RFC-1189: material.credits.public-text.validate joins the commit gate — unscoped over src/content/prose/ and src/content/site/ so generated-credits public-text leaks fail at commit time</item>
   <item>RFC-1199: fail-closed materialization preflight — MATERIALIZATION_IN_PROGRESS result when workpiece/.git/MATERIALIZATION-IN-PROGRESS exists or manifest.materializedAt is null; runs before the .git check, staging, and commit-gate validators</item>
   <item>RFC-1204: trigger effects.contract.validate unscoped on pages/prose staging</item>
@@ -86,6 +87,10 @@ export const VALIDATOR_MAPPINGS: ValidatorMapping[] = [
   // cross-locale, so staging any content file forces the unscoped run.
   { prefix: "src/content/pages/", validator: "effects.contract.validate" },
   { prefix: "src/content/prose/", validator: "effects.contract.validate" },
+  // warpgogol-m000196: post-hero density rhythm — the check resolves
+  // component-level density defaults from section sources, so it always runs
+  // unscoped over all pages when any page file is staged.
+  { prefix: "src/content/pages/", validator: "layout.rhythm.validate" },
 ];
 
 function matchesPrefix(filePath: string, prefix: string): boolean {

@@ -101,6 +101,7 @@ test("prefix matching — business-profile and pages trigger correct validators"
     "typography.validate": { ok: true, exitCode: 0, summary: "pass" },
     "shared.context.validate": { ok: true, exitCode: 0, summary: "pass" },
     "effects.contract.validate": { ok: true, exitCode: 0, summary: "pass" },
+    "layout.rhythm.validate": { ok: true, exitCode: 0, summary: "pass" },
   };
   const result = await runPreCommitValidation(
     ["src/content/business-profile/de/offerings/automation.md", "src/content/pages/de/index.md"],
@@ -117,7 +118,9 @@ test("prefix matching — business-profile and pages trigger correct validators"
   expect(result.validatorsRun).toContain("shared.context.validate");
   // RFC-1204: pages/ commits trigger the unscoped effect-signature parity check.
   expect(result.validatorsRun).toContain("effects.contract.validate");
-  expect(result.validatorsRun).toHaveLength(7);
+  // warpgogol-m000196: pages/ commits trigger the unscoped post-hero rhythm check.
+  expect(result.validatorsRun).toContain("layout.rhythm.validate");
+  expect(result.validatorsRun).toHaveLength(8);
 });
 
 test("unregistered validator — skipped with warning, commit proceeds", async () => {
