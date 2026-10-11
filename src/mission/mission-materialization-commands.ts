@@ -6,6 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>warpgogol-m000196: ours-resolution handles clone-only paths absent from clone HEAD — gitignored RFC-0913 files tracked on the workpiece side conflict as UD, where `git checkout HEAD --` fails ("pathspec did not match"); presence in HEAD now decides restore-vs-`git rm`.</item>
   <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
   <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
@@ -2259,9 +2260,28 @@ export async function buildReconcileSteps(
                 await shExec(`git add -- ${delPathArgs}`, cc.systemDir, cc.context.io);
               }
               if (oursPaths.length > 0) {
-                const oursArgs = oursPaths.map((p) => JSON.stringify(p)).join(" ");
-                await shExec(`git checkout HEAD -- ${oursArgs}`, cc.systemDir, cc.context.io);
-                await shExec(`git add -- ${oursArgs}`, cc.systemDir, cc.context.io);
+                // warpgogol-m000196: "ours" for a clone-only path can also mean
+                // ABSENT — gitignored cache-clone-only files (RFC-0913) arrive
+                // tracked from the workpiece side and conflict as UD, where
+                // clone HEAD has no such path and `git checkout HEAD --` fails
+                // with "pathspec did not match". Presence in HEAD decides
+                // restore-vs-remove, mirroring the theirs branch below.
+                for (const oursPath of oursPaths) {
+                  const quoted = JSON.stringify(oursPath);
+                  const inHead = (
+                    await shExec(`git ls-tree HEAD -- ${quoted}`, cc.systemDir, cc.context.io)
+                  ).trim();
+                  if (inHead.length > 0) {
+                    await shExec(`git checkout HEAD -- ${quoted}`, cc.systemDir, cc.context.io);
+                    await shExec(`git add -- ${quoted}`, cc.systemDir, cc.context.io);
+                  } else {
+                    await shExec(
+                      `git rm -f --ignore-unmatch -- ${quoted}`,
+                      cc.systemDir,
+                      cc.context.io,
+                    );
+                  }
+                }
               }
               for (const theirsPath of theirsPaths) {
                 const quoted = JSON.stringify(theirsPath);
