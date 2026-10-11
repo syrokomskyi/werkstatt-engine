@@ -139,6 +139,32 @@ async function shExec(cmd: string, cwd: string, io: WorkspaceIO): Promise<string
   return result.stdout;
 }
 
+/**
+ * warpgogol-m000196: resolve "ours" for reconcile merge conflicts on
+ * cache-clone-only paths. "Ours" can mean two things: the clone HEAD version
+ * (path tracked in HEAD — restore it) or ABSENT (gitignored RFC-0913 files
+ * arrive tracked from the workpiece side and conflict as UD/DU, where clone
+ * HEAD has no such path and `git checkout HEAD --` fails with "pathspec did
+ * not match"). Presence in HEAD decides restore-vs-remove. Exported for the
+ * regression test — the inline version previously failed real reconciles.
+ */
+export async function resolveOursConflicts(
+  systemDir: string,
+  oursPaths: string[],
+  io: WorkspaceIO,
+): Promise<void> {
+  for (const oursPath of oursPaths) {
+    const quoted = JSON.stringify(oursPath);
+    const inHead = (await shExec(`git ls-tree HEAD -- ${quoted}`, systemDir, io)).trim();
+    if (inHead.length > 0) {
+      await shExec(`git checkout HEAD -- ${quoted}`, systemDir, io);
+      await shExec(`git add -- ${quoted}`, systemDir, io);
+    } else {
+      await shExec(`git rm -f --ignore-unmatch -- ${quoted}`, systemDir, io);
+    }
+  }
+}
+
 async function copyDir(src: string, dest: string, io: WorkspaceIO): Promise<void> {
   if (!(await io.exists(src))) return;
   await io.mkdir(dest);
@@ -2261,27 +2287,8 @@ export async function buildReconcileSteps(
               }
               if (oursPaths.length > 0) {
                 // warpgogol-m000196: "ours" for a clone-only path can also mean
-                // ABSENT — gitignored cache-clone-only files (RFC-0913) arrive
-                // tracked from the workpiece side and conflict as UD, where
-                // clone HEAD has no such path and `git checkout HEAD --` fails
-                // with "pathspec did not match". Presence in HEAD decides
-                // restore-vs-remove, mirroring the theirs branch below.
-                for (const oursPath of oursPaths) {
-                  const quoted = JSON.stringify(oursPath);
-                  const inHead = (
-                    await shExec(`git ls-tree HEAD -- ${quoted}`, cc.systemDir, cc.context.io)
-                  ).trim();
-                  if (inHead.length > 0) {
-                    await shExec(`git checkout HEAD -- ${quoted}`, cc.systemDir, cc.context.io);
-                    await shExec(`git add -- ${quoted}`, cc.systemDir, cc.context.io);
-                  } else {
-                    await shExec(
-                      `git rm -f --ignore-unmatch -- ${quoted}`,
-                      cc.systemDir,
-                      cc.context.io,
-                    );
-                  }
-                }
+                // ABSENT — see resolveOursConflicts.
+                await resolveOursConflicts(cc.systemDir, oursPaths, cc.context.io);
               }
               for (const theirsPath of theirsPaths) {
                 const quoted = JSON.stringify(theirsPath);

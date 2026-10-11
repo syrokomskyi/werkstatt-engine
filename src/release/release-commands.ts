@@ -6,6 +6,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>warpgogol-m000196: release.prepare refreshes mission distribution/ after a fresh rebuild (rm + copy from staging dist + post-build build-input-hash.json) — a stale distribution/ copy from an earlier ship attempt forced pointless rebuilds and misled post-ship verification reading distribution/ instead of the release artifact.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -548,6 +549,39 @@ export async function runReleasePrepare(
       await context.io.rm(path.join(publicWellKnownDir, "build-identity.json"), {
         recursive: true,
       });
+
+      // warpgogol-m000196: write the fresh dist back to the mission
+      // distribution — the reuse decision above reads distribution/dist +
+      // build-input-hash.json, and a stale copy (built by an earlier ship
+      // attempt against older platform code) both forces a pointless rebuild
+      // next time and misleads post-ship verification that reads mission
+      // distribution/ instead of the release artifact. Keep distribution/ ==
+      // the dist this release actually packaged. Hash recomputed post-build
+      // (the build mutates generated workpiece artifacts), matching
+      // persistDistribution's semantics.
+      if (!buildReused) {
+        const missionDistributionDir = path.join(missionDir, "distribution", "dist");
+        if (await context.io.exists(missionDistributionDir)) {
+          await context.io.rm(missionDistributionDir, { recursive: true });
+        }
+        await context.io.mkdir(path.dirname(missionDistributionDir));
+        await copyDir(distDest, missionDistributionDir);
+        const { buildInputHash: postBuildHash } = await computeBuildInputHash(
+          workspaceRoot,
+          workpieceDir,
+        );
+        await atomicWriteFile(
+          distributionMetaPath,
+          JSON.stringify(
+            { buildInputHash: postBuildHash, computedAt: new Date().toISOString() },
+            null,
+            2,
+          ) + "\n",
+        );
+        logger.info(
+          `  Refreshed mission distribution/ from the fresh build (build-input hash updated)`,
+        );
+      }
 
       // RFC-0961: Boot-smoke — boot built worker in miniflare and execute representative requests
       const { runBootSmoke, planBootSmokeRequests, detectBootSmokeLanguages } =
