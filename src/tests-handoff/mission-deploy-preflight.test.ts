@@ -7,11 +7,12 @@
 <CHANGE_SUMMARY>
   <item>RFC-1256: initial tests — all-pass, failing-step aggregation, unavailable commands, site-module fallback, missing --mission, missing workpiece, workpiece context, warning-only pass.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
+  <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
 </CHANGE_SUMMARY>
 */
 
 import { test, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type {
@@ -30,16 +31,20 @@ const mockCheckState = vi.hoisted(() => ({
   violations: {} as Record<string, number>,
   // per-command warning counts
   warnings: {} as Record<string, number>,
+  // names of commands that report a self-skip ({skipped:true} payload)
+  skipping: new Set<string>(),
   // when true, mocked site-module ActualStates carry the check commands
   // (mirroring the real site-module home of the validators).
   siteModuleChecks: true,
   // last site.directory seen by an executed check — asserts workpiece targeting.
   seenSiteDirs: {} as Record<string, string | undefined>,
+  seenSiteNames: {} as Record<string, string | undefined>,
 }));
 
 let tempRoot: string;
-const MISSION = "test-mission";
-const workpieceDir = () => join(tempRoot, "missions", MISSION, "workpiece");
+const MISSION = "test-m000001";
+const missionDir = () => join(tempRoot, "missions", MISSION);
+const workpieceDir = () => join(missionDir(), "workpiece");
 
 vi.mock("../kernel/runtime/registry-cache.ts", async (importOriginal) => {
   const original = (await importOriginal()) as Record<string, unknown>;
@@ -104,6 +109,14 @@ function makeMockCheckCommand(name: string): KernelCommandDefinition {
     mutatesState: false,
     execute: async (_input: KernelCommandInput, context: KernelRuntimeContext) => {
       mockCheckState.seenSiteDirs[name] = context.site?.directory;
+      mockCheckState.seenSiteNames[name] = context.site?.name;
+      if (mockCheckState.skipping.has(name)) {
+        return {
+          data: { systemId: context.site?.name, skipped: true, reason: "mock skip" },
+          exitCode: 0,
+          summary: `[${name}] skipped — mock reason`,
+        };
+      }
       const errors = mockCheckState.violations[name] ?? 0;
       const warnings = mockCheckState.warnings[name] ?? 0;
       return {
@@ -145,13 +158,34 @@ const input = (flags: Record<string, unknown>): KernelCommandInput => ({
   flags: flags as KernelCommandInput["flags"],
 });
 
+const MISSION_YAML = `schemaVersion: 1.0.0
+missionId: test-m000001
+systemId: test-system
+state: open
+brief: Test
+openedAt: 2026-10-11T00:00:00.000Z
+openedBy: test
+closedAt: null
+closedBy: null
+pinAtOpen: 0.0.0
+materializedAt: 2026-10-11T00:00:00.000Z
+reconciledAt: null
+migratedAt: null
+releaseId: null
+rfcId: null
+operationId: op-test
+`;
+
 beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), "deploy-preflight-test-"));
   mkdirSync(workpieceDir(), { recursive: true });
+  writeFileSync(join(missionDir(), "mission.yaml"), MISSION_YAML);
   mockCheckState.violations = {};
   mockCheckState.warnings = {};
+  mockCheckState.skipping = new Set();
   mockCheckState.siteModuleChecks = true;
   mockCheckState.seenSiteDirs = {};
+  mockCheckState.seenSiteNames = {};
 });
 
 afterEach(() => {
@@ -216,6 +250,33 @@ test("step context targets the mission workpiece, not the workspace root", async
   for (const name of DEPLOY_PREFLIGHT_CHECKS) {
     expect(mockCheckState.seenSiteDirs[name]).toBe(workpieceDir());
   }
+});
+
+test("site.name carries manifest.systemId — identity-derived steps resolve the Sternsystem id (REV-01)", async () => {
+  const { runMissionDeployPreflight } = await import("../mission/mission-deploy-preflight.ts");
+  await runMissionDeployPreflight(input({ mission: MISSION }), makeContext());
+  for (const name of DEPLOY_PREFLIGHT_CHECKS) {
+    expect(mockCheckState.seenSiteNames[name]).toBe("test-system");
+  }
+});
+
+test("self-skipping step reports status skipped with its reason, not pass (vacuity tripwire)", async () => {
+  mockCheckState.skipping = new Set(["nachweis.validate"]);
+  const { runMissionDeployPreflight } = await import("../mission/mission-deploy-preflight.ts");
+  const result = await runMissionDeployPreflight(input({ mission: MISSION }), makeContext());
+  const step = result.data!.steps.find((s) => s.command === "nachweis.validate");
+  expect(step?.status).toBe("skipped");
+  expect(step?.note).toContain("skipped");
+  expect(result.data?.status).toBe("pass");
+  expect(result.exitCode).toBe(0);
+  expect(result.summary).toContain("1 skipped");
+});
+
+test("unavailable step records violations:1 (envelope consistency)", async () => {
+  mockCheckState.siteModuleChecks = false;
+  const { runMissionDeployPreflight } = await import("../mission/mission-deploy-preflight.ts");
+  const result = await runMissionDeployPreflight(input({ mission: MISSION }), makeContext(false));
+  expect(result.data!.steps.every((s) => s.violations === 1)).toBe(true);
 });
 
 test("missing --mission → exitCode 1, no steps", async () => {

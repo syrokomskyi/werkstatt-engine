@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1176 follow-up: drop duplicated writes[] on mission.validate — the contract sweep's narrower evidence/** entry shadowed the existing evidence+distribution declaration (TS1117).</item>
   <item>RFC-1199: mission.git.commit description documents the MATERIALIZATION_IN_PROGRESS fail-closed guard</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
 
@@ -17,7 +16,8 @@ assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
-  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173</history>
+  <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
+  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176</history>
 </CHANGE_SUMMARY>
 */
 
@@ -665,6 +665,8 @@ export async function createMissionModule(): Promise<ModuleExport> {
         writes: [],
         reads: ["missions/{mission}/workpiece/**"],
         cacheable: false,
+        expectedDurationMs: 120_000,
+        timeoutMs: 300_000,
         execute: runMissionDeployPreflight,
       },
       {

@@ -19,6 +19,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1256: initial implementation — mirrors mission-preflight.ts dispatch (RFC-1157 site-module resolution), aggregates all steps, warning-only steps report pass, workpieceDirty informational.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
+  <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,6 +38,7 @@ import { computeOwnershipMap } from "../kernel/runtime/execute-command.ts";
 import { getOrBuildSiteModuleStates } from "../kernel/runtime/registry-cache.ts";
 import { resolveMissionDir } from "../kernel/mission-resolver.ts";
 import { isWorkpieceDirty } from "./mission-git-commit.ts";
+import { readMissionManifest } from "./mission-io.ts";
 
 /**
  * Deploy-blocker families observed in warpgogol-m000196 plus their fragile
@@ -62,9 +64,11 @@ export const DEPLOY_PREFLIGHT_CHECKS = [
 
 export interface DeployPreflightStepResult {
   command: string;
-  status: "pass" | "fail" | "unavailable";
+  status: "pass" | "fail" | "unavailable" | "skipped";
   violations: number;
   durationMs: number;
+  /** Command's own summary — surfaced for skipped/vacuous steps so a skip reason is never dropped. */
+  note?: string;
 }
 
 export interface MissionDeployPreflightData {
@@ -85,7 +89,7 @@ function countViolations(report: KernelExecutionReport): number {
 }
 
 function buildNextSteps(steps: DeployPreflightStepResult[]): KernelNextStep[] {
-  const failed = steps.filter((s) => s.status !== "pass");
+  const failed = steps.filter((s) => s.status === "fail" || s.status === "unavailable");
   if (failed.length === 0) return [];
   return [
     {
@@ -141,10 +145,25 @@ export async function runMissionDeployPreflight(
     };
   }
 
+  // Identity-derived consumers (nachweis.validate resolves systemId from
+  // site.name, generated.drift.validate uses it for generator dispatch) need
+  // the Sternsystem id, not the mission id — read it from mission.yaml, same
+  // as mission.validate's closed-workpiece site synthesis.
+  let systemId = missionId;
+  try {
+    const manifest = await readMissionManifest(context.workspaceRoot, missionId, context.io);
+    systemId = manifest.systemId;
+  } catch (err) {
+    context.logger.warn(
+      `[mission.deploy-preflight] mission.yaml unreadable — site.name falls back to the mission id and identity-derived steps may skip: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const workpieceSite: DiscoveredSiteWorkspace = {
-    name: missionId,
+    name: systemId,
     directory: workpieceDir,
     toolsDirectory: join(workpieceDir, "tools"),
+    configPath: join(workpieceDir, "tools", "kernel.config.ts"),
   };
 
   // RFC-1157: check commands live in site-module ActualStates — materialize
@@ -192,7 +211,7 @@ export async function runMissionDeployPreflight(
       }
     }
     if (!command) {
-      steps.push({ command: stepName, status: "unavailable", violations: 0, durationMs: 0 });
+      steps.push({ command: stepName, status: "unavailable", violations: 1, durationMs: 0 });
       totalViolations += 1;
       context.logger.warn(`[mission.deploy-preflight] Command ${stepName} is not registered`);
       continue;
@@ -201,11 +220,21 @@ export async function runMissionDeployPreflight(
     const report = await executeRegisteredCommand(command, workpieceContext, []);
     const durationMs = Date.now() - started;
     totalDurationMs += durationMs;
+    // Vacuity tripwire: a step that self-reports `skipped` (e.g. nachweis
+    // entitlement unresolved) is surfaced distinctly — never masquerades as
+    // "pass" and never drops its own reason (REVIEW-RFC-1256 finding).
+    const skipped = (report.data as { skipped?: boolean } | undefined)?.skipped === true;
     const violations = countViolations(report);
     // Q-2 (AUDIT-RFC-1256-01): warning-only results count as pass — identical
     // to mission.validate semantics where advisory diagnostics do not block.
-    const status = violations > 0 ? "fail" : "pass";
-    steps.push({ command: stepName, status, violations, durationMs });
+    const status = skipped ? "skipped" : violations > 0 ? "fail" : "pass";
+    steps.push({
+      command: stepName,
+      status,
+      violations,
+      durationMs,
+      ...(skipped && report.summary ? { note: report.summary } : {}),
+    });
     totalViolations += violations;
   }
 
@@ -222,10 +251,12 @@ export async function runMissionDeployPreflight(
     workpieceDirty: dirty.dirty,
   };
 
+  const skippedCount = steps.filter((s) => s.status === "skipped").length;
+  const skippedNote = skippedCount > 0 ? `, ${skippedCount} skipped` : "";
   const summary =
     overallStatus === "pass"
-      ? `[mission.deploy-preflight] ${missionId}: all ${steps.length} deploy checks passed in ${(totalDurationMs / 1000).toFixed(1)}s${dirty.dirty ? " (workpiece dirty — informational)" : ""}`
-      : `[mission.deploy-preflight] ${missionId}: ${totalViolations} violation(s) across ${steps.filter((s) => s.status !== "pass").length} step(s)`;
+      ? `[mission.deploy-preflight] ${missionId}: ${steps.length - skippedCount}/${steps.length} deploy checks passed in ${(totalDurationMs / 1000).toFixed(1)}s${skippedNote}${dirty.dirty ? " (workpiece dirty — informational)" : ""}`
+      : `[mission.deploy-preflight] ${missionId}: ${totalViolations} violation(s) across ${steps.filter((s) => s.status === "fail" || s.status === "unavailable").length} step(s)${skippedNote}`;
 
   return {
     data,
