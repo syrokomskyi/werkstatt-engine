@@ -6,13 +6,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1199: MATERIALIZATION-IN-PROGRESS sentinel — written in setup-staging into stagingDir/.git (rides atomic-move into workpiece/.git) or inside git-init-commit after git init on the non-git fallback; deleted only after the baseline commit lands; git-init-commit is idempotent on resume (skip commit when HEAD resolves and the staged index is clean); workpiece commit hook installs early in setup-staging</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1265</item>
   <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958, RFC-1093, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -1873,6 +1871,25 @@ export async function buildMaterializeSteps(
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           cc.logger.warn(`  Warning: compass.audit.baseline failed: ${msg}`);
+        }
+      },
+    },
+    {
+      // RFC-1265: every fresh workpiece carries a current ops card. Advisory —
+      // a compile failure degrades instruction quality, not workpiece safety.
+      name: "ops-card",
+      run: async (c: unknown) => {
+        const cc = c as MaterializeStepCtx;
+        try {
+          await executeKernelCommand({
+            workspaceRoot: cc.workspaceRoot,
+            commandName: "ops.card.generate",
+            argv: [`--site=${cc.manifest.systemId}`],
+          });
+          cc.logger.info(`  Ops card compiled for ${cc.manifest.systemId}`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          cc.logger.warn(`  Warning: ops.card.generate failed: ${msg}`);
         }
       },
     },
