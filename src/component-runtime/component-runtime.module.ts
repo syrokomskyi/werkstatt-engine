@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1030: initial implementation — registers 5 runtime.reflect.* commands.</item>
+  <item>RFC-1265 follow-up: runtime-catalog.generated.yaml marked conditional — the artifact is produced only by an embedding caller injecting reflectionInput (no CLI/pipeline path), so generated.files.validate must not demand its presence.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -111,7 +112,15 @@ export async function createComponentRuntimeModule(): Promise<ModuleExport> {
         cacheable: false,
         flags: {},
         writes: ["docs/runtime-catalog.generated.yaml"],
-        generates: [{ path: "docs/runtime-catalog.generated.yaml", phase: "build.prepare" }],
+        generates: [
+          {
+            path: "docs/runtime-catalog.generated.yaml",
+            phase: "build.prepare",
+            // Produced only by an embedding caller that injects reflectionInput —
+            // no CLI/pipeline path exists, so absence must not fail GEN-FILES-01.
+            conditional: true,
+          },
+        ],
         execute: runReflectCatalogGenerate,
       },
     ],
