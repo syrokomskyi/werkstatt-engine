@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0655: initial tests for CloseReport.releaseId field and bordbuch top-level option.</item>
+  <item>RFC-1264</item>
 </CHANGE_SUMMARY>
 */
 
@@ -36,6 +37,7 @@ test("CloseReport interface includes releaseId field", () => {
       reconciledSha: null,
     },
     templateSync: { synced: false, syncError: null },
+    digest: { path: null, skipped: false },
     warnings: [],
   };
   expect(report.releaseId).toBe("sys-r000001");
@@ -62,6 +64,7 @@ test("CloseReport accepts null releaseId", () => {
       reconciledSha: null,
     },
     templateSync: { synced: false, syncError: null },
+    digest: { path: null, skipped: false },
     warnings: [{ rule: "missing-release-id", message: "test" }],
   };
   expect(report.releaseId).toBe(null);

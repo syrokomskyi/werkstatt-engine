@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
@@ -15,7 +14,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1263</item>
-  <history>ADR-0010, ADR-0084, RECOVERY-2026, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097</history>
+  <item>RFC-1264</item>
+  <history>ADR-0010, ADR-0084, RECOVERY-2026, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -113,12 +113,18 @@ export interface CloseReportTemplateSync {
   syncError: string | null;
 }
 
+export interface CloseReportDigest {
+  path: string | null;
+  skipped: boolean;
+}
+
 export interface CloseReport {
   releaseId: string | null;
   git: CloseReportGit;
   mirror: CloseReportMirror;
   reconcile: CloseReportReconcile;
   templateSync: CloseReportTemplateSync;
+  digest: CloseReportDigest;
   warnings: Array<{ rule: string; message: string }>;
 }
 
@@ -319,8 +325,10 @@ export async function runMissionClose(
       allowNoOp,
       skipContentRegression: flagBoolean(input, "skip-content-regression"),
       skipBehaviorSnapshot: flagBoolean(input, "skip-behavior-snapshot"),
+      skipDigest: flagBoolean(input, "skip-digest"),
       context,
       templateSyncResult,
+      digestPath: null,
       closeReport: null,
       evidenceSynced: false,
       evidenceSyncResult: null,
@@ -422,8 +430,10 @@ export interface CloseStepCtx {
   allowNoOp: boolean;
   skipContentRegression: boolean;
   skipBehaviorSnapshot: boolean;
+  skipDigest: boolean;
   context: KernelRuntimeContext;
   templateSyncResult: CloseReportTemplateSync;
+  digestPath: string | null;
   closeReport: CloseReport | null;
   evidenceSynced: boolean;
   evidenceSyncResult: { r2KeyPrefix: string; uploadedFiles: number } | null;
@@ -770,6 +780,40 @@ export async function buildCloseSteps(
       },
     },
     {
+      // RFC-1264: emit the mission digest pre-bordbuch so the close event can
+      // link it. Non-blocking for the advisory rollout minor — failures warn.
+      name: "mission-digest",
+      run: async (c: unknown) => {
+        const cc = c as CloseStepCtx;
+        if (cc.skipDigest) {
+          logger.info("  [mission-digest] Skipped by --skip-digest (audited in close event)");
+          return;
+        }
+        try {
+          const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+          const result = (await executeKernelCommand({
+            workspaceRoot: cc.workspaceRoot,
+            commandName: "mission.digest.generate",
+            argv: [`--mission=${cc.missionId}`],
+          })) as { exitCode?: number; data?: { artifacts?: string[] }; summary?: string };
+          if ((result.exitCode ?? 1) !== 0) {
+            logger.warn(
+              `  [mission-digest] Non-fatal: ${result.summary ?? "mission.digest.generate failed"}`,
+            );
+            return;
+          }
+          cc.digestPath = result.data?.artifacts?.[0] ?? null;
+          if (cc.digestPath) {
+            logger.info(`  [mission-digest] ${cc.digestPath}`);
+          }
+        } catch (err) {
+          logger.warn(
+            `  [mission-digest] Non-fatal: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      },
+    },
+    {
       name: "bordbuch-validate-and-append",
       run: async (c: unknown) => {
         const cc = c as CloseStepCtx;
@@ -796,6 +840,10 @@ export async function buildCloseSteps(
               // RFC-1263 AC-6: the close event records the lane the mission
               // took — "fast" when a green composite gate record carried it.
               lane: cc.manifest.fastLane?.green === true ? "fast" : "full",
+              // RFC-1264 AC-1: link the mission digest; record the audited
+              // escape hatch when the operator passed --skip-digest.
+              ...(cc.digestPath ? { digestPath: cc.digestPath } : {}),
+              ...(cc.skipDigest ? { digestSkipped: true } : {}),
               ...(cc.releaseId ? { releaseId: cc.releaseId } : {}),
             },
           },
@@ -1097,6 +1145,7 @@ export async function buildCloseSteps(
             reconciledSha: cc.reconciledSha,
           },
           templateSync: cc.templateSyncResult,
+          digest: { path: cc.digestPath, skipped: cc.skipDigest },
           warnings,
         };
         const evidencePath = path.join(cc.missionDir, "evidence", "close-report.json");

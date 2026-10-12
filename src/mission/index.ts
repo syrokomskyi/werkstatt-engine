@@ -7,11 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0355: initial mission command module.</item>
   <item>ADR-0041: removed duplicate command registrations; mission.module.ts is the single source of truth for flag schemas. This file is now a pure re-export barrel.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1260</item>
   <item>RFC-1263</item>
+  <item>RFC-1264</item>
+  <history>RFC-0355</history>
 </CHANGE_SUMMARY>
 */
 
@@ -68,7 +69,12 @@ export {
 } from "./validate-postbuild.ts";
 export { resolveActorFromEnv, resolveActor, type ActorIdentity } from "./actor-identity.ts";
 export { createSignedCommit, type SignedCommitResult } from "./signed-commit.ts";
-export { resolveMissionEvidenceDir, resolveMissionDir } from "./mission-io.ts";
+export {
+  resolveMissionEvidenceDir,
+  resolveMissionDir,
+  readMissionManifest,
+  writeMissionManifest,
+} from "./mission-io.ts";
 export {
   persistEnvFilesToCacheClone,
   restoreEnvFilesFromCacheClone,

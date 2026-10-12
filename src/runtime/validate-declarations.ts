@@ -7,14 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1138: pipeline hygiene — module-scoped exempt entries, archive gitignore guard, dns upsert to deploy phases, promote auto-sync, rfc.create claim protocol, siteHasRuntime filter</item>
   <item>RFC-1138: scope all remaining exempt entries — 15 site-plugin commands to check (ALL_COMMANDS), nachweis.manifest.generate to nachweis, sichtpass.generate to sichtpass; stops stale-entry warnings in registries without those modules.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1177: GENERATOR_OWNERSHIP_EXEMPT += csp.hashes.generate (check) — rewrites emitted dist/client/_headers in place, owns no generated artifact.</item>
-  <history>RFC-1038</history>
+  <item>RFC-1264</item>
+  <history>RFC-1038, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -175,6 +173,12 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "csp.hashes.generate",
     reason:
       "Build-post CSP mutator (RFC-1177): rewrites the emitted dist/client/_headers script-src in place — public.infrastructure.generate owns the file, this command produces no new generated artifact.",
+    module: "check",
+  },
+  {
+    command: "mission.digest.generate",
+    reason:
+      "Mission evidence emitter (RFC-1264): writes missions/<id>/evidence/mission-digest/* — operator-review evidence, not an app-scoped generated artifact.",
     module: "check",
   },
 ];

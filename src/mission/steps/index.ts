@@ -11,6 +11,7 @@
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1219: resolveOperationSteps gains KernelRuntimeContext and returns { steps, ctx } — mission.resume previously passed a thin {workspaceRoot, missionId, manifest, context} runtime ctx, so every resumed step crashed on missing fields (m000192: fetch-and-merge died with "path argument must be of type string. Received undefined"). Each kind now reconstructs the command ctx: derivable fields resolved (dirs, systemDir, state), flag-derived fields defaulted (documented resume semantics: flags reset on resume).</item>
+  <item>RFC-1264</item>
 </CHANGE_SUMMARY>
 */
 
@@ -67,8 +68,10 @@ export async function resolveOperationSteps(
         allowNoOp: false,
         skipContentRegression: false,
         skipBehaviorSnapshot: false,
+        skipDigest: false,
         context,
         templateSyncResult: { synced: false, syncError: null },
+        digestPath: null,
         closeReport: null,
         evidenceSynced: false,
         evidenceSyncResult: null,

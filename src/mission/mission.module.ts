@@ -7,17 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
-
-Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
-follows the parsed selector. Guard renamed assertAllSitesAllowed ->
-assertAllFlagAccepted, message updated. 417 declaration sites + type
-surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
   <item>RFC-1263</item>
-  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176, RFC-1199</history>
+  <item>RFC-1264</item>
+  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176, RFC-1199, RFC-1231</history>
 </CHANGE_SUMMARY>
 */
 
@@ -160,10 +155,16 @@ export async function createMissionModule(): Promise<ModuleExport> {
             description:
               "RFC-0991: Skip behavior-snapshot-refresh step (auto-generate behavior snapshot during close).",
           },
+          "skip-digest": {
+            kind: "boolean",
+            description:
+              "RFC-1264: Skip mission-digest step. Audited escape hatch — records digestSkipped in the close bordbuch event.",
+          },
         },
         writes: [
           "missions/{mission}/mission.yaml",
           "missions/{mission}/evidence/close-report.json",
+          "missions/{mission}/evidence/mission-digest/**",
           "missions/{mission}/workpiece/behavior.snapshot.generated.yaml",
           "../systems-cache/{system}/system-state.yaml",
           "../systems-cache/{system}/bordbuch/events.ndjson",
