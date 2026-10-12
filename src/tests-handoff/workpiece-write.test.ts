@@ -5,6 +5,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0555: initial unit tests for workpiece.write.</item>
+  <item>RFC-1262</item>
 </CHANGE_SUMMARY>
 */
 
@@ -171,4 +172,75 @@ test("workpiece.write does not auto-commit (file is left dirty)", async () => {
   );
   const content = readFileSync(join(workpieceDir, "src", "content", "pages", "home.md"), "utf8");
   expect(content).toBe("# Modified Home");
+});
+
+// RFC-1262 GENW-01: the generated-path registry blocks writes into
+// non-editable generated outputs inside the workpiece.
+
+function writeGeneratedPathsRegistry(yaml: string): void {
+  mkdirSync(join(workpieceDir, ".werkstatt"), { recursive: true });
+  writeFileSync(join(workpieceDir, ".werkstatt", "generated-paths.generated.yaml"), yaml);
+}
+
+test("workpiece.write rejects a registered non-editable generated path (GENW-01)", async () => {
+  writeGeneratedPathsRegistry(`version: 1
+generatedAt: 2026-10-11T00:00:00.000Z
+paths:
+  - path: "src/content/pages/**"
+    owner: routes.generate
+    sources: [command-generates]
+    editable: false
+    modulePath: packages/werkstatt-site/src/codegen/routes.ts
+`);
+  mockStdin("# forged");
+  await expect(
+    runWorkpieceWrite(
+      makeInput({ mission: "test-mission", path: "src/content/pages/home.md", stdin: true }),
+      makeContext(),
+    ),
+  ).rejects.toThrow("GENW-01");
+});
+
+test("workpiece.write GENW-01 carries the owner and sanctioned edit hint", async () => {
+  writeGeneratedPathsRegistry(`version: 1
+paths:
+  - path: "src/content/pages/**"
+    owner: routes.generate
+    modulePath: packages/werkstatt-site/src/codegen/routes.ts
+`);
+  mockStdin("# forged");
+  await expect(
+    runWorkpieceWrite(
+      makeInput({ mission: "test-mission", path: "src/content/pages/home.md", stdin: true }),
+      makeContext(),
+    ),
+  ).rejects.toThrow(/routes\.generate.*packages\/werkstatt-site\/src\/codegen\/routes\.ts/s);
+});
+
+test("workpiece.write allows an editable marker path (RFC-1153 escape hatch)", async () => {
+  writeGeneratedPathsRegistry(`version: 1
+paths:
+  - path: "src/content/pages/**"
+    owner: routes.generate
+    editable: true
+`);
+  mockStdin("# editable override");
+  const result = await runWorkpieceWrite(
+    makeInput({ mission: "test-mission", path: "src/content/pages/home.md", stdin: true }),
+    makeContext(),
+  );
+  expect(result.data?.bytesWritten).toBeGreaterThan(0);
+  expect(readFileSync(join(workpieceDir, "src", "content", "pages", "home.md"), "utf8")).toBe(
+    "# editable override",
+  );
+});
+
+test("workpiece.write proceeds with a GENW-02 warning when the registry is absent", async () => {
+  // No .werkstatt/ seeded — guard must fail open and still write.
+  mockStdin("# no registry");
+  const result = await runWorkpieceWrite(
+    makeInput({ mission: "test-mission", path: "src/content/pages/home.md", stdin: true }),
+    makeContext(),
+  );
+  expect(result.data?.bytesWritten).toBeGreaterThan(0);
 });
