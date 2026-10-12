@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RECOVERY-2026-10-04: sweep passes getActiveOpIds() — ops still executing in this process (the ship journal that mission.close runs inside) are excluded so the live ship op is not self-abandoned mid-run.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -15,7 +14,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>ADR-0010, ADR-0084, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097</history>
+  <item>RFC-1263</item>
+  <history>ADR-0010, ADR-0084, RECOVERY-2026, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -36,6 +36,7 @@ import {
   writePassport,
 } from "../sternsystem/registry-io.ts";
 import { readMissionManifest, writeMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { missionHasGreenCoverage } from "./lifecycle-precondition.ts";
 import {
   commitWorkpieceIfDirty,
   countOperatorCommits,
@@ -257,7 +258,12 @@ export async function runMissionClose(
   // RFC-0593: inline validation gate — run mission.validate before acquiring locks.
   // This avoids holding registry/system/mission locks for 2+ minutes during the build.
   // State is re-checked inside the lock after validation passes.
-  const validationCheck = await runInlineValidate(missionId, context);
+  // RFC-1263: a mission carrying a green fast-lane gate record satisfies the
+  // coverage precondition without a full mission.validate run — the scoped
+  // gate set already ran inside mission.content-edit.
+  const validationCheck = missionHasGreenCoverage(manifest, null)
+    ? { passed: true, failures: [] as string[], report: null }
+    : await runInlineValidate(missionId, context);
   if (!validationCheck.passed) {
     const failureLines = validationCheck.failures.map((f) => `  ${f}`).join("\n");
     throw new Error(
@@ -786,7 +792,12 @@ export async function buildCloseSteps(
             missionId: cc.missionId,
             releaseId: cc.releaseId,
             writerRole: "mission",
-            metadata: cc.releaseId ? { releaseId: cc.releaseId } : undefined,
+            metadata: {
+              // RFC-1263 AC-6: the close event records the lane the mission
+              // took — "fast" when a green composite gate record carried it.
+              lane: cc.manifest.fastLane?.green === true ? "fast" : "full",
+              ...(cc.releaseId ? { releaseId: cc.releaseId } : {}),
+            },
           },
           `Bordbuch: mission-close ${cc.missionId}`,
         );

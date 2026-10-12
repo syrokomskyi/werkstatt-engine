@@ -6,13 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>warpgogol-m000196: ours-resolution handles clone-only paths absent from clone HEAD — gitignored RFC-0913 files tracked on the workpiece side conflict as UD, where `git checkout HEAD --` fails ("pathspec did not match"); presence in HEAD now decides restore-vs-`git rm`.</item>
-  <item>RFC-1218: extend reconcile conflict auto-resolution to the generated-file registry (ownershipMap ∪ CACHE_CLONE_GENERATED_PATTERNS) resolving theirs (workpiece); record paths in merge commit body + mission-reconcile bordbuch metadata.autoResolvedPaths[]</item>
   <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
   <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
   <item>RFC-1221 follow-up: mergeCommitSha now records commitSha itself when commitSha is a merge commit (null otherwise) — the previous HEAD^1 capture ran after post-merge steps could commit, storing a post-merge parent instead of the merge commit.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159</history>
+  <item>RFC-1263</item>
+  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159, RFC-1218, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 */
 
@@ -44,6 +43,7 @@ import {
   cleanupPreliminaryBuildIdentity,
 } from "../handoff/build-pipeline-helpers.ts";
 import { readMissionManifest, writeMissionManifest, resolveMissionDir } from "./mission-io.ts";
+import { missionHasGreenCoverage } from "./lifecycle-precondition.ts";
 import {
   isWorkpieceDirty,
   investigateUntrackedFiles,
@@ -1837,13 +1837,15 @@ export async function runMissionReconcile(
     );
   }
 
-  // Check validation has passed
+  // RFC-1263: coverage precondition — a green mission.validate report OR a
+  // green fast-lane gate record on the mission manifest. Centralized via
+  // missionHasGreenCoverage so reconcile/close share one rule.
   const evidenceDir = path.join(
     await resolveMissionDir(workspaceRoot, missionId, context.io),
     "evidence",
   );
   const validationPath = path.join(evidenceDir, "validation-report.json");
-  if (!(await context.io.exists(validationPath))) {
+  if (!(await context.io.exists(validationPath)) && manifest.fastLane?.green !== true) {
     throw new Error(
       `[mission.reconcile] mission '${missionId}' has not passed validation — run mission.validate first`,
     );
@@ -1864,15 +1866,13 @@ export async function runMissionReconcile(
     actor,
   );
 
-  // RFC-0356 §6: verify validation passed before reconciling.
+  // RFC-0356 §6 + RFC-1263: verify coverage before reconciling — full
+  // validation report when present, else the fast-lane gate record.
   const validationRaw = await context.io.readFile(validationPath).catch(() => null);
-  if (!validationRaw) {
-    throw new Error(
-      `[mission.reconcile] mission '${missionId}' has not passed validation — run mission.validate first`,
-    );
-  }
-  const validationReport = JSON.parse(validationRaw) as { contractFull?: { passed?: boolean } };
-  if (!validationReport.contractFull?.passed) {
+  const validationReport = validationRaw
+    ? (JSON.parse(validationRaw) as { contractFull?: { passed?: boolean } })
+    : null;
+  if (!missionHasGreenCoverage(manifest, validationReport)) {
     throw new Error(
       `[mission.reconcile] mission '${missionId}' validation did not pass — fix issues and re-run mission.validate`,
     );

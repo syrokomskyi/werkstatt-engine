@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1199: mission.git.commit description documents the MATERIALIZATION_IN_PROGRESS fail-closed guard</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
 
 Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
@@ -17,7 +16,8 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
-  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176</history>
+  <item>RFC-1263</item>
+  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176, RFC-1199</history>
 </CHANGE_SUMMARY>
 */
 
@@ -32,6 +32,7 @@ export async function createMissionModule(): Promise<ModuleExport> {
   const { runMissionMaterialize } = await import("./mission-materialize.ts");
   const { runMissionMigrate } = await import("./mission-migrate.ts");
   const { runMissionGitCommit } = await import("./mission-git-commit.ts");
+  const { runMissionContentEdit } = await import("./mission-content-edit.ts");
   const { runMissionPreview } = await import("./mission-preview.ts");
   const { runMissionCleanup } = await import("./mission-cleanup.ts");
   const { runMissionValidate, runMissionBuild, runMissionDiff, runMissionReconcile } =
@@ -72,6 +73,11 @@ export async function createMissionModule(): Promise<ModuleExport> {
             kind: "boolean",
             description:
               "Read actor identity from WERKSTATT_ACTOR_ID env var set by Studio Gate auth.",
+          },
+          lane: {
+            kind: "string",
+            description:
+              'RFC-1263: declare the mission lane on the record — "content" marks a content fast-lane mission (used by mission.content-edit); "full" is the standard lifecycle.',
           },
         },
         writes: [
@@ -452,6 +458,62 @@ export async function createMissionModule(): Promise<ModuleExport> {
         reads: ["missions/{mission}/workpiece/**", "missions/{mission}/mission.yaml"],
         cacheable: false,
         execute: runMissionGitCommit,
+      },
+      {
+        name: "mission.content-edit",
+        modulePath: "packages/werkstatt-engine/src/mission/mission.module.ts",
+        generates: [],
+        description:
+          'RFC-1263: content fast-lane composite — for a mission whose touched set resolves inside the editable content surface, runs the scoped gate set (content.patch, author validators, content.regression.check, advisory deploy-preflight), commits via mission.git.commit, records the gate set on the mission, reconciles, and closes when the site\'s contentEditLane is "active". Required flags: `--site` + `--brief`, or `--mission`; `--ops-file` to apply ops. `--dry-run` reports eligibility without writes.',
+        scope: "workspace",
+        acceptsAllFlag: false,
+        mutatesState: true,
+        flags: {
+          site: {
+            kind: "string",
+            description: "Sternsystem id — opens a new content-lane mission.",
+          },
+          mission: {
+            kind: "string",
+            description: "Reuse an already-open mission instead of opening one.",
+          },
+          brief: { kind: "string", description: "Mission brief (required with --site)." },
+          "ops-file": {
+            kind: "string",
+            description: "YAML ops file for content.patch (list of {op, selector, value|slots}).",
+          },
+          message: {
+            kind: "string",
+            description: "Commit message override (defaults to --brief).",
+          },
+          actor: {
+            kind: "string",
+            default: "unknown",
+            description: "Actor identity propagated to open/commit/reconcile/close.",
+          },
+          "actor-from-auth": {
+            kind: "boolean",
+            description:
+              "Read actor identity from WERKSTATT_ACTOR_ID env var set by Studio Gate auth.",
+          },
+          "dry-run": {
+            kind: "boolean",
+            description: "Report eligibility + read-only gate results; no writes.",
+          },
+        },
+        writes: [
+          "missions/{mission}/mission.yaml",
+          "missions/{mission}/workpiece/**",
+          "../systems-cache/{system}/**",
+        ],
+        reads: [
+          "missions/{mission}/**",
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/src/content/**",
+          "../systems-cache/{system}/.werkstatt/generated-paths.generated.yaml",
+        ],
+        cacheable: false,
+        execute: runMissionContentEdit,
       },
       {
         name: "mission.cleanup",

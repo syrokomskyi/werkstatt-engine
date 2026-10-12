@@ -6,12 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1139: CLI hint accuracy and agent-safety hygiene — rfc.create hint, EC-14-PARTIAL, amend delegation, ledger scope, sync footer, mission.open remnants</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1157: auto-trash cache-only mission husks in cleanupStaleMissionEntries; logger-threaded isCacheOnlyMissionRemnant.</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>ADR-0030, RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593, RFC-0796, RFC-0951, RFC-0958, RFC-1097</history>
+  <item>RFC-1263</item>
+  <history>ADR-0030, RFC-0355, RFC-0477, RFC-0560, RFC-0580, RFC-0593, RFC-0796, RFC-0951, RFC-0958, RFC-1097, RFC-1139</history>
 </CHANGE_SUMMARY>
 */
 
@@ -198,6 +198,12 @@ export async function runMissionOpen(
   const systemId = flagString(input, "system");
   const brief = flagString(input, "brief");
   const actor = resolveActor(input);
+  // RFC-1263: --lane declares the mission's lifecycle lane on the record —
+  // "content" marks a content fast-lane mission (mission.content-edit).
+  const laneFlag = flagString(input, "lane");
+  if (laneFlag && laneFlag !== "content" && laneFlag !== "full") {
+    throw new Error(`[mission.open] --lane must be "content" or "full" (got "${laneFlag}")`);
+  }
 
   if (!systemId) throw new Error("[mission.open] --system is required");
   if (!brief) throw new Error("[mission.open] --brief is required");
@@ -382,6 +388,7 @@ export async function runMissionOpen(
       releaseId: null,
       rfcId: null,
       operationId,
+      ...(laneFlag ? { lane: laneFlag as "content" | "full" } : {}),
     };
 
     // RFC-0958: Build step context and run post-lock lifecycle via journal

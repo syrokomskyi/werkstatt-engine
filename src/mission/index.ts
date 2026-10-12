@@ -11,6 +11,7 @@
   <item>ADR-0041: removed duplicate command registrations; mission.module.ts is the single source of truth for flag schemas. This file is now a pure re-export barrel.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1260</item>
+  <item>RFC-1263</item>
 </CHANGE_SUMMARY>
 */
 
@@ -49,6 +50,17 @@ export {
   type ValidatorMapping,
 } from "./mission-git-commit.ts";
 export { runMissionCleanup, type MissionCleanupData } from "./mission-cleanup.ts";
+export {
+  runMissionContentEdit,
+  type ContentEditResult,
+  type ContentEditGate,
+} from "./mission-content-edit.ts";
+export { missionHasGreenCoverage } from "./lifecycle-precondition.ts";
+export {
+  evaluateContentEditEligibility,
+  type EligibilityResult,
+  type ContentEditOpRef,
+} from "./content-edit-eligibility.ts";
 export {
   runValidatePostbuild,
   type ValidatePostbuildData,

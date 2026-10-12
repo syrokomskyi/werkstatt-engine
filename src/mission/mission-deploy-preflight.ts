@@ -10,7 +10,7 @@
   site.directory points at the workpiece.
 </purpose>
 <non-goals>
-  <item>Do not replace mission.validate — it remains the reconcile gate; this probe is advisory and never wired into reconcile/ship (superseding RFC required for gating).</item>
+  <item>Do not replace mission.validate — it remains the reconcile gate for full-lane missions; this probe stays advisory. RFC-1263 wires it into mission.content-edit as the fast lane's gate 4 (advisory there too) — never wired into leitstand.ship.</item>
   <item>Do not run build pipelines — every step is a non-build validator; the probe stays inside the RFC-0963 time budget.</item>
   <item>Do not mutate the workpiece — no commits, no artifact regeneration; workpieceDirty is informational only.</item>
   <item>Do not evaluate the cache clone — mission.preflight owns the cache-clone subject; this command only reads missions/{id}/workpiece.</item>
@@ -21,6 +21,7 @@
   <item>RFC-1256: initial implementation — mirrors mission-preflight.ts dispatch (RFC-1157 site-module resolution), aggregates all steps, warning-only steps report pass, workpieceDirty informational.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
+  <item>RFC-1263: deploy-preflight becomes the fast lane's advisory gate 4 (mission.content-edit).</item>
 </CHANGE_SUMMARY>
 */
 
