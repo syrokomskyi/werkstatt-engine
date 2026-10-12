@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1120: initial verify.py acceptance test.</item>
+  <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
 </CHANGE_SUMMARY>
 */
 
@@ -134,15 +135,10 @@ beforeEach(async () => {
     "utf8",
   );
 
-  // Site workspace fixture (apps/<id> — resolver target when no mission/cache package.json)
-  const appDir = join(workspaceRoot, "apps", SYSTEM_ID);
-  await mkdir(join(appDir, "src", "content"), { recursive: true });
-  await writeFile(
-    join(appDir, "package.json"),
-    JSON.stringify({ name: SYSTEM_ID, version: "1.0.0" }),
-    "utf8",
-  );
-  await writeFile(join(appDir, "src", "content", "test.md"), "# Test\n", "utf8");
+  // Site content lives in the cache clone — the canonical mirror a real
+  // registered system resolves to (apps/ is retired, RFC-0381).
+  await mkdir(join(cacheDir, "src", "content"), { recursive: true });
+  await writeFile(join(cacheDir, "src", "content", "test.md"), "# Test\n", "utf8");
 
   await mkdir(join(workspaceRoot, "docs", "rfcs"), { recursive: true });
   await writeFile(

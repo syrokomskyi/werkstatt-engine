@@ -7,6 +7,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0380: initial notausgang export/validate integration tests.</item>
+  <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
 </CHANGE_SUMMARY>
 */
 
@@ -121,14 +122,11 @@ behaviorSnapshotHash: sha256:snap-abc
   await writeFile(join(releaseDir, "production-snapshot.json"), '{"version":"1.0"}\n', "utf8");
   await writeFile(join(releaseDir, "snapshot-diff.json"), '{"diff":[]}\n', "utf8");
 
-  const siteContentDir = join(workspace, "apps", systemId, "src", "content");
+  // Site content lives in the cache clone — the canonical mirror a real
+  // registered system resolves to (apps/ is retired, RFC-0381).
+  const siteContentDir = join(root, "systems-cache", systemId, "src", "content");
   await mkdir(siteContentDir, { recursive: true });
   await writeFile(join(siteContentDir, "test.md"), "# Test\n", "utf8");
-  await writeFile(
-    join(workspace, "apps", systemId, "package.json"),
-    JSON.stringify({ name: "test-bundle", version: "1.0.0" }),
-    "utf8",
-  );
 }
 
 beforeEach(async () => {

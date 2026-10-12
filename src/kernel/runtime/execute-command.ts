@@ -14,7 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
 
@@ -26,7 +25,8 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
 
 KernelRuntimeContext.allSites populated from options.allSites at all three executor context sites (workspace path, app-scope fast path, fallback registry path). executeRegisteredCommand injects input.flags.all = true when context.allSites and the command declares the flag — after flag resolution, before the RFC-1133 cache-key computation so cached and fresh executions see identical flags.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126</history>
+  <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
+  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126, RFC-1133</history>
 </CHANGE_SUMMARY>
 */
 
@@ -169,6 +169,19 @@ export async function executeRegisteredCommand(
   ) {
     logger.info(`Skipped: closed-mission — ${command.name} (workpiece is closed)`);
     return skippedExecutionReport(command, context, "closed-mission");
+  }
+
+  // Cache-clone mirrors are read-only resolution targets (RFC-1260 COPS-07,
+  // generalized to every mutating command): a Sternsystem mirror changes only
+  // through mission workpieces + reconcile, never through direct command
+  // writes. The content.* op layer enforces its own COPS-07; this executor
+  // guard covers the rest (agents.generate, ops.card.generate, …) now that
+  // cache clones resolve through ensureTargetSites.
+  if (command.mutatesState !== false && context.site?.source === "cache-clone") {
+    logger.info(
+      `Skipped: cache-clone — ${command.name} (mutating commands require a mission workpiece)`,
+    );
+    return skippedExecutionReport(command, context, "cache-clone");
   }
 
   // RFC-0260: schema-carrying commands resolve flags strictly and abort before
@@ -329,6 +342,15 @@ export async function executeRegisteredCommand(
       const v = input.flags[f];
       return v !== undefined && v !== false && v !== "false";
     });
+  // A mutating flag on a read-declared command hits the same cache-clone
+  // refusal as a mutating command — the guard above covers the declared case,
+  // this covers the flag-upgraded one.
+  if (flagMutating && context.site?.source === "cache-clone") {
+    logger.info(
+      `Skipped: cache-clone — ${command.name} (mutating commands require a mission workpiece)`,
+    );
+    return skippedExecutionReport(command, context, "cache-clone");
+  }
   if (command.mutatesState === false && !flagMutating) {
     effectiveIo = createReadOnlyIO(context.io, command.name, {
       allowExec: command.execOnReadOnly === true,

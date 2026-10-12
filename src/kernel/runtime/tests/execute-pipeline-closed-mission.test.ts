@@ -246,3 +246,80 @@ describe("executeRegisteredCommand closed-workpiece guard (ADR-0087)", () => {
     expect(report.summary).toBe("ran");
   });
 });
+
+// RFC-1260 (COPS-07, generalized): cache clones resolve through the
+// site-workspace resolver but are read-only targets — mutating commands are
+// skipped at the executor, mirroring the ADR-0085 closed-workpiece guard.
+describe("executeRegisteredCommand cache-clone guard", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(process.cwd(), "tmp-clone-exec-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeCloneContext(): KernelRuntimeContext {
+    const { io, intents } = createDefaultIO();
+    return {
+      logger: createKernelLogger(),
+      workspaceRoot: tmpDir,
+      site: {
+        name: "site",
+        directory: tmpDir,
+        source: "cache-clone",
+      } as DiscoveredSiteWorkspace,
+      io,
+      fileIntents: intents,
+    } as unknown as KernelRuntimeContext;
+  }
+
+  test("mutating command is skipped without executing", async () => {
+    let executed = false;
+    const cmd = makeCommand("agents.generate", true, ["<app>/AGENTS.md"]);
+    cmd.execute = async () => {
+      executed = true;
+      return { exitCode: 0, ok: true, summary: "ran" };
+    };
+    const report = await executeRegisteredCommand(cmd, makeCloneContext(), []);
+    expect(executed, "mutating command must not run on a cache clone").toBe(false);
+    expect(report.summary).toBe("Skipped: cache-clone");
+    expect(report.ok).toBe(true);
+  });
+
+  test("read-only command is not affected by the cache-clone guard", async () => {
+    const cmd = makeCommand("content.get", false, []);
+    cmd.execute = async () => ({ exitCode: 0, ok: true, summary: "read" });
+    const report = await executeRegisteredCommand(cmd, makeCloneContext(), []);
+    expect(report.summary).not.toBe("Skipped: cache-clone");
+  });
+
+  test("mutating flag on a read-declared command is refused on a cache clone", async () => {
+    let executed = false;
+    const cmd = makeCommand("typography.check", false, []);
+    cmd.mutatingFlags = ["fix"];
+    cmd.flags = {
+      fix: { kind: "boolean", description: "Apply fixes in place." },
+    };
+    cmd.execute = async () => {
+      executed = true;
+      return { exitCode: 0, ok: true, summary: "fixed" };
+    };
+    const report = await executeRegisteredCommand(cmd, makeCloneContext(), ["--fix"]);
+    expect(executed, "flag-upgraded mutator must not run on a cache clone").toBe(false);
+    expect(report.summary).toBe("Skipped: cache-clone");
+  });
+
+  test("the same read-declared command without the flag runs on a cache clone", async () => {
+    const cmd = makeCommand("typography.check", false, []);
+    cmd.mutatingFlags = ["fix"];
+    cmd.flags = {
+      fix: { kind: "boolean", description: "Apply fixes in place." },
+    };
+    cmd.execute = async () => ({ exitCode: 0, ok: true, summary: "checked" });
+    const report = await executeRegisteredCommand(cmd, makeCloneContext(), []);
+    expect(report.summary).not.toBe("Skipped: cache-clone");
+  });
+});

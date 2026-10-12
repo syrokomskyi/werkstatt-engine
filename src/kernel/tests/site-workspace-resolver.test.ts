@@ -31,13 +31,13 @@ async function writeWorkpiece(wsRoot: string, missionId: string, siteId: string)
   );
 }
 
-async function writeCacheClonePackage(wsRoot: string, siteId: string): Promise<void> {
+// Real cache clones carry system-config.yaml (written by writeSystemFiles)
+// and tools/kernel.config.ts, but never package.json — the generated manifest
+// is gitignored and exists only in materialized workpieces.
+async function writeCacheCloneKernelConfig(wsRoot: string, siteId: string): Promise<void> {
   const cacheDir = path.join(wsRoot, "..", "systems-cache", siteId);
-  await fs.mkdir(cacheDir, { recursive: true });
-  await fs.writeFile(
-    path.join(cacheDir, "package.json"),
-    JSON.stringify({ name: `@warpgogol/${siteId}` }),
-  );
+  await fs.mkdir(path.join(cacheDir, "tools"), { recursive: true });
+  await fs.writeFile(path.join(cacheDir, "tools", "kernel.config.ts"), "export default {};\n");
 }
 
 async function writeSystemFiles(
@@ -112,7 +112,7 @@ describe("RFC-1025: cache clone fallback", () => {
   test("AC-1: resolves cache clone when no mission and no apps/", async () => {
     const ws = await makeWorkspace();
     await writeSystemFiles(ws, [{ id: "demo" }]);
-    await writeCacheClonePackage(ws, "demo");
+    await writeCacheCloneKernelConfig(ws, "demo");
     const result = await resolveSiteWorkspace(ws, "demo");
     expect(result.source).toBe("cache-clone");
     expect(result.name).toBe("demo");
@@ -123,22 +123,36 @@ describe("RFC-1025: cache clone fallback", () => {
     const ws = await makeWorkspace();
     await writeSystemFiles(ws, [{ id: "demo", currentMission: "demo-m000001" }]);
     await writeWorkpiece(ws, "demo-m000001", "demo");
-    await writeCacheClonePackage(ws, "demo");
+    await writeCacheCloneKernelConfig(ws, "demo");
     const result = await resolveSiteWorkspace(ws, "demo");
     expect(result.source).toBe("mission");
     expect(result.missionId).toBe("demo-m000001");
   });
 
   test("AC-3: throws Unknown site id when no cache clone, no mission, no apps/", async () => {
+    // A stray systems-cache/<id> directory without system-config.yaml is not
+    // a cache clone — the marker file is what makes it resolvable.
+    const ws = await makeWorkspace();
+    await fs.mkdir(path.join(ws, "..", "systems-cache", "demo"), { recursive: true });
+    await expect(resolveSiteWorkspace(ws, "demo")).rejects.toThrow("Unknown site id");
+  });
+
+  test("resolves a real cache clone — system-config.yaml only, no package.json", async () => {
+    // Regression: the resolver previously required package.json, which is
+    // gitignored and absent from every real clone — the fallback was dead.
+    // system-config.yaml (already written by writeSystemFiles) is the marker.
     const ws = await makeWorkspace();
     await writeSystemFiles(ws, [{ id: "demo" }]);
-    await expect(resolveSiteWorkspace(ws, "demo")).rejects.toThrow("Unknown site id");
+    const result = await resolveSiteWorkspace(ws, "demo");
+    expect(result.source).toBe("cache-clone");
+    expect(result.configPath).toBeUndefined();
+    expect(result.packageName).toBeUndefined();
   });
 
   test("AC-4: discoverSiteWorkspaces includes cache clone-resolvable sites", async () => {
     const ws = await makeWorkspace();
     await writeSystemFiles(ws, [{ id: "alpha" }]);
-    await writeCacheClonePackage(ws, "alpha");
+    await writeCacheCloneKernelConfig(ws, "alpha");
     const results = await discoverSiteWorkspaces(ws);
     expect(results.length).toBe(1);
     expect(results[0]!.source).toBe("cache-clone");
@@ -177,16 +191,18 @@ describe("discoverSiteWorkspaces", () => {
     expect(results[0]!.missionId).toBe("delta-m000001");
   });
 
-  test("discovers apps/ entry when workpiece exists but registry has no currentMission", async () => {
+  test("cache clone outranks apps/ when workpiece exists but registry has no currentMission", async () => {
     const ws = await makeWorkspace();
     await writeSystemFiles(ws, [{ id: "delta" }]);
     await writeApp(ws, "delta");
     await writeWorkpiece(ws, "delta-m000001", "delta");
-    // Without currentMission, tryResolveMissionWorkpiece returns null, so
-    // the workpiece on disk is ignored and apps/delta is discovered.
+    // Without currentMission, tryResolveMissionWorkpiece returns null, so the
+    // workpiece on disk is ignored. The cache clone (system-config.yaml
+    // written by writeSystemFiles) outranks apps/ — read-only mirrors have no
+    // dual-representation write ambiguity.
     const results = await discoverSiteWorkspaces(ws);
     expect(results.length).toBe(1);
-    expect(results[0]!.source).toBe("apps");
+    expect(results[0]!.source).toBe("cache-clone");
   });
 
   test("returns empty array when no sites exist", async () => {

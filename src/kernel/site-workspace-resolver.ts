@@ -23,6 +23,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
 </CHANGE_SUMMARY>
 */
 
@@ -127,7 +128,13 @@ async function tryResolveCacheClone(
   siteId: string,
 ): Promise<SiteWorkspace | null> {
   const cacheDir = resolveCacheClonePath(workspaceRoot, siteId);
-  if (!(await fileExists(path.join(cacheDir, "package.json")))) return null;
+  // Cache clones are identified by system-config.yaml (RFC-0790 — the same
+  // marker discoverSystems uses), never by package.json: the generated
+  // manifest is gitignored and exists only in materialized workpieces, so
+  // requiring it left the RFC-1025 fallback unreachable for every real
+  // clone. RFC-1260 read commands (content.get/query) resolve through here;
+  // mutating commands are rejected at the executor level.
+  if (!(await fileExists(path.join(cacheDir, "system-config.yaml")))) return null;
   const configPath = await resolveConfigPath(cacheDir);
   const packageName = await readPackageName(path.join(cacheDir, "package.json"));
   return {
@@ -227,15 +234,17 @@ export async function discoverSiteWorkspaces(
   for (const entry of entries) {
     if (!entry.isDirectory || shouldIgnoreName(entry.name)) continue;
     if (seen.has(entry.name)) {
-      // Dual representation: both mission workpiece and apps/<id> exist.
-      // When the registry entry has currentMission set, the mission workpiece
-      // wins (mirrors resolveSiteWorkspace logic). Otherwise this is a real
-      // dual-representation error (RFC-0354 §6.4).
+      // A higher-precedence source already claimed this id
+      // (resolveSiteWorkspace order: mission > cache-clone > apps/). The
+      // cache clone wins silently — it is a read-only mirror, so there is no
+      // write-target ambiguity. A mission workpiece coexisting with apps/
+      // remains a real dual-representation error (RFC-0354 §6.4).
+      const claimed = results.find((ws) => ws.name === entry.name);
+      if (claimed?.source === "cache-clone") continue;
       const sysInfo = infos.find((r) => r.id === entry.name);
       if (sysInfo?.currentMission) continue;
-      const missionWs = results.find((ws) => ws.name === entry.name);
       throw new Error(
-        `dual-representation: site "${entry.name}" exists both as apps/${entry.name} and as mission workpiece missions/${missionWs?.missionId}/workpiece. RFC-0354 §6.4 forbids dual representation.`,
+        `dual-representation: site "${entry.name}" exists both as apps/${entry.name} and as mission workpiece missions/${claimed?.missionId}/workpiece. RFC-0354 §6.4 forbids dual representation.`,
       );
     }
     const ws = await tryResolveAppsDirectory(workspaceRoot, entry.name);
