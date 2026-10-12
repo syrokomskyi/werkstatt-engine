@@ -10,6 +10,7 @@
   <item>RFC-0355: initial mission command module.</item>
   <item>ADR-0041: removed duplicate command registrations; mission.module.ts is the single source of truth for flag schemas. This file is now a pure re-export barrel.</item>
   <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
+  <item>RFC-1260</item>
 </CHANGE_SUMMARY>
 */
 
@@ -43,6 +44,9 @@ export {
   investigateUntrackedFiles,
   type UntrackedFileReport,
   cacheCloneCommit,
+  VALIDATOR_MAPPINGS,
+  selectValidators,
+  type ValidatorMapping,
 } from "./mission-git-commit.ts";
 export { runMissionCleanup, type MissionCleanupData } from "./mission-cleanup.ts";
 export {
