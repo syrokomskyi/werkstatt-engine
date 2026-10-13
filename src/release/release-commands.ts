@@ -6,15 +6,11 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>warpgogol-m000196: release.prepare refreshes mission distribution/ after a fresh rebuild (rm + copy from staging dist + post-build build-input-hash.json) — a stale distribution/ copy from an earlier ship attempt forced pointless rebuilds and misled post-ship verification reading distribution/ instead of the release artifact.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: bootSmokeAppliesToAdapter resolves the adapter and reads bootSmokeCapable() — new static adapters opt out in their own file; unknown names keep boot-smoke (strict default).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
-  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931, RFC-0948, RFC-1097</history>
+  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931, RFC-0948, RFC-1097, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
