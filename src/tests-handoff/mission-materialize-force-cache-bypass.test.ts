@@ -6,6 +6,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0619: initial regression test — asserts force: true is passed to executeKernelPipeline.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1275: steps 1-5: journal-portal domain, six blocks, binding emission</item>
 </CHANGE_SUMMARY>
 */
 
@@ -83,6 +84,7 @@ vi.mock("@warpgogol/werkstatt-site/onboarding", () => ({
   readTemplateFields: vi.fn(() => ({})),
   resolveBasePath: vi.fn(() => ""),
   resolveAdapterBlock: vi.fn(() => ""),
+  resolveJournalBindingsBlock: vi.fn(() => ""),
 }));
 
 vi.mock("../bordbuch/bordbuch-io.ts", () => ({

@@ -6,12 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1199: MATERIALIZATION-IN-PROGRESS sentinel — written in setup-staging into stagingDir/.git (rides atomic-move into workpiece/.git) or inside git-init-commit after git init on the non-git fallback; deleted only after the baseline commit lands; git-init-commit is idempotent on resume (skip commit when HEAD resolves and the staged index is clean); workpiece commit hook installs early in setup-staging</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1265</item>
-  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958, RFC-1093, RFC-1097</history>
+  <item>RFC-1275: steps 1-5: journal-portal domain, six blocks, binding emission</item>
+  <history>RFC-0356, RFC-0388, RFC-0389, RFC-0480, RFC-0517, RFC-0568, RFC-0580, RFC-0597, RFC-0620, RFC-0647, RFC-0659, RFC-0796, RFC-0822, RFC-0870, RFC-0952, RFC-0954, RFC-0958, RFC-1093, RFC-1097, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -286,6 +286,7 @@ async function generateFullBoilerplate(
     readTemplateFields,
     resolveBasePath,
     resolveAdapterBlock,
+    resolveJournalBindingsBlock,
   } = onboardingMod;
   const { runEnvExampleGenerate } = checksMod;
 
@@ -347,7 +348,13 @@ async function generateFullBoilerplate(
     },
     {
       dest: "wrangler.jsonc",
-      content: applyTokens(await readTemplate("wrangler.template.jsonc", context.io), tokens),
+      content: applyTokens(
+        (await readTemplate("wrangler.template.jsonc", context.io)).replace(
+          "// WG_JOURNAL_BINDINGS",
+          await resolveJournalBindingsBlock(stagingDir, context.io),
+        ),
+        tokens,
+      ),
     },
     {
       dest: "tsconfig.json",

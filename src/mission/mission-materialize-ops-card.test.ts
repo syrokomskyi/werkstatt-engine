@@ -6,6 +6,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1265: initial test — ops.card.generate invoked with --site during materialize; failure is non-fatal.</item>
   <item>RFC-1265</item>
+  <item>RFC-1275: steps 1-5: journal-portal domain, six blocks, binding emission</item>
 </CHANGE_SUMMARY>
 */
 
@@ -122,6 +123,7 @@ vi.mock("@warpgogol/werkstatt-site/onboarding", () => ({
   readTemplateFields: vi.fn(() => ({})),
   resolveBasePath: vi.fn(() => ""),
   resolveAdapterBlock: vi.fn(() => ""),
+  resolveJournalBindingsBlock: vi.fn(() => ""),
 }));
 
 vi.mock("@warpgogol/werkstatt-site/checks", () => ({
