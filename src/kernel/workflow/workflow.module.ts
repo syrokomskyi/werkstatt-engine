@@ -9,7 +9,6 @@
   <item>Module registers the command only — workflow logic lives in sibling modules.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-0075: Add workflow command module.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -24,6 +23,7 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1276: remove workflow-amend.list and the workflows-amend lint branch — the RFC-0135/0136 amend pipeline is superseded</item>
+  <history>RFC-0075</history>
 </CHANGE_SUMMARY>
 */
 
