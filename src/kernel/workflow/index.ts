@@ -23,12 +23,9 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 */
 
 // workflowModule migrated to @warpgogol/forge (RFC-0374) — see packages/forge/os/workflow/
-export { runWorkflowLint, runWorkflowList, runWorkflowAmendList } from "./handlers.ts";
+export { runWorkflowLint, runWorkflowList } from "./handlers.ts";
 export type {
   WorkflowPhase,
-  WorkflowChain,
-  WorkflowPreconditions,
-  WorkflowBranch,
   WorkflowFrontmatter,
   WorkflowListEntry,
   WorkflowLintViolation,

@@ -141,12 +141,9 @@ export { createSemanticModule } from "./semantic/semantic.module.ts";
 export { runSemanticPageValidate } from "./semantic/handlers.ts";
 
 // RFC-0075: Agent workflow discovery and linting domain — workflowModule migrated to @warpgogol/forge (RFC-0374)
-export { runWorkflowLint, runWorkflowList, runWorkflowAmendList } from "./workflow/index.ts";
+export { runWorkflowLint, runWorkflowList } from "./workflow/index.ts";
 export type {
   WorkflowPhase,
-  WorkflowChain,
-  WorkflowPreconditions,
-  WorkflowBranch,
   WorkflowFrontmatter,
   WorkflowListEntry,
   WorkflowLintViolation,

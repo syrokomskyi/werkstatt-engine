@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
+  <item>RFC-1276: remove runWorkflowAmendList, WORKFLOW_AMEND_DIR, and the amend RFC command exemption set — the RFC-0135/0136 amend pipeline is superseded</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,8 +31,6 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import {
   WORKFLOW_PHASES,
-  WORKFLOW_CHAINS,
-  type WorkflowChain,
   type WorkflowFrontmatter,
   type WorkflowLintResult,
   type WorkflowLintViolation,
@@ -40,22 +39,7 @@ import {
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 const WORKFLOW_DIR = ".agents/workflows";
-const WORKFLOW_AMEND_DIR = ".agents/workflows-amend";
 
-// RFC-0135/RFC-0136 commands (registered in site-kernel-onboarding / site-kernel-checks).
-const _PENDING_AMEND_RFC_COMMANDS = new Set([
-  "amend.input.validate",
-  "amend.atoms.merge",
-  "amend.provenance.append",
-  "amend.provenance.validate",
-  "amend.phase.validate",
-  "content.coverage.delta",
-  "audit.delta.run",
-  "amend-check.author",
-  "amend-check.postbuild",
-  "amend-check.run",
-  "workflow-amend.list",
-]);
 const PENDING_ACCEPTED_RFC_COMMANDS = new Set([
   "brief.validate",
   "biome.tokens.derive",
@@ -133,7 +117,6 @@ function validateFrontmatter(file: string, value: unknown): WorkflowFrontmatter 
     typeof candidate.id === "string" &&
     typeof candidate.title === "string" &&
     WORKFLOW_PHASES.includes(candidate.phase) &&
-    (candidate.chain === undefined || WORKFLOW_CHAINS.includes(candidate.chain)) &&
     isStringArray(candidate.reads) &&
     isStringArray(candidate.writes) &&
     Boolean(candidate.scope) &&
@@ -149,25 +132,18 @@ function validateFrontmatter(file: string, value: unknown): WorkflowFrontmatter 
     typeof candidate.selfOrchestration.autoRun === "boolean" &&
     isStringArray(candidate.selfOrchestration.pauseFor) &&
     isStringArray(candidate.checkpoints) &&
-    (candidate.nextWorkflow === undefined || typeof candidate.nextWorkflow === "string") &&
-    (candidate.branch === undefined ||
-      (typeof candidate.branch.on === "string" && isStringArray(candidate.branch.cases)));
+    (candidate.nextWorkflow === undefined || typeof candidate.nextWorkflow === "string");
 
   if (!valid) throw new Error(`${file}: invalid workflow frontmatter shape`);
   return candidate;
 }
 
-/** Load one chain's workflow files. The chain a file belongs to is fixed by its directory. */
-async function loadWorkflows(
-  workspaceRoot: string,
-  chain: WorkflowChain = "greenfield",
-  io: WorkspaceIO = createDefaultIO().io,
-) {
-  const dir = chain === "amend" ? WORKFLOW_AMEND_DIR : WORKFLOW_DIR;
+/** Load the greenfield chain's workflow files. */
+async function loadWorkflows(workspaceRoot: string, io: WorkspaceIO = createDefaultIO().io) {
+  const dir = WORKFLOW_DIR;
   const files = await readWorkflowFiles(workspaceRoot, dir);
   const workflows: Array<{
     relativeFile: string;
-    chain: WorkflowChain;
     data: WorkflowFrontmatter;
   }> = [];
   const violations: WorkflowLintViolation[] = [];
@@ -178,7 +154,6 @@ async function loadWorkflows(
       const source = await io.readFile(file);
       workflows.push({
         relativeFile,
-        chain,
         data: validateFrontmatter(relativeFile, parseMarkdownFrontmatter(source)),
       });
     } catch (error) {
@@ -212,27 +187,12 @@ export async function runWorkflowList(
   _input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<{ command: "workflow.list"; workflows: WorkflowListEntry[] }>> {
-  const { workflows } = await loadWorkflows(context.workspaceRoot, "greenfield");
+  const { workflows } = await loadWorkflows(context.workspaceRoot);
   const entries = toListEntries(workflows);
   return {
     data: { command: "workflow.list", workflows: entries },
     exitCode: 0,
     summary: `[workflow.list] ${entries.length} workflow file(s) found`,
-  };
-}
-
-export async function runWorkflowAmendList(
-  _input: KernelCommandInput,
-  context: KernelRuntimeContext,
-): Promise<
-  KernelCommandResult<{ command: "workflow-amend.list"; workflows: WorkflowListEntry[] }>
-> {
-  const { workflows } = await loadWorkflows(context.workspaceRoot, "amend");
-  const entries = toListEntries(workflows);
-  return {
-    data: { command: "workflow-amend.list", workflows: entries },
-    exitCode: 0,
-    summary: `[workflow-amend.list] ${entries.length} amend workflow file(s) found`,
   };
 }
 

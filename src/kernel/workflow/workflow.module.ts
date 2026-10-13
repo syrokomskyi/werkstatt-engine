@@ -23,13 +23,14 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1276: remove workflow-amend.list and the workflows-amend lint branch — the RFC-0135/0136 amend pipeline is superseded</item>
 </CHANGE_SUMMARY>
 */
 
 import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
 export async function createWorkflowModule(): Promise<ModuleExport> {
-  const { runWorkflowLint, runWorkflowList, runWorkflowAmendList } = await import("./handlers.ts");
+  const { runWorkflowLint, runWorkflowList } = await import("./handlers.ts");
   return {
     name: "workflow",
     version: "0.1.0",
@@ -42,8 +43,8 @@ export async function createWorkflowModule(): Promise<ModuleExport> {
         rules: [],
         modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
         description:
-          "Validate .agents/workflows AND .agents/workflows-amend markdown frontmatter, command references, " +
-          "and per-chain phase links (RFC-0075 + RFC-0136).",
+          "Validate .agents/workflows markdown frontmatter, command references, " +
+          "and per-chain phase links (RFC-0075).",
         scope: "workspace",
         flags: {},
         acceptsAllFlag: true,
@@ -61,18 +62,6 @@ export async function createWorkflowModule(): Promise<ModuleExport> {
         acceptsAllFlag: true,
         reads: [".agents/workflows/**/*.md", ".windsurf/workflows/**/*.md"],
         execute: runWorkflowList,
-      },
-      {
-        name: "workflow-amend.list",
-        mutatesState: false,
-        modulePath: "packages/werkstatt-engine/src/kernel/workflow/workflow.module.ts",
-        description:
-          "List .agents/workflows-amend entries with phase, IO summary, and next workflow (RFC-0136).",
-        scope: "workspace",
-        flags: {},
-        acceptsAllFlag: true,
-        reads: [".agents/workflows-amend/**/*.md"],
-        execute: runWorkflowAmendList,
       },
     ],
     pipelines: [],

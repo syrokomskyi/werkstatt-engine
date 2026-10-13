@@ -1,7 +1,7 @@
 import { test, expect, describe, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runWorkflowList, runWorkflowAmendList, runWorkflowLint } from "../handlers.ts";
+import { runWorkflowList, runWorkflowLint } from "../handlers.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-shared/kernel";
 import type { ActualState } from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
@@ -95,21 +95,6 @@ describe("runWorkflowList", () => {
     const result = await runWorkflowList(mockInput, makeContext());
     expect(result.summary).toContain("workflow.list");
     expect(result.summary).toContain("0");
-  });
-});
-
-describe("runWorkflowAmendList", () => {
-  test("returns empty list when no amend workflow directory exists", async () => {
-    const result = await runWorkflowAmendList(mockInput, makeContext());
-    expect(result.exitCode).toBe(0);
-    expect(result.data!.workflows).toEqual([]);
-  });
-
-  test("returns amend workflow entries", async () => {
-    mkdirSync(join(tmpDir, ".agents/workflows-amend"), { recursive: true });
-    writeFileSync(join(tmpDir, ".agents/workflows-amend/wf-amend-001.md"), VALID_FRONTMATTER);
-    const result = await runWorkflowAmendList(mockInput, makeContext());
-    expect(result.data!.workflows).toHaveLength(1);
   });
 });
 

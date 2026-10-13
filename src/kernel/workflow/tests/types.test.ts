@@ -1,13 +1,10 @@
 import { test, expect, describe } from "vitest";
 import {
   WORKFLOW_PHASES,
-  WORKFLOW_CHAINS,
   type WorkflowFrontmatter,
   type WorkflowListEntry,
   type WorkflowLintViolation,
   type WorkflowLintResult,
-  type WorkflowPreconditions,
-  type WorkflowBranch,
   type WorkflowScope,
   type WorkflowRecoveryRule,
   type WorkflowSelfOrchestration,
@@ -34,17 +31,6 @@ describe("WORKFLOW_PHASES", () => {
   });
 });
 
-describe("WORKFLOW_CHAINS", () => {
-  test("contains greenfield and amend", () => {
-    expect(WORKFLOW_CHAINS).toContain("greenfield");
-    expect(WORKFLOW_CHAINS).toContain("amend");
-  });
-
-  test("has exactly 2 chains", () => {
-    expect(WORKFLOW_CHAINS).toHaveLength(2);
-  });
-});
-
 describe("type instantiation", () => {
   test("WorkflowFrontmatter can be instantiated", () => {
     const fm: WorkflowFrontmatter = {
@@ -67,11 +53,8 @@ describe("type instantiation", () => {
   test("WorkflowFrontmatter with optional fields", () => {
     const fm: WorkflowFrontmatter = {
       id: "wf-002",
-      title: "Amend Workflow",
+      title: "Test Workflow",
       phase: "compose",
-      chain: "amend",
-      preconditions: { appPresent: true },
-      branch: { on: "routeType", cases: ["new", "existing"] },
       reads: ["src/"],
       writes: ["dist/"],
       scope: { allowedWriteRoots: ["src/"], forbiddenWriteRoots: ["node_modules/"] },
@@ -82,8 +65,6 @@ describe("type instantiation", () => {
       checkpoints: ["cp-1"],
       nextWorkflow: "wf-003",
     };
-    expect(fm.chain).toBe("amend");
-    expect(fm.preconditions!.appPresent).toBe(true);
     expect(fm.nextWorkflow).toBe("wf-003");
   });
 
@@ -118,16 +99,6 @@ describe("type instantiation", () => {
     };
     expect(r.command).toBe("workflow.lint");
     expect(r.filesChecked).toBe(5);
-  });
-
-  test("WorkflowPreconditions can be instantiated", () => {
-    const p: WorkflowPreconditions = { appPresent: true, systemManifestValid: false };
-    expect(p.appPresent).toBe(true);
-  });
-
-  test("WorkflowBranch can be instantiated", () => {
-    const b: WorkflowBranch = { on: "routeType", cases: ["new"] };
-    expect(b.cases).toHaveLength(1);
   });
 
   test("WorkflowScope can be instantiated", () => {
