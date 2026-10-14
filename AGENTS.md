@@ -567,6 +567,12 @@ Excludes: `node_modules/`, `tests/`, `tests-handoff/`, `*.test.ts`, `*.spec.ts`.
 - **Raw artifacts:** `cloudflare-submission.json` and `cloudflare-result.json` are preserved as bundle artifacts.
 - **No duplication:** Same as Lighthouse — the adapter produces an `AssessmentBundleV1` and calls `runNachweisAssessmentIngest` directly.
 
+## Nachweis operational notes
+
+- **Post-release measurements need the entitlement file.** `nachweis.measure.*` and `nachweis.assessment.ingest` resolve the `nachweis` entitlement from `src/entitlements.generated.yaml` — a gitignored file that exists only inside a materialized mission workpiece. Once a mission closes, the cache clone lacks it and measurement commands skip silently ("nachweis entitlement not resolved"). For post-release measurements (no open mission), copy the file from the closed workpiece into the cache clone — it is gitignored and never committed. Discovered during warpgogol-m000201.
+- **`nachweis.sign --key-file` expects hex, not PEM.** The flag reads raw Ed25519 private-key bytes as a 32-byte hex string; the `.env`-configured `signing.key.pem` fails with `"secretKey" expected Uint8Array of length 32`. Convert once to `.keys/signing.key.hex` (chmod 600) and pass that path. Discovered during warpgogol-m000201.
+- **Do not hand-commit ingest-written evidence in the cache clone.** Measurement/ingest commands update `src/content/**/trust/evidence/*.md` in the cache clone but commit only the Bordbuch event — the evidence file stays dirty, and direct `git commit` is blocked by hooks/external-edit guard. `sternsystem.sync` sweeps it via `commitCacheCloneIfDirty`. Discovered during warpgogol-m000201.
+
 ## nachweis.consent.update and display↔consent coupling (RFC-0886)
 
 `nachweis.consent.update` requires a `--scope` flag (`document|screenshot|websiteLink`) and updates `consentScope[scope]` instead of the removed `consentStatus`. The publication gate enforces display↔consent consistency via the `display-consent-consistent` condition (required for `attestation-v1` only).
