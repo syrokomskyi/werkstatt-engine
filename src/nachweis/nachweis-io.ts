@@ -9,6 +9,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1279: scope bordbuch-derived gate V2 conditions to the record slug inside evaluateGateV2 — recordApproved now reads metadata.approved === true; entries without metadata.slug satisfy no condition (fail-closed, kills cross-record attestation contamination).</item>
   <item>RFC-0886: add display-consent-consistent gate condition, per-aspect consent evaluation in evaluateGateV2, resolveNachweisScreenshotR2Path, NachweisScreenshotUploadResult, extend NachweisConsentUpdateResult with scope, extend NachweisManifestEntry with display and websiteUrl.</item>
   <item>RFC-0890: add resolveNachweisRawScreenshotR2Path, resolveNachweisRawScreenshotLocalPath, parseCaptureXFilename, detectImageMetadata, NachweisScreenshotIngestResult.</item>
   <item>RFC-0891: add resolveNachweisScreenshotDisplayR2Path, downloadFromR2, NachweisScreenshotProcessResult.</item>
@@ -287,15 +288,18 @@ export function evaluateGateV2(
     items != null &&
     Object.keys(items).length > 0 &&
     Object.values(items).every((item) => isValidSha256Hex(item.sha256));
-  const recordApproved = input.bordbuchEntries.some(
-    (e) => e.kind === "nachweis-record" && e.summary.includes("approved"),
+  // RFC-1279: bordbuch-derived conditions count only the evaluated record's own
+  // entries — an entry without metadata.slug satisfies no condition (fail-closed).
+  const scopedBordbuchEntries = input.bordbuchEntries.filter((e) => e.metadata?.slug === slug);
+  const recordApproved = scopedBordbuchEntries.some(
+    (e) => e.kind === "nachweis-record" && e.metadata?.approved === true,
   );
-  const verificationLevelMet = input.bordbuchEntries.some(
+  const verificationLevelMet = scopedBordbuchEntries.some(
     (e) => e.kind === "nachweis-record" && e.metadata?.verificationLevel === "N3",
   );
   const publicDerivativeReady =
     items != null && Object.values(items).some((item) => item.storage === "public");
-  const legalContentCheckPassed = input.bordbuchEntries.some(
+  const legalContentCheckPassed = scopedBordbuchEntries.some(
     (e) => e.kind === "nachweis-record" && e.metadata?.legalContentCheckPassed === true,
   );
   const canonicalRawArtifactVerified =

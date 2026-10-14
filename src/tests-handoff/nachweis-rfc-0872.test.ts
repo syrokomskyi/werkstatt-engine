@@ -9,6 +9,24 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0872: initial tests for policy resolution, gate V2, technical-assessment validation, withdraw, manifest, locale drift.</item>
+  <item>RFC-1279: scope nachweis gate V2 bordbuch conditions to record slug
+
+evaluateGateV2 derived record-approved / n3-met / legal-content-check-passed
+from every nachweis-record entry in the site log, so one record's approval
+satisfied every other record's gate (observed: nicaragua-projekt passed
+allPassed on borrowed attestation).
+
+Scope the three predicates to entries whose metadata.slug equals the
+evaluated slug; slug-less entries satisfy no condition (fail-closed).
+record-approved now reads metadata.approved === true instead of summary
+substring matching (decision Q-1). Scoping lives inside the shared
+evaluator — nachweis.validate and nachweis.publish inherit it unchanged.
+
+Adds nachweis-rfc-1279.test.ts regression suite (8 tests, AC-1..AC-4 +
+predicate pin); sweeps RFC-0872/0888 fixtures to stamp slug + approved;
+documents the contract in the engine AGENTS notes. Evidence emitted via
+rfc.verification.emit; review REVIEW-CODE-2026-10-14-01 (warning, both
+findings fixed).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -881,7 +899,12 @@ describe("RFC-0872: nachweis.publish V2 gate", () => {
       status: "done",
       actor: "agent",
       summary: "approved",
-      metadata: { verificationLevel: "N3", legalContentCheckPassed: true },
+      metadata: {
+        slug: "tech-publish",
+        verificationLevel: "N3",
+        legalContentCheckPassed: true,
+        approved: true,
+      },
       previousHash: null,
       hash: "sha256:fake",
     });
