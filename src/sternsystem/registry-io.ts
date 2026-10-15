@@ -125,6 +125,7 @@ export async function readSystemState(
       lastRelease: null,
       lastPropagated: {},
       accessPin: null,
+      accessPinSuspended: null,
       passportRequired: false,
       ownershipRequired: false,
     };

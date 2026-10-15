@@ -97,6 +97,7 @@ async function buildFleetSiteRecord(
       lastRelease: null,
       lastPropagated: {},
       accessPin: null,
+      accessPinSuspended: null,
       passportRequired: false,
       ownershipRequired: false,
     };

@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import type { SystemState } from "@warpgogol/werkstatt-engine/schemas";
 
 vi.mock("../../sternsystem/registry-io.ts", () => ({
   readSystemConfigSmart: vi.fn(),
@@ -33,18 +34,24 @@ function makeContext(workspaceRoot: string) {
   } as unknown as Parameters<typeof runLeitstandAccessStatus>[1];
 }
 
+function makeState(overrides: Partial<SystemState>): SystemState {
+  return {
+    schemaVersion: "1.0.0",
+    systemId: "test-bundle",
+    currentMission: null,
+    lastRelease: null,
+    lastPropagated: {},
+    accessPin: null,
+    accessPinSuspended: null,
+    passportRequired: false,
+    ownershipRequired: false,
+    ...overrides,
+  };
+}
+
 describe("RFC-0899: leitstand.access.status", () => {
   it("reports protected when accessPin is set", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce({
-      schemaVersion: "1.0.0",
-      systemId: "test-bundle",
-      currentMission: null,
-      lastRelease: null,
-      lastPropagated: {},
-      accessPin: "1234",
-      passportRequired: false,
-      ownershipRequired: false,
-    });
+    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
     const result = await runLeitstandAccessStatus(
       makeInput({ site: "test-bundle" }),
       makeContext("/tmp/test"),
@@ -55,16 +62,7 @@ describe("RFC-0899: leitstand.access.status", () => {
   });
 
   it("reports unprotected when accessPin is null", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce({
-      schemaVersion: "1.0.0",
-      systemId: "test-bundle",
-      currentMission: null,
-      lastRelease: null,
-      lastPropagated: {},
-      accessPin: null,
-      passportRequired: false,
-      ownershipRequired: false,
-    });
+    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({}));
     const result = await runLeitstandAccessStatus(
       makeInput({ site: "test-bundle" }),
       makeContext("/tmp/test"),
@@ -81,16 +79,9 @@ describe("RFC-0899: leitstand.access.status", () => {
   });
 
   it("accepts --system as alias for --site", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce({
-      schemaVersion: "1.0.0",
-      systemId: "alias-site",
-      currentMission: null,
-      lastRelease: null,
-      lastPropagated: {},
-      accessPin: "9999",
-      passportRequired: false,
-      ownershipRequired: false,
-    });
+    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+      makeState({ systemId: "alias-site", accessPin: "9999" }),
+    );
     const result = await runLeitstandAccessStatus(
       makeInput({ system: "alias-site" }),
       makeContext("/tmp/test"),
