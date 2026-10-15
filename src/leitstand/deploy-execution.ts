@@ -17,6 +17,10 @@
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
+  <item>RFC-1284: post-propagate access-pin reconcile — after a successful dev/alt
+propagation, re-assert ACCESS_PIN from the freshly re-read system state when
+protection is desired and no suspension marker is open. Non-fatal diagnostic on
+accessReconcile; ACCESS-01 in sternsystem.validate is the hard backstop.</item>
   <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138</history>
 </CHANGE_SUMMARY>
 */
@@ -46,6 +50,7 @@ import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import { writeSystemStateSmart, readSystemStateSmart } from "../sternsystem/registry-io.ts";
 import { collectPurgeUrls, purgeCacheByUrls, skippedPurgeResult } from "./cache-purge.ts";
 import { readBehaviorSnapshot, sourceDotenv, filterEnv } from "./adapters/index.ts";
+import { runWranglerSecretPut } from "./adapters/wrangler-secrets.ts";
 import { fingerprintTree } from "@warpgogol/werkstatt-engine/fingerprint/semantic";
 import { atomicWriteFile } from "../werkstatt/atomic.ts";
 import {
@@ -128,6 +133,8 @@ export interface DeployExecutionResult {
   /** RFC-1190: dev-channel post-deploy mission.check outcome (recorded, not just thrown). */
   axiomStatus: "pass" | "fail" | "not-run";
   axiomExitCode: number;
+  /** RFC-1284: post-propagate ACCESS_PIN reconcile outcome — present only when the channel was eligible for reconciliation (dev/alt, pin declared, no suspension). */
+  accessReconcile?: { ok: boolean; error?: string };
   /** RFC-1190: mission identity resolution record propagated to the deploy result. */
   missionContext?: MissionContext;
   failingPhase?: string;
@@ -309,6 +316,7 @@ export async function executeDeployPhases(
   let releaseSignResult: DeployExecutionResult["releaseSignResult"];
   let featureSmokeCheck: FeatureSmokeCheckResult | undefined;
   let agentContractCheck: AgentContractCheckResult | undefined;
+  let accessReconcile: DeployExecutionResult["accessReconcile"];
 
   const gate =
     channel === "dev" ? "dev-deploy" : channel === "alt" ? "propagate-alt" : "promote-main";
@@ -488,6 +496,48 @@ export async function executeDeployPhases(
       );
     }
     const actualDeploymentUrl = propagateResult.deploymentUrl || deploymentUrl;
+
+    // --- RFC-1284: access-pin reconcile ---
+    // A crashed certify (or failed resume) can leave ACCESS_PIN deleted while
+    // accessPin still declares protection. Re-assert the secret on dev/alt
+    // immediately after a successful propagation — before purge/health/smoke
+    // phases that can throw — so every deploy converges the projection to the
+    // desired state. Fresh state re-read: a concurrent certify may have opened
+    // a suspension during the build/deploy window. Reconcile failure is a
+    // non-fatal diagnostic — ACCESS-01 in sternsystem.validate is the backstop.
+    if (channel !== "main") {
+      try {
+        const freshState = await readSystemStateSmart(ctx.workspaceRoot, ctx.systemId);
+        const desiredPin = freshState?.accessPin ?? null;
+        const suspended = (freshState?.accessPinSuspended ?? null) !== null;
+        if (desiredPin !== null && !suspended) {
+          const secretsEnv = ctx.secretsFilePath ? await sourceDotenv(ctx.secretsFilePath) : {};
+          const pinEnv = {
+            ...filterEnv(process.env as Record<string, string | undefined>),
+            ...secretsEnv,
+          };
+          const putResult = await runWranglerSecretPut(
+            channelConfig.workerName,
+            "ACCESS_PIN",
+            desiredPin,
+            pinEnv,
+            ctx.workspaceRoot,
+          );
+          accessReconcile =
+            putResult.exitCode === 0
+              ? { ok: true }
+              : {
+                  ok: false,
+                  error:
+                    putResult.stderr.trim() ||
+                    putResult.stdout.trim() ||
+                    `exit code ${putResult.exitCode}`,
+                };
+        }
+      } catch (err) {
+        accessReconcile = { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
 
     if (channel !== "dev" || !isDevWorkersUrl(actualDeploymentUrl)) {
       if (ctx.adapter.purgeCapable()) {
@@ -801,6 +851,7 @@ export async function executeDeployPhases(
       evidenceSyncError,
       axiomStatus,
       axiomExitCode,
+      accessReconcile,
       missionContext: ctx.missionContext,
     };
   } catch (err) {
@@ -841,6 +892,7 @@ export async function executeDeployPhases(
       evidenceSyncError,
       axiomStatus,
       axiomExitCode,
+      accessReconcile,
       missionContext: ctx.missionContext,
       failingPhase: failingPhase ?? "unknown",
       errorMessage,
