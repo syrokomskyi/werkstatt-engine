@@ -12,12 +12,14 @@ INTAKE-11 warning-only contract (status stays pass).</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-1281: created — one describe per INTAKE rule + committed-fixture pass test.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
+  <item>RFC-1281: resolve valid-minimal fixture path relative to test file</item>
 </CHANGE_SUMMARY>
 */
 
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { describe, expect, it } from "vitest";
@@ -49,7 +51,7 @@ const rules = (
 
 describe("committed fixture (AC-3)", () => {
   it("fixtures/valid-minimal passes with zero errors", async () => {
-    const dir = join(process.cwd(), "src/intake/fixtures/valid-minimal");
+    const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures/valid-minimal");
     const exportInfo = await resolveIntakeExportSha256(io);
     const result = await validateIntakeBundle(dir, io, {
       exportSha256: exportInfo!.sha256,
