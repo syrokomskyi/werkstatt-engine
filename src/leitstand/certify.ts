@@ -42,7 +42,11 @@ import {
   type CandidatePreview,
   type CertifyTarget,
 } from "./candidate-preview.ts";
-import { resolveCacheClonePath, readSystemStateSmart } from "../sternsystem/registry-io.ts";
+import {
+  resolveCacheClonePath,
+  readSystemStateSmart,
+  readSystemConfigSmart,
+} from "../sternsystem/registry-io.ts";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
 import { gitExec } from "../werkstatt/git-exec.ts";
 import { createR2StorageAdapter } from "../certification/storage/r2-adapter.ts";
@@ -232,8 +236,9 @@ export interface CertifyInput {
 
 export interface PinManagement {
   autoManaged: boolean;
-  removedBefore: boolean;
-  restoredAfter: boolean;
+  suspended: boolean;
+  resumed: boolean;
+  staleResumed: boolean;
   restoreError: string | null;
 }
 
@@ -300,6 +305,80 @@ export async function runLeitstandCertify(
   }
   const certifyTarget: CertifyTarget = targetFlag === "channel" ? "channel" : "candidate";
 
+  // RFC-0938: Auto-manage access PIN. Default: true. Post-RFC-1284 the flag
+  // controls suspend-before-measure / resume-after; crash recovery (stale
+  // suspension markers) runs unconditionally regardless of the flag.
+  const autoManagePinRaw = input.flags["auto-manage-pin"];
+  const autoManagePin = autoManagePinRaw === false || autoManagePinRaw === "false" ? false : true;
+
+  // RFC-1284: crash recovery on entry. A stale accessPinSuspended marker means
+  // a previous certify died between secret deletion and restore — the channel
+  // is currently open and desired protection is unmet. Resume unconditionally
+  // (before --auto-manage-pin evaluation and before any early return) so the
+  // next certify always re-asserts the projection.
+  const systemState = await readSystemStateSmart(context.workspaceRoot, systemId);
+  const recordedPin = systemState.accessPin;
+  // `?? null` — loose-schema extension keys may be undefined in un-normalized reads.
+  let suspensionActive = (systemState.accessPinSuspended ?? null) !== null;
+
+  let pinSuspended = false;
+  let pinResumed = false;
+  let staleResumed = false;
+  let pinRestoreError: string | null = null;
+
+  const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+
+  if (suspensionActive) {
+    context.logger.info(
+      `[leitstand.certify] stale access-PIN suspension detected (by ${systemState.accessPinSuspended?.by} at ${systemState.accessPinSuspended?.at}) — resuming before certification`,
+    );
+    let resumeFailedDetail: string | null = null;
+    try {
+      const resumeResult = await executeKernelCommand({
+        workspaceRoot: context.workspaceRoot,
+        commandName: "leitstand.access.resume",
+        argv: [`--site=${systemId}`],
+      });
+      const resumeReports = Array.isArray(resumeResult) ? resumeResult : [resumeResult];
+      if (
+        resumeReports.some((r: { ok?: boolean; exitCode?: number }) => !r.ok || r.exitCode !== 0)
+      ) {
+        resumeFailedDetail = "leitstand.access.resume reported failure";
+      }
+    } catch (err) {
+      resumeFailedDetail = err instanceof Error ? err.message : String(err);
+    }
+    if (resumeFailedDetail !== null) {
+      const msg =
+        `[leitstand.certify] failed to resume access PIN suspension for site '${systemId}': ${resumeFailedDetail}. ` +
+        `The site may still be unprotected. Run: pnpm exec werkstatt run leitstand.access.resume --site ${systemId}`;
+      return {
+        exitCode: 1,
+        summary: msg,
+        nextSteps: [{ action: msg, kind: "required" as const }],
+        data: {
+          command: "leitstand.certify",
+          systemId,
+          gate,
+          decisionId: "",
+          status: "fail",
+          outputPath: "",
+          producerCount: 0,
+          evidenceCount: 0,
+          pinManagement: {
+            autoManaged: autoManagePin,
+            suspended: false,
+            resumed: false,
+            staleResumed: false,
+            restoreError: resumeFailedDetail,
+          },
+        } as CertifyResult,
+      } as unknown as KernelCommandResult<CertifyResult>;
+    }
+    staleResumed = true;
+    suspensionActive = false;
+  }
+
   const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
   const candidateServerDir = path.join(releaseDir, "dist", "server");
 
@@ -340,35 +419,40 @@ export async function runLeitstandCertify(
 
   const forceRequested = flagBoolean(input, "force");
 
-  // RFC-0938: Auto-manage access PIN. Default: true. When true, auto-remove PIN
-  // before certification producers and restore it in a finally block. When false,
-  // preserve RFC-0929 fail-early behavior.
-  const autoManagePinRaw = input.flags["auto-manage-pin"];
-  const autoManagePin = autoManagePinRaw === false || autoManagePinRaw === "false" ? false : true;
+  // RFC-1284: suspend only when the measurement target is a protected live
+  // host — a `--target channel` run, or an explicit --base-url pointing at a
+  // configured dev/alt channel hostname. candidate-preview (the RFC-1207
+  // default) never touches the channel and never suspends.
+  const operationId = `certify-${new Date()
+    .toISOString()
+    .toLowerCase()
+    .replace(/[:.]/g, "-")}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const systemState = await readSystemStateSmart(context.workspaceRoot, systemId);
-  const recordedPin = systemState.accessPin;
+  const protectedLiveTarget = await isProtectedLiveTarget(
+    baseUrlFlag,
+    certifyTarget,
+    context.workspaceRoot,
+    systemId,
+  );
 
-  let pinRemoved = false;
-  let pinRestoreError: string | null = null;
-  let pinRestored = false;
-
-  if (recordedPin !== null && autoManagePin) {
-    console.info(`[leitstand.certify] access PIN active — auto-removing for certification`);
-    const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-    const unprotectResult = await executeKernelCommand({
+  if (recordedPin !== null && autoManagePin && protectedLiveTarget) {
+    context.logger.info(
+      `[leitstand.certify] access PIN active on protected live target — suspending for certification`,
+    );
+    const suspendResult = await executeKernelCommand({
       workspaceRoot: context.workspaceRoot,
-      commandName: "leitstand.access.unprotect",
-      argv: [`--site=${systemId}`],
+      commandName: "leitstand.access.suspend",
+      argv: [`--site=${systemId}`, `--by=leitstand.certify`, `--operation-id=${operationId}`],
     });
-    const unprotectReports = Array.isArray(unprotectResult) ? unprotectResult : [unprotectResult];
-    const unprotectFailed = unprotectReports.some(
+    const suspendReports = Array.isArray(suspendResult) ? suspendResult : [suspendResult];
+    const suspendFailed = suspendReports.some(
       (r: { ok?: boolean; exitCode?: number }) => !r.ok || r.exitCode !== 0,
     );
-    if (unprotectFailed) {
+    if (suspendFailed) {
       const msg =
-        `[leitstand.certify] failed to auto-remove access PIN for site '${systemId}'. ` +
-        `The PIN is still active. Run: pnpm exec werkstatt run leitstand.access.unprotect --site ${systemId}`;
+        `[leitstand.certify] failed to suspend access PIN for site '${systemId}'. ` +
+        `Producers would hit the protected channel. ` +
+        `Run: pnpm exec werkstatt run leitstand.access.suspend --site ${systemId}`;
       return {
         exitCode: 1,
         summary: msg,
@@ -384,25 +468,27 @@ export async function runLeitstandCertify(
           evidenceCount: 0,
           pinManagement: {
             autoManaged: true,
-            removedBefore: false,
-            restoredAfter: false,
+            suspended: false,
+            resumed: false,
+            staleResumed,
             restoreError: null,
           },
-        },
+        } as CertifyResult,
       } as unknown as KernelCommandResult<CertifyResult>;
     }
-    pinRemoved = true;
+    pinSuspended = true;
     // Cloudflare Workers may retain the deleted secret for a few seconds.
     // Wait before running discovery to avoid 401 race condition.
     console.info(
       `[leitstand.certify] waiting ${PIN_DELETION_PROPAGATION_DELAY_MS / 1000}s for PIN deletion to propagate…`,
     );
     await new Promise((resolve) => setTimeout(resolve, PIN_DELETION_PROPAGATION_DELAY_MS));
-  } else if (recordedPin !== null && !autoManagePin) {
-    // RFC-0929: fail-early when auto-manage is disabled
+  } else if (recordedPin !== null && !autoManagePin && !suspensionActive) {
+    // RFC-0929/RFC-1284: fail-early fires only when the pin is active and no
+    // suspension is in effect — a suspended system already has an open channel.
     const msg =
       `[leitstand.certify] site '${systemId}' has access PIN protection active. ` +
-      `Run: pnpm exec werkstatt run leitstand.access.unprotect --site ${systemId}`;
+      `Run: pnpm exec werkstatt run leitstand.access.suspend --site ${systemId}`;
     return {
       exitCode: 1,
       summary: msg,
@@ -418,11 +504,12 @@ export async function runLeitstandCertify(
         evidenceCount: 0,
         pinManagement: {
           autoManaged: false,
-          removedBefore: false,
-          restoredAfter: false,
+          suspended: false,
+          resumed: false,
+          staleResumed,
           restoreError: null,
         },
-      },
+      } as CertifyResult,
     } as unknown as KernelCommandResult<CertifyResult>;
   }
 
@@ -506,7 +593,8 @@ export async function runLeitstandCertify(
     }
 
     const now = new Date().toISOString();
-    const operationId = `certify-${now.toLowerCase().replace(/[:.]/g, "-")}-${Math.random().toString(36).slice(2, 8)}`;
+    // operationId is generated at run head (RFC-1284) so the access.suspend
+    // marker and producer attempts share one run identity.
 
     const candidate: ReleaseCandidateV1 = {
       schema: "werkstatt/release-candidate@1",
@@ -1039,23 +1127,22 @@ export async function runLeitstandCertify(
   try {
     result = await certifyCore();
   } finally {
-    if (pinRemoved) {
-      console.info(`[leitstand.certify] restoring access PIN after certification`);
+    if (pinSuspended) {
+      console.info(`[leitstand.certify] resuming access PIN after certification`);
       try {
-        const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
-        const protectResult = await executeKernelCommand({
+        const resumeResult = await executeKernelCommand({
           workspaceRoot: context.workspaceRoot,
-          commandName: "leitstand.access.protect",
-          argv: [`--site=${systemId}`, `--pin=${recordedPin}`],
+          commandName: "leitstand.access.resume",
+          argv: [`--site=${systemId}`],
         });
-        const protectReports = Array.isArray(protectResult) ? protectResult : [protectResult];
-        const protectFailed = protectReports.some(
+        const resumeReports = Array.isArray(resumeResult) ? resumeResult : [resumeResult];
+        const resumeFailed = resumeReports.some(
           (r: { ok?: boolean; exitCode?: number }) => !r.ok || r.exitCode !== 0,
         );
-        if (protectFailed) {
-          pinRestoreError = `PIN restore failed for site '${systemId}'`;
+        if (resumeFailed) {
+          pinRestoreError = `PIN resume failed for site '${systemId}'`;
         } else {
-          pinRestored = true;
+          pinResumed = true;
         }
       } catch (err) {
         pinRestoreError = err instanceof Error ? err.message : String(err);
@@ -1063,11 +1150,13 @@ export async function runLeitstandCertify(
     }
   }
 
-  // Post-finally: if PIN restore failed, override to hard fail (exitCode 1)
-  if (pinRemoved && pinRestoreError !== null) {
+  // Post-finally: if PIN resume failed, override to hard fail (exitCode 1).
+  // The suspension marker stays written — desired state remains declared and
+  // the next certify/deploy/validate converges it (RFC-1284).
+  if (pinSuspended && pinRestoreError !== null) {
     const msg =
-      `[leitstand.certify] CRITICAL: access PIN restore failed: ${pinRestoreError}. ` +
-      `Site '${systemId}' is UNPROTECTED. Run: pnpm exec werkstatt run leitstand.access.protect --site ${systemId} --pin ${recordedPin}`;
+      `[leitstand.certify] CRITICAL: access PIN resume failed: ${pinRestoreError}. ` +
+      `Site '${systemId}' stays suspended. Run: pnpm exec werkstatt run leitstand.access.resume --site ${systemId}`;
     return {
       exitCode: 1,
       summary: msg,
@@ -1079,20 +1168,22 @@ export async function runLeitstandCertify(
         gate,
         pinManagement: {
           autoManaged: true,
-          removedBefore: true,
-          restoredAfter: false,
+          suspended: true,
+          resumed: false,
+          staleResumed,
           restoreError: pinRestoreError,
         },
       } as CertifyResult,
     } as unknown as KernelCommandResult<CertifyResult>;
   }
 
-  // Attach pinManagement to the result for auto-manage paths
-  if (autoManagePin && result.data) {
+  // Attach pinManagement for auto-manage paths and entry-recovery runs.
+  if ((autoManagePin || staleResumed) && result.data) {
     (result.data as CertifyResult).pinManagement = {
-      autoManaged: true,
-      removedBefore: pinRemoved,
-      restoredAfter: pinRestored,
+      autoManaged: autoManagePin,
+      suspended: pinSuspended,
+      resumed: pinResumed,
+      staleResumed,
       restoreError: null,
     };
   }
@@ -1152,6 +1243,54 @@ export async function resolveDevBaseUrl(
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<string | undefined> {
   return (await resolveDevDeploymentRecord(cacheCloneDir, baseUrlFlag, io))?.deploymentUrl;
+}
+
+// RFC-1284: does this run's measurement target hit a protected live host?
+// Channel mode measures the recorded dev deployment — always the protected
+// channel. Explicit --base-url is protected when its hostname matches a
+// configured dev/alt channel URL (covers custom subdomains and
+// dev-<site>.<account>.workers.dev), with a ^(dev|alt)[.-] prefix fallback
+// for hosts absent from channel config. candidate-preview never qualifies.
+async function isProtectedLiveTarget(
+  baseUrlFlag: string | undefined,
+  certifyTarget: CertifyTarget,
+  workspaceRoot: string,
+  systemId: string,
+): Promise<boolean> {
+  if (certifyTarget === "channel") return true;
+  if (!baseUrlFlag) return false;
+
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrlFlag).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  // Unreadable/absent config degrades to the prefix fallback — a missing
+  // channel list must never crash the PIN pre-flight.
+  let channelUrls: Array<string | undefined> = [];
+  try {
+    const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
+    channelUrls = [
+      systemConfig.deployment?.channels.dev.url,
+      systemConfig.deployment?.channels.alt.url,
+    ];
+  } catch {
+    channelUrls = [];
+  }
+  const channelHosts = channelUrls
+    .map((url) => {
+      try {
+        return url ? new URL(url).hostname.toLowerCase() : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter((h): h is string => h !== null);
+
+  if (channelHosts.includes(hostname)) return true;
+  return /^(dev|alt)[.-]/.test(hostname);
 }
 
 // RECOVERY-2026-10-05: stale-channel detection. A remote certify without

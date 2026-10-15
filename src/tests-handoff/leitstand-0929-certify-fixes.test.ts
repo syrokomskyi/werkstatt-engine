@@ -139,14 +139,15 @@ test("RFC-0929: certify fails with clear message when accessPin is set", async (
 
   expect(result.exitCode).toBe(1);
   expect(result.summary).toContain("access PIN protection active");
-  expect(result.summary).toContain("leitstand.access.unprotect");
+  expect(result.summary).toContain("leitstand.access.suspend");
   expect(result.summary).toContain("test-sys");
   expect(result.data!.status).toBe("fail");
   expect(result.data!.producerCount).toBe(0);
   expect(result.data!.pinManagement).toEqual({
     autoManaged: false,
-    removedBefore: false,
-    restoredAfter: false,
+    suspended: false,
+    resumed: false,
+    staleResumed: false,
     restoreError: null,
   });
 });
