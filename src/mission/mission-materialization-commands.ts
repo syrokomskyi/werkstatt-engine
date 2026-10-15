@@ -10,6 +10,8 @@
   <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
   <item>RFC-1221 follow-up: mergeCommitSha now records commitSha itself when commitSha is a merge commit (null otherwise) — the previous HEAD^1 capture ran after post-merge steps could commit, storing a post-merge parent instead of the merge commit.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>ADR-0110: post-reconcile divergence check classifies origin-side commits by PIPELINE_SUBJECT_PREFIXES (git log origin/main --not HEAD) — transient when all are pipeline-authored or none exist, real divergence otherwise; warning names sternsystem.sync as the remedy and never advises git reset --hard.</item>
+  <item>ADR-0096 follow-up: runMissionBuild now calls bootstrapCommittedSnapshot before build.post — the ADR-0096 baseline commit existed only on the mission.validate path, so mission.build deadlocked on SNAP-02 for first-time missions with no committed behavior snapshot.</item>
   <item>RFC-1263</item>
   <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159, RFC-1218, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
@@ -68,6 +70,7 @@ import {
   untrackForbiddenGeneratedFiles,
   CACHE_CLONE_GENERATED_PATTERNS,
 } from "./cache-clone-gitignore.ts";
+import { PIPELINE_SUBJECT_PREFIXES } from "../sternsystem/external-edit-guard.ts";
 import { runOperation } from "../journal/runner.ts";
 import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
@@ -1635,6 +1638,19 @@ export async function runMissionBuild(
 
   // Phase 3: build.post (text.normalize.apply, passport.emit, etc.)
   if (!buildError) {
+    // ADR-0096: ensure a committed behavior.snapshot.generated.yaml exists
+    // before build.post — behavior.snapshot.validate diffs against the
+    // committed baseline (SNAP-02) and would deadlock first-time missions
+    // otherwise. Non-fatal: failure is logged and build.post proceeds
+    // (SNAP-02's fixHint remains the fallback).
+    await bootstrapCommittedSnapshot({
+      workspaceRoot,
+      systemId: manifest.systemId,
+      missionId,
+      logger,
+      context,
+    });
+
     logger.info(`  Running build.post pipeline for ${manifest.systemId}…`);
     try {
       await runPipelinePhase(workspaceRoot, "build.post", manifest.systemId);
@@ -1812,6 +1828,11 @@ export interface MissionReconcileData {
     cacheCloneHead: string;
     originHead: string;
     diverged: boolean;
+    /** ADR-0110: true when every origin-side commit missing from HEAD is
+        pipeline-authored (PIPELINE_SUBJECT_PREFIXES) or none exist — the
+        expected post-reconcile transient that sternsystem.sync converges;
+        false when origin carries foreign commits (real divergence). */
+    expectedTransient?: boolean;
   } | null;
 }
 
@@ -2020,7 +2041,12 @@ export interface ReconcileStepCtx {
   gitignoreRestored: boolean;
   forbiddenFilesUntracked: string[];
   mirrorSync: { attempted: boolean; succeeded: boolean; error: string | null };
-  divergenceWarning: { cacheCloneHead: string; originHead: string; diverged: boolean } | null;
+  divergenceWarning: {
+    cacheCloneHead: string;
+    originHead: string;
+    diverged: boolean;
+    expectedTransient?: boolean;
+  } | null;
   workpieceCommit: { committed: boolean; commitSha: string | null };
 }
 
@@ -2583,7 +2609,8 @@ export async function buildReconcileSteps(
         }
         if (!pushSucceeded) {
           cc.context.logger.info(
-            `  Push failed after ${pushBackoffMs.length} attempts (non-fatal)`,
+            `  Push failed after ${pushBackoffMs.length} attempts (non-fatal — ` +
+              `sternsystem.sync converges unpushed commits)`,
           );
         }
       },
@@ -2602,10 +2629,50 @@ export async function buildReconcileSteps(
             await shExec("git rev-parse origin/main", cc.systemDir, cc.context.io)
           ).trim();
           if (cacheCloneHead !== originHead) {
-            cc.divergenceWarning = { cacheCloneHead, originHead, diverged: true };
+            // ADR-0110: classify by the *nature* of origin-side commits, not
+            // ancestry — a re-run reconcile produces a different merge SHA for
+            // the same content, so the bare can hold "extra" commits that are
+            // still pipeline bookkeeping. Transient = every commit on
+            // origin/main missing from HEAD is pipeline-authored (or there are
+            // none); a foreign subject means a real divergence.
+            let foreignCount = 0;
+            let classifyFailed = false;
+            try {
+              const log = (
+                await shExec(
+                  "git log --format=%s origin/main --not HEAD",
+                  cc.systemDir,
+                  cc.context.io,
+                )
+              ).trim();
+              foreignCount = (log ? log.split("\n") : []).filter(
+                (s) => !PIPELINE_SUBJECT_PREFIXES.some((p) => s.startsWith(p)),
+              ).length;
+            } catch {
+              classifyFailed = true;
+            }
+            const expectedTransient = !classifyFailed && foreignCount === 0;
+            cc.divergenceWarning = {
+              cacheCloneHead,
+              originHead,
+              diverged: true,
+              expectedTransient,
+            };
             cc.context.logger.warn(
-              `[mission.reconcile] WARNING: Cache clone HEAD (${cacheCloneHead.slice(0, 8)}) diverged from origin/main (${originHead.slice(0, 8)}).\n` +
-                `  Run \`git reset --hard origin/main\` in the cache clone to resolve.`,
+              expectedTransient
+                ? `[mission.reconcile] Cache clone HEAD (${cacheCloneHead.slice(0, 8)}) differs ` +
+                    `from origin/main (${originHead.slice(0, 8)}) — expected transient after the ` +
+                    `pre-reconcile rewind (ADR-0110); the reconcile mirror-sync or a manual ` +
+                    `\`sternsystem.sync --id ${cc.manifest.systemId}\` converges it. ` +
+                    `Never run \`git reset --hard origin/main\` — it discards the reconcile merge.`
+                : `[mission.reconcile] WARNING: Cache clone HEAD (${cacheCloneHead.slice(0, 8)}) ` +
+                    `diverged from origin/main (${originHead.slice(0, 8)}) — ` +
+                    (classifyFailed
+                      ? `origin-side commits could not be classified`
+                      : `origin/main carries ${foreignCount} foreign (non-pipeline) commit(s)`) +
+                    `; this is not the reconcile transient. Converge via ` +
+                    `\`sternsystem.sync --id ${cc.manifest.systemId}\` and escalate if it ` +
+                    `persists — never \`git reset --hard origin/main\` (discards the merge).`,
             );
           }
         } catch {

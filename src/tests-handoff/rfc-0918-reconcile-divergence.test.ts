@@ -9,6 +9,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0918: initial tests for post-push divergence check in mission.reconcile.</item>
+  <item>ADR-0110: implement ADR-0110 — classify post-reconcile divergence by PIPELINE_SUBJECT_PREFIXES; sync remedy, never reset --hard; plus ADR-0096 bootstrapCommittedSnapshot on mission.build path (SNAP-02)</item>
 </CHANGE_SUMMARY>
 */
 
@@ -269,6 +270,102 @@ test("reconcile sets divergenceWarning with diverged=true when cache clone HEAD 
 
   // The divergenceWarning should be present in the report
   expect(report).toHaveProperty("divergenceWarning");
+});
+
+test("ADR-0110: pipeline-authored origin-side commits flag expectedTransient and never advise reset --hard", async () => {
+  setupReconcileWorkspace();
+
+  const cacheDir = join(testRoot, "systems-cache", "test-system");
+  const bareDir = join(testRoot, "systems-cache", "test-system.git");
+
+  // Simulate a re-run reconcile: land a pipeline-subject commit on the bare
+  // (a previous reconcile merge carries a different SHA for the same
+  // content), fetch it into the clone, then reconcile again — the new merge
+  // push fails non-ff and the divergence is the expected transient.
+  execSync("git push -f origin main", { cwd: cacheDir, stdio: "pipe" });
+  const other = join(testRoot, "other-clone");
+  execSync(`git clone ${JSON.stringify(bareDir)} ${JSON.stringify(other)}`, { stdio: "pipe" });
+  execSync("git config user.email t@t.com", { cwd: other, stdio: "pipe" });
+  execSync("git config user.name T", { cwd: other, stdio: "pipe" });
+  writeFileSync(join(other, "prior-merge.txt"), "prior\n");
+  gitCommit(other, "reconcile mission test-system-m000001");
+  execSync("git push origin main", { cwd: other, stdio: "pipe" });
+  execSync("git fetch origin", { cwd: cacheDir, stdio: "pipe" });
+  // The tracking ref and fetched objects stay local; sever the transport so
+  // every push (bordbuch helper + reconcile retries) fails like the
+  // transient remote failure observed in warpgogol-m000201.
+  execSync("git remote set-url origin /nonexistent/bare.git", {
+    cwd: cacheDir,
+    stdio: "pipe",
+  });
+
+  const warn = vi.fn();
+  const { runMissionReconcile } = await import("../mission/mission-materialization-commands.ts");
+  const input = { flags: { mission: "test-system-m000001" } } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+    logger: { info: () => {}, warn },
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionReconcile(input, context);
+  const data = expectData(result);
+
+  expect(data.divergenceWarning).not.toBeNull();
+  expect(data.divergenceWarning?.diverged).toBe(true);
+  expect(data.divergenceWarning?.expectedTransient).toBe(true);
+
+  const messages = warn.mock.calls.flat().join("\n");
+  expect(messages).toContain("expected transient");
+  expect(messages).toContain("sternsystem.sync");
+  // The forbidden remedy must only appear negated ("never run git reset --hard").
+  for (const line of messages.split("\n")) {
+    if (line.includes("reset --hard")) expect(line).toMatch(/[Nn]ever/);
+  }
+});
+
+test("ADR-0110: origin carrying foreign commits is real divergence (expectedTransient=false)", async () => {
+  setupReconcileWorkspace();
+
+  const cacheDir = join(testRoot, "systems-cache", "test-system");
+  const bareDir = join(testRoot, "systems-cache", "test-system.git");
+
+  // Land a foreign commit on origin/main via a second clone, then fetch it in
+  // the cache clone so origin/main tracks it — HEAD ends up behind → real
+  // divergence, not the reconcile transient.
+  execSync("git push -f origin main", { cwd: cacheDir, stdio: "pipe" });
+  const other = join(testRoot, "other-clone");
+  execSync(`git clone ${JSON.stringify(bareDir)} ${JSON.stringify(other)}`, { stdio: "pipe" });
+  execSync("git config user.email t@t.com", { cwd: other, stdio: "pipe" });
+  execSync("git config user.name T", { cwd: other, stdio: "pipe" });
+  writeFileSync(join(other, "foreign.txt"), "foreign\n");
+  gitCommit(other, "foreign commit");
+  execSync("git push origin main", { cwd: other, stdio: "pipe" });
+  execSync("git fetch origin", { cwd: cacheDir, stdio: "pipe" });
+  // Sever the transport so pushes fail while origin/main stays readable —
+  // the foreign commit then surfaces in `origin/main --not HEAD`.
+  execSync("git remote set-url origin /nonexistent/bare.git", {
+    cwd: cacheDir,
+    stdio: "pipe",
+  });
+
+  const warn = vi.fn();
+  const { runMissionReconcile } = await import("../mission/mission-materialization-commands.ts");
+  const input = { flags: { mission: "test-system-m000001" } } as unknown as KernelCommandInput;
+  const context = {
+    io: createDefaultIO().io,
+    workspaceRoot: tmpWorkspace,
+    logger: { info: () => {}, warn },
+  } as unknown as KernelRuntimeContext;
+
+  const result = await runMissionReconcile(input, context);
+  const data = expectData(result);
+
+  expect(data.divergenceWarning?.diverged).toBe(true);
+  expect(data.divergenceWarning?.expectedTransient).toBe(false);
+  const messages = warn.mock.calls.flat().join("\n");
+  expect(messages).toContain("not the reconcile transient");
+  expect(messages).toContain("sternsystem.sync --id test-system");
 });
 
 test("reconcile sets divergenceWarning to null when git rev-parse origin/main fails", async () => {
