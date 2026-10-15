@@ -1,0 +1,11 @@
+{
+  "runId": "run-2026-10-15-01",
+  "records": [
+    {
+      "id": "CLM-023",
+      "kind": "client-statement",
+      "sourceRef": "evidence-source/src-01",
+      "recordedAt": "2026-10-10T14:00:00Z"
+    }
+  ]
+}

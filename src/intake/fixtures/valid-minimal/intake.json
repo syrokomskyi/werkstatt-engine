@@ -1,0 +1,294 @@
+{
+  "schema": "werkstatt:intake/v1",
+  "intakeId": "int_019a4f2c-7a01-7f30-8c1e-9f2e4a6b8d01",
+  "systemId": "dp7",
+  "producedAt": "2026-10-15T10:00:00Z",
+  "classification": {
+    "locales": [
+      {
+        "tag": "ru",
+        "role": "primary",
+        "sourceLanguageBy": "client",
+        "reviewer": "studio"
+      },
+      {
+        "tag": "uz-Latn",
+        "role": "secondary",
+        "sourceLanguageBy": "translation",
+        "reviewer": "unassigned"
+      }
+    ],
+    "jurisdiction": "DE",
+    "conversionModel": "inquiry",
+    "profile": "standard",
+    "pageSetIntent": [
+      {
+        "intent": "home",
+        "evidenceRefs": [
+          "evidence-source/src-01"
+        ]
+      }
+    ]
+  },
+  "pbp": [
+    {
+      "schema": "pbp/business@1",
+      "id": "business/dp7",
+      "type": "business",
+      "status": "published",
+      "name": "DP7",
+      "legalIdentityRef": {
+        "ref": "pbp/legal-identity@1:legal-identity/dp7"
+      }
+    },
+    {
+      "schema": "pbp/legal-identity@1",
+      "id": "legal-identity/dp7",
+      "type": "legal-identity",
+      "status": "published",
+      "legalName": "DP7 Digitalprojekt GmbH"
+    },
+    {
+      "schema": "pbp/evidence-source@1",
+      "id": "evidence-source/src-01",
+      "type": "evidence-source",
+      "status": "published",
+      "name": "Client interview 2026-10-10",
+      "kind": "client-statement",
+      "authority": {
+        "kind": "client"
+      },
+      "slug": "client-interview-2026-10-10",
+      "display": {
+        "document": "visible",
+        "screenshot": "hidden",
+        "websiteLink": "hidden"
+      },
+      "items": {
+        "src": {
+          "sha256": "3ec8437a0660c98c3c5056ce496b404050682fc8d8c8566a92b2d9e8985d46f3",
+          "mediaType": "text/markdown",
+          "storage": "private"
+        }
+      }
+    },
+    {
+      "schema": "pbp/claim@1",
+      "id": "claim/european-quality",
+      "type": "claim",
+      "status": "published",
+      "claimClass": "factual",
+      "claimKind": "fact",
+      "subject": {
+        "kind": "business",
+        "name": "DP7"
+      },
+      "statement": "Европейское качество — доступное каждому",
+      "statementLang": "ru",
+      "evidenceRefs": {
+        "src": {
+          "ref": "pbp/evidence-source@1:evidence-source/src-01"
+        }
+      },
+      "governance": {
+        "authorityRef": "pbp/business@1:business/dp7"
+      }
+    },
+    {
+      "schema": "pbp/claim@1",
+      "id": "claim/installation-warranty",
+      "type": "claim",
+      "status": "draft",
+      "claimClass": "factual",
+      "claimKind": "fact",
+      "subject": {
+        "kind": "business",
+        "name": "DP7"
+      },
+      "statement": "One-year installation warranty",
+      "statementLang": "ru",
+      "governance": {
+        "authorityRef": "pbp/business@1:business/dp7"
+      }
+    }
+  ],
+  "annotations": {
+    "claim/european-quality": {
+      "verbatim": [
+        {
+          "text": "Европейское качество — доступное каждому",
+          "sourceRef": "evidence-source/src-01",
+          "speaker": "client"
+        }
+      ],
+      "ledgerRef": "CLM-023"
+    },
+    "claim/installation-warranty": {
+      "gapRef": "GAP-04"
+    }
+  },
+  "gaps": [
+    {
+      "id": "GAP-04",
+      "what": "Warranty policy wording",
+      "why": "A publishable warranty claim requires the client's actual terms",
+      "obtainableBy": "client",
+      "itemType": "file",
+      "clientPrompt": "Upload your warranty terms document",
+      "defaultIfSilent": "One-year installation warranty",
+      "blocks": [
+        "claim/installation-warranty"
+      ],
+      "severity": "launch-blocking"
+    }
+  ],
+  "operatorDecisions": [
+    {
+      "id": "OPD-01",
+      "kind": "ruling",
+      "gate": "G-V",
+      "question": "Accept concept-1 as the visual direction?",
+      "answer": "yes",
+      "answeredAt": "2026-10-15T10:00:00Z",
+      "reversible": false
+    }
+  ],
+  "voice": {
+    "verbatim": [
+      {
+        "id": "VOI-01",
+        "text": "Европейское качество — доступное каждому",
+        "sourceRef": "evidence-source/src-01",
+        "use": "slogan",
+        "claimRefs": [
+          "claim/european-quality"
+        ]
+      }
+    ],
+    "directives": [
+      {
+        "id": "DIR-01",
+        "text": "Никаких обещаний без источника",
+        "sourceRef": "evidence-source/src-01",
+        "appliesTo": [
+          "composition",
+          "publication"
+        ]
+      }
+    ],
+    "profile": {
+      "toneOfVoice": {
+        "tone": "calm",
+        "posture": "expert",
+        "readingLevel": "B2",
+        "avoids": [
+          "hype",
+          "superlatives without proof"
+        ],
+        "prefers": [
+          "concrete numbers",
+          "short sentences"
+        ]
+      },
+      "linguisticRules": {
+        "ru": [
+          "no anglicisms in headlines"
+        ],
+        "uz-Latn": [
+          "keep loanword spellings consistent"
+        ]
+      },
+      "culturalRules": [
+        "respect local forms of address"
+      ]
+    }
+  },
+  "visual": {
+    "conceptId": "concept-1",
+    "rejectedConceptIds": [
+      "concept-2"
+    ],
+    "axes": {
+      "warmth": "neutral",
+      "contrast": "medium",
+      "density": "comfortable",
+      "typographySharpness": "balanced",
+      "diagramPresence": "minimal",
+      "photoStance": "documentary",
+      "motionStance": "restrained",
+      "textContrast": "aa",
+      "cornerRadius": "4px",
+      "borderWeight": "1px"
+    },
+    "palette": {
+      "brand": "#1a3a5c",
+      "ink": "#111111",
+      "paper": "#f7f5f0"
+    },
+    "fonts": [
+      {
+        "family": "Inter",
+        "role": "body",
+        "source": "@fontsource/inter",
+        "scripts": [
+          "Latn",
+          "Cyrl"
+        ]
+      }
+    ],
+    "moodAssetRefs": [
+      "AST-01"
+    ],
+    "rationale": "quiet factual authority"
+  },
+  "assets": [
+    {
+      "id": "AST-01",
+      "kind": "logo",
+      "file": "assets/49e9c254c70f1678e2bc12aef76f65de59d3332b8de29dfcb61c52e7e0cc3227.svg",
+      "sha256": "sha256:49e9c254c70f1678e2bc12aef76f65de59d3332b8de29dfcb61c52e7e0cc3227",
+      "mediaType": "image/svg+xml",
+      "origin": "generated",
+      "rights": {
+        "state": "generated"
+      },
+      "generator": {
+        "model": "flux-1-pro",
+        "promptSha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "conceptId": "concept-1",
+        "generatedAt": "2026-10-15T09:00:00Z"
+      }
+    }
+  ],
+  "provenance": {
+    "producer": "site-werkstatt",
+    "producerVersion": "0.1.0",
+    "runId": "run-2026-10-15-01",
+    "contractSnapshot": "sha256:bfc4e96dc878ee22306734dd5cae15cb6758db95b55f15f18349d776a10c5280",
+    "inputs": [
+      {
+        "path": ".input/client-knowledge-base.json",
+        "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "bytes": 42137
+      }
+    ],
+    "evidenceLedger": "sha256:6864b256b67708513105ae99890c2b40257a5de2fbf810cd37fe6bb094d36009",
+    "models": [
+      {
+        "step": "phase0-ledger",
+        "model": "claude-opus-4.1",
+        "effort": "high"
+      }
+    ],
+    "quoteCheck": {
+      "result": "pass",
+      "checked": 3,
+      "failed": 0
+    },
+    "cost": {
+      "currency": "USD",
+      "total": 4.2,
+      "reportPath": "cost-report.json"
+    }
+  }
+}

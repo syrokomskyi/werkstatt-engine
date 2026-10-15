@@ -1,0 +1,11 @@
+{
+  "currency": "USD",
+  "total": 4.2,
+  "steps": [
+    {
+      "step": "phase0-ledger",
+      "model": "claude-opus-4.1",
+      "cost": 4.2
+    }
+  ]
+}

@@ -242,6 +242,10 @@
       "types": "./src/lagebild/lagebild.module.ts",
       "default": "./src/lagebild/lagebild.module.ts"
     },
+    "./intake-module": {
+      "types": "./src/intake/intake.module.ts",
+      "default": "./src/intake/intake.module.ts"
+    },
     "./subdomain-module": {
       "types": "./src/subdomain/subdomain.module.ts",
       "default": "./src/subdomain/subdomain.module.ts"
@@ -419,11 +423,7 @@
       "default": "./src/certification/index.ts"
     }
   },
-  "files": [
-    "src",
-    "bin",
-    "os"
-  ],
+  "files": ["src", "bin", "os"],
   "scripts": {
     "lint": "pnpm exec eslint \"src/**/*.ts\" \"os/**/*.ts\"",
     "typecheck": "pnpm exec tsc -p tsconfig.json --noEmit",
