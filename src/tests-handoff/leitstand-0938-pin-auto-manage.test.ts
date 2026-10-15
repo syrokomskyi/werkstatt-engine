@@ -6,9 +6,6 @@
   <keywords>RFC-0938, RFC-1284, leitstand, certify, accessPin, accessPinSuspended, auto-manage, test</keywords>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1126: step 4 — artifact-hash provenance
-
-resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1284: suspend/resume vocabulary — removedBefore/restoredAfter →
   suspended/resumed/staleResumed; access.unprotect/protect → access.suspend/resume;
@@ -16,7 +13,10 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
   candidate-preview never touches the secret.</item>
   <item>RFC-1284 review (REVIEW-CODE-2026-10-15-02 F2, Q-7): AC-16 semantics —
   flag=false + marker at entry proceeds without resume (secrets untouched);
-  certify state reads move to the non-smart cache-clone store (Q-6).</item>
+  certify state reads move to the non-smart cache-clone store (Q-6).
+  Explicit per-test timeout 30s: acceptance probes run vitest from the repo
+  root without this package's vitest.config (default 5s timeout < the real
+  5s PIN-deletion propagation sleep).</item>
   <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
 
 F1: marker store unified on the git-tracked cache clone — access commands,
@@ -31,7 +31,12 @@ F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
 F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
-  <history>RFC-0938</history>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02 (follow-up): explicit 30s test timeouts
+
+Acceptance probes spawn vitest from the repo root without the package
+vitest.config — the default 5s timeout raced the real 5s PIN-deletion
+propagation sleep and failed four probes (AC-6/8/11/16).</item>
+  <history>RFC-0938, RFC-1126</history>
 </CHANGE_SUMMARY>
 */
 
@@ -205,229 +210,266 @@ test("RFC-0938: no PIN active — certify proceeds, pinManagement has autoManage
   }
 });
 
-test("RFC-1284: PIN active, auto-manage=true, channel target — suspends with certify provenance", async () => {
-  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
+test(
+  "RFC-1284: PIN active, auto-manage=true, channel target — suspends with certify provenance",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
 
-  await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    }),
-    context,
-  );
-
-  const suspendCalls = accessCalls("leitstand.access.suspend");
-  expect(suspendCalls).toHaveLength(1);
-  expect(suspendCalls[0].argv).toContain("--site=test-sys");
-  expect(suspendCalls[0].argv).toContain("--by=leitstand.certify");
-  expect(
-    suspendCalls[0].argv.some((a) => a.startsWith("--operation-id=certify-")),
-    "suspend must carry the certify operation id into the marker (AC-1/AC-11)",
-  ).toBe(true);
-});
-
-test("RFC-1284: PIN active, auto-manage=true, suspend fails — exitCode 1, no resume attempted", async () => {
-  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
-  suspendShouldFail = true;
-
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    }),
-    context,
-  );
-
-  expect(result.exitCode).toBe(1);
-  expect(result.summary).toContain("failed to suspend access PIN");
-  expect(result.summary).toContain("test-sys");
-  expect(result.data!.pinManagement).toBeDefined();
-  expect(result.data!.pinManagement!.autoManaged).toBe(true);
-  expect(result.data!.pinManagement!.suspended).toBe(false);
-  expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
-});
-
-test("RFC-1284: PIN active, auto-manage=false — fail-early recommends access.suspend", async () => {
-  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "1234" }));
-
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "auto-manage-pin": false,
-    }),
-    context,
-  );
-
-  expect(result.exitCode).toBe(1);
-  expect(result.summary).toContain("access PIN protection active");
-  expect(
-    result.summary,
-    "fail-early must recommend access.suspend — unprotect erases desired state (RFC-1284)",
-  ).toContain("leitstand.access.suspend");
-  expect(result.summary).not.toContain("leitstand.access.unprotect");
-  expect(result.data!.pinManagement).toBeDefined();
-  expect(result.data!.pinManagement!.autoManaged).toBe(false);
-  expect(executeKernelCommandCalls).toHaveLength(0);
-});
-
-test("RFC-1284: PIN active, resume fails in finally — hard fail exitCode 1, restoreError set", async () => {
-  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
-  resumeShouldFail = true;
-
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    }),
-    context,
-  );
-
-  expect(result.exitCode).toBe(1);
-  expect(result.summary).toContain("CRITICAL");
-  expect(result.summary).toContain("PIN resume failed");
-  expect(result.summary).toContain("leitstand.access.resume");
-  expect(result.data!.pinManagement).toBeDefined();
-  expect(result.data!.pinManagement!.suspended).toBe(true);
-  expect(result.data!.pinManagement!.resumed).toBe(false);
-  expect(result.data!.pinManagement!.restoreError).not.toBeNull();
-});
-
-test("RFC-1284: PIN active, suspend+resume succeed — pinManagement reports both", async () => {
-  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
-
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    }),
-    context,
-  );
-
-  // certify will fail because no real release dir, but PIN management should still work
-  const resumeCalls = accessCalls("leitstand.access.resume");
-  expect(resumeCalls).toHaveLength(1);
-  expect(resumeCalls[0].argv).toContain("--site=test-sys");
-
-  if (result.data?.pinManagement) {
-    expect(result.data.pinManagement.autoManaged).toBe(true);
-    expect(result.data.pinManagement.suspended).toBe(true);
-    expect(result.data.pinManagement.resumed).toBe(true);
-    expect(result.data.pinManagement.restoreError).toBeNull();
-  }
-});
-
-test("RFC-1284: candidate-preview target never touches ACCESS_PIN (AC-6)", async () => {
-  // The artifact-missing guard precedes PIN handling, so materialize the
-  // expected dist/server dir to reach the pin block.
-  mkdirSync(`${WORKSPACE_ROOT}/releases/test-sys-r000001/dist/server`, { recursive: true });
-  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
-
-  await runLeitstandCertify(
-    {
-      flags: {
+    await runLeitstandCertify(
+      makeInput({
         site: "test-sys",
         gate: "dev",
         release: "test-sys-r000001",
         "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-        // no --target → candidate-preview default
-      },
-      argv: [],
-    } as unknown as KernelCommandInput,
-    context,
-  );
+      }),
+      context,
+    );
 
-  expect(
-    accessCalls("leitstand.access.suspend"),
-    "candidate-preview certification must never suspend — the preview is a local wrangler dev, not the protected channel (AC-6)",
-  ).toHaveLength(0);
-  expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
-  expect(accessCalls("leitstand.access.unprotect")).toHaveLength(0);
-  expect(accessCalls("leitstand.access.protect")).toHaveLength(0);
-});
+    const suspendCalls = accessCalls("leitstand.access.suspend");
+    expect(suspendCalls).toHaveLength(1);
+    expect(suspendCalls[0].argv).toContain("--site=test-sys");
+    expect(suspendCalls[0].argv).toContain("--by=leitstand.certify");
+    expect(
+      suspendCalls[0].argv.some((a) => a.startsWith("--operation-id=certify-")),
+      "suspend must carry the certify operation id into the marker (AC-1/AC-11)",
+    ).toBe(true);
+  },
+);
 
-test("RFC-1284: stale suspension marker — certify resumes before producers (AC-8)", async () => {
-  mockReadSystemState.mockResolvedValue(
-    makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
-  );
+test(
+  "RFC-1284: PIN active, auto-manage=true, suspend fails — exitCode 1, no resume attempted",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
+    suspendShouldFail = true;
 
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    }),
-    context,
-  );
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      }),
+      context,
+    );
 
-  const resumeCalls = accessCalls("leitstand.access.resume");
-  expect(
-    resumeCalls.length,
-    "stale marker must trigger access.resume on entry — crash recovery before any producer runs (AC-8)",
-  ).toBeGreaterThanOrEqual(1);
-  expect(resumeCalls[0].argv).toContain("--site=test-sys");
-  // Entry-resume ran, then the live-target run suspended again and resumed in finally.
-  if (result.data?.pinManagement) {
-    expect(result.data.pinManagement.staleResumed).toBe(true);
-  }
-});
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain("failed to suspend access PIN");
+    expect(result.summary).toContain("test-sys");
+    expect(result.data!.pinManagement).toBeDefined();
+    expect(result.data!.pinManagement!.autoManaged).toBe(true);
+    expect(result.data!.pinManagement!.suspended).toBe(false);
+    expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
+  },
+);
 
-test("RFC-1284: stale marker resume fails on entry — certify hard-fails before producers", async () => {
-  mockReadSystemState.mockResolvedValue(
-    makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
-  );
-  resumeShouldFail = true;
+test(
+  "RFC-1284: PIN active, auto-manage=false — fail-early recommends access.suspend",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(makeState({ accessPin: "1234" }));
 
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    }),
-    context,
-  );
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "auto-manage-pin": false,
+      }),
+      context,
+    );
 
-  expect(result.exitCode).toBe(1);
-  expect(result.summary).toContain("failed to resume access PIN suspension");
-  expect(result.data!.pinManagement!.restoreError).not.toBeNull();
-  expect(accessCalls("leitstand.access.suspend")).toHaveLength(0);
-});
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain("access PIN protection active");
+    expect(
+      result.summary,
+      "fail-early must recommend access.suspend — unprotect erases desired state (RFC-1284)",
+    ).toContain("leitstand.access.suspend");
+    expect(result.summary).not.toContain("leitstand.access.unprotect");
+    expect(result.data!.pinManagement).toBeDefined();
+    expect(result.data!.pinManagement!.autoManaged).toBe(false);
+    expect(executeKernelCommandCalls).toHaveLength(0);
+  },
+);
 
-test("RFC-1284: auto-manage=false with active suspension — proceeds without resume (AC-16, Q-7)", async () => {
-  mockReadSystemState.mockResolvedValue(
-    makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
-  );
+test(
+  "RFC-1284: PIN active, resume fails in finally — hard fail exitCode 1, restoreError set",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
+    resumeShouldFail = true;
 
-  const result = await runLeitstandCertify(
-    makeInput({
-      site: "test-sys",
-      gate: "dev",
-      release: "test-sys-r000001",
-      "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "auto-manage-pin": false,
-    }),
-    context,
-  );
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      }),
+      context,
+    );
 
-  // flag=false + marker at entry: no resume, no suspend — secrets untouched.
-  expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
-  expect(accessCalls("leitstand.access.suspend")).toHaveLength(0);
-  // The debug workflow proceeds: no fail-early on the open channel.
-  expect(result.summary ?? "").not.toContain("access PIN protection active");
-  if (result.data?.pinManagement) {
-    expect(result.data.pinManagement.autoManaged).toBe(false);
-    expect(result.data.pinManagement.staleResumed).toBe(false);
-  }
-});
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain("CRITICAL");
+    expect(result.summary).toContain("PIN resume failed");
+    expect(result.summary).toContain("leitstand.access.resume");
+    expect(result.data!.pinManagement).toBeDefined();
+    expect(result.data!.pinManagement!.suspended).toBe(true);
+    expect(result.data!.pinManagement!.resumed).toBe(false);
+    expect(result.data!.pinManagement!.restoreError).not.toBeNull();
+  },
+);
+
+test(
+  "RFC-1284: PIN active, suspend+resume succeed — pinManagement reports both",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
+
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      }),
+      context,
+    );
+
+    // certify will fail because no real release dir, but PIN management should still work
+    const resumeCalls = accessCalls("leitstand.access.resume");
+    expect(resumeCalls).toHaveLength(1);
+    expect(resumeCalls[0].argv).toContain("--site=test-sys");
+
+    if (result.data?.pinManagement) {
+      expect(result.data.pinManagement.autoManaged).toBe(true);
+      expect(result.data.pinManagement.suspended).toBe(true);
+      expect(result.data.pinManagement.resumed).toBe(true);
+      expect(result.data.pinManagement.restoreError).toBeNull();
+    }
+  },
+);
+
+test(
+  "RFC-1284: candidate-preview target never touches ACCESS_PIN (AC-6)",
+  { timeout: 30_000 },
+  async () => {
+    // The artifact-missing guard precedes PIN handling, so materialize the
+    // expected dist/server dir to reach the pin block.
+    mkdirSync(`${WORKSPACE_ROOT}/releases/test-sys-r000001/dist/server`, { recursive: true });
+    mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
+
+    await runLeitstandCertify(
+      {
+        flags: {
+          site: "test-sys",
+          gate: "dev",
+          release: "test-sys-r000001",
+          "artifact-hash":
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          // no --target → candidate-preview default
+        },
+        argv: [],
+      } as unknown as KernelCommandInput,
+      context,
+    );
+
+    expect(
+      accessCalls("leitstand.access.suspend"),
+      "candidate-preview certification must never suspend — the preview is a local wrangler dev, not the protected channel (AC-6)",
+    ).toHaveLength(0);
+    expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
+    expect(accessCalls("leitstand.access.unprotect")).toHaveLength(0);
+    expect(accessCalls("leitstand.access.protect")).toHaveLength(0);
+  },
+);
+
+test(
+  "RFC-1284: stale suspension marker — certify resumes before producers (AC-8)",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(
+      makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
+    );
+
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      }),
+      context,
+    );
+
+    const resumeCalls = accessCalls("leitstand.access.resume");
+    expect(
+      resumeCalls.length,
+      "stale marker must trigger access.resume on entry — crash recovery before any producer runs (AC-8)",
+    ).toBeGreaterThanOrEqual(1);
+    expect(resumeCalls[0].argv).toContain("--site=test-sys");
+    // Entry-resume ran, then the live-target run suspended again and resumed in finally.
+    if (result.data?.pinManagement) {
+      expect(result.data.pinManagement.staleResumed).toBe(true);
+    }
+  },
+);
+
+test(
+  "RFC-1284: stale marker resume fails on entry — certify hard-fails before producers",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(
+      makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
+    );
+    resumeShouldFail = true;
+
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      }),
+      context,
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain("failed to resume access PIN suspension");
+    expect(result.data!.pinManagement!.restoreError).not.toBeNull();
+    expect(accessCalls("leitstand.access.suspend")).toHaveLength(0);
+  },
+);
+
+test(
+  "RFC-1284: auto-manage=false with active suspension — proceeds without resume (AC-16, Q-7)",
+  { timeout: 30_000 },
+  async () => {
+    mockReadSystemState.mockResolvedValue(
+      makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
+    );
+
+    const result = await runLeitstandCertify(
+      makeInput({
+        site: "test-sys",
+        gate: "dev",
+        release: "test-sys-r000001",
+        "artifact-hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "auto-manage-pin": false,
+      }),
+      context,
+    );
+
+    // flag=false + marker at entry: no resume, no suspend — secrets untouched.
+    expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
+    expect(accessCalls("leitstand.access.suspend")).toHaveLength(0);
+    // The debug workflow proceeds: no fail-early on the open channel.
+    expect(result.summary ?? "").not.toContain("access PIN protection active");
+    if (result.data?.pinManagement) {
+      expect(result.data.pinManagement.autoManaged).toBe(false);
+      expect(result.data.pinManagement.staleResumed).toBe(false);
+    }
+  },
+);
