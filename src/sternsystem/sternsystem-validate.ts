@@ -6,11 +6,16 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0082: add COMMITTED_GENERATED_ALLOWED — exempt shrink-only baselines (list-punctuation.baseline.generated.yaml) from bundle-contract without requiring HEAD persistence, unlike COMMITTED_MANIFEST_PATHS entries.</item>
   <item>ADR-0091: pass externalEditBaselineSha from collectExternalEditInputs into evaluateExternalEditGate.</item>
   <item>RFC-1149: phase 1b — DRIFT-02 diagnostics promoted from warnings to violations (blocking); DRIFT-01 stays warning per ADR-0082 cleanup caveat.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
+  <item>RFC-1284: ACCESS-01/02 diagnostics in sternsystem.validate
+
+RFC-1284 step 5: checkAccessProtection compares desired accessPin to
+observed channel answers — a proven non-401 is a violation, transport
+failures downgrade to warnings, suspended systems skip the probe, and
+stale markers (>1h) warn via ACCESS-02.</item>
   <history>ADR-0082, ADR-0088, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -24,7 +29,11 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { StarCatalog } from "@warpgogol/werkstatt-shared/ontology/cosmic";
-import { systemPinSchema } from "@warpgogol/werkstatt-engine/schemas";
+import {
+  systemPinSchema,
+  type SystemConfig,
+  type SystemState,
+} from "@warpgogol/werkstatt-engine/schemas";
 import {
   discoverSystems,
   hasAppsCollision,
@@ -52,6 +61,11 @@ import { readAuthorization, isAuthorizationExpired } from "./handover.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
 import { readJournal } from "../journal/jsonl.ts";
 import type { JournalRecord } from "../journal/types.ts";
+import { probeAccessProtection } from "@warpgogol/werkstatt-shared/node/access-probe";
+
+// RFC-1284: suspension is a transient measured in minutes — a marker older
+// than this is almost certainly orphaned (ACCESS-02 warning threshold).
+const ACCESS_SUSPENSION_STALE_MS = 60 * 60 * 1000;
 
 export interface SternsystemValidateData {
   validated: number;
@@ -287,6 +301,60 @@ export function routeDriftDiagnostics(
       violations.push({ systemId, rule: "DRIFT-02", message });
     } else {
       warnings.push({ systemId, field: diag.ruleId ?? "DRIFT", message });
+    }
+  }
+}
+
+/**
+ * RFC-1284: ACCESS-01/02 — compare desired protection (system-state.yaml
+ * accessPin) to observed channel behavior.
+ *
+ * ACCESS-01 — protection drift: pin declared and no suspension marker → every
+ * configured dev/alt channel URL must answer 401 to an anonymous request. A
+ * proven non-401 response is a violation; transport failures are warnings,
+ * never violations (probe inconclusive). Suspended systems skip the probe.
+ * ACCESS-02 — stale suspension: a marker older than ACCESS_SUSPENSION_STALE_MS
+ * is almost certainly orphaned → warning.
+ */
+export async function checkAccessProtection(
+  entry: SystemConfig,
+  accessState: Pick<SystemState, "accessPin" | "accessPinSuspended">,
+  violations: SternsystemViolation[],
+  warnings: Array<{ systemId: string; field: string; message: string }>,
+  probe: typeof probeAccessProtection = probeAccessProtection,
+): Promise<void> {
+  const desiredPin = accessState.accessPin;
+  const suspension = accessState.accessPinSuspended ?? null;
+
+  if (suspension !== null) {
+    const suspendedAt = Date.parse(suspension.at);
+    if (!Number.isNaN(suspendedAt) && Date.now() - suspendedAt > ACCESS_SUSPENSION_STALE_MS) {
+      warnings.push({
+        systemId: entry.id,
+        field: "ACCESS-02",
+        message: `accessPinSuspended since ${suspension.at} (by ${suspension.by}) — stale > 1h; run: pnpm exec werkstatt run leitstand.access.resume --site ${entry.id}`,
+      });
+    }
+  }
+
+  if (desiredPin !== null && suspension === null) {
+    for (const channelName of ["dev", "alt"] as const) {
+      const channelUrl = entry.deployment?.channels[channelName]?.url;
+      if (!channelUrl) continue;
+      const result = await probe(channelUrl);
+      if (result.outcome === "transport-error") {
+        warnings.push({
+          systemId: entry.id,
+          field: "ACCESS-01",
+          message: `access protection probe inconclusive for ${channelUrl}: ${result.error}`,
+        });
+      } else if (result.status !== 401) {
+        violations.push({
+          systemId: entry.id,
+          rule: "ACCESS-01",
+          message: `accessPin declared but ${channelUrl} returned ${result.status} (expected 401) — run: pnpm exec werkstatt run leitstand.access.resume --site ${entry.id}`,
+        });
+      }
     }
   }
 }
@@ -895,6 +963,14 @@ export async function runSternsystemValidate(
       }
     } catch {
       // Non-fatal — handover check skipped
+    }
+
+    // RFC-1284: ACCESS-01/02 — desired-vs-live access protection checks.
+    try {
+      const accessState = await readSystemState(workspaceRoot, entry.id, context.io);
+      await checkAccessProtection(entry, accessState, violations, warnings);
+    } catch {
+      // Non-fatal — access protection checks skipped
     }
 
     // RFC-1034: STERN-CONFIG-RESOLVE-01 — check if cache clone's kernel.config.ts can be loaded
