@@ -62,8 +62,13 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
   const { runLeitstandShipStatus } = await import("./ship-status.ts");
   const { runLeitstandServiceDevDeploy } = await import("./service-dev-deploy.ts");
   const { runLeitstandServicePromote } = await import("./service-promote.ts");
-  const { runLeitstandAccessProtect, runLeitstandAccessUnprotect, runLeitstandAccessStatus } =
-    await import("./access-commands.ts");
+  const {
+    runLeitstandAccessProtect,
+    runLeitstandAccessUnprotect,
+    runLeitstandAccessSuspend,
+    runLeitstandAccessResume,
+    runLeitstandAccessStatus,
+  } = await import("./access-commands.ts");
   return {
     name: "leitstand",
     version: "0.1.0",
@@ -546,7 +551,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:
-          "RFC-0899: Set ACCESS_PIN secret on dev and alt channel Workers for Basic Auth access protection. Flags: --site, [--pin].",
+          "RFC-0899/RFC-1284: Set ACCESS_PIN secret on dev and alt channel Workers for Basic Auth access protection; clears any suspension marker. Flags: --site, [--pin].",
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
@@ -577,7 +582,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         generates: [],
         description:
-          "RFC-0899: Remove ACCESS_PIN secret from dev and alt channel Workers. Flags: --site.",
+          "RFC-0899/RFC-1284: Remove ACCESS_PIN secret from dev and alt channel Workers permanently — sets accessPin to null and clears any suspension marker. This is the only hard-removal path; for transient removal use leitstand.access.suspend. Flags: --site.",
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
@@ -598,6 +603,68 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
           "../systems-cache/{system}/system-state.yaml",
         ],
         execute: runLeitstandAccessUnprotect,
+      },
+      {
+        name: "leitstand.access.suspend",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
+        description:
+          "RFC-1284: Temporarily remove ACCESS_PIN from dev and alt channel Workers while preserving the desired accessPin — writes an accessPinSuspended marker so a crash leaves resumable state. Refuses when accessPin is null. Flags: --site, [--by], [--operation-id].",
+        scope: "workspace",
+        acceptsAllFlag: false,
+        mutatesState: true,
+        flags: {
+          site: {
+            kind: "string",
+            required: true,
+            description: "Sternsystem id.",
+          },
+          system: {
+            kind: "string",
+            description: "Alias for --site.",
+          },
+          by: {
+            kind: "string",
+            description: "Suspension invoker recorded in the marker (default: operator).",
+          },
+          "operation-id": {
+            kind: "string",
+            description: "Optional operation id recorded in the marker.",
+          },
+        },
+        writes: ["../systems-cache/{system}/system-state.yaml"],
+        reads: [
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+        ],
+        execute: runLeitstandAccessSuspend,
+      },
+      {
+        name: "leitstand.access.resume",
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
+        description:
+          "RFC-1284: Restore ACCESS_PIN on dev and alt channel Workers from the desired accessPin and clear the suspension marker. No-op when not suspended; errors when accessPin is null. Flags: --site.",
+        scope: "workspace",
+        acceptsAllFlag: false,
+        mutatesState: true,
+        flags: {
+          site: {
+            kind: "string",
+            required: true,
+            description: "Sternsystem id.",
+          },
+          system: {
+            kind: "string",
+            description: "Alias for --site.",
+          },
+        },
+        writes: ["../systems-cache/{system}/system-state.yaml"],
+        reads: [
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+        ],
+        execute: runLeitstandAccessResume,
       },
       {
         name: "leitstand.hotfix.dev-deploy",
@@ -651,7 +718,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         coverage: "operator" as const,
         modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
         description:
-          "RFC-0899: Report access protection status (PIN set or not) for a Sternsystem. Flags: --site.",
+          "RFC-0899/RFC-1284: Report access protection status for a Sternsystem — protected | suspended | unprotected, plus suspension marker details. Flags: --site.",
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: false,

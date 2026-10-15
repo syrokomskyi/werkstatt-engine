@@ -56,7 +56,7 @@ describe("RFC-0899: leitstand.access.status", () => {
       makeInput({ site: "test-bundle" }),
       makeContext("/tmp/test"),
     );
-    expect(result.data!.protected).toBe(true);
+    expect(result.data!.status).toBe("protected");
     expect(result.data!.accessPin).toBe("1234");
     expect(result.summary).toContain("protected");
   });
@@ -67,7 +67,7 @@ describe("RFC-0899: leitstand.access.status", () => {
       makeInput({ site: "test-bundle" }),
       makeContext("/tmp/test"),
     );
-    expect(result.data!.protected).toBe(false);
+    expect(result.data!.status).toBe("unprotected");
     expect(result.data!.accessPin).toBe(null);
     expect(result.summary).toContain("unprotected");
   });
@@ -87,6 +87,24 @@ describe("RFC-0899: leitstand.access.status", () => {
       makeContext("/tmp/test"),
     );
     expect(result.data!.systemId).toBe("alias-site");
-    expect(result.data!.protected).toBe(true);
+    expect(result.data!.status).toBe("protected");
+  });
+
+  it("reports suspended with marker details when accessPinSuspended is set", async () => {
+    const marker = {
+      at: "2026-10-15T10:00:00.000Z",
+      by: "leitstand.certify",
+      operationId: "certify-1",
+    };
+    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+      makeState({ accessPin: "1234", accessPinSuspended: marker }),
+    );
+    const result = await runLeitstandAccessStatus(
+      makeInput({ site: "test-bundle" }),
+      makeContext("/tmp/test"),
+    );
+    expect(result.data!.status).toBe("suspended");
+    expect(result.data!.suspended).toEqual(marker);
+    expect(result.summary).toContain("suspended");
   });
 });

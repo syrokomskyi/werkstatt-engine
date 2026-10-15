@@ -1,12 +1,18 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0899: Leitstand access protection commands — protect, unprotect, status. Manages 4-digit PIN secrets for dev/alt subdomain Workers via wrangler secret put/delete.</purpose>
+  <purpose>RFC-0899/RFC-1284: Leitstand access protection commands — protect,
+  unprotect, suspend, resume, status. Manages 4-digit PIN secrets for dev/alt
+  subdomain Workers via wrangler secret put/delete. system-state.yaml accessPin
+  is the authoritative desired declaration; accessPinSuspended marks legitimate
+  transient divergence of the projection (RFC-1284, DNA-111).</purpose>
 
 
   <non-goals>
     <item>Do not set secrets on the main channel Worker — main domain is never protected.</item>
     <item>Do not store the PIN in git — system-state.yaml stores only null or the 4-digit string.</item>
     <item>Do not use wrangler.toml — use temporary wrangler.jsonc only.</item>
+    <item>leitstand.access.suspend is the only writer of accessPinSuspended besides the
+      normalizing clear in protect/unprotect/resume — no other command touches the marker.</item>
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
@@ -19,6 +25,13 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
+  <item>RFC-1284: suspend/resume commands, crash-safe marker, status tri-state
+
+accessPin becomes desired-state authority: suspend deletes the projection
+secret then writes accessPinSuspended (marker only when every channel delete
+succeeds — a kill in between leaves ACCESS-01-visible drift); resume re-puts
+the pin and clears the marker only on full success; protect/unprotect
+normalize stale markers; status reports protected|suspended|unprotected.</item>
   <history>RFC-0899</history>
 </CHANGE_SUMMARY>
 */
@@ -28,7 +41,9 @@ import type {
   KernelCommandInput,
   KernelCommandResult,
   KernelRuntimeContext,
+  WorkspaceIO,
 } from "@warpgogol/werkstatt-engine/kernel";
+import type { SystemConfig, SystemState } from "@warpgogol/werkstatt-engine/schemas";
 import {
   readSystemConfigSmart,
   readSystemStateSmart,
@@ -39,6 +54,8 @@ import { sourceDotenv, filterEnv } from "./adapters/index.ts";
 import { runWranglerSecretPut, runWranglerSecretDelete } from "./adapters/wrangler-secrets.ts";
 
 type ChannelName = "dev" | "alt";
+
+type AccessProtectionStatus = "protected" | "suspended" | "unprotected";
 
 interface ChannelSecretResult {
   channel: ChannelName;
@@ -62,40 +79,57 @@ function flagString(input: KernelCommandInput, name: string): string | undefined
   return typeof v === "string" ? v : undefined;
 }
 
-export async function runLeitstandAccessProtect(
-  input: KernelCommandInput,
-  context: KernelRuntimeContext,
-): Promise<KernelCommandResult<{ pin: string; channels: ChannelSecretResult[] }>> {
+function requireSite(input: KernelCommandInput, commandName: string): string {
   const systemId = flagString(input, "site") ?? flagString(input, "system");
-  if (!systemId) throw new Error("[leitstand.access.protect] --site is required");
+  if (!systemId) throw new Error(`[${commandName}] --site is required`);
+  return systemId;
+}
 
-  const pinArg = flagString(input, "pin");
-  const pin = pinArg ?? generateRandomPin();
-  validatePin(pin);
+// Type helper for channel iteration
+type deploymentChannelSchema_t = {
+  channel: ChannelName;
+  workerName: string;
+  url: string;
+  secretsFile?: string;
+};
 
-  const workspaceRoot = context.workspaceRoot;
-  const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
+function accessChannels(
+  systemConfig: SystemConfig,
+  commandName: string,
+  systemId: string,
+): deploymentChannelSchema_t[] {
   if (!systemConfig.deployment) {
     throw new Error(
-      `[leitstand.access.protect] system '${systemId}' has no deployment config in system-config.yaml`,
+      `[${commandName}] system '${systemId}' has no deployment config in system-config.yaml`,
     );
   }
-
-  const channels: deploymentChannelSchema_t[] = [
+  return [
     { channel: "dev" as const, ...systemConfig.deployment.channels.dev },
     { channel: "alt" as const, ...systemConfig.deployment.channels.alt },
   ];
+}
 
+async function buildSecretsEnv(
+  workspaceRoot: string,
+  systemId: string,
+  io: WorkspaceIO,
+): Promise<Record<string, string | undefined>> {
   const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
   const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = (await context.io.exists(envPath)) ? await sourceDotenv(envPath) : {};
-  const env: Record<string, string | undefined> = {
+  const secretsEnv = (await io.exists(envPath)) ? await sourceDotenv(envPath) : {};
+  return {
     ...filterEnv(process.env as Record<string, string | undefined>),
     ...secretsEnv,
   };
+}
 
+async function putPinOnChannels(
+  channels: deploymentChannelSchema_t[],
+  pin: string,
+  env: Record<string, string | undefined>,
+  workspaceRoot: string,
+): Promise<ChannelSecretResult[]> {
   const results: ChannelSecretResult[] = [];
-
   for (const ch of channels) {
     const result = await runWranglerSecretPut(ch.workerName, "ACCESS_PIN", pin, env, workspaceRoot);
     const channelResult: ChannelSecretResult = {
@@ -109,9 +143,56 @@ export async function runLeitstandAccessProtect(
     }
     results.push(channelResult);
   }
+  return results;
+}
+
+async function deletePinFromChannels(
+  channels: deploymentChannelSchema_t[],
+  env: Record<string, string | undefined>,
+  workspaceRoot: string,
+): Promise<ChannelSecretResult[]> {
+  const results: ChannelSecretResult[] = [];
+  for (const ch of channels) {
+    const result = await runWranglerSecretDelete(ch.workerName, "ACCESS_PIN", env, workspaceRoot);
+    const channelResult: ChannelSecretResult = {
+      channel: ch.channel,
+      workerName: ch.workerName,
+      // wrangler secret delete returns non-zero if secret doesn't exist — treat as success (idempotent)
+      success:
+        result.exitCode === 0 ||
+        result.stderr.includes("not found") ||
+        result.stdout.includes("not found"),
+    };
+    if (!channelResult.success && result.exitCode !== 0) {
+      channelResult.error =
+        result.stderr.trim() || result.stdout.trim() || `exit code ${result.exitCode}`;
+    }
+    results.push(channelResult);
+  }
+  return results;
+}
+
+export async function runLeitstandAccessProtect(
+  input: KernelCommandInput,
+  context: KernelRuntimeContext,
+): Promise<KernelCommandResult<{ pin: string; channels: ChannelSecretResult[] }>> {
+  const systemId = requireSite(input, "leitstand.access.protect");
+
+  const pinArg = flagString(input, "pin");
+  const pin = pinArg ?? generateRandomPin();
+  validatePin(pin);
+
+  const workspaceRoot = context.workspaceRoot;
+  const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
+  const channels = accessChannels(systemConfig, "leitstand.access.protect", systemId);
+  const env = await buildSecretsEnv(workspaceRoot, systemId, context.io);
+
+  const results = await putPinOnChannels(channels, pin, env, workspaceRoot);
 
   const state = await readSystemStateSmart(workspaceRoot, systemId);
   state.accessPin = pin;
+  // RFC-1284: normalize stale suspension — a freshly asserted pin is not suspended.
+  state.accessPinSuspended = null;
   await writeSystemState(workspaceRoot, systemId, state);
 
   const allSuccess = results.every((r) => r.success);
@@ -133,52 +214,19 @@ export async function runLeitstandAccessUnprotect(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<KernelCommandResult<{ channels: ChannelSecretResult[] }>> {
-  const systemId = flagString(input, "site") ?? flagString(input, "system");
-  if (!systemId) throw new Error("[leitstand.access.unprotect] --site is required");
+  const systemId = requireSite(input, "leitstand.access.unprotect");
 
   const workspaceRoot = context.workspaceRoot;
   const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
-  if (!systemConfig.deployment) {
-    throw new Error(
-      `[leitstand.access.unprotect] system '${systemId}' has no deployment config in system-config.yaml`,
-    );
-  }
+  const channels = accessChannels(systemConfig, "leitstand.access.unprotect", systemId);
+  const env = await buildSecretsEnv(workspaceRoot, systemId, context.io);
 
-  const channels: deploymentChannelSchema_t[] = [
-    { channel: "dev" as const, ...systemConfig.deployment.channels.dev },
-    { channel: "alt" as const, ...systemConfig.deployment.channels.alt },
-  ];
-
-  const cacheCloneDir = resolveCacheClonePath(workspaceRoot, systemId);
-  const envPath = join(cacheCloneDir, ".env");
-  const secretsEnv = (await context.io.exists(envPath)) ? await sourceDotenv(envPath) : {};
-  const env: Record<string, string | undefined> = {
-    ...filterEnv(process.env as Record<string, string | undefined>),
-    ...secretsEnv,
-  };
-
-  const results: ChannelSecretResult[] = [];
-
-  for (const ch of channels) {
-    const result = await runWranglerSecretDelete(ch.workerName, "ACCESS_PIN", env, workspaceRoot);
-    const channelResult: ChannelSecretResult = {
-      channel: ch.channel,
-      workerName: ch.workerName,
-      // wrangler secret delete returns non-zero if secret doesn't exist — treat as success (idempotent)
-      success:
-        result.exitCode === 0 ||
-        result.stderr.includes("not found") ||
-        result.stdout.includes("not found"),
-    };
-    if (!channelResult.success && result.exitCode !== 0) {
-      channelResult.error =
-        result.stderr.trim() || result.stdout.trim() || `exit code ${result.exitCode}`;
-    }
-    results.push(channelResult);
-  }
+  const results = await deletePinFromChannels(channels, env, workspaceRoot);
 
   const state = await readSystemStateSmart(workspaceRoot, systemId);
   state.accessPin = null;
+  // RFC-1284: permanent unprotection dissolves any suspension marker.
+  state.accessPinSuspended = null;
   await writeSystemState(workspaceRoot, systemId, state);
 
   const allSuccess = results.every((r) => r.success);
@@ -196,33 +244,148 @@ export async function runLeitstandAccessUnprotect(
   };
 }
 
-export async function runLeitstandAccessStatus(
+// RFC-1284: transient suspension — deletes the projection secret FIRST, then
+// writes the marker only when every channel deleted. A kill in between leaves
+// detectable drift (pin declared, secret absent, no marker) that ACCESS-01
+// raises — the inversion errs toward alarm, not silence.
+export async function runLeitstandAccessSuspend(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
 ): Promise<
-  KernelCommandResult<{ systemId: string; accessPin: string | null; protected: boolean }>
+  KernelCommandResult<{
+    channels: ChannelSecretResult[];
+    suspended: NonNullable<SystemState["accessPinSuspended"]> | null;
+  }>
 > {
-  const systemId = flagString(input, "site") ?? flagString(input, "system");
-  if (!systemId) throw new Error("[leitstand.access.status] --site is required");
+  const systemId = requireSite(input, "leitstand.access.suspend");
+
+  const workspaceRoot = context.workspaceRoot;
+  const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
+  const channels = accessChannels(systemConfig, "leitstand.access.suspend", systemId);
+
+  const state = await readSystemStateSmart(workspaceRoot, systemId);
+  if (state.accessPin === null) {
+    throw new Error(
+      `[leitstand.access.suspend] system '${systemId}' has accessPin: null — nothing to suspend. ` +
+        `Set a pin first: pnpm exec werkstatt run leitstand.access.protect --site ${systemId}`,
+    );
+  }
+
+  const env = await buildSecretsEnv(workspaceRoot, systemId, context.io);
+  const results = await deletePinFromChannels(channels, env, workspaceRoot);
+  const allSuccess = results.every((r) => r.success);
+
+  let suspended: NonNullable<SystemState["accessPinSuspended"]> | null = null;
+  if (allSuccess) {
+    // Idempotent: re-suspending refreshes the marker.
+    suspended = {
+      at: new Date().toISOString(),
+      by: flagString(input, "by") ?? "operator",
+      operationId: flagString(input, "operation-id") ?? null,
+    };
+    state.accessPinSuspended = suspended;
+    await writeSystemState(workspaceRoot, systemId, state);
+  }
+
+  const summary = allSuccess
+    ? `[leitstand.access.suspend] PIN suspended on ${results.length} channel(s) for ${systemId} (by ${suspended!.by})`
+    : `[leitstand.access.suspend] suspension failed — no marker written, drift visible via ACCESS-01: ${results
+        .filter((r) => !r.success)
+        .map((r) => r.channel)
+        .join(", ")}`;
+
+  return {
+    data: { channels: results, suspended },
+    summary,
+    exitCode: allSuccess ? undefined : 1,
+  };
+}
+
+export async function runLeitstandAccessResume(
+  input: KernelCommandInput,
+  context: KernelRuntimeContext,
+): Promise<KernelCommandResult<{ channels: ChannelSecretResult[]; resumed: boolean }>> {
+  const systemId = requireSite(input, "leitstand.access.resume");
 
   const workspaceRoot = context.workspaceRoot;
   const state = await readSystemStateSmart(workspaceRoot, systemId);
 
+  if (state.accessPinSuspended === null) {
+    return {
+      data: { channels: [], resumed: false },
+      summary: `[leitstand.access.resume] ${systemId}: not suspended — nothing to resume`,
+      exitCode: 0,
+    };
+  }
+
+  if (state.accessPin === null) {
+    throw new Error(
+      `[leitstand.access.resume] system '${systemId}' is suspended but accessPin is null — ` +
+        `the desired pin is unknown and cannot be resumed. ` +
+        `Run: pnpm exec werkstatt run leitstand.access.protect --site ${systemId} --pin <4-digit>`,
+    );
+  }
+
+  const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
+  const channels = accessChannels(systemConfig, "leitstand.access.resume", systemId);
+  const env = await buildSecretsEnv(workspaceRoot, systemId, context.io);
+
+  const results = await putPinOnChannels(channels, state.accessPin, env, workspaceRoot);
+  const allSuccess = results.every((r) => r.success);
+
+  if (allSuccess) {
+    // Clear the marker only when the projection is fully re-asserted — a
+    // partial restore keeps the suspension declared so ACCESS-01 stays muted
+    // and ACCESS-02 keeps aging toward a warning.
+    state.accessPinSuspended = null;
+    await writeSystemState(workspaceRoot, systemId, state);
+  }
+
+  const summary = allSuccess
+    ? `[leitstand.access.resume] PIN restored on ${results.length} channel(s) for ${systemId}`
+    : `[leitstand.access.resume] restore failed — suspension marker kept: ${results
+        .filter((r) => !r.success)
+        .map((r) => r.channel)
+        .join(", ")}`;
+
   return {
-    data: {
-      systemId,
-      accessPin: state.accessPin,
-      protected: state.accessPin !== null,
-    },
-    exitCode: 0,
-    summary: `[leitstand.access.status] ${systemId}: ${state.accessPin !== null ? "protected" : "unprotected"}`,
+    data: { channels: results, resumed: allSuccess },
+    summary,
+    exitCode: allSuccess ? undefined : 1,
   };
 }
 
-// Type helper for channel iteration
-type deploymentChannelSchema_t = {
-  channel: ChannelName;
-  workerName: string;
-  url: string;
-  secretsFile?: string;
-};
+export async function runLeitstandAccessStatus(
+  input: KernelCommandInput,
+  context: KernelRuntimeContext,
+): Promise<
+  KernelCommandResult<{
+    systemId: string;
+    status: AccessProtectionStatus;
+    accessPin: string | null;
+    suspended: SystemState["accessPinSuspended"];
+  }>
+> {
+  const systemId = requireSite(input, "leitstand.access.status");
+
+  const workspaceRoot = context.workspaceRoot;
+  const state = await readSystemStateSmart(workspaceRoot, systemId);
+
+  const status: AccessProtectionStatus =
+    state.accessPin === null
+      ? "unprotected"
+      : state.accessPinSuspended !== null
+        ? "suspended"
+        : "protected";
+
+  return {
+    data: {
+      systemId,
+      status,
+      accessPin: state.accessPin,
+      suspended: state.accessPinSuspended,
+    },
+    exitCode: 0,
+    summary: `[leitstand.access.status] ${systemId}: ${status}`,
+  };
+}
