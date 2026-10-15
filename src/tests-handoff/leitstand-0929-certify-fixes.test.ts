@@ -10,6 +10,20 @@
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,7 +40,7 @@ vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../sternsystem/registry-io.ts")>();
   return {
     ...actual,
-    readSystemStateSmart: vi.fn(),
+    readSystemState: vi.fn(),
     resolveCacheClonePath: vi.fn().mockReturnValue("/tmp/test-cache-clone"),
   };
 });
@@ -78,8 +92,8 @@ vi.mock("../leitstand/deploy-helpers.ts", async (importOriginal) => {
   };
 });
 
-const { readSystemStateSmart } = await import("../sternsystem/registry-io.ts");
-const mockReadSystemStateSmart = readSystemStateSmart as unknown as ReturnType<typeof vi.fn>;
+const { readSystemState } = await import("../sternsystem/registry-io.ts");
+const mockReadSystemState = readSystemState as unknown as ReturnType<typeof vi.fn>;
 
 const fsMock = await import("node:fs/promises");
 const mockReaddir = fsMock.readdir as unknown as ReturnType<typeof vi.fn>;
@@ -103,7 +117,7 @@ function makeInput(flags: Record<string, KernelFlagValue>): KernelCommandInput {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockReadSystemStateSmart.mockResolvedValue({
+  mockReadSystemState.mockResolvedValue({
     schemaVersion: "1.0.0",
     systemId: "test-sys",
     currentMission: null,
@@ -114,7 +128,7 @@ beforeEach(() => {
 });
 
 test("RFC-0929: certify fails with clear message when accessPin is set", async () => {
-  mockReadSystemStateSmart.mockResolvedValue({
+  mockReadSystemState.mockResolvedValue({
     schemaVersion: "1.0.0",
     systemId: "test-sys",
     currentMission: null,
@@ -153,7 +167,7 @@ test("RFC-0929: certify fails with clear message when accessPin is set", async (
 });
 
 test("RFC-0929: --force does not bypass accessPin check", async () => {
-  mockReadSystemStateSmart.mockResolvedValue({
+  mockReadSystemState.mockResolvedValue({
     schemaVersion: "1.0.0",
     systemId: "test-sys",
     currentMission: null,

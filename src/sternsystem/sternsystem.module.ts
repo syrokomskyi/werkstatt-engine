@@ -19,6 +19,7 @@ assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1231: sternsystem.status opts into --all (acceptsAllFlag: true — selector lands in flags.all); sternsystem.sync flag renamed all -> all-branches so the reserved token stays gated off.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <item>RFC-1284: sternsystem.validate declares ACCESS-01/02 rules + system-state.yaml in reads (REVIEW-CODE-2026-10-15-02 F5)</item>
   <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -113,16 +114,20 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         mutatesState: false,
         execOnReadOnly: true,
         contract: "sternsystem",
-        rules: ["HANDOVER-01", "JRN-01"],
+        rules: ["HANDOVER-01", "JRN-01", "ACCESS-01", "ACCESS-02"],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
-          "Validate registry invariants, bundle contract, and pin file for one or all Sternsystems (RFC-0354). Flags: --id.",
+          "Validate registry invariants, bundle contract, pin file, and access-protection drift (ACCESS-01/02) for one or all Sternsystems (RFC-0354, RFC-1284). Flags: --id.",
         scope: "workspace",
         acceptsAllFlag: false,
         flags: {
           id: { kind: "string", description: "Optional Sternsystem id to validate." },
         },
-        reads: ["../systems-cache/*/system-config.yaml", "../systems-cache/*/system.pin.json"],
+        reads: [
+          "../systems-cache/*/system-config.yaml",
+          "../systems-cache/*/system.pin.json",
+          "../systems-cache/*/system-state.yaml",
+        ],
         execute: runSternsystemValidate,
         gate: {
           severity: "error",
@@ -143,8 +148,14 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           id: { kind: "string", required: true, description: "Sternsystem id." },
           platform: { kind: "string", description: "Pinned platform version." },
         },
-        writes: ["../systems-cache/{id}/system.pin.json", "../systems-cache/{id}/system-config.yaml"],
-        reads: ["../systems-cache/{id}/system-config.yaml", "../systems-cache/{id}/system.pin.json"],
+        writes: [
+          "../systems-cache/{id}/system.pin.json",
+          "../systems-cache/{id}/system-config.yaml",
+        ],
+        reads: [
+          "../systems-cache/{id}/system-config.yaml",
+          "../systems-cache/{id}/system.pin.json",
+        ],
         cacheable: false,
         execute: runSternsystemPin,
       },

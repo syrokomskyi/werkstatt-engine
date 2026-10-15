@@ -6,6 +6,20 @@
 <CHANGE_SUMMARY>
   <item>RFC-1207: initial test suite for candidate-preview certification (AC-1..AC-5, AC-7).</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -48,10 +62,10 @@ vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
     resolveCacheClonePath: vi.fn((workspaceRoot: string, systemId: string) =>
       path.join(workspaceRoot, "systems-cache", systemId),
     ),
-    // readSystemStateSmart resolves the cache-clone path internally (shared
+    // readSystemState resolves the cache-clone path internally (shared
     // ../systems-cache pool) — mock it so a stale sibling-pool state file
     // cannot inject a foreign systemState into the certify path.
-    readSystemStateSmart: vi.fn(async (_workspaceRoot: string, systemId: string) => ({
+    readSystemState: vi.fn(async (_workspaceRoot: string, systemId: string) => ({
       schemaVersion: "1.0.0",
       systemId,
       currentMission: null,

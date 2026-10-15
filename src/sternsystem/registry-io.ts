@@ -20,6 +20,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1284: default system state gains accessPinSuspended: null — the durable suspension marker read/written via the non-smart cache-clone store (Q-6)</item>
   <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966, RFC-0967, RFC-0981</history>
 </CHANGE_SUMMARY>
 */

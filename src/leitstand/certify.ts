@@ -17,6 +17,7 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
   <item>RECOVERY-2026-10-05: stale-channel detection — resolveDevDeploymentRecord captures the releaseId of the latest succeeded dev record; detectMeasuredReleaseMismatch flags when a remote (non---base-url) certify would measure a different artifact than the candidate. Upfront logger.warn, measured-release reason in the gate decision, and a fail-summary hint pointing at the --base-url recovery path (warpgogol r000028 dev gate measured stale r000027).</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1284: crash-safe access protection — suspend-before-measure via durable accessPinSuspended marker, stale-marker entry resume (flag=true), finally-restore, pinManagement {suspended,resumed,staleResumed,restoreError}, isProtectedLiveTarget gating, cache-clone marker store (Q-6), flag=false+suspended proceeds without resume (Q-7)</item>
   <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -44,7 +45,7 @@ import {
 } from "./candidate-preview.ts";
 import {
   resolveCacheClonePath,
-  readSystemStateSmart,
+  readSystemState,
   readSystemConfigSmart,
 } from "../sternsystem/registry-io.ts";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
@@ -306,17 +307,20 @@ export async function runLeitstandCertify(
   const certifyTarget: CertifyTarget = targetFlag === "channel" ? "channel" : "candidate";
 
   // RFC-0938: Auto-manage access PIN. Default: true. Post-RFC-1284 the flag
-  // controls suspend-before-measure / resume-after; crash recovery (stale
-  // suspension markers) runs unconditionally regardless of the flag.
+  // controls suspend-before-measure / resume-after and crash recovery — under
+  // flag=false an entry suspension marker is left in place and the run
+  // proceeds on the already-open channel (REVIEW-CODE-2026-10-15-02 F2,
+  // decisions Q-7).
   const autoManagePinRaw = input.flags["auto-manage-pin"];
   const autoManagePin = autoManagePinRaw === false || autoManagePinRaw === "false" ? false : true;
 
   // RFC-1284: crash recovery on entry. A stale accessPinSuspended marker means
   // a previous certify died between secret deletion and restore — the channel
   // is currently open and desired protection is unmet. Resume unconditionally
-  // (before --auto-manage-pin evaluation and before any early return) so the
-  // next certify always re-asserts the projection.
-  const systemState = await readSystemStateSmart(context.workspaceRoot, systemId);
+  // when --auto-manage-pin is in effect so the next certify always re-asserts
+  // the projection. The cache clone owns the marker — non-smart state reads
+  // keep every access-touching command on one store (decisions Q-6).
+  const systemState = await readSystemState(context.workspaceRoot, systemId);
   const recordedPin = systemState.accessPin;
   // `?? null` — loose-schema extension keys may be undefined in un-normalized reads.
   let suspensionActive = (systemState.accessPinSuspended ?? null) !== null;
@@ -328,7 +332,7 @@ export async function runLeitstandCertify(
 
   const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
 
-  if (suspensionActive) {
+  if (suspensionActive && autoManagePin) {
     context.logger.info(
       `[leitstand.certify] stale access-PIN suspension detected (by ${systemState.accessPinSuspended?.by} at ${systemState.accessPinSuspended?.at}) — resuming before certification`,
     );
@@ -377,6 +381,10 @@ export async function runLeitstandCertify(
     }
     staleResumed = true;
     suspensionActive = false;
+  } else if (suspensionActive && !autoManagePin) {
+    context.logger.info(
+      `[leitstand.certify] access-PIN suspension marker present (by ${systemState.accessPinSuspended?.by} at ${systemState.accessPinSuspended?.at}) — proceeding on the open channel; --auto-manage-pin=false leaves secrets untouched`,
+    );
   }
 
   const cacheCloneDir = resolveCacheClonePath(context.workspaceRoot, systemId);
@@ -1251,7 +1259,7 @@ export async function resolveDevBaseUrl(
 // configured dev/alt channel URL (covers custom subdomains and
 // dev-<site>.<account>.workers.dev), with a ^(dev|alt)[.-] prefix fallback
 // for hosts absent from channel config. candidate-preview never qualifies.
-async function isProtectedLiveTarget(
+export async function isProtectedLiveTarget(
   baseUrlFlag: string | undefined,
   certifyTarget: CertifyTarget,
   workspaceRoot: string,

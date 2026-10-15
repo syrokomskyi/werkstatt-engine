@@ -16,10 +16,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1065: extracted runWranglerSecretPut/Delete to wrangler-secrets.ts shared helper.</item>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
@@ -32,7 +28,21 @@ secret then writes accessPinSuspended (marker only when every channel delete
 succeeds — a kill in between leaves ACCESS-01-visible drift); resume re-puts
 the pin and clears the marker only on full success; protect/unprotect
 normalize stale markers; status reports protected|suspended|unprotected.</item>
-  <history>RFC-0899</history>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
+  <history>RFC-0899, RFC-1065, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -46,7 +56,7 @@ import type {
 import type { SystemConfig, SystemState } from "@warpgogol/werkstatt-engine/schemas";
 import {
   readSystemConfigSmart,
-  readSystemStateSmart,
+  readSystemState,
   writeSystemState,
   resolveCacheClonePath,
 } from "../sternsystem/registry-io.ts";
@@ -189,7 +199,7 @@ export async function runLeitstandAccessProtect(
 
   const results = await putPinOnChannels(channels, pin, env, workspaceRoot);
 
-  const state = await readSystemStateSmart(workspaceRoot, systemId);
+  const state = await readSystemState(workspaceRoot, systemId);
   state.accessPin = pin;
   // RFC-1284: normalize stale suspension — a freshly asserted pin is not suspended.
   state.accessPinSuspended = null;
@@ -223,7 +233,7 @@ export async function runLeitstandAccessUnprotect(
 
   const results = await deletePinFromChannels(channels, env, workspaceRoot);
 
-  const state = await readSystemStateSmart(workspaceRoot, systemId);
+  const state = await readSystemState(workspaceRoot, systemId);
   state.accessPin = null;
   // RFC-1284: permanent unprotection dissolves any suspension marker.
   state.accessPinSuspended = null;
@@ -260,16 +270,19 @@ export async function runLeitstandAccessSuspend(
   const systemId = requireSite(input, "leitstand.access.suspend");
 
   const workspaceRoot = context.workspaceRoot;
-  const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
-  const channels = accessChannels(systemConfig, "leitstand.access.suspend", systemId);
-
-  const state = await readSystemStateSmart(workspaceRoot, systemId);
+  // Marker authority is the git-tracked cache clone — non-smart reads/writes
+  // keep the contract single-store even while a mission workpiece shadows
+  // system-state.yaml (REVIEW-CODE-2026-10-15-02 F1, decisions Q-6).
+  const state = await readSystemState(workspaceRoot, systemId);
   if (state.accessPin === null) {
     throw new Error(
       `[leitstand.access.suspend] system '${systemId}' has accessPin: null — nothing to suspend. ` +
         `Set a pin first: pnpm exec werkstatt run leitstand.access.protect --site ${systemId}`,
     );
   }
+
+  const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
+  const channels = accessChannels(systemConfig, "leitstand.access.suspend", systemId);
 
   const env = await buildSecretsEnv(workspaceRoot, systemId, context.io);
   const results = await deletePinFromChannels(channels, env, workspaceRoot);
@@ -308,7 +321,7 @@ export async function runLeitstandAccessResume(
   const systemId = requireSite(input, "leitstand.access.resume");
 
   const workspaceRoot = context.workspaceRoot;
-  const state = await readSystemStateSmart(workspaceRoot, systemId);
+  const state = await readSystemState(workspaceRoot, systemId);
 
   if (state.accessPinSuspended === null) {
     return {
@@ -369,7 +382,7 @@ export async function runLeitstandAccessStatus(
   const systemId = requireSite(input, "leitstand.access.status");
 
   const workspaceRoot = context.workspaceRoot;
-  const state = await readSystemStateSmart(workspaceRoot, systemId);
+  const state = await readSystemState(workspaceRoot, systemId);
 
   const status: AccessProtectionStatus =
     state.accessPin === null

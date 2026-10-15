@@ -6,9 +6,6 @@
   <keywords>RFC-0938, RFC-1284, leitstand, certify, accessPin, accessPinSuspended, auto-manage, test</keywords>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0938: test restore failure — hard fail exitCode 1, restoreError set.</item>
-  <item>RFC-0938: test --auto-manage-pin=false preserves RFC-0929 fail-early behavior.</item>
-  <item>RFC-0938: test no PIN active — certify proceeds, pinManagement absent or autoManaged true.</item>
   <item>RFC-1126: step 4 — artifact-hash provenance
 
 resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.yaml); all 4 leitstand call sites log provenance via context.logger. Tests updated for the new contract + new release.yaml provenance case.</item>
@@ -17,6 +14,23 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
   suspended/resumed/staleResumed; access.unprotect/protect → access.suspend/resume;
   fail-early recommends access.suspend; stale-marker resume on entry;
   candidate-preview never touches the secret.</item>
+  <item>RFC-1284 review (REVIEW-CODE-2026-10-15-02 F2, Q-7): AC-16 semantics —
+  flag=false + marker at entry proceeds without resume (secrets untouched);
+  certify state reads move to the non-smart cache-clone store (Q-6).</item>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
   <history>RFC-0938</history>
 </CHANGE_SUMMARY>
 */
@@ -40,6 +54,7 @@ vi.mock("../sternsystem/registry-io.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../sternsystem/registry-io.ts")>();
   return {
     ...actual,
+    readSystemState: vi.fn(),
     readSystemStateSmart: vi.fn(),
     resolveCacheClonePath: vi.fn().mockReturnValue("/tmp/test-cache-clone-0938"),
   };
@@ -112,8 +127,9 @@ vi.mock("../leitstand/deploy-helpers.ts", async (importOriginal) => {
   };
 });
 
-const { readSystemStateSmart } = await import("../sternsystem/registry-io.ts");
-const mockReadSystemStateSmart = readSystemStateSmart as unknown as ReturnType<typeof vi.fn>;
+const { readSystemState } = await import("../sternsystem/registry-io.ts");
+// certify reads the cache-clone marker store via non-smart readSystemState (Q-6).
+const mockReadSystemState = readSystemState as unknown as ReturnType<typeof vi.fn>;
 
 const WORKSPACE_ROOT = "/tmp/test-workspace-0938";
 
@@ -166,7 +182,7 @@ beforeEach(() => {
   executeKernelCommandCalls = [];
   suspendShouldFail = false;
   resumeShouldFail = false;
-  mockReadSystemStateSmart.mockResolvedValue(makeState({}));
+  mockReadSystemState.mockResolvedValue(makeState({}));
 });
 
 test("RFC-0938: no PIN active — certify proceeds, pinManagement has autoManaged true", async () => {
@@ -190,7 +206,7 @@ test("RFC-0938: no PIN active — certify proceeds, pinManagement has autoManage
 });
 
 test("RFC-1284: PIN active, auto-manage=true, channel target — suspends with certify provenance", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(makeState({ accessPin: "4092" }));
+  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
 
   await runLeitstandCertify(
     makeInput({
@@ -213,7 +229,7 @@ test("RFC-1284: PIN active, auto-manage=true, channel target — suspends with c
 });
 
 test("RFC-1284: PIN active, auto-manage=true, suspend fails — exitCode 1, no resume attempted", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(makeState({ accessPin: "4092" }));
+  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
   suspendShouldFail = true;
 
   const result = await runLeitstandCertify(
@@ -236,7 +252,7 @@ test("RFC-1284: PIN active, auto-manage=true, suspend fails — exitCode 1, no r
 });
 
 test("RFC-1284: PIN active, auto-manage=false — fail-early recommends access.suspend", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(makeState({ accessPin: "1234" }));
+  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "1234" }));
 
   const result = await runLeitstandCertify(
     makeInput({
@@ -262,7 +278,7 @@ test("RFC-1284: PIN active, auto-manage=false — fail-early recommends access.s
 });
 
 test("RFC-1284: PIN active, resume fails in finally — hard fail exitCode 1, restoreError set", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(makeState({ accessPin: "4092" }));
+  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
   resumeShouldFail = true;
 
   const result = await runLeitstandCertify(
@@ -286,7 +302,7 @@ test("RFC-1284: PIN active, resume fails in finally — hard fail exitCode 1, re
 });
 
 test("RFC-1284: PIN active, suspend+resume succeed — pinManagement reports both", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(makeState({ accessPin: "4092" }));
+  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
 
   const result = await runLeitstandCertify(
     makeInput({
@@ -315,7 +331,7 @@ test("RFC-1284: candidate-preview target never touches ACCESS_PIN (AC-6)", async
   // The artifact-missing guard precedes PIN handling, so materialize the
   // expected dist/server dir to reach the pin block.
   mkdirSync(`${WORKSPACE_ROOT}/releases/test-sys-r000001/dist/server`, { recursive: true });
-  mockReadSystemStateSmart.mockResolvedValue(makeState({ accessPin: "4092" }));
+  mockReadSystemState.mockResolvedValue(makeState({ accessPin: "4092" }));
 
   await runLeitstandCertify(
     {
@@ -341,7 +357,7 @@ test("RFC-1284: candidate-preview target never touches ACCESS_PIN (AC-6)", async
 });
 
 test("RFC-1284: stale suspension marker — certify resumes before producers (AC-8)", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(
+  mockReadSystemState.mockResolvedValue(
     makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
   );
 
@@ -368,7 +384,7 @@ test("RFC-1284: stale suspension marker — certify resumes before producers (AC
 });
 
 test("RFC-1284: stale marker resume fails on entry — certify hard-fails before producers", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(
+  mockReadSystemState.mockResolvedValue(
     makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
   );
   resumeShouldFail = true;
@@ -389,8 +405,8 @@ test("RFC-1284: stale marker resume fails on entry — certify hard-fails before
   expect(accessCalls("leitstand.access.suspend")).toHaveLength(0);
 });
 
-test("RFC-1284: auto-manage=false with active suspension — entry-resume runs, then fail-early (AC-16)", async () => {
-  mockReadSystemStateSmart.mockResolvedValue(
+test("RFC-1284: auto-manage=false with active suspension — proceeds without resume (AC-16, Q-7)", async () => {
+  mockReadSystemState.mockResolvedValue(
     makeState({ accessPin: "4092", accessPinSuspended: STALE_MARKER }),
   );
 
@@ -405,10 +421,13 @@ test("RFC-1284: auto-manage=false with active suspension — entry-resume runs, 
     context,
   );
 
-  // Crash recovery is orthogonal to the debug flag — resume still ran.
-  expect(accessCalls("leitstand.access.resume")).toHaveLength(1);
-  // Post-resume the pin is active again with no marker → fail-early fires.
-  expect(result.exitCode).toBe(1);
-  expect(result.summary).toContain("access PIN protection active");
-  expect(result.summary).toContain("leitstand.access.suspend");
+  // flag=false + marker at entry: no resume, no suspend — secrets untouched.
+  expect(accessCalls("leitstand.access.resume")).toHaveLength(0);
+  expect(accessCalls("leitstand.access.suspend")).toHaveLength(0);
+  // The debug workflow proceeds: no fail-early on the open channel.
+  expect(result.summary ?? "").not.toContain("access PIN protection active");
+  if (result.data?.pinManagement) {
+    expect(result.data.pinManagement.autoManaged).toBe(false);
+    expect(result.data.pinManagement.staleResumed).toBe(false);
+  }
 });

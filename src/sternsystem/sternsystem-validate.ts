@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0091: pass externalEditBaselineSha from collectExternalEditInputs into evaluateExternalEditGate.</item>
   <item>RFC-1149: phase 1b — DRIFT-02 diagnostics promoted from warnings to violations (blocking); DRIFT-01 stays warning per ADR-0082 cleanup caveat.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
@@ -16,7 +15,21 @@ RFC-1284 step 5: checkAccessProtection compares desired accessPin to
 observed channel answers — a proven non-401 is a violation, transport
 failures downgrade to warnings, suspended systems skip the probe, and
 stale markers (>1h) warn via ACCESS-02.</item>
-  <history>ADR-0082, ADR-0088, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
+  <history>ADR-0082, ADR-0088, ADR-0091, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -328,7 +341,13 @@ export async function checkAccessProtection(
 
   if (suspension !== null) {
     const suspendedAt = Date.parse(suspension.at);
-    if (!Number.isNaN(suspendedAt) && Date.now() - suspendedAt > ACCESS_SUSPENSION_STALE_MS) {
+    if (Number.isNaN(suspendedAt)) {
+      warnings.push({
+        systemId: entry.id,
+        field: "ACCESS-02",
+        message: `accessPinSuspended.at is unparseable ("${suspension.at}", by ${suspension.by}) — age unknown; run: pnpm exec werkstatt run leitstand.access.resume --site ${entry.id}`,
+      });
+    } else if (Date.now() - suspendedAt > ACCESS_SUSPENSION_STALE_MS) {
       warnings.push({
         systemId: entry.id,
         field: "ACCESS-02",

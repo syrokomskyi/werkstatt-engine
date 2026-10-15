@@ -8,6 +8,20 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1284: initial — deploy-time ACCESS_PIN reconcile coverage (AC-7).</item>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
   <history>RFC-1284</history>
 </CHANGE_SUMMARY>
 */
@@ -60,21 +74,19 @@ vi.mock("../../sternsystem/registry-io.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../sternsystem/registry-io.ts")>();
   return {
     ...actual,
+    // Reconcile reads the cache-clone store (non-smart) — REVIEW-CODE-2026-10-15-02 F1/Q-6.
+    readSystemState: vi.fn(async () => deploySystemState),
     readSystemStateSmart: vi.fn(async () => deploySystemState),
     writeSystemStateSmart: vi.fn().mockResolvedValue(undefined),
   };
 });
 
 vi.mock("../adapters/wrangler-secrets.ts", () => ({
-  runWranglerSecretPut: vi.fn(
-    async (workerName: string, secretName: string, value: string) => {
-      wranglerSecretPutCalls.push({ workerName, secretName, value });
-      return { exitCode: wranglerSecretPutExitCode, stdout: "", stderr: "" };
-    },
-  ),
-  runWranglerSecretDelete: vi
-    .fn()
-    .mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" }),
+  runWranglerSecretPut: vi.fn(async (workerName: string, secretName: string, value: string) => {
+    wranglerSecretPutCalls.push({ workerName, secretName, value });
+    return { exitCode: wranglerSecretPutExitCode, stdout: "", stderr: "" };
+  }),
+  runWranglerSecretDelete: vi.fn().mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" }),
 }));
 
 function makeAdapter(): DeploymentAdapter {
@@ -163,10 +175,7 @@ const authResult: AuthorizeResult = {
   },
 };
 
-function makeCtx(
-  adapter: DeploymentAdapter,
-  workspaceRoot: string,
-): DeployExecutionContext {
+function makeCtx(adapter: DeploymentAdapter, workspaceRoot: string): DeployExecutionContext {
   return {
     systemId: "test-sys",
     releaseId: "r000001",
@@ -247,7 +256,11 @@ test("RFC-1284: reconcile is skipped while a suspension marker is open", async (
     deploySystemState = {
       ...deploySystemState,
       accessPin: "4092",
-      accessPinSuspended: { at: "2026-10-15T10:00:00.000Z", by: "leitstand.certify", operationId: null },
+      accessPinSuspended: {
+        at: "2026-10-15T10:00:00.000Z",
+        by: "leitstand.certify",
+        operationId: null,
+      },
     };
     const result = await executeDeployPhases(makeCtx(makeAdapter(), tmp), "dev");
 
@@ -295,6 +308,41 @@ test("RFC-1284: alt deploy reconciles ACCESS_PIN", async () => {
     expect(wranglerSecretPutCalls).toHaveLength(1);
     expect(wranglerSecretPutCalls[0].workerName).toBe("test-alt");
     expect(result.accessReconcile).toEqual({ ok: true });
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+test("RFC-1284: reconcile re-reads state AFTER propagation — a suspension opened mid-deploy is respected", async () => {
+  const tmp = makeWorkspace();
+  try {
+    // Desired pin set, no suspension yet — a naive pre-deploy read would
+    // re-assert the pin. Simulate a concurrent certify opening a suspension
+    // while the adapter propagates.
+    deploySystemState = { ...deploySystemState, accessPin: "4092" };
+    const adapter = makeAdapter();
+    const originalPropagate = adapter.propagate;
+    adapter.propagate = async (input) => {
+      const res = await originalPropagate.call(adapter, input);
+      deploySystemState = {
+        ...deploySystemState,
+        accessPinSuspended: {
+          at: new Date().toISOString(),
+          by: "leitstand.certify",
+          operationId: "op-concurrent",
+        },
+      };
+      return res;
+    };
+
+    const result = await executeDeployPhases(makeCtx(adapter, tmp), "dev");
+
+    expect(
+      wranglerSecretPutCalls,
+      "reconcile must read fresh state — the mid-deploy suspension suppresses the re-assert",
+    ).toHaveLength(0);
+    expect(result.accessReconcile).toBeUndefined();
   } finally {
     rmSync(tmp, { recursive: true, force: true });
     rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });

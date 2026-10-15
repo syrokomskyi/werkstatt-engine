@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — signing failures route into the command report via onSigningFailure → logger.warn instead of the default console channel</item>
   <item>RFC-1190: resolveMissionContext precedence chain — --mission flag → releases/&lt;id&gt;/dist build-identity.json → system-state.currentMission, MISSION_CONTEXT_MISMATCH on flag/identity contradiction; dev-deploy, propagate, and promote block with MISSION_CONTEXT_UNRESOLVED when nothing resolves unless --skip-evidence-sync is passed; resolved context + axiom.status + evidence-sync outcome propagated into result data and executeDeployPhases.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -15,7 +14,21 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>REVIEW-CODE-2026, RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149, RFC-1203</history>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
+  <history>REVIEW-CODE-2026, RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149, RFC-1188, RFC-1203</history>
 </CHANGE_SUMMARY>
 */
 
@@ -938,12 +951,15 @@ export async function runLeitstandDevDeploy(
       releaseDeployed: releaseId,
       failingPhase: deployResult.failingPhase,
       channelDriftWarning: driftWarning,
+      accessReconcile: deployResult.accessReconcile,
     },
     summary: deployResult.failingPhase
       ? `[leitstand.dev-deploy] failed at phase: ${deployResult.failingPhase}`
       : driftWarning
         ? `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl} — WARN: ${driftWarning}`
-        : `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl}`,
+        : deployResult.accessReconcile && !deployResult.accessReconcile.ok
+          ? `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl} — WARN: ACCESS_PIN reconcile failed: ${deployResult.accessReconcile.error}`
+          : `[leitstand.dev-deploy] deployed to dev: ${deployResult.deploymentUrl}`,
     exitCode: deployResult.failingPhase ? 1 : 0,
     nextSteps: deployResult.failingPhase
       ? [
@@ -1174,10 +1190,13 @@ export async function runLeitstandPropagate(
       testEvidenceVerified: deployResult.evidenceSynced,
       failingPhase: deployResult.failingPhase,
       missionContext: missionCtx,
+      accessReconcile: deployResult.accessReconcile,
     },
     summary: deployResult.failingPhase
       ? `[leitstand.propagate] failed at phase: ${deployResult.failingPhase}${deployResult.errorMessage ? ` — ${deployResult.errorMessage}` : ""}`
-      : `[leitstand.propagate] deployed to alt: ${deployResult.deploymentUrl}`,
+      : deployResult.accessReconcile && !deployResult.accessReconcile.ok
+        ? `[leitstand.propagate] deployed to alt: ${deployResult.deploymentUrl} — WARN: ACCESS_PIN reconcile failed: ${deployResult.accessReconcile.error}`
+        : `[leitstand.propagate] deployed to alt: ${deployResult.deploymentUrl}`,
     exitCode: deployResult.failingPhase ? 1 : 0,
     nextSteps: deployResult.failingPhase
       ? [

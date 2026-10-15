@@ -5,6 +5,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0899: Initial access status command tests.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1284: access.status tests updated to the three-state contract (protected/suspended/unprotected) with suspension metadata</item>
 </CHANGE_SUMMARY>
 */
 
@@ -14,12 +15,12 @@ import type { SystemState } from "@warpgogol/werkstatt-engine/schemas";
 
 vi.mock("../../sternsystem/registry-io.ts", () => ({
   readSystemConfigSmart: vi.fn(),
-  readSystemStateSmart: vi.fn(),
+  readSystemState: vi.fn(),
   writeSystemState: vi.fn(),
 }));
 
 const { runLeitstandAccessStatus } = await import("../access-commands.ts");
-const { readSystemStateSmart } = await import("../../sternsystem/registry-io.ts");
+const { readSystemState } = await import("../../sternsystem/registry-io.ts");
 
 function makeInput(flags: Record<string, unknown>) {
   return { flags, args: [] } as unknown as Parameters<typeof runLeitstandAccessStatus>[0];
@@ -51,7 +52,7 @@ function makeState(overrides: Partial<SystemState>): SystemState {
 
 describe("RFC-0899: leitstand.access.status", () => {
   it("reports protected when accessPin is set", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
     const result = await runLeitstandAccessStatus(
       makeInput({ site: "test-bundle" }),
       makeContext("/tmp/test"),
@@ -62,7 +63,7 @@ describe("RFC-0899: leitstand.access.status", () => {
   });
 
   it("reports unprotected when accessPin is null", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({}));
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({}));
     const result = await runLeitstandAccessStatus(
       makeInput({ site: "test-bundle" }),
       makeContext("/tmp/test"),
@@ -79,7 +80,7 @@ describe("RFC-0899: leitstand.access.status", () => {
   });
 
   it("accepts --system as alias for --site", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ systemId: "alias-site", accessPin: "9999" }),
     );
     const result = await runLeitstandAccessStatus(
@@ -96,7 +97,7 @@ describe("RFC-0899: leitstand.access.status", () => {
       by: "leitstand.certify",
       operationId: "certify-1",
     };
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ accessPin: "1234", accessPinSuspended: marker }),
     );
     const result = await runLeitstandAccessStatus(

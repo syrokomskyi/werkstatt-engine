@@ -17,6 +17,7 @@
   <item>RFC-0378: initial implementation of fleet.sites.generate command (in werkstatt-site).</item>
   <item>RFC-0964: moved from werkstatt-site to werkstatt-engine, repointed from discoverSiteWorkspaces to discoverSystems, enriched output with platformVersion, channels, mirrors, activeMission, canary, path fields.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1284: fallback system state literal gains accessPinSuspended: null</item>
 </CHANGE_SUMMARY>
 */
 

@@ -6,6 +6,20 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1284: initial — suspension marker lifecycle coverage.</item>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
   <history>RFC-1284</history>
 </CHANGE_SUMMARY>
 */
@@ -19,7 +33,7 @@ vi.mock("../../sternsystem/registry-io.ts", async (importOriginal) => {
   return {
     ...mod,
     readSystemConfigSmart: vi.fn(),
-    readSystemStateSmart: vi.fn(),
+    readSystemState: vi.fn(),
     writeSystemState: vi.fn(),
   };
 });
@@ -35,7 +49,7 @@ const {
   runLeitstandAccessProtect,
   runLeitstandAccessUnprotect,
 } = await import("../access-commands.ts");
-const { readSystemConfigSmart, readSystemStateSmart, writeSystemState } =
+const { readSystemConfigSmart, readSystemState, writeSystemState } =
   await import("../../sternsystem/registry-io.ts");
 const { runWranglerSecretPut, runWranglerSecretDelete } =
   await import("../adapters/wrangler-secrets.ts");
@@ -88,7 +102,7 @@ beforeEach(() => {
 describe("RFC-1284: leitstand.access.suspend", () => {
   it("deletes ACCESS_PIN on dev/alt and writes the suspension marker preserving accessPin", async () => {
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
     vi.mocked(runWranglerSecretDelete).mockResolvedValue(wranglerOk);
 
     const result = await runLeitstandAccessSuspend(
@@ -110,7 +124,7 @@ describe("RFC-1284: leitstand.access.suspend", () => {
 
   it("refuses when accessPin is null — nothing to suspend", async () => {
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({ accessPin: null }));
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: null }));
 
     await expect(
       runLeitstandAccessSuspend(makeInput({ site: "test-bundle" }), makeContext("/tmp/test")),
@@ -121,7 +135,7 @@ describe("RFC-1284: leitstand.access.suspend", () => {
 
   it("does not write a marker when a channel delete fails", async () => {
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
     vi.mocked(runWranglerSecretDelete)
       .mockResolvedValueOnce(wranglerOk)
       .mockResolvedValueOnce({ exitCode: 1, stdout: "", stderr: "boom" });
@@ -144,7 +158,7 @@ describe("RFC-1284: leitstand.access.resume", () => {
   const marker = { at: "2026-10-15T10:00:00.000Z", by: "leitstand.certify", operationId: null };
 
   it("re-puts ACCESS_PIN from accessPin on dev/alt and clears the marker", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ accessPin: "1234", accessPinSuspended: marker }),
     );
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
@@ -165,7 +179,7 @@ describe("RFC-1284: leitstand.access.resume", () => {
   });
 
   it("is a no-op when the system is not suspended", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: "1234" }));
 
     const result = await runLeitstandAccessResume(
       makeInput({ site: "test-bundle" }),
@@ -178,7 +192,7 @@ describe("RFC-1284: leitstand.access.resume", () => {
   });
 
   it("keeps the marker when a channel restore fails", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ accessPin: "1234", accessPinSuspended: marker }),
     );
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
@@ -200,7 +214,7 @@ describe("RFC-1284: leitstand.access.resume", () => {
   });
 
   it("errors when suspended but accessPin is null — cannot resume an unknown pin", async () => {
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ accessPin: null, accessPinSuspended: marker }),
     );
 
@@ -215,7 +229,7 @@ describe("RFC-1284: marker normalization", () => {
   it("protect clears a stale suspension marker", async () => {
     const marker = { at: "2026-10-15T09:00:00.000Z", by: "leitstand.certify", operationId: null };
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ accessPin: "1111", accessPinSuspended: marker }),
     );
     vi.mocked(runWranglerSecretPut).mockResolvedValue(wranglerOk);
@@ -236,7 +250,7 @@ describe("RFC-1284: marker normalization", () => {
   it("unprotect clears both accessPin and the suspension marker", async () => {
     const marker = { at: "2026-10-15T09:00:00.000Z", by: "operator", operationId: null };
     vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
-    vi.mocked(readSystemStateSmart).mockResolvedValueOnce(
+    vi.mocked(readSystemState).mockResolvedValueOnce(
       makeState({ accessPin: "1111", accessPinSuspended: marker }),
     );
     vi.mocked(runWranglerSecretDelete).mockResolvedValue(wranglerOk);

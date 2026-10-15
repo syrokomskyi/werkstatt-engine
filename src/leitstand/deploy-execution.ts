@@ -8,8 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1179: blocking smoke gates after the health check on every channel — site.smoke.run (failingPhase "site-smoke") then deploy.smoke.run (failingPhase "deploy-smoke"); non-zero exits throw before propagation continues</item>
-  <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
   <item>RFC-1188: fo-review fix — outbound client resolved once per channel invocation and shared by health/freshness/feature-smoke instead of three independent resolutions</item>
   <item>RFC-1190: evidence.sync fail-closed when evidence/axiom + evidence-metadata.json exist (throws EVIDENCE_SYNC_FAILED, failingPhase "evidence-sync") and a clean no-op when absent — replaces the swallowed-error branch that reported deploy success while uploading nothing; axiomStatus/axiomExitCode + missionContext surfaced on DeployExecutionResult.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -21,7 +19,21 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 propagation, re-assert ACCESS_PIN from the freshly re-read system state when
 protection is desired and no suspension marker is open. Non-fatal diagnostic on
 accessReconcile; ACCESS-01 in sternsystem.validate is the hard backstop.</item>
-  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138</history>
+  <item>RFC-1284: fix review REVIEW-CODE-2026-10-15-02: RFC-1284 — single-store marker, flag=false proceed, surfaced reconcile
+
+F1: marker store unified on the git-tracked cache clone — access commands,
+certify entry check, and deploy reconcile all use non-smart
+readSystemState/writeSystemState (decisions Q-6); the mission-window
+blindness and the DNA-106 false-resume are gone.
+F2: --auto-manage-pin=false + suspension at entry skips entry-resume and
+proceeds on the open channel (decisions Q-7) — RFC/AC-8 text amended.
+F3: accessReconcile surfaced in data + summary of dev-deploy/propagate.
+F4: CHANGE_SUMMARY items on all touched files.
+F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
+F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
+F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
+the re-assert.</item>
+  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188</history>
 </CHANGE_SUMMARY>
 */
 
@@ -47,7 +59,11 @@ import type { AuthorizeOutcome } from "./deploy-helpers.ts";
 import type { DeploymentEffectRecordV1 } from "../certification/deployment/authority.ts";
 import { buildEffectRecord, writeDeploymentEffectRecord } from "./deploy-helpers.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
-import { writeSystemStateSmart, readSystemStateSmart } from "../sternsystem/registry-io.ts";
+import {
+  writeSystemStateSmart,
+  readSystemStateSmart,
+  readSystemState,
+} from "../sternsystem/registry-io.ts";
 import { collectPurgeUrls, purgeCacheByUrls, skippedPurgeResult } from "./cache-purge.ts";
 import { readBehaviorSnapshot, sourceDotenv, filterEnv } from "./adapters/index.ts";
 import { runWranglerSecretPut } from "./adapters/wrangler-secrets.ts";
@@ -503,11 +519,13 @@ export async function executeDeployPhases(
     // immediately after a successful propagation — before purge/health/smoke
     // phases that can throw — so every deploy converges the projection to the
     // desired state. Fresh state re-read: a concurrent certify may have opened
-    // a suspension during the build/deploy window. Reconcile failure is a
-    // non-fatal diagnostic — ACCESS-01 in sternsystem.validate is the backstop.
+    // a suspension during the build/deploy window. The cache clone owns the
+    // marker — non-smart read, same store as the access commands (Q-6).
+    // Reconcile failure is a non-fatal diagnostic — ACCESS-01 in
+    // sternsystem.validate is the backstop.
     if (channel !== "main") {
       try {
-        const freshState = await readSystemStateSmart(ctx.workspaceRoot, ctx.systemId);
+        const freshState = await readSystemState(ctx.workspaceRoot, ctx.systemId);
         const desiredPin = freshState?.accessPin ?? null;
         const suspended = (freshState?.accessPinSuspended ?? null) !== null;
         if (desiredPin !== null && !suspended) {
