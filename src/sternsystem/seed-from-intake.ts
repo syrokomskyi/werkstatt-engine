@@ -19,10 +19,12 @@ sidecars, and the system-state onboarding provenance block.</purpose>
   <item>Two entities resolving to one document path fail the plan — a silent overwrite is a validator defect, never a last-write-wins.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: introduce the deterministic intake seed planner.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1307: record review-fix decisions in compass headers</item>
+  <item>REVIEW-CODE-2026-10-16-08 N3/N4: reject duplicate locale primary segments and non-2-letter primary subtags at plan time instead of seeding born-invalid i18n; credit target.domain names business-profile — the tree the seeded asset actually lands in.</item>
+  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <history>RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -116,7 +118,14 @@ export function isSeedableAsset(asset: IntakeAsset): boolean {
 
 function creditFor(asset: IntakeAsset, lang: string): Record<string, unknown> {
   const id = assetBaseName(asset);
-  const target = { kind: materialKindFor(asset.mediaType), id, domain: "business", lang };
+  // Seeded assets land under src/content/business-profile/<lang>/assets/ — the
+  // target domain must name the tree the file actually lives in (REVIEW-08 N5).
+  const target = {
+    kind: materialKindFor(asset.mediaType),
+    id,
+    domain: "business-profile",
+    lang,
+  };
   if (asset.rights.state === "generated") {
     const generator = asset.generator;
     return {
@@ -161,8 +170,24 @@ function creditFor(asset: IntakeAsset, lang: string): Record<string, unknown> {
 function buildSystemMd(input: IntakeSeedInput, primarySegment: string): string {
   const { intake } = input;
   const supported: Record<string, Record<string, string>> = {};
+  const seenSegments = new Set<string>();
   for (const locale of intake.classification.locales) {
     const segment = localeSegment(locale.tag);
+    // i18n.config.validate requires ^[a-z]{2}(-[A-Z]{2})?$ keys — a 3-letter
+    // primary subtag would birth a site that fails its own i18n validation.
+    if (!/^[a-z]{2}$/.test(segment)) {
+      throw new Error(
+        `[seed-from-intake] locale '${locale.tag}' primary subtag '${segment}' is not a 2-letter i18n segment — restrict the intake tag upstream`,
+      );
+    }
+    // Two distinct tags sharing a primary segment would silently overwrite —
+    // one locale lost, the survivor claiming the wrong hreflang.
+    if (seenSegments.has(segment)) {
+      throw new Error(
+        `[seed-from-intake] locales share primary segment '${segment}' — disambiguate the intake tags before registering`,
+      );
+    }
+    seenSegments.add(segment);
     supported[segment] =
       segment === locale.tag
         ? { name: segment, hreflang: locale.tag }

@@ -11,21 +11,6 @@ With --amend: update pin and open amend mission without creating a new registry 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <item>RFC-1293: require timing semantics on time-bound policy fields via contractTerms.gate (RFC-1293)
-
-policySchema gains an optional timing map (pbpTimingSchema: startEvent, clock,
-timezone, businessHours, boundary) inherited by every specialized policy.
-pbp.content.validate sweeps each pbp/* entity's frontmatter — TIMED_FIELDS
-registry paths plus every ISO-8601 duration literal — and emits
-PBP-TIMING-01..04 at contractTerms.gate severity (warn|enforce in system.md;
-absent = warn). enforce also makes pbp.terms-reference.validate behave as
---strict. New sites register with contractTerms.gate: enforce
-(sternsystem-register stub + both onboarding system templates). Live warpgogol
-run: 129 PBP-TIMING-01 warnings across policies/offerings/documents/claims —
-the owner's contract-decision agenda; no timing values authored, no site gate
-flipped. Known registry gap: renewal.renewalPeriod/reminder are not ISO-shaped
-and escape the sweep (documented in the RFC evidence). Canary C10 active.</item>
   <item>RFC-1294: require verbatim source provenance for external local facts (RFC-1294)
 
 localFacts[] entries gain sourceUrl/excerpt/excerptLang/scope/reviewedBy/
@@ -43,7 +28,9 @@ across the 12 city demand records — the owner's research backlog; no excerpts,
 review records, or gate flips authored. Canary C11 active.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
-  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149</history>
+  <item>REVIEW-CODE-2026-10-16-08 N1/N2/N6/N7: rollback is ref-scoped — only refs absent from the pre-register snapshot are deleted, file-level deletes run before the git rewind, and captured bytes restore pre-existing config/state/pin that never reached a commit. The scaffold commit stages only register's own paths so untracked pre-existing files survive reset --hard. writeSystemConfig moves inside the guarded try; all forward git ops take the injected io; the scaffold push derives its branch from the captured origin HEAD.</item>
+  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293</history>
 </CHANGE_SUMMARY>
 */
 
@@ -259,6 +246,36 @@ async function rollbackPin(systemDir: string, io: WorkspaceIO): Promise<void> {
   }
 }
 
+/** Remove every seeded file + dirs register created; pre-existing content stays. */
+async function rollbackSeedFiles(
+  systemDir: string,
+  plan: IntakeSeedPlan,
+  io: WorkspaceIO,
+): Promise<void> {
+  const parentDirs = new Set<string>();
+  for (const file of plan.files) {
+    const target = join(systemDir, ...file.path.split("/"));
+    if (await io.exists(target)) {
+      await io.rm(target, { recursive: true });
+    }
+    let dir = join(target, "..");
+    while (dir !== systemDir && dir.startsWith(systemDir)) {
+      parentDirs.add(dir);
+      dir = join(dir, "..");
+    }
+  }
+  // Deepest first — a dir that still holds entries is pre-existing and stays.
+  for (const dir of [...parentDirs].sort((a, b) => b.length - a.length)) {
+    try {
+      if ((await io.readdir(dir)).length === 0) {
+        await io.rm(dir, { recursive: true });
+      }
+    } catch {
+      // Already removed by an earlier prune — cosmetic only.
+    }
+  }
+}
+
 async function rollbackContent(systemDir: string, io: WorkspaceIO): Promise<void> {
   const contentPath = join(systemDir, "src", "content");
   if (await io.exists(contentPath)) {
@@ -273,21 +290,30 @@ async function rollbackSystemDirIfEmpty(systemDir: string, io: WorkspaceIO): Pro
   await io.rm(systemDir, { recursive: true });
 }
 
+/** Git state captured before register's first write — rollback trusts only this. */
+interface PreRegisterGit {
+  /** The probe ran; refs + sha are trustworthy. False = skip ref surgery entirely. */
+  captured: boolean;
+  /** HEAD commit at capture — null only when HEAD was genuinely unborn. */
+  sha: string | null;
+  /** refs/heads/* present before register — never touched by rollback. */
+  refs: string[];
+  /** The branch register pushes to (origin/HEAD-derived, falls back to "main"). */
+  branch: string;
+}
+
 /**
- * Rewind the commits register pushed into the cache clone: the writeSystemState
- * auto-commit, the scaffold commit and their pushes to the bare remote. When
- * the clone had no commits before register (fresh repo), every local branch
- * ref is register's own — drop them so HEAD returns to unborn, and delete the
- * pushed branch on the remote. All steps are best-effort: file-level rollback
- * still runs afterwards.
+ * Probe the clone's git state before register writes: HEAD sha (or confirmed
+ * unborn), the pre-existing branch refs, and the push branch. An ambiguous
+ * probe (rev-parse fails without an unborn HEAD, or any exec throw) yields
+ * captured=false — rollback then skips ref surgery rather than risk deleting
+ * branches it cannot attribute to register (REVIEW-CODE-2026-10-16-08 N1).
  */
-async function rollbackGitHistory(
-  systemDir: string,
-  preRegisterSha: string | null,
-  io: WorkspaceIO,
-): Promise<void> {
-  const gitDir = join(systemDir, ".git");
-  if (!(await io.exists(gitDir))) return;
+async function capturePreRegisterGit(systemDir: string, io: WorkspaceIO): Promise<PreRegisterGit> {
+  const failed: PreRegisterGit = { captured: false, sha: null, refs: [], branch: "main" };
+  if (!(await io.exists(join(systemDir, ".git")))) {
+    return { ...failed, captured: true };
+  }
   const git = (args: string[]) => io.exec("git", args, { cwd: systemDir, timeoutMs: 10000 });
   try {
     let branch = "main";
@@ -295,29 +321,115 @@ async function rollbackGitHistory(
     if (remoteHead.exitCode === 0 && remoteHead.stdout.trim()) {
       branch = remoteHead.stdout.trim().replace(/^origin\//, "");
     }
-    if (preRegisterSha) {
-      await git(["reset", "--hard", preRegisterSha]);
-      // Rewind the remote branch register pushed to — the clone matched
-      // preRegisterSha before register, so the remote only has register's pushes.
-      await git(["push", "--force-with-lease", "origin", `HEAD:refs/heads/${branch}`]);
+    const refsResult = await git(["for-each-ref", "--format=%(refname)", "refs/heads"]);
+    if (refsResult.exitCode !== 0) return failed;
+    const refs = refsResult.stdout
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const head = await git(["rev-parse", "HEAD"]);
+    let sha: string | null = null;
+    if (head.exitCode === 0) {
+      sha = head.stdout.trim() || null;
     } else {
-      const refs = await git(["for-each-ref", "--format=%(refname)", "refs/heads"]);
-      const branchRefs = refs.stdout
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      for (const ref of branchRefs) {
-        await git(["update-ref", "-d", ref]);
+      // rev-parse fails for unborn HEAD and for corrupt/detached states alike —
+      // only a symbolic HEAD pointing at a branch ref proves "unborn".
+      const sym = await git(["symbolic-ref", "-q", "HEAD"]);
+      if (!(sym.exitCode === 0 && sym.stdout.trim().startsWith("refs/heads/"))) return failed;
+    }
+    return { captured: true, sha, refs, branch };
+  } catch {
+    return failed;
+  }
+}
+
+/**
+ * Rewind the commits register pushed into the cache clone: the writeSystemState
+ * auto-commit, the scaffold commit and their pushes to the bare remote. Runs
+ * AFTER the file-level helpers — a reset restores pre-existing tracked files,
+ * so deleting register's files first and resetting second leaves the clone
+ * exactly at its pre-register state (REVIEW-CODE-2026-10-16-08 N2). Only refs
+ * register created are deleted — anything captured pre-register is untouched.
+ * Failures are reported via diagnostics, never silently swallowed.
+ */
+async function rollbackGitHistory(
+  systemDir: string,
+  pre: PreRegisterGit,
+  io: WorkspaceIO,
+  diagnostics: string[],
+): Promise<void> {
+  const gitDir = join(systemDir, ".git");
+  if (!(await io.exists(gitDir))) return;
+  if (!pre.captured) {
+    diagnostics.push(
+      "rollback: pre-register git probe was unreliable — skipped ref surgery; file-level rollback already ran",
+    );
+    return;
+  }
+  const git = (args: string[]) => io.exec("git", args, { cwd: systemDir, timeoutMs: 10000 });
+  try {
+    if (pre.sha) {
+      const reset = await git(["reset", "--hard", pre.sha]);
+      if (reset.exitCode !== 0) {
+        diagnostics.push(
+          `rollback: git reset --hard ${pre.sha} failed: ${reset.stderr.slice(0, 160)}`,
+        );
       }
-      // Drop the staged index so leftover seed files stay plain untracked
-      // files for the file-level rollback to remove.
-      await git(["rm", "-r", "-f", "-q", "--cached", "."]);
-      for (const ref of branchRefs) {
-        await git(["push", "origin", `:${ref}`]);
+      // Rewind the remote branch register pushed to — the clone matched the
+      // pre-register HEAD, so the remote only carries register's pushes.
+      const push = await git([
+        "push",
+        "--force-with-lease",
+        "origin",
+        `HEAD:refs/heads/${pre.branch}`,
+      ]);
+      if (
+        push.exitCode !== 0 &&
+        !/does not appear to be|no origin|Could not read/.test(push.stderr)
+      ) {
+        diagnostics.push(
+          `rollback: remote rewind push failed (non-fatal): ${push.stderr.slice(0, 160)}`,
+        );
       }
     }
+    // Delete only refs register created — pre-register refs are never touched,
+    // whether HEAD was unborn or rev-parse was merely confused at capture.
+    const current = await git(["for-each-ref", "--format=%(refname)", "refs/heads"]);
+    if (current.exitCode === 0) {
+      const preRefs = new Set(pre.refs);
+      const created = current.stdout
+        .split("\n")
+        .map((s) => s.trim())
+        .filter((r) => r !== "" && !preRefs.has(r));
+      for (const ref of created) {
+        const del = await git(["update-ref", "-d", ref]);
+        if (del.exitCode !== 0) {
+          diagnostics.push(
+            `rollback: failed to delete register-created ${ref}: ${del.stderr.slice(0, 160)}`,
+          );
+          continue;
+        }
+        const remote = await git(["push", "origin", `:${ref}`]);
+        if (
+          remote.exitCode !== 0 &&
+          !/does not appear to be|no origin|Could not read|unable to delete/.test(remote.stderr)
+        ) {
+          diagnostics.push(
+            `rollback: remote delete of ${ref} failed (non-fatal): ${remote.stderr.slice(0, 160)}`,
+          );
+        }
+      }
+    }
+    if (!pre.sha) {
+      // Unborn-HEAD path: drop the staged index so file-level rollback output
+      // stays plain untracked deletions — read-tree --empty has no HEAD
+      // dependency, unlike git rm --cached.
+      await git(["read-tree", "--empty"]);
+    }
   } catch {
-    // Rollback is best-effort — the file-level helpers still run.
+    diagnostics.push(
+      "rollback: git history rewind aborted mid-way — file-level rollback already ran",
+    );
   }
 }
 
@@ -493,67 +605,109 @@ export async function runSternsystemRegister(
 
   const systemDir = resolveMirrorPath(workspaceRoot, mirrors[0].path);
   await context.io.mkdir(systemDir);
-  // Record the clone's pre-register HEAD so a failed registration can rewind
-  // the commits writeSystemState and the scaffold step make.
-  let preRegisterSha: string | null = null;
-  if (await context.io.exists(join(systemDir, ".git"))) {
-    const head = await context.io.exec("git", ["rev-parse", "HEAD"], {
-      cwd: systemDir,
-      timeoutMs: 10000,
-    });
-    preRegisterSha = head.exitCode === 0 ? head.stdout.trim() || null : null;
-  }
-  await writeSystemConfig(workspaceRoot, id, newConfig);
+  // Capture the clone's git state before the first write so a failed
+  // registration can distinguish register's own files/commits from anything
+  // that was already there (REVIEW-CODE-2026-10-16-08 N1/N2).
+  const preGit = await capturePreRegisterGit(systemDir, context.io);
+  const contentDirExisted = await context.io.exists(join(systemDir, "src", "content"));
+  // Byte capture for files register overwrites — a pre-existing file that was
+  // never committed cannot be restored by the git rewind alone (N2).
+  const readIfExists = async (filePath: string): Promise<string | null> =>
+    (await context.io.exists(filePath)) ? await context.io.readFile(filePath) : null;
+  const preConfigBytes = await readIfExists(join(systemDir, "system-config.yaml"));
+  const preStateBytes = await readIfExists(join(systemDir, "system-state.yaml"));
+  const prePinBytes = await readIfExists(join(systemDir, "system.pin.json"));
 
   let pinCreated = false;
   let contentCreated = false;
+  let configCreated = false;
+  let stateCreated = false;
   let missionOpened = false;
   let missionId: string | undefined;
 
   try {
+    // Inside the guarded scope: a config-write failure must not orphan the
+    // clone directory register just created (REVIEW-CODE-2026-10-16-08 N7).
+    // Flags mark "write begun", not "write succeeded" — a mid-write throw
+    // leaves partial output that rollback must still remove.
+    configCreated = true;
+    await writeSystemConfig(workspaceRoot, id, newConfig, context.io);
+
     const pinInput: Record<string, KernelFlagValue> = { id };
     if (platform) pinInput.platform = platform;
+    pinCreated = true;
     const pinResult = await runSternsystemPin(makeInput(pinInput), context);
     const pinPath = pinResult.data!.pinPath;
-    pinCreated = true;
 
-    await writeSeedFiles(systemDir, seedPlan, context.io);
     contentCreated = true;
+    await writeSeedFiles(systemDir, seedPlan, context.io);
+    // readSystemState may throw on a malformed PRE-EXISTING state file — that
+    // file must survive rollback untouched, so the flag arms only once
+    // register itself is about to write.
     const state = await readSystemState(workspaceRoot, id, context.io);
+    stateCreated = true;
     await writeSystemState(
       workspaceRoot,
       id,
       { ...state, onboarding: seedPlan.systemState.onboarding },
       context.io,
+      (msg) => logger.warn(`  [sternsystem.register] ${msg}`),
     );
 
     // Commit config, pin, and content to cache clone before mission.open
-    // so syncCacheClone's git reset --hard doesn't wipe uncommitted files
+    // so syncCacheClone's git reset --hard doesn't wipe uncommitted files.
+    // Add ONLY register's own paths — `git add -A` would sweep pre-existing
+    // untracked files into register's commit, and the rollback's reset --hard
+    // would then destroy them (REVIEW-CODE-2026-10-16-08 N2).
     if (await context.io.exists(join(systemDir, ".git"))) {
       try {
-        const addResult = await context.io.exec("sh", ["-c", "git add -A"], {
+        const seedPaths = [
+          "system-config.yaml",
+          "system-state.yaml",
+          "system.pin.json",
+          ...seedPlan.files.map((f) => f.path),
+        ];
+        const existingSeedPaths: string[] = [];
+        for (const p of seedPaths) {
+          if (await context.io.exists(join(systemDir, ...p.split("/")))) {
+            existingSeedPaths.push(p);
+          }
+        }
+        const addResult = await context.io.exec("git", ["add", "--", ...existingSeedPaths], {
           cwd: systemDir,
           timeoutMs: 10000,
         });
         if (addResult.exitCode !== 0) {
           throw new Error(
-            `git add -A exited ${addResult.exitCode}: ${addResult.stderr.slice(0, 200)}`,
+            `git add exited ${addResult.exitCode}: ${addResult.stderr.slice(0, 200)}`,
           );
         }
-        await cacheCloneCommit(systemDir, `sternsystem.register: scaffold ${id}`);
-        // Push to bare repo so syncCacheClone can fetch
+        await cacheCloneCommit(
+          systemDir,
+          `sternsystem.register: scaffold ${id}`,
+          undefined,
+          context.io,
+        );
+        // Push to the bare repo's default branch so syncCacheClone can fetch —
+        // same branch writeSystemState and the rollback rewind use.
         try {
-          const pushResult = await context.io.exec("sh", ["-c", "git push origin main"], {
-            cwd: systemDir,
-            timeoutMs: 10000,
-          });
+          const pushResult = await context.io.exec(
+            "git",
+            ["push", "origin", `HEAD:refs/heads/${preGit.branch}`],
+            {
+              cwd: systemDir,
+              timeoutMs: 10000,
+            },
+          );
           if (pushResult.exitCode !== 0) {
             throw new Error(
               `git push exited ${pushResult.exitCode}: ${pushResult.stderr.slice(0, 200)}`,
             );
           }
-        } catch {
-          // push failure non-fatal
+        } catch (pushErr) {
+          logger.warn(
+            `  [sternsystem.register] scaffold push to origin/${preGit.branch} failed (non-fatal): ${pushErr instanceof Error ? pushErr.message : String(pushErr)}`,
+          );
         }
       } catch {
         // commit failure non-fatal (nothing to commit)
@@ -657,17 +811,45 @@ export async function runSternsystemRegister(
         );
       }
     }
-    // Git rewind first — restores tracked files to the pre-register state;
-    // the file-level helpers then remove any untracked leftovers.
-    await rollbackGitHistory(systemDir, preRegisterSha, context.io);
+    // File-level rollback first, git rewind second — the rewind restores
+    // tracked files to the pre-register state, so removing register's files
+    // up front guarantees pre-existing content survives (REVIEW-08 N2).
     if (contentCreated) {
-      await rollbackContent(systemDir, context.io);
+      await rollbackSeedFiles(systemDir, seedPlan, context.io);
+      // register created src/content entirely — the dir goes away; if it
+      // pre-existed, only register's files were removed.
+      if (!contentDirExisted) {
+        await rollbackContent(systemDir, context.io);
+      }
     }
     if (pinCreated) {
       await rollbackPin(systemDir, context.io);
     }
-    await rollbackConfig(workspaceRoot, id, context.io);
-    await rollbackSystemState(workspaceRoot, id, context.io);
+    if (configCreated) {
+      await rollbackConfig(workspaceRoot, id, context.io);
+    }
+    if (stateCreated) {
+      await rollbackSystemState(workspaceRoot, id, context.io);
+    }
+    await rollbackGitHistory(systemDir, preGit, context.io, diagnostics);
+    // A pre-existing file register overwrote survives the rewind only if it was
+    // tracked — for the untracked edge, restore the captured bytes (N2).
+    const restorePreExisting = async (filePath: string, bytes: string | null) => {
+      if (bytes === null) return;
+      const exists = await context.io.exists(filePath);
+      if (!exists || (await context.io.readFile(filePath)) !== bytes) {
+        await context.io.writeFile(filePath, bytes);
+      }
+    };
+    try {
+      await restorePreExisting(join(systemDir, "system-config.yaml"), preConfigBytes);
+      await restorePreExisting(join(systemDir, "system-state.yaml"), preStateBytes);
+      await restorePreExisting(join(systemDir, "system.pin.json"), prePinBytes);
+    } catch (restoreErr) {
+      diagnostics.push(
+        `rollback: pre-existing file restore failed: ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
+      );
+    }
     await rollbackSystemDirIfEmpty(systemDir, context.io);
 
     diagnostics.push(

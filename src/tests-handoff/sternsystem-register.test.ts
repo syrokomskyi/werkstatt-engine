@@ -6,6 +6,8 @@
   <item>RFC-0532 review fix: add tests for extended sternsystem.register — amend validation, content stub, flag parsing.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
+  <item>REVIEW-CODE-2026-10-16-08 N1/N2: pre-existing content/refs/remote-branch survival on rollback + unborn-HEAD ref cleanup.</item>
+  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
 </CHANGE_SUMMARY>
 */
 
@@ -222,6 +224,159 @@ test("register rewinds clone commits to the pre-register HEAD on failure", async
   expect(existsSync(join(cacheDir, "system-config.yaml"))).toBe(false);
   expect(existsSync(join(cacheDir, "src", "content"))).toBe(false);
   expect(existsSync(join(cacheDir, "README.md"))).toBe(true);
+});
+
+test("register preserves pre-existing tracked content, untracked files and state on rollback (REVIEW-08 N2)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  await mkdir(join(cacheDir, "src", "content", "pages", "de"), { recursive: true });
+  const git = (args: string) =>
+    execSync(`git ${args}`, { cwd: cacheDir, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+  const preContent = "---\ntitle: pre-existing\n---\nbody\n";
+  await writeFile(join(cacheDir, "src", "content", "pages", "de", "home.md"), preContent);
+  const preState =
+    'schemaVersion: "1.0.0"\nsystemId: dp7\ncurrentMission: "dp7-m000000"\nlastRelease: null\n';
+  await writeFile(join(cacheDir, "system-state.yaml"), preState);
+  git("add -A");
+  git('commit -m "pre-register"');
+  // Untracked at register start — must survive both the scaffold add and the rewind.
+  await writeFile(join(cacheDir, "scratch.txt"), "operator scratch\n", "utf8");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  expect(execSync("cat src/content/pages/de/home.md", { cwd: cacheDir }).toString()).toBe(
+    preContent,
+  );
+  expect(execSync("cat system-state.yaml", { cwd: cacheDir }).toString()).toBe(preState);
+  // Register's state write is gone from history; the pre-existing file stays.
+  expect(execSync("cat scratch.txt", { cwd: cacheDir }).toString()).toBe("operator scratch\n");
+  expect(git("status --porcelain -- src/content/business-profile")).toBe("");
+  expect(existsSync(join(cacheDir, "src", "content", "system.md"))).toBe(false);
+  expect(existsSync(join(cacheDir, "system-config.yaml"))).toBe(false);
+});
+
+test("register keeps pre-existing branch refs and rewinds the pushed remote branch (REVIEW-08 N1)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  const remoteDir = join(workspaceRoot, "..", "systems-git", "dp7.git");
+  await mkdir(cacheDir, { recursive: true });
+  await mkdir(remoteDir, { recursive: true });
+  const git = (args: string, cwd = cacheDir) =>
+    execSync(`git ${args}`, { cwd, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init --bare -b main", remoteDir);
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+  await writeFile(join(cacheDir, "README.md"), "pre-register\n", "utf8");
+  git("add -A");
+  git('commit -m "pre-register"');
+  const preSha = git("rev-parse HEAD");
+  git("branch keep-me");
+  git(`remote add origin ${remoteDir}`);
+  git("push -u origin main");
+  git("push origin keep-me");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  // The pre-existing branch is untouched and still points at its own commit.
+  expect(git("rev-parse keep-me")).toBe(preSha);
+  // Local main rewound; the remote branch register pushed is rewound too.
+  expect(git("rev-parse HEAD")).toBe(preSha);
+  expect(git("rev-parse refs/heads/main", remoteDir)).toBe(preSha);
+});
+
+test("register on an unborn HEAD deletes only register-created refs (REVIEW-08 N1)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  await mkdir(cacheDir, { recursive: true });
+  const git = (args: string) =>
+    execSync(`git ${args}`, { cwd: cacheDir, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  // Every ref register created is gone — HEAD is unborn again, no stray commits.
+  expect(git("for-each-ref --format='%(refname)' refs/heads")).toBe("");
+  expect(existsSync(join(cacheDir, "system-config.yaml"))).toBe(false);
+  expect(existsSync(join(cacheDir, "system-state.yaml"))).toBe(false);
+  expect(existsSync(join(cacheDir, "src", "content"))).toBe(false);
 });
 
 test("register rejects a non-conventional mirrors[0] before any write", async () => {

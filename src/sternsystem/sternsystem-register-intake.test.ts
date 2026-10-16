@@ -8,6 +8,8 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
   <item>RFC-1307: created.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
+  <item>REVIEW-CODE-2026-10-16-08 N3/N4: duplicate primary-segment and non-2-letter locale rejections.</item>
+  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
 </CHANGE_SUMMARY>
 */
 
@@ -263,6 +265,24 @@ describe("planSeedFromIntake (RFC-1307)", () => {
     const json = fixtureJson();
     json.pbp[3].id = "claim/Bad Slug";
     expect(() => planSeedFromIntake(seedInput(json))).toThrow(/kebab-case slug/);
+  });
+
+  it("rejects two locale tags sharing a primary segment (REVIEW-08 N3)", () => {
+    const json = fixtureJson();
+    json.classification.locales[0].tag = "de-DE";
+    json.classification.locales.push({
+      tag: "de-CH",
+      role: "secondary",
+      sourceLanguageBy: "translation",
+      reviewer: "studio",
+    });
+    expect(() => planSeedFromIntake(seedInput(json))).toThrow(/share primary segment 'de'/);
+  });
+
+  it("rejects a locale whose primary subtag is not a 2-letter segment (REVIEW-08 N4)", () => {
+    const json = fixtureJson();
+    json.classification.locales[0].tag = "eng";
+    expect(() => planSeedFromIntake(seedInput(json))).toThrow(/primary subtag 'eng'/);
   });
 
   it("AC-6: two calls and a key-permuted intake yield byte-identical seeds", () => {

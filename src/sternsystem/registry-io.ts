@@ -11,17 +11,12 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1284: default system state gains accessPinSuspended: null — the durable suspension marker read/written via the non-smart cache-clone store (Q-6)</item>
-  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966, RFC-0967, RFC-0981</history>
+  <item>REVIEW-CODE-2026-10-16-08 N6: writeSystemState threads the caller's WorkspaceIO through its internal git add/commit/push instead of falling back to the ambient adapter, and reports push failures through an injected warn channel.</item>
+  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966, RFC-0967, RFC-0981, RFC-1097, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -167,6 +162,7 @@ export async function writeSystemState(
   systemId: string,
   state: SystemState,
   io: WorkspaceIO = createDefaultIO().io,
+  onWarn?: (message: string) => void,
 ): Promise<void> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, systemId);
   const filePath = path.join(cacheClone, "system-state.yaml");
@@ -178,7 +174,7 @@ export async function writeSystemState(
   if (await io.exists(path.join(cacheClone, ".git"))) {
     try {
       await execOrThrow(io, "git", ["add", "system-state.yaml"], { cwd: cacheClone });
-      await cacheCloneCommit(cacheClone, `system-state: update ${systemId}`);
+      await cacheCloneCommit(cacheClone, `system-state: update ${systemId}`, undefined, io);
     } catch {
       // Git commit may fail if nothing changed — non-fatal
     }
@@ -192,20 +188,28 @@ export async function writeSystemState(
     try {
       let branch = "main";
       try {
-        const ref = await gitExec(cacheClone, "symbolic-ref --short refs/remotes/origin/HEAD", {
-          allowNonZero: true,
-        });
+        const ref = await gitExec(
+          cacheClone,
+          "symbolic-ref --short refs/remotes/origin/HEAD",
+          { allowNonZero: true },
+          io,
+        );
         branch = ref.replace("origin/", "") || "main";
       } catch {
         // No remote HEAD set — default to main
       }
       // RFC-0986: Use --force-with-lease — cache clone is the source of truth.
       // Fixes non-fast-forward errors when bare repo diverged after last fetch.
-      await gitExec(cacheClone, `push --force-with-lease origin HEAD:refs/heads/${branch}`);
+      await gitExec(
+        cacheClone,
+        `push --force-with-lease origin HEAD:refs/heads/${branch}`,
+        undefined,
+        io,
+      );
     } catch (err) {
       // Push may fail if no bare repo is configured or branch diverged — non-fatal
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[writeSystemState] git push failed for ${systemId}: ${msg}`);
+      (onWarn ?? console.warn)(`[writeSystemState] git push failed for ${systemId}: ${msg}`);
     }
   }
 }
