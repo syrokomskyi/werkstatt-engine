@@ -29,15 +29,16 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten â
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
+  <item>RFC-1306 review-r1: manifest write migrated ambient writeFileAtomic to context.io via writeFileIfChanged â€” dry-run/readonly interception + honest filesModified.</item>
   <history>RFC-0266</history>
 </CHANGE_SUMMARY>
 */
 
 import { createHash } from "node:crypto";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
-import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
+import { writeFileIfChanged } from "@warpgogol/werkstatt-shared/kernel";
 import { listStaticCommandSurface } from "./runtime.ts";
 import type {
   CheckResult,
@@ -389,8 +390,11 @@ export async function runCommandManifestGenerate(
 
   if (!dryRun) {
     const outputPath = manifestFilePath(context.workspaceRoot);
-    await context.io.mkdir(dirname(outputPath));
-    await writeFileAtomic(
+    // RFC-1306 review: write through the io port (atomic + mkdir built in) so
+    // the artifact write lands in filesModified, and skip byte-identical
+    // rewrites so a synced tree reports zero changes.
+    await writeFileIfChanged(
+      context.io,
       outputPath,
       `${buildGeneratedHeader({ filePath: MANIFEST_RELATIVE_PATH, ownerCommand: "command.manifest.generate" })}${yamlStringify(manifest)}\n`,
     );

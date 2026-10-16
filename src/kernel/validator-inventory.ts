@@ -24,16 +24,17 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 Scheduler: collectErrors option on executeScheduledSteps — read-only steps (ScheduledStep.readOnly, executor-resolved from mutatesState === false) run after dependency failures with ranAfterFailedDependency annotation; ranTainted set propagates taint transitively so mutating dependents still skip. Executor: mergeCollectErrorsOption OR-merges PipelineDeclaration.collectErrors with the CLI flag at registry resolution; readOnly annotated post-buildSchedule; taint flag copied to step reports; tainted failures marked in pretty output. Contracts: PipelineDeclaration.collectErrors, KernelExecutionReport.ranAfterFailedDependency, pipelines maps store full declarations. Declarations: collectErrors on validation-gate registrations (build.post, check, build.check, compass, integrity.release in the workpiece template; packages.check in checks module). Tests: 10 new cases covering AC-1..AC-6 plus transitive taint.</item>
   <item>RFC-1200: add a11y.axe.probe pre-deploy axe probe and register in postbuild pipeline</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
+  <item>RFC-1306 review-r1: inventory write migrated ambient writeFileAtomic to context.io via writeFileIfChanged — dry-run/readonly interception + honest filesModified.</item>
   <history>RFC-0963, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
 // @ai-invariant: The inventory is generated from the live registry only — never hand-edit the generated.yaml or seed entries from static lists.
 
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
-import { writeFileAtomic } from "@warpgogol/werkstatt-shared/kernel";
+import { writeFileIfChanged } from "@warpgogol/werkstatt-shared/kernel";
 import { loadPipelineBudgets } from "./pipeline-budgets.ts";
 import { getOrBuildWorkspaceRegistry } from "./runtime/registry-cache.ts";
 import type {
@@ -218,8 +219,9 @@ export async function runValidatorInventoryGenerate(
 
   if (!dryRun) {
     const outputPath = inventoryFilePath(context.workspaceRoot);
-    await context.io.mkdir(dirname(outputPath));
-    await writeFileAtomic(outputPath, content);
+    // RFC-1306 review: io-port write (atomic + mkdir built in) so the write is
+    // recorded in filesModified; skip byte-identical rewrites.
+    await writeFileIfChanged(context.io, outputPath, content);
   }
 
   const summaryParts = [

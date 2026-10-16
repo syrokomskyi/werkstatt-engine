@@ -14,20 +14,12 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
-
-Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
-follows the parsed selector. Guard renamed assertAllSitesAllowed ->
-assertAllFlagAccepted, message updated. 417 declaration sites + type
-surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
-  <item>RFC-1231: step 2 — allSites context carrier + flags.all injection
-
-KernelRuntimeContext.allSites populated from options.allSites at all three executor context sites (workspace path, app-scope fast path, fallback registry path). executeRegisteredCommand injects input.flags.all = true when context.allSites and the command declares the flag — after flag resolution, before the RFC-1133 cache-key computation so cached and fresh executions see identical flags.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
   <item>RFC-1303: review REVIEW-CODE-2026-10-16-02 — scanner moves to werkstatt-shared/node (IO-01), workpieceEnv hashes into envDigest, saveCache tolerates KERNEL-META-01, ENV-INPUT-02 coverage notice, ratchet path-arg tightening</item>
-  <item>RFC-1306: executeRegisteredCommand populates ctx.invoke — thin wrapper over executeKernelCommand inheriting workspaceRoot/site/output/dryRun/io policy.</item>
-  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126, RFC-1133, RFC-1149</history>
+  <item>RFC-1306: executeRegisteredCommand populates ctx.invoke — thin wrapper over executeKernelCommand inheriting workspaceRoot/site/output/dryRun/io policy; review-r1: executionContext is always a fresh object (no caller aliasing).</item>
+  <item>RFC-1306: review-r1 — io-native writes, cacheable off on chain generators, EVIDENCE-SYNC-02 on invoke throws</item>
+  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126, RFC-1133, RFC-1149, RFC-1231</history>
 </CHANGE_SUMMARY>
 */
 
@@ -374,8 +366,10 @@ export async function executeRegisteredCommand(
     // Real run — use context.fileIntents (from createDefaultIO's tracing).
     capturedIntents = context.fileIntents;
   }
-  const executionContext: KernelRuntimeContext =
-    effectiveIo === context.io ? context : { ...context, io: effectiveIo };
+  // Always a fresh object — the invoke port must never alias the caller's
+  // context (fo-review RFC-1306: assignment landed on the shared object when
+  // io was unchanged, on a copy otherwise).
+  const executionContext: KernelRuntimeContext = { ...context, io: effectiveIo };
 
   // RFC-1306: sibling-command invocation port — delegates by name through
   // executeKernelCommand so the child resolves its own flags and io adapter

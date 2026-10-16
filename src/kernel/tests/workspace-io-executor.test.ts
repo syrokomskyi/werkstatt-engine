@@ -130,14 +130,18 @@ export default {
       {
         name: "fixture.echo.flag",
         modulePath: "test",
-        description: "RFC-1306: returns input.flags.msg — proves invoke flag serialization",
+        description: "RFC-1306: echoes input.flags — proves invoke flag serialization for all kinds",
         scope: "workspace",
         mutatesState: false,
         flags: {
           msg: { kind: "string", description: "Echo this value" },
+          flag: { kind: "boolean", description: "Boolean true round-trip" },
+          off: { kind: "boolean", description: "Boolean false round-trip" },
+          list: { kind: "string[]", description: "Array round-trip" },
+          skip: { kind: "string", description: "Must stay absent when undefined" },
         },
         async execute(input) {
-          return { exitCode: 0, data: { msg: input.flags.msg } };
+          return { exitCode: 0, data: { flags: input.flags } };
         },
       },
       {
@@ -148,10 +152,16 @@ export default {
         mutatesState: false,
         async execute(_input, context) {
           if (!context.invoke) return { exitCode: 1, data: { invokeMissing: true } };
-          const report = await context.invoke("fixture.echo.flag", { msg: "hello-sync" });
+          const report = await context.invoke("fixture.echo.flag", {
+            msg: "a=b c",
+            flag: true,
+            off: false,
+            list: ["x", "y"],
+            skip: undefined,
+          });
           return {
             exitCode: 0,
-            data: { childOk: report.ok, childExit: report.exitCode, msg: report.data?.msg },
+            data: { childOk: report.ok, childExit: report.exitCode, flags: report.data?.flags },
           };
         },
       },
@@ -385,10 +395,21 @@ test(
       });
       const single = Array.isArray(report) ? report[0]! : report;
       expect(single.ok).toBe(true);
-      const data = single.data as { childOk: boolean; childExit: number; msg: string };
+      const data = single.data as {
+        childOk: boolean;
+        childExit: number;
+        flags: Record<string, unknown>;
+      };
       expect(data.childOk).toBe(true);
       expect(data.childExit).toBe(0);
-      expect(data.msg).toBe("hello-sync");
+      // Every flag kind round-trips through argv serialization: string with
+      // "=" and a space, boolean true/false, string[] accumulation, and
+      // undefined dropped entirely.
+      expect(data.flags.msg).toBe("a=b c");
+      expect(data.flags.flag).toBe(true);
+      expect(data.flags.off).toBe(false);
+      expect(data.flags.list).toEqual(["x", "y"]);
+      expect("skip" in data.flags).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
