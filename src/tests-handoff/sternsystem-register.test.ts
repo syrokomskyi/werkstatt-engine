@@ -8,6 +8,7 @@
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N1/N2: pre-existing content/refs/remote-branch survival on rollback + unborn-HEAD ref cleanup.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: non-git dir survival, remote-branch create-vs-rewind differentiation, dirty-worktree and seed-path-collision refusal.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -403,4 +404,245 @@ test("register rejects a non-conventional mirrors[0] before any write", async ()
       makeContext(workspaceRoot),
     ),
   ).rejects.toThrow(/mirrors\[0\] must be the conventional/);
+});
+
+test("register preserves a pre-existing non-git system dir and restores captured bytes (REVIEW-09 N8)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  // systems-cache/dp7 pre-exists WITHOUT .git and holds foreign content plus a
+  // pre-existing system-config.yaml — rollback must leave all of it in place.
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  await mkdir(cacheDir, { recursive: true });
+  const preConfig = "schemaVersion: '1.0.0'\nid: dp7\npreExisting: true\n";
+  await writeFile(join(cacheDir, "system-config.yaml"), preConfig, "utf8");
+  await writeFile(join(cacheDir, "operator-notes.txt"), "do not lose me\n", "utf8");
+  const preState =
+    'schemaVersion: "1.0.0"\nsystemId: dp7\ncurrentMission: "dp7-m000000"\nlastRelease: null\n';
+  await writeFile(join(cacheDir, "system-state.yaml"), preState, "utf8");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  // The pre-existing dir survives; register's files are gone; captured bytes
+  // are restored verbatim.
+  expect(existsSync(cacheDir)).toBe(true);
+  expect(execSync("cat operator-notes.txt", { cwd: cacheDir }).toString()).toBe("do not lose me\n");
+  expect(execSync("cat system-config.yaml", { cwd: cacheDir }).toString()).toBe(preConfig);
+  expect(execSync("cat system-state.yaml", { cwd: cacheDir }).toString()).toBe(preState);
+  expect(existsSync(join(cacheDir, "src", "content"))).toBe(false);
+  expect(existsSync(join(cacheDir, "system.pin.json"))).toBe(false);
+});
+
+test("register deletes a remote branch it created and leaves the remote clean (REVIEW-09 N9)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  const remoteDir = join(workspaceRoot, "..", "systems-git", "dp7.git");
+  await mkdir(cacheDir, { recursive: true });
+  await mkdir(remoteDir, { recursive: true });
+  const git = (args: string, cwd = cacheDir) =>
+    execSync(`git ${args}`, { cwd, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init --bare -b main", remoteDir);
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+  await writeFile(join(cacheDir, "README.md"), "pre-register\n", "utf8");
+  git("add -A");
+  git('commit -m "pre-register"');
+  const preSha = git("rev-parse HEAD");
+  // Remote exists but has NO branches — register's push creates refs/heads/main.
+  git(`remote add origin ${remoteDir}`);
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  expect(git("rev-parse HEAD")).toBe(preSha);
+  // The register-created remote branch is gone — the remote is back to empty.
+  expect(git("ls-remote origin 'refs/heads/*'")).toBe("");
+});
+
+test("register leaves a diverged remote branch untouched when its pushes were rejected (REVIEW-09 N9)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  const remoteDir = join(workspaceRoot, "..", "systems-git", "dp7.git");
+  const seederDir = join(workspaceRoot, "..", "systems-git", "dp7-seeder");
+  await mkdir(cacheDir, { recursive: true });
+  await mkdir(remoteDir, { recursive: true });
+  await mkdir(seederDir, { recursive: true });
+  const git = (args: string, cwd = cacheDir) =>
+    execSync(`git ${args}`, { cwd, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init --bare -b main", remoteDir);
+  // Seed the remote with a commit the register clone does NOT have.
+  git("init -b main", seederDir);
+  git("config user.email test@test", seederDir);
+  git("config user.name test", seederDir);
+  await writeFile(join(seederDir, "remote-only.txt"), "remote history\n", "utf8");
+  git("add -A", seederDir);
+  git('commit -m "remote seed"', seederDir);
+  const remoteSha = git("rev-parse HEAD", seederDir);
+  git(`remote add origin ${remoteDir}`, seederDir);
+  git("push origin main", seederDir);
+  // Register's clone sits on an unrelated local commit — every register push
+  // fails non-fast-forward, so the remote must stay at remoteSha.
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+  await writeFile(join(cacheDir, "README.md"), "pre-register\n", "utf8");
+  git("add -A");
+  git('commit -m "pre-register"');
+  const preSha = git("rev-parse HEAD");
+  git(`remote add origin ${remoteDir}`);
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  expect(git("rev-parse HEAD")).toBe(preSha);
+  // The remote branch is exactly where it was — remote-unique history kept.
+  expect(git("rev-parse refs/heads/main", remoteDir)).toBe(remoteSha);
+  expect(git(`cat-file -p ${remoteSha}:remote-only.txt`, remoteDir)).toBe("remote history");
+});
+
+test("register refuses to run on a dirty cache clone before any write (REVIEW-09 N12)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  await mkdir(cacheDir, { recursive: true });
+  const git = (args: string) =>
+    execSync(`git ${args}`, { cwd: cacheDir, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+  await writeFile(join(cacheDir, "README.md"), "pre-register\n", "utf8");
+  git("add -A");
+  git('commit -m "pre-register"');
+  // Uncommitted edit on a tracked file — reset --hard would destroy it.
+  await writeFile(join(cacheDir, "README.md"), "uncommitted work\n", "utf8");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  await expect(
+    runSternsystemRegister(
+      makeInput({
+        id: "dp7",
+        cosmicStar: "Vega",
+        mirrors: "../systems-cache/dp7:non-bare",
+        intake: "onboarding/dp7/.input/intake",
+        biome: "dp7-03",
+      }),
+      makeContext(workspaceRoot),
+    ),
+  ).rejects.toThrow(/uncommitted changes/);
+  vi.restoreAllMocks();
+  // Refused before the first write — the operator's edit is intact.
+  expect(execSync("cat README.md", { cwd: cacheDir }).toString()).toBe("uncommitted work\n");
+});
+
+test("register refuses to overwrite a pre-existing file at a planned seed path (REVIEW-09 N12)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  await mkdir(join(cacheDir, "src", "content"), { recursive: true });
+  const preSystem = "---\ntitle: existing system doc\n---\npre-existing\n";
+  await writeFile(join(cacheDir, "src", "content", "system.md"), preSystem, "utf8");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("unreachable"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  // The collision refused the write — and rollback only removes paths register
+  // actually wrote, so the pre-existing file is still there verbatim.
+  expect(execSync("cat src/content/system.md", { cwd: cacheDir }).toString()).toBe(preSystem);
 });

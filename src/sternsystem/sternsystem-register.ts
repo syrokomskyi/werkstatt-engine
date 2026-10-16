@@ -30,6 +30,7 @@ review records, or gate flips authored. Canary C11 active.</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N1/N2/N6/N7: rollback is ref-scoped — only refs absent from the pre-register snapshot are deleted, file-level deletes run before the git rewind, and captured bytes restore pre-existing config/state/pin that never reached a commit. The scaffold commit stages only register's own paths so untracked pre-existing files survive reset --hard. writeSystemConfig moves inside the guarded try; all forward git ops take the injected io; the scaffold push derives its branch from the captured origin HEAD.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: remote surgery is anchored on a pre-register ls-remote snapshot — a register-created remote branch is deleted (in place on local-path mirrors where receive-pack refuses), a moved pre-existing branch is restored to its captured sha with a lease pinned to the observed sha, and an untouched remote is left alone. Rollback removes only the seed paths register actually wrote, refuses to run on a dirty worktree, and a pre-existing clone dir is never deleted.</item>
   <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293</history>
 </CHANGE_SUMMARY>
 */
@@ -211,11 +212,25 @@ async function writeSeedFiles(
   systemDir: string,
   plan: IntakeSeedPlan,
   io: WorkspaceIO,
+  written: string[],
 ): Promise<void> {
+  // Refuse to overwrite anything already on disk — a pre-existing file at a
+  // planned path is not register's to clobber, and rollback must never delete
+  // it (REVIEW-CODE-2026-10-16-09 N12). Checked before the first write so a
+  // collision leaves zero partial output.
+  for (const file of plan.files) {
+    const target = join(systemDir, ...file.path.split("/"));
+    if (await io.exists(target)) {
+      throw new Error(
+        `[sternsystem.register] seed path already exists: ${file.path} — refusing to overwrite pre-existing content`,
+      );
+    }
+  }
   for (const file of plan.files) {
     const target = join(systemDir, ...file.path.split("/"));
     await io.mkdir(join(target, ".."));
     await io.writeFile(target, file.content);
+    written.push(file.path);
   }
 }
 
@@ -246,15 +261,15 @@ async function rollbackPin(systemDir: string, io: WorkspaceIO): Promise<void> {
   }
 }
 
-/** Remove every seeded file + dirs register created; pre-existing content stays. */
+/** Remove the seeded files register actually wrote + dirs it created; pre-existing content stays. */
 async function rollbackSeedFiles(
   systemDir: string,
-  plan: IntakeSeedPlan,
+  seededPaths: string[],
   io: WorkspaceIO,
 ): Promise<void> {
   const parentDirs = new Set<string>();
-  for (const file of plan.files) {
-    const target = join(systemDir, ...file.path.split("/"));
+  for (const filePath of seededPaths) {
+    const target = join(systemDir, ...filePath.split("/"));
     if (await io.exists(target)) {
       await io.rm(target, { recursive: true });
     }
@@ -283,11 +298,19 @@ async function rollbackContent(systemDir: string, io: WorkspaceIO): Promise<void
   }
 }
 
-async function rollbackSystemDirIfEmpty(systemDir: string, io: WorkspaceIO): Promise<void> {
-  if (!(await io.exists(systemDir))) return;
+/**
+ * Remove the clone dir only when it is git-less AND empty. Callers invoke this
+ * solely for dirs register itself created — a pre-existing dir is never
+ * removed, no matter its contents (REVIEW-CODE-2026-10-16-09 N8). Returns
+ * whether the dir was removed so the caller can log the residue.
+ */
+async function rollbackSystemDirIfEmpty(systemDir: string, io: WorkspaceIO): Promise<boolean> {
+  if (!(await io.exists(systemDir))) return true;
   const gitDir = join(systemDir, ".git");
-  if (await io.exists(gitDir)) return;
+  if (await io.exists(gitDir)) return false;
+  if ((await io.readdir(systemDir)).length !== 0) return false;
   await io.rm(systemDir, { recursive: true });
+  return true;
 }
 
 /** Git state captured before register's first write — rollback trusts only this. */
@@ -300,6 +323,18 @@ interface PreRegisterGit {
   refs: string[];
   /** The branch register pushes to (origin/HEAD-derived, falls back to "main"). */
   branch: string;
+  /**
+   * Non-untracked entries in git status at capture — uncommitted tracked or
+   * staged work register would destroy with reset --hard on rollback. Register
+   * refuses before the first write (REVIEW-CODE-2026-10-16-09 N12).
+   */
+  dirty: boolean;
+  /**
+   * origin's refs/heads/* at capture (sha by refname). Null = ls-remote was
+   * unreachable/failed — rollback then skips ALL remote surgery rather than
+   * guess at remote state (REVIEW-CODE-2026-10-16-09 N9).
+   */
+  remoteRefs: Record<string, string> | null;
 }
 
 /**
@@ -310,7 +345,14 @@ interface PreRegisterGit {
  * branches it cannot attribute to register (REVIEW-CODE-2026-10-16-08 N1).
  */
 async function capturePreRegisterGit(systemDir: string, io: WorkspaceIO): Promise<PreRegisterGit> {
-  const failed: PreRegisterGit = { captured: false, sha: null, refs: [], branch: "main" };
+  const failed: PreRegisterGit = {
+    captured: false,
+    sha: null,
+    refs: [],
+    branch: "main",
+    dirty: false,
+    remoteRefs: null,
+  };
   if (!(await io.exists(join(systemDir, ".git")))) {
     return { ...failed, captured: true };
   }
@@ -327,6 +369,15 @@ async function capturePreRegisterGit(systemDir: string, io: WorkspaceIO): Promis
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
+    // Tracked modifications or staged entries would be destroyed by the
+    // rollback's reset --hard — register refuses to run at all (N12). Untracked
+    // (??) entries are safe: reset --hard never touches them and the
+    // pathspec-scoped add never stages them.
+    const status = await git(["status", "--porcelain"]);
+    if (status.exitCode !== 0) return failed;
+    const dirty = status.stdout
+      .split("\n")
+      .some((line) => line.trim() !== "" && !line.startsWith("??"));
     const head = await git(["rev-parse", "HEAD"]);
     let sha: string | null = null;
     if (head.exitCode === 0) {
@@ -337,7 +388,23 @@ async function capturePreRegisterGit(systemDir: string, io: WorkspaceIO): Promis
       const sym = await git(["symbolic-ref", "-q", "HEAD"]);
       if (!(sym.exitCode === 0 && sym.stdout.trim().startsWith("refs/heads/"))) return failed;
     }
-    return { captured: true, sha, refs, branch };
+    // Remote refs at capture — the rollback's remote surgery trusts only this
+    // snapshot, never possibly-stale remote-tracking refs (N9). An unreachable
+    // or unconfigured origin yields null → remote steps are skipped with a
+    // diagnostic rather than guessed.
+    let remoteRefs: Record<string, string> | null = null;
+    const remote = await git(["ls-remote", "origin", "refs/heads/*"]);
+    if (remote.exitCode === 0) {
+      remoteRefs = {};
+      for (const line of remote.stdout.split("\n")) {
+        const [rsha, rref] = line.split("\t");
+        const ref = rref?.trim();
+        if (rsha?.trim() && ref?.startsWith("refs/heads/")) {
+          remoteRefs[ref] = rsha.trim();
+        }
+      }
+    }
+    return { captured: true, sha, refs, branch, dirty, remoteRefs };
   } catch {
     return failed;
   }
@@ -367,6 +434,31 @@ async function rollbackGitHistory(
     return;
   }
   const git = (args: string[]) => io.exec("git", args, { cwd: systemDir, timeoutMs: 10000 });
+  // Delete a remote ref: push first; when the remote is a local-path mirror
+  // (the systems-git convention) whose HEAD names the ref, receive-pack's
+  // denyDeleteCurrent refuses — the operator owns the dir, so delete in place.
+  const tryDeleteRemoteRef = async (refname: string): Promise<void> => {
+    const del = await git(["push", "origin", `:${refname}`]);
+    if (del.exitCode === 0) return;
+    const url = await git(["remote", "get-url", "origin"]);
+    const configured = url.exitCode === 0 ? url.stdout.trim() : "";
+    const remotePath = configured.startsWith("file://")
+      ? configured.slice("file://".length)
+      : configured;
+    const resolved =
+      remotePath && !isAbsolute(remotePath) ? join(systemDir, remotePath) : remotePath;
+    if (resolved && (await io.exists(resolved))) {
+      const direct = await git(["-C", resolved, "update-ref", "-d", refname]);
+      if (direct.exitCode === 0) return;
+      diagnostics.push(
+        `rollback: in-place remote delete of ${refname} failed (non-fatal): ${direct.stderr.slice(0, 160)}`,
+      );
+      return;
+    }
+    diagnostics.push(
+      `rollback: remote delete of ${refname} failed (non-fatal): ${del.stderr.slice(0, 160)}`,
+    );
+  };
   try {
     if (pre.sha) {
       const reset = await git(["reset", "--hard", pre.sha]);
@@ -375,21 +467,58 @@ async function rollbackGitHistory(
           `rollback: git reset --hard ${pre.sha} failed: ${reset.stderr.slice(0, 160)}`,
         );
       }
-      // Rewind the remote branch register pushed to — the clone matched the
-      // pre-register HEAD, so the remote only carries register's pushes.
-      const push = await git([
-        "push",
-        "--force-with-lease",
-        "origin",
-        `HEAD:refs/heads/${pre.branch}`,
-      ]);
-      if (
-        push.exitCode !== 0 &&
-        !/does not appear to be|no origin|Could not read/.test(push.stderr)
-      ) {
+    }
+    // Rewind the remote branch register pushed to — anchored on the remote
+    // refs captured pre-register AND the remote's state right now, never on
+    // possibly-stale remote-tracking refs (REVIEW-CODE-2026-10-16-09 N9).
+    // Three cases: register created the remote branch → delete it; register
+    // moved a pre-existing branch → restore the captured sha with a lease
+    // pinned to the sha just observed; remote untouched → nothing to do.
+    const remoteKey = `refs/heads/${pre.branch}`;
+    if (pre.remoteRefs === null) {
+      diagnostics.push(
+        "rollback: remote refs were not captured — remote branch state left untouched",
+      );
+    } else {
+      const now = await git(["ls-remote", "origin", "refs/heads/*"]);
+      if (now.exitCode !== 0) {
         diagnostics.push(
-          `rollback: remote rewind push failed (non-fatal): ${push.stderr.slice(0, 160)}`,
+          `rollback: ls-remote failed — remote state unverifiable, remote left untouched (non-fatal): ${now.stderr.slice(0, 160)}`,
         );
+      } else {
+        const nowRefs: Record<string, string> = {};
+        for (const line of now.stdout.split("\n")) {
+          const [rsha, rref] = line.split("\t");
+          const ref = rref?.trim();
+          if (rsha?.trim() && ref?.startsWith("refs/heads/")) {
+            nowRefs[ref] = rsha.trim();
+          }
+        }
+        const preRemoteSha = pre.remoteRefs[remoteKey];
+        const nowSha = nowRefs[remoteKey];
+        if (nowSha !== undefined && preRemoteSha === undefined) {
+          // Register created this remote branch — delete it.
+          await tryDeleteRemoteRef(remoteKey);
+        } else if (nowSha !== undefined && preRemoteSha !== undefined && nowSha !== preRemoteSha) {
+          // Register moved a pre-existing remote branch — restore its captured
+          // sha, lease-asserted on the sha observed moments ago (a concurrent
+          // foreign push fails the lease instead of being clobbered).
+          const rew = await git([
+            "push",
+            `--force-with-lease=${remoteKey}:${nowSha}`,
+            "origin",
+            `${preRemoteSha}:${remoteKey}`,
+          ]);
+          if (rew.exitCode !== 0) {
+            diagnostics.push(
+              `rollback: remote rewind of ${remoteKey} to ${preRemoteSha.slice(0, 12)} failed (non-fatal): ${rew.stderr.slice(0, 160)}`,
+            );
+          }
+        } else if (nowSha === undefined && preRemoteSha !== undefined) {
+          diagnostics.push(
+            `rollback: remote branch ${remoteKey} vanished externally during register — left as-is`,
+          );
+        }
       }
     }
     // Delete only refs register created — pre-register refs are never touched,
@@ -409,15 +538,17 @@ async function rollbackGitHistory(
           );
           continue;
         }
-        const remote = await git(["push", "origin", `:${ref}`]);
-        if (
-          remote.exitCode !== 0 &&
-          !/does not appear to be|no origin|Could not read|unable to delete/.test(remote.stderr)
-        ) {
+        // Remote counterpart: delete only when the pre-snapshot proves the
+        // remote ref did not exist before register — a same-named remote
+        // branch predating register is not ours to remove (N9).
+        if (pre.remoteRefs === null) {
           diagnostics.push(
-            `rollback: remote delete of ${ref} failed (non-fatal): ${remote.stderr.slice(0, 160)}`,
+            `rollback: remote refs uncaptured — remote ${ref} (if any) left untouched`,
           );
+          continue;
         }
+        if (pre.remoteRefs[ref] !== undefined) continue;
+        await tryDeleteRemoteRef(ref);
       }
     }
     if (!pre.sha) {
@@ -487,7 +618,7 @@ export async function runSternsystemRegister(
   }
 
   if (isAmend) {
-    const _config = await readSystemConfig(workspaceRoot, id);
+    const _config = await readSystemConfig(workspaceRoot, id, context.io);
 
     if (owner) {
       // owner field not in systemConfigSchema — would need schema extension
@@ -541,7 +672,7 @@ export async function runSternsystemRegister(
   }
 
   // Check for existing system via discovery
-  const { systems: existingSystems } = await discoverSystems(workspaceRoot);
+  const { systems: existingSystems } = await discoverSystems(workspaceRoot, context.io);
 
   if (existingSystems.some((s) => s.id === id)) {
     throw new Error(`[sternsystem.register] id '${id}' already exists in ../systems-cache/`);
@@ -604,11 +735,23 @@ export async function runSternsystemRegister(
   const seedPlan = await prepareIntakeSeed({ id, cosmicStar, intakeDir, biomeId }, context);
 
   const systemDir = resolveMirrorPath(workspaceRoot, mirrors[0].path);
+  // A pre-existing clone dir is NEVER removed by rollback — only a dir
+  // register itself created is (REVIEW-CODE-2026-10-16-09 N8).
+  const systemDirExisted = await context.io.exists(systemDir);
   await context.io.mkdir(systemDir);
   // Capture the clone's git state before the first write so a failed
   // registration can distinguish register's own files/commits from anything
   // that was already there (REVIEW-CODE-2026-10-16-08 N1/N2).
   const preGit = await capturePreRegisterGit(systemDir, context.io);
+  // Uncommitted tracked or staged work would be destroyed by the rollback's
+  // reset --hard — refuse before the first write rather than risk it
+  // (REVIEW-CODE-2026-10-16-09 N12). The just-created dir is git-less, so a
+  // fresh clone can never trip this.
+  if (preGit.dirty) {
+    throw new Error(
+      `[sternsystem.register] cache clone has uncommitted changes — commit or clean ${systemDir} before registering`,
+    );
+  }
   const contentDirExisted = await context.io.exists(join(systemDir, "src", "content"));
   // Byte capture for files register overwrites — a pre-existing file that was
   // never committed cannot be restored by the git rewind alone (N2).
@@ -624,6 +767,9 @@ export async function runSternsystemRegister(
   let stateCreated = false;
   let missionOpened = false;
   let missionId: string | undefined;
+  // Paths register actually wrote — rollback removes ONLY these, never a
+  // pre-existing file that happens to share a planned path (REVIEW-09 N12).
+  const seededPaths: string[] = [];
 
   try {
     // Inside the guarded scope: a config-write failure must not orphan the
@@ -640,7 +786,7 @@ export async function runSternsystemRegister(
     const pinPath = pinResult.data!.pinPath;
 
     contentCreated = true;
-    await writeSeedFiles(systemDir, seedPlan, context.io);
+    await writeSeedFiles(systemDir, seedPlan, context.io, seededPaths);
     // readSystemState may throw on a malformed PRE-EXISTING state file — that
     // file must survive rollback untouched, so the flag arms only once
     // register itself is about to write.
@@ -815,7 +961,7 @@ export async function runSternsystemRegister(
     // tracked files to the pre-register state, so removing register's files
     // up front guarantees pre-existing content survives (REVIEW-08 N2).
     if (contentCreated) {
-      await rollbackSeedFiles(systemDir, seedPlan, context.io);
+      await rollbackSeedFiles(systemDir, seededPaths, context.io);
       // register created src/content entirely — the dir goes away; if it
       // pre-existed, only register's files were removed.
       if (!contentDirExisted) {
@@ -850,7 +996,16 @@ export async function runSternsystemRegister(
         `rollback: pre-existing file restore failed: ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
       );
     }
-    await rollbackSystemDirIfEmpty(systemDir, context.io);
+    // Only a dir register itself created is removed — and only when rollback
+    // left it empty; a pre-existing dir is never touched (REVIEW-09 N8).
+    if (!systemDirExisted) {
+      const removed = await rollbackSystemDirIfEmpty(systemDir, context.io);
+      if (!removed) {
+        diagnostics.push(
+          "rollback: system dir left in place — not empty after file-level rollback",
+        );
+      }
+    }
 
     diagnostics.push(
       `sternsystem.register failed: ${error instanceof Error ? error.message : String(error)}`,

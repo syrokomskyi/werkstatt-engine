@@ -16,6 +16,7 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
   <item>RFC-1284: default system state gains accessPinSuspended: null — the durable suspension marker read/written via the non-smart cache-clone store (Q-6)</item>
   <item>REVIEW-CODE-2026-10-16-08 N6: writeSystemState threads the caller's WorkspaceIO through its internal git add/commit/push instead of falling back to the ambient adapter, and reports push failures through an injected warn channel.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <item>REVIEW-CODE-2026-10-16-09 N11: writeSystemState pushes via array-args execOrThrow — the remote-derived branch name never reaches a shell-interpolated command string.</item>
   <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966, RFC-0967, RFC-0981, RFC-1097, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -200,11 +201,13 @@ export async function writeSystemState(
       }
       // RFC-0986: Use --force-with-lease — cache clone is the source of truth.
       // Fixes non-fast-forward errors when bare repo diverged after last fetch.
-      await gitExec(
-        cacheClone,
-        `push --force-with-lease origin HEAD:refs/heads/${branch}`,
-        undefined,
+      // Array-args exec — the remote-derived branch name must never reach a
+      // shell-interpolated command string (REVIEW-CODE-2026-10-16-09 N11).
+      await execOrThrow(
         io,
+        "git",
+        ["push", "--force-with-lease", "origin", `HEAD:refs/heads/${branch}`],
+        { cwd: cacheClone },
       );
     } catch (err) {
       // Push may fail if no bare repo is configured or branch diverged — non-fatal

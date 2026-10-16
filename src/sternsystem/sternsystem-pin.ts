@@ -10,6 +10,7 @@
   <item>RFC-0381: use shared pin-helpers for highestRfcId and snapshotCapabilities; case-insensitive RFC regex.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
+  <item>REVIEW-CODE-2026-10-16-09 N11: thread the caller's WorkspaceIO through config/ecosystem/rfc-head/capability reads and the pin + config writes — no ambient-io on the register-invoked path.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -58,7 +59,7 @@ export async function runSternsystemPin(
   const id = flagString(input, "id");
   if (!id) throw new Error("[sternsystem.pin] requires --id <system-id>");
 
-  const config = await readSystemConfigSmart(workspaceRoot, id);
+  const config = await readSystemConfigSmart(workspaceRoot, id, context.io);
 
   const cacheDir = resolveCacheClonePath(workspaceRoot, id);
   if (!(await context.io.exists(cacheDir))) {
@@ -85,11 +86,12 @@ export async function runSternsystemPin(
     }
   }
 
-  const platform = requestedPlatform ?? (await resolveCurrentEcosystem(workspaceRoot)).version;
-  const { commit } = await resolveCurrentEcosystem(workspaceRoot);
-  const rfcHead = await highestRfcId(workspaceRoot);
-  const platformSemanticHash = await resolvePlatformSemanticHash(workspaceRoot);
-  const capabilities = await snapshotCapabilities(workspaceRoot);
+  const platform =
+    requestedPlatform ?? (await resolveCurrentEcosystem(workspaceRoot, context.io)).version;
+  const { commit } = await resolveCurrentEcosystem(workspaceRoot, context.io);
+  const rfcHead = await highestRfcId(workspaceRoot, context.io);
+  const platformSemanticHash = await resolvePlatformSemanticHash(workspaceRoot, context.io);
+  const capabilities = await snapshotCapabilities(workspaceRoot, context.io);
 
   const pin: SystemPin = {
     schemaVersion: "1.0.0",
@@ -107,7 +109,7 @@ export async function runSternsystemPin(
   };
 
   systemPinSchema.parse(pin);
-  await atomicWriteFile(pinPath, JSON.stringify(pin, null, 2) + "\n");
+  await atomicWriteFile(pinPath, JSON.stringify(pin, null, 2) + "\n", context.io);
 
   // Update config: always activate on pin, update pinnedPlatform if changed
   let configChanged = false;
@@ -120,7 +122,7 @@ export async function runSternsystemPin(
     configChanged = true;
   }
   if (configChanged) {
-    await writeSystemConfigSmart(workspaceRoot, id, config);
+    await writeSystemConfigSmart(workspaceRoot, id, config, context.io);
   }
 
   logger.success(`[sternsystem.pin] pinned '${id}' to platform ${platform} (${rfcHead})`);
