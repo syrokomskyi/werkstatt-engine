@@ -17,6 +17,8 @@ sidecars, and the system-state onboarding provenance block.</purpose>
   <item>Every seeded file is serialized through canonical writers (sorted keys, RFC-0493 quoting) so the same intake yields byte-identical seeds (DNA-58).</item>
   <item>The seeded system.md carries the enforce gate triple (contractTerms, provenance, publication) plus legalJurisdiction — the born-valid contract, no downstream repair.</item>
   <item>Two entities resolving to one document path fail the plan — a silent overwrite is a validator defect, never a last-write-wins.</item>
+  <item>Two locale tags sharing a primary subtag fail the plan rather than silently overwriting an i18n entry, and a non-2-letter primary subtag is rejected — both would birth an invalid i18n config (REVIEW-08 N3/N4).</item>
+  <item>Seeded credit sidecars declare target.domain "business-profile" — the content tree the seeded asset physically lands in — so credits-gallery and material validators resolve the same path (REVIEW-08 N5).</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
