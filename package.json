@@ -246,6 +246,10 @@
       "types": "./src/intake/intake.module.ts",
       "default": "./src/intake/intake.module.ts"
     },
+    "./intake": {
+      "types": "./src/intake/intake-validate.ts",
+      "default": "./src/intake/intake-validate.ts"
+    },
     "./subdomain-module": {
       "types": "./src/subdomain/subdomain.module.ts",
       "default": "./src/subdomain/subdomain.module.ts"
