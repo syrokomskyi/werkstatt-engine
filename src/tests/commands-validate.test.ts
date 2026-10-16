@@ -21,6 +21,7 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <item>RFC-1304: AC-5 probes for CMDGEN-04/05 + review-r1 coverage — per-definition pairing (valid+dropped def), hybrid/factory satisfies, pragma-in-string non-suppression, CMD-SCAN-01 zero-corpus and unreadable-input via injected io.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -28,9 +29,16 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { runCommandsValidate } from "../plugin/commands-validate.ts";
+import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 function makeTempWorkspace(): string {
-  return mkdtempSync(join(process.cwd(), "tmp-commands-validate-"));
+  const root = mkdtempSync(join(process.cwd(), "tmp-commands-validate-"));
+  // RFC-1304 CMD-SCAN-01: missing scan roots are a coverage warning — fixture
+  // workspaces create all three roots so only the fixture's own files scan.
+  for (const pkg of ["werkstatt-engine", "werkstatt-site", "werkstatt-shared"]) {
+    mkdirSync(join(root, "packages", pkg, "src"), { recursive: true });
+  }
+  return root;
 }
 
 function writeHandlerFile(workspaceRoot: string, relPath: string, content: string): void {
@@ -481,5 +489,106 @@ export const looksLikeDef: KernelCommandDefinition = buildCommand();
     const result = await runCommandsValidate(workspaceRoot, "error");
     const violations = result.data?.diagnostics ?? [];
     expect(violations.some((d) => d.ruleId === "CMDGEN-04")).toBe(false);
+  });
+
+  it("RFC-1304 r1: a file with one valid and one unpaired definition still emits CMDGEN-04", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-site/src/checks/mixed.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const goodOne: KernelCommandDefinition = {
+  name: "x.good",
+  modulePath: "packages/werkstatt-site/src/checks/mixed.ts",
+  description: "ok",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0 }),
+};
+export const droppedOne: KernelCommandDefinition = buildIt();
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMDGEN-04")).toBe(true);
+  });
+
+  it("RFC-1304 r1: hybrid ': T = {…} satisfies KCD' extracts clean, factory satisfies is suspect", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-site/src/checks/hybrid.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const hybridDef: KernelCommandDefinition = {
+  name: "x.hybrid",
+  modulePath: "packages/werkstatt-site/src/checks/hybrid.ts",
+  description: "hybrid",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0 }),
+} satisfies KernelCommandDefinition;
+`,
+    );
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-site/src/checks/factory.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const factoryDef = buildCommand() satisfies KernelCommandDefinition;
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    const suspect = violations.filter((d) => d.ruleId === "CMDGEN-04");
+    // exactly one suspect — the literal-less factory file, not the hybrid
+    expect(suspect.length).toBe(1);
+    expect(suspect[0]!.file).toContain("factory.ts");
+  });
+
+  it("RFC-1304 r1: a cmdgen-ignore line inside a template literal does not suppress", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-site/src/checks/fake-pragma.ts",
+      `const tpl = \`
+// cmdgen-ignore
+\`;
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const hidden: KernelCommandDefinition = buildCommand();
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMDGEN-04")).toBe(true);
+  });
+
+  it("RFC-1304 r1: zero scanned files fails closed with CMD-SCAN-01", async () => {
+    // workspaceRoot has no packages/*/src roots at all.
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMD-SCAN-01" && d.severity === "error")).toBe(true);
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("RFC-1304 r1: an unreadable file emits a CMD-SCAN-01 warning, not silence", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/readable.ts",
+      `${HANDLER_HEADER}
+export async function runOk() {
+  return { exitCode: 0, summary: "[x] ok" };
+}
+`,
+    );
+    const failingIo = {
+      ...createDefaultIO().io,
+      readFile: (p: string) =>
+        p.endsWith("readable.ts")
+          ? Promise.reject(new Error("EACCES"))
+          : createDefaultIO().io.readFile(p),
+    };
+
+    const result = await runCommandsValidate(workspaceRoot, "error", failingIo);
+    const violations = result.data?.diagnostics ?? [];
+    expect(
+      violations.some((d) => d.ruleId === "CMD-SCAN-01" && d.file?.includes("readable.ts")),
+    ).toBe(true);
   });
 });

@@ -21,6 +21,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <item>RFC-1304: shared fail-loud scan — CMDGEN-05 forbidden-codepoint sweep on raw source, CMDGEN-04 per-definition suspect pairing over the site-src corpus via werkstatt-shared/kernel/command-source-scan.ts (line-anchored comment-aware pragma), CMD-SCAN-01 warnings on unreadable dirs/files and an error on a zero-file corpus; io is injectable for coverage-failure tests.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -31,11 +32,12 @@ import type {
   KernelNextStep,
 } from "@warpgogol/werkstatt-shared/kernel";
 import {
-  fileHasCommandSignal,
+  CMDGEN_IGNORE_RE,
   findDefinitionAnchors,
   maskSource,
   NON_COMMAND_ALLOWLIST,
   scanForbiddenCodepoints,
+  unpairedCommandSignals,
 } from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
@@ -69,7 +71,6 @@ const FILE_DETECTION_PATTERNS = [
   /\bKernelCommandDefinition\b/,
 ];
 
-const CMDGEN_IGNORE_RE = /\/\/\s*cmdgen-ignore/;
 // The CMDGEN-04 suspect net only applies to the generator's corpus — site src.
 // Engine/shared commands register via registry.registerCommand (a different,
 // non-anchored pattern), so the signal would false-positive there.
@@ -265,7 +266,20 @@ async function scanFile(
   workspaceRoot: string,
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<Diagnostic[]> {
-  const content = await io.readFile(filePath).catch(() => "");
+  // RFC-1304 CMD-SCAN-01: an unreadable input is a coverage gap — warn loudly
+  // instead of treating the file as empty and attesting it scanned clean.
+  const content = await io.readFile(filePath).catch(() => undefined);
+  if (content === undefined) {
+    return [
+      {
+        ruleId: "CMD-SCAN-01",
+        severity: "warning",
+        message: `File could not be read and was skipped: ${relative(workspaceRoot, filePath)}`,
+        file: relative(workspaceRoot, filePath),
+        fixHint: `Fix the unreadable file (permissions, encoding, dangling symlink) — the scanner cannot attest coverage over inputs it cannot open (RFC-1304).`,
+      },
+    ];
+  }
   if (!content) return [];
 
   const diagnostics: Diagnostic[] = [];
@@ -288,22 +302,33 @@ async function scanFile(
   }
 
   // RFC-1304 CMDGEN-04: re-run the generator's suspect-file signal over its own
-  // corpus, so a file unreachable during generation is still caught here.
-  if (posixRel.startsWith(SITE_SRC_PREFIX) && !CMDGEN_IGNORE_RE.test(content)) {
+  // corpus, so a file unreachable during generation is still caught here. The
+  // pairing is per-definition: unpaired annotation/satisfies evidence flags the
+  // file even when earlier definitions extracted fine.
+  if (
+    posixRel.startsWith(SITE_SRC_PREFIX) &&
+    !CMDGEN_IGNORE_RE.test(maskSource(content, { keepComments: true }))
+  ) {
     const masked = maskSource(content);
+    const anchors = findDefinitionAnchors(masked);
+    const signals = unpairedCommandSignals(masked, anchors);
     if (
-      findDefinitionAnchors(masked).length === 0 &&
-      fileHasCommandSignal(masked) &&
+      signals.unpaired > 0 &&
       !(
         posixRel.startsWith(SITE_CHECKS_PREFIX) &&
         NON_COMMAND_ALLOWLIST.has(posixRel.slice(SITE_CHECKS_PREFIX.length))
       )
     ) {
+      const line =
+        signals.firstOffset >= 0
+          ? content.slice(0, signals.firstOffset).split("\n").length
+          : undefined;
       diagnostics.push({
         ruleId: "CMDGEN-04",
         severity: "error",
-        message: `File appears to contain a command definition but none was extracted in ${relPath}`,
+        message: `File appears to contain a command definition that was not extracted in ${relPath}`,
         file: relPath,
+        line,
         fixHint: `Check for unmaskable constructs (nested template literals, control bytes) or add a // cmdgen-ignore pragma if the file is not a command source (RFC-1304).`,
       });
     }
@@ -373,19 +398,29 @@ async function scanDirectory(
 ): Promise<{ diagnostics: Diagnostic[]; scannedFiles: number }> {
   let scannedFiles = 0;
   const allDiagnostics: Diagnostic[] = [];
-  const entries = await io.readdir(dir).catch(() => []);
+  const entries = await io.readdir(dir).catch(() => undefined);
+  if (entries === undefined) {
+    allDiagnostics.push({
+      ruleId: "CMD-SCAN-01",
+      severity: "warning",
+      message: `Directory could not be listed and was skipped: ${relative(workspaceRoot, dir)}`,
+      file: relative(workspaceRoot, dir),
+      fixHint: `Fix the unreadable directory — the scanner cannot attest coverage over inputs it cannot list (RFC-1304).`,
+    });
+    return { diagnostics: allDiagnostics, scannedFiles };
+  }
 
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
 
     if (entry.isDirectory) {
       if (EXCLUDE_DIRS.has(entry.name)) continue;
-      const subResult = await scanDirectory(fullPath, workspaceRoot);
+      const subResult = await scanDirectory(fullPath, workspaceRoot, io);
       scannedFiles += subResult.scannedFiles;
       allDiagnostics.push(...subResult.diagnostics);
     } else if (entry.name.endsWith(".ts") && !shouldExcludeFile(entry.name)) {
       scannedFiles++;
-      const fileDiagnostics = await scanFile(fullPath, workspaceRoot);
+      const fileDiagnostics = await scanFile(fullPath, workspaceRoot, io);
       allDiagnostics.push(...fileDiagnostics);
     }
   }
@@ -405,6 +440,7 @@ function defaultFailNextSteps(): KernelNextStep[] {
 export async function runCommandsValidate(
   workspaceRoot: string,
   mode: "error" | "warning" = "error",
+  io: WorkspaceIO = createDefaultIO().io,
 ): Promise<KernelCommandResult<CommandsValidateResult>> {
   const scanRoots = [
     join(workspaceRoot, "packages", "werkstatt-engine", "src"),
@@ -416,9 +452,20 @@ export async function runCommandsValidate(
   let totalScanned = 0;
 
   for (const root of scanRoots) {
-    const result = await scanDirectory(root, workspaceRoot);
+    const result = await scanDirectory(root, workspaceRoot, io);
     allDiagnostics.push(...result.diagnostics);
     totalScanned += result.scannedFiles;
+  }
+
+  // RFC-1304 CMD-SCAN-01: a validator that scanned zero files would attest a
+  // clean corpus while covering nothing — fail closed on an empty input set.
+  if (totalScanned === 0) {
+    allDiagnostics.push({
+      ruleId: "CMD-SCAN-01",
+      severity: "error",
+      message: `No source files were scanned under the expected package roots — workspace layout drift or glob failure`,
+      fixHint: `Check packages/*/src exists and is readable; the validator cannot attest coverage over an empty corpus (RFC-1304).`,
+    });
   }
 
   if (mode === "warning") {

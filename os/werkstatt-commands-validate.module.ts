@@ -22,6 +22,7 @@ follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
+  <item>RFC-1304: shared fail-loud scanner — CMDGEN-04/05 diagnostics via werkstatt-shared/kernel/command-source-scan.ts, CMD-SCAN-01 coverage notices, rules[] lists every emitted rule id</item>
   <history>RFC-0903</history>
 </CHANGE_SUMMARY>
 */
@@ -46,7 +47,14 @@ export const werkstattCommandsValidateModule: ModuleExport = {
       name: "werkstatt.commands.validate",
       mutatesState: false,
       contract: "werkstatt",
-      rules: ["CMDGEN-04", "CMDGEN-05"],
+      rules: [
+        "CMD-OUTPUT-01",
+        "CMD-OUTPUT-02",
+        "CMD-OUTPUT-03",
+        "CMDGEN-04",
+        "CMDGEN-05",
+        "CMD-SCAN-01",
+      ],
       modulePath: "packages/werkstatt-engine/os/werkstatt-commands-validate.module.ts",
       description:
         "Statically analyze kernel command handler return statements for DNA-82 compliance: explicit exitCode, [command.name]-prefixed summary, nextSteps on failure. Enforces RFC-0903.",
