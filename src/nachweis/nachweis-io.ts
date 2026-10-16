@@ -9,8 +9,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1279: scope bordbuch-derived gate V2 conditions to the record slug inside evaluateGateV2 — recordApproved now reads metadata.approved === true; entries without metadata.slug satisfy no condition (fail-closed, kills cross-record attestation contamination).</item>
-  <item>RFC-0886: add display-consent-consistent gate condition, per-aspect consent evaluation in evaluateGateV2, resolveNachweisScreenshotR2Path, NachweisScreenshotUploadResult, extend NachweisConsentUpdateResult with scope, extend NachweisManifestEntry with display and websiteUrl.</item>
   <item>RFC-0890: add resolveNachweisRawScreenshotR2Path, resolveNachweisRawScreenshotLocalPath, parseCaptureXFilename, detectImageMetadata, NachweisScreenshotIngestResult.</item>
   <item>RFC-0891: add resolveNachweisScreenshotDisplayR2Path, downloadFromR2, NachweisScreenshotProcessResult.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -19,7 +17,8 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0707, RFC-0713, RFC-0714, RFC-0872, RFC-0873</history>
+  <item>RFC-1307: step 1 — shared PBP layout map, canonical writer, typed onboarding state</item>
+  <history>RFC-0707, RFC-0713, RFC-0714, RFC-0872, RFC-0873, RFC-0886, RFC-1279</history>
 </CHANGE_SUMMARY>
 */
 
@@ -31,6 +30,7 @@ import { loadSystemManifest } from "@warpgogol/werkstatt-shared/content";
 import { createR2Client, resolveR2ConfigFromEnv, MissingEnvError } from "../evidence/r2-client.ts";
 import { resolveCacheClonePath, resolveActiveWorkpieceDir } from "../sternsystem/registry-io.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { pbpEntityDir } from "@warpgogol/werkstatt-shared/onboarding/pbp-layout";
 
 const NACHWEIS_BUCKET = "nachweis";
 
@@ -491,14 +491,8 @@ export function isMissingEnvError(err: unknown): err is MissingEnvError {
   return err instanceof MissingEnvError;
 }
 
-const PBP_ENTITY_DIR_MAP: Record<string, string> = {
-  "evidence-source": "trust/evidence",
-  consent: "trust/consents",
-  claim: "trust/claims",
-};
-
 export function resolvePbpEntityDir(cachePath: string, lang: string, entityType: string): string {
-  const subDir = PBP_ENTITY_DIR_MAP[entityType] ?? entityType;
+  const subDir = pbpEntityDir(entityType);
   return path.join(cachePath, "src", "content", "business-profile", lang, subDir);
 }
 
