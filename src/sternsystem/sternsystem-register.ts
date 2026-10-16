@@ -9,12 +9,25 @@ With --amend: update pin and open amend mission without creating a new registry 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0532: extend with pin creation, content stubs, mission.open, mission.materialize, --amend/--amend-id flags, and atomic rollback.</item>
   <item>RFC-0561: add --owner flag for VC subject id (did:web) on new registration and amend backfill.</item>
   <item>RFC-0902: reject TLD-suffixed IDs before writing any files.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>RFC-0354</history>
+  <item>RFC-1293: require timing semantics on time-bound policy fields via contractTerms.gate (RFC-1293)
+
+policySchema gains an optional timing map (pbpTimingSchema: startEvent, clock,
+timezone, businessHours, boundary) inherited by every specialized policy.
+pbp.content.validate sweeps each pbp/* entity's frontmatter — TIMED_FIELDS
+registry paths plus every ISO-8601 duration literal — and emits
+PBP-TIMING-01..04 at contractTerms.gate severity (warn|enforce in system.md;
+absent = warn). enforce also makes pbp.terms-reference.validate behave as
+--strict. New sites register with contractTerms.gate: enforce
+(sternsystem-register stub + both onboarding system templates). Live warpgogol
+run: 129 PBP-TIMING-01 warnings across policies/offerings/documents/claims —
+the owner's contract-decision agenda; no timing values authored, no site gate
+flipped. Known registry gap: renewal.renewalPeriod/reminder are not ISO-shaped
+and escape the sweep (documented in the RFC evidence). Canary C10 active.</item>
+  <history>RFC-0354, RFC-0532</history>
 </CHANGE_SUMMARY>
 */
 
@@ -112,6 +125,8 @@ i18n:
   supported:
 ${supported}
 legalJurisdiction: ${brief.legalJurisdiction}
+contractTerms:
+  gate: enforce
 ---
 `;
   await io.writeFile(join(contentDir, "system.md"), systemMd);
