@@ -11,6 +11,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0965: initial confinement tests — path safety and preflight dirty-tree check.</item>
+  <item>RFC-1307: step 5 — remove 00-brief.md path, onboarding.synthesize and brief.validate; cold run registers from intake</item>
 </CHANGE_SUMMARY>
 */
 
@@ -84,5 +85,33 @@ describe("werkstatt.e2e.cold confinement (RFC-0965)", () => {
       "de",
     );
     expect(bpDir.startsWith(coldRoot)).toBe(true);
+  });
+});
+
+describe("werkstatt.e2e.cold intake fixture (RFC-1307)", () => {
+  it("AC-8: prepares a valid de intake bundle and no 00-brief.md", async () => {
+    const { mkdtemp, rm } = await import("node:fs/promises");
+    const { existsSync } = await import("node:fs");
+    const { createDefaultIO } = await import("@warpgogol/werkstatt-shared/kernel/workspace-io");
+    const { prepareColdIntake } = await import("./cold.ts");
+    const { resolveIntakeExportSha256, validateIntakeBundle } =
+      await import("../intake/intake-validate.ts");
+    const io = createDefaultIO().io;
+    const root = await mkdtemp(path.join(os.tmpdir(), "cold-intake-"));
+    try {
+      const rel = await prepareColdIntake(root, "e2e-cold", io);
+      const exportInfo = await resolveIntakeExportSha256(io);
+      expect(exportInfo, "intake schema export must be installed").not.toBeNull();
+      const result = await validateIntakeBundle(path.join(root, rel), io, {
+        exportSha256: exportInfo!.sha256,
+      });
+      expect(result.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+      expect(result.systemId).toBe("e2e-cold");
+      expect(existsSync(path.join(root, "onboarding", "e2e-cold", ".input", "00-brief.md"))).toBe(
+        false,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

@@ -11,7 +11,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0965: initial werkstatt.e2e.cold command handler, ColdRunReport type, step runner with timeout and intervention tracking.</item>
   <item>RFC-0988: add handover-dry-run step — verifies prepare and complete dry-run commands work end-to-end without side effects.</item>
   <item>RFC-1189: step 1 — partyKindLabels schema contract
 
@@ -22,6 +21,8 @@ of raw enum tokens. Seed the e2e cold-test labels fixture and cover the
 completeness gate with schema tests.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
+  <item>RFC-1307: step 5 — remove 00-brief.md path, onboarding.synthesize and brief.validate; cold run registers from intake</item>
+  <history>RFC-0965</history>
 </CHANGE_SUMMARY>
 */
 
@@ -36,6 +37,7 @@ import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
+import { buildIntakeBundle } from "../intake/test-bundle.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -170,6 +172,41 @@ async function execChecked(
 }
 
 // ─── Main command handler ──────────────────────────────────────────────────
+
+/**
+ * RFC-1307: write a valid single-locale (`de`) intake bundle for the cold
+ * run's synthetic site and return its workspace-relative directory. The cold
+ * run never writes an `00-brief.md`.
+ */
+export async function prepareColdIntake(
+  workspaceRoot: string,
+  systemId: string,
+  io: WorkspaceIO,
+): Promise<string> {
+  const rel = path.join("onboarding", systemId, ".input", "intake");
+  await buildIntakeBundle(path.join(workspaceRoot, rel), io, {
+    mutate: (seed) => {
+      const envelope = seed.envelope as {
+        systemId: string;
+        classification: { locales: unknown[]; domain?: string | null };
+        pbp: Array<{ statementLang?: string }>;
+        voice?: { profile?: { linguisticRules?: Record<string, string[]> } };
+      };
+      envelope.systemId = systemId;
+      envelope.classification.locales = [
+        { tag: "de", role: "primary", sourceLanguageBy: "client", reviewer: "studio" },
+      ];
+      envelope.classification.domain = "e2e-cold.test";
+      for (const entity of envelope.pbp) {
+        if (entity.statementLang !== undefined) entity.statementLang = "de";
+      }
+      if (envelope.voice?.profile) {
+        envelope.voice.profile.linguisticRules = { de: ["keine Anglizismen in Überschriften"] };
+      }
+    },
+  });
+  return rel;
+}
 
 export async function runColdE2e(
   input: KernelCommandInput,
@@ -420,26 +457,19 @@ export async function runColdE2e(
           );
           await execChecked(context.io, "git", ["push", "origin", "main"], { cwd: cachePath });
 
-          // Copy fixture brief into cold root
-          const briefDir = path.join(stepCtx.workspaceRoot, "onboarding", systemId, ".input");
-          await context.io.mkdir(briefDir);
-          const fixtureBrief = `---
-client:
-  id: e2e-cold
-  domain: e2e-cold.test
-i18n:
-  default: de
-  supported:
-    - de
-legalJurisdiction: DE
----
-`;
-          await context.io.writeFile(path.join(briefDir, "00-brief.md"), fixtureBrief);
+          // RFC-1307: register from a synthetic werkstatt:intake/v1 bundle.
+          const intakeDir = await prepareColdIntake(stepCtx.workspaceRoot, systemId, context.io);
 
           const result = (await executeKernelCommand({
             workspaceRoot: stepCtx.workspaceRoot,
             commandName: "sternsystem.register",
-            argv: [`--id=${systemId}`, "--cosmicStar=Polaris", `--mirrors=${mirrorsFlag}`],
+            argv: [
+              `--id=${systemId}`,
+              "--cosmicStar=Polaris",
+              `--mirrors=${mirrorsFlag}`,
+              `--intake=${intakeDir}`,
+              "--biome=handwerk-material-warm",
+            ],
             outputFormat: "json",
           })) as { exitCode?: number; summary?: string; data?: { firstMissionId?: string } };
 
