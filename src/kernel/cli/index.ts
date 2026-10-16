@@ -116,7 +116,7 @@ function consumeCommonFlags(argv: string[]) {
       continue;
     }
 
-    if (entry === "--json" || entry === "--json=true" || entry === "--json=1") {
+    if (isJsonFlagToken(entry)) {
       outputFormat = "json";
       continue;
     }
@@ -167,17 +167,27 @@ function consumeCommonFlags(argv: string[]) {
 function printUsage() {
   console.log("werkstatt sites list [--json]");
   console.log(
-    "werkstatt run <command> [--site <name>] [--all] [--dry-run] [--no-registry-cache] [--json] [-- ...args]",
+    "werkstatt run <command> [--site <name>] [--all] [--dry-run] [--no-registry-cache] [--json|--output] [-- ...args]",
   );
   console.log(
     "werkstatt pipeline <name> [--site <name>] [--all] [--dry-run] [--force] [--no-registry-cache] [--concurrency N] [--collect-errors] [--json]",
   );
 }
 
-function argvRequestsJson(argv: string[]): boolean {
-  return argv.some(
-    (entry) => entry === "--json" || entry === "--json=true" || entry === "--json=1",
+function isJsonFlagToken(entry: string): boolean {
+  return (
+    entry === "--json" ||
+    entry === "--json=true" ||
+    entry === "--json=1" ||
+    entry === "--output" ||
+    entry === "--output=json" ||
+    entry === "--output=true" ||
+    entry === "--output=1"
   );
+}
+
+function argvRequestsJson(argv: string[]): boolean {
+  return argv.some(isJsonFlagToken);
 }
 
 /**

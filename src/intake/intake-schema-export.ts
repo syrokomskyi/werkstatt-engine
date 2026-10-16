@@ -101,7 +101,7 @@ export async function runIntakeSchemaExport(
     },
     exitCode: 0,
     summary: dryRun
-      ? `onboarding.intake.schema.export: dry-run rendered ${bytes} bytes -> ${INTAKE_SCHEMA_EXPORT_PATH}`
-      : `onboarding.intake.schema.export: wrote ${bytes} bytes -> ${INTAKE_SCHEMA_EXPORT_PATH}`,
+      ? `[intake.schema.export] dry-run rendered ${bytes} bytes -> ${INTAKE_SCHEMA_EXPORT_PATH}`
+      : `[intake.schema.export] wrote ${bytes} bytes -> ${INTAKE_SCHEMA_EXPORT_PATH}`,
   };
 }

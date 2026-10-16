@@ -108,6 +108,11 @@ const KERNEL_BOOLEAN_FLAGS = new Set<string>([
   "write",
 ]);
 
+/** Universal flag aliases resolved before schema lookup (--output → --json). */
+const KERNEL_FLAG_ALIASES: Record<string, string> = {
+  output: "json",
+};
+
 export function parseKernelArgv(argv: string[]): {
   argv: string[];
   flags: Record<string, KernelFlagValue>;
@@ -147,8 +152,12 @@ export function parseKernelArgv(argv: string[]): {
 
     const withoutPrefix = entry.slice(2);
     const eqIndex = withoutPrefix.indexOf("=");
-    const flagName = eqIndex === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIndex);
+    const rawFlagName = eqIndex === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIndex);
     const inlineValue = eqIndex === -1 ? undefined : withoutPrefix.slice(eqIndex + 1);
+    // Aliases apply to bare switches only — `--output=json|true|1` is
+    // normalized by the CLI token scan; `--output=<other>` stays unknown.
+    const flagName =
+      inlineValue === undefined ? (KERNEL_FLAG_ALIASES[rawFlagName] ?? rawFlagName) : rawFlagName;
 
     if (!flagName) {
       continue;
@@ -257,8 +266,12 @@ export function resolveCommandFlags(
 
     const withoutPrefix = entry.slice(2);
     const eqIndex = withoutPrefix.indexOf("=");
-    const flagName = eqIndex === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIndex);
+    const rawFlagName = eqIndex === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIndex);
     const inlineValue = eqIndex === -1 ? undefined : withoutPrefix.slice(eqIndex + 1);
+    // Aliases apply to bare switches only — `--output=json|true|1` is
+    // normalized by the CLI token scan; `--output=<other>` stays unknown.
+    const flagName =
+      inlineValue === undefined ? (KERNEL_FLAG_ALIASES[rawFlagName] ?? rawFlagName) : rawFlagName;
     if (!flagName) continue;
 
     const spec = schema[flagName];

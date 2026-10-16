@@ -62,6 +62,13 @@ describe("parseKernelArgv (legacy heuristic parser)", () => {
     expect(flags["quiet"]).toBe(true);
     expect(flags["verbose"]).toBe(true);
   });
+
+  test("--output aliases to --json without consuming the next token", () => {
+    const { flags, diagnostics } = parseKernelArgv(["--output"]);
+    expect(flags["json"]).toBe(true);
+    expect(flags["output"]).toBeUndefined();
+    expect(diagnostics).toHaveLength(0);
+  });
 });
 
 describe("resolveCommandFlags (schema-driven parser)", () => {
@@ -87,6 +94,13 @@ describe("resolveCommandFlags (schema-driven parser)", () => {
     const { diagnostics } = resolveCommandFlags(["--bogus"], mockDefinition);
     const flag01 = diagnostics.filter((d) => d.ruleId === "KERNEL-FLAG-01");
     expect(flag01).toHaveLength(1);
+  });
+
+  test("--output aliases to --json in the schema-driven parser", () => {
+    const { flags, diagnostics } = resolveCommandFlags(["--output"], mockDefinition);
+    expect(flags["json"]).toBe(true);
+    expect(flags["output"]).toBeUndefined();
+    expect(diagnostics.filter((d) => d.ruleId !== "KERNEL-FLAG-03")).toHaveLength(0);
   });
 
   test("emits KERNEL-FLAG-02 when string flag has no value", () => {

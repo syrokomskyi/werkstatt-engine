@@ -704,8 +704,7 @@ export async function runIntakeValidate(
   if ((id === undefined) === (bundle === undefined)) {
     return {
       exitCode: 2,
-      summary:
-        "onboarding.intake.validate requires exactly one of --id <onboarding-id> or --bundle <dir>",
+      summary: "[intake.validate] requires exactly one of --id <onboarding-id> or --bundle <dir>",
     };
   }
   const budgetRaw = flagString(input, "cost-budget-usd");
@@ -713,7 +712,7 @@ export async function runIntakeValidate(
   if (!Number.isFinite(costBudgetUsd) || costBudgetUsd < 0) {
     return {
       exitCode: 2,
-      summary: `--cost-budget-usd must be a non-negative number (got '${budgetRaw}')`,
+      summary: `[intake.validate] --cost-budget-usd must be a non-negative number (got '${budgetRaw}')`,
     };
   }
 
@@ -749,7 +748,14 @@ export async function runIntakeValidate(
       data: result,
       exitCode: 1,
       summary:
-        "onboarding.intake.validate: schema export missing — run onboarding.intake.schema.export first",
+        "[intake.validate] schema export missing — run onboarding.intake.schema.export first",
+      nextSteps: [
+        {
+          action:
+            "Run onboarding.intake.schema.export to regenerate intake.schema.generated.yaml, then re-run this validation.",
+          kind: "required",
+        },
+      ],
     };
   }
 
@@ -763,6 +769,6 @@ export async function runIntakeValidate(
   return {
     data: result,
     exitCode: result.status === "pass" ? 0 : 1,
-    summary: `onboarding.intake.validate ${result.systemId ?? bundleLabel}: ${result.status} (${errors} errors, ${warnings} warnings)`,
+    summary: `[intake.validate] ${result.systemId ?? bundleLabel}: ${result.status} (${errors} errors, ${warnings} warnings)`,
   };
 }
