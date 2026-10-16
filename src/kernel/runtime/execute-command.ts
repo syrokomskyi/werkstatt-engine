@@ -31,7 +31,7 @@ KernelRuntimeContext.allSites populated from options.allSites at all three execu
 */
 
 import { performance } from "node:perf_hooks";
-import { relative } from "node:path";
+import { join, relative } from "node:path";
 import { createKernelLogger } from "../logger.ts";
 import { pipelineHint } from "../pipeline-hint.ts";
 import { loadWorkspaceConfig, loadKernelAppConfig } from "../discovery.ts";
@@ -352,9 +352,17 @@ export async function executeRegisteredCommand(
     return skippedExecutionReport(command, context, "cache-clone");
   }
   if (command.mutatesState === false && !flagMutating) {
+    // RFC-1303: "<app>/" cacheWrites prefixes expand against the resolved site
+    // directory; workspace-relative entries resolve under workspaceRoot inside
+    // createReadOnlyIO (path.resolve passes absolute prefixes through).
+    const siteDir = context.site?.directory;
+    const cacheWrites = (command.cacheWrites ?? []).flatMap((p) =>
+      p.startsWith("<app>/") ? (siteDir ? [join(siteDir, p.slice("<app>/".length))] : []) : [p],
+    );
     effectiveIo = createReadOnlyIO(context.io, command.name, {
       allowExec: command.execOnReadOnly === true,
       workspaceRoot: context.workspaceRoot,
+      cacheWrites,
     });
   } else if (context.dryRun) {
     const recording = createRecordingIO(context.io);

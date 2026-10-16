@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach, afterEach } from "vitest";
+import { test, expect, describe, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -187,6 +187,49 @@ describe("RFC-1133: direct-path command-result cache", () => {
 
     expect(executions.count).toBe(1);
     expect(second.cached).toBe(true);
+  });
+
+  test("RFC-1303: declared envInputs hash into the key — an env change invalidates the entry", async () => {
+    const executions = { count: 0 };
+    const cmd = makeCommand(executions, { envInputs: ["RFC1303_TEST_ENV"] });
+    const ctx = makeContext(tmpDir, cacheCtx());
+
+    vi.stubEnv("RFC1303_TEST_ENV", "a");
+    await executeRegisteredCommand(cmd, ctx, []);
+    const hit = await executeRegisteredCommand(cmd, ctx, []);
+    expect(executions.count).toBe(1);
+    expect(hit.cached).toBe(true);
+
+    vi.stubEnv("RFC1303_TEST_ENV", "b");
+    const miss = await executeRegisteredCommand(cmd, ctx, []);
+    expect(miss.cached).toBeFalsy();
+    expect(executions.count).toBe(2);
+
+    vi.unstubAllEnvs();
+    const unset = await executeRegisteredCommand(cmd, ctx, []);
+    expect(unset.cached).toBeFalsy();
+    expect(executions.count).toBe(3);
+  });
+
+  test("RFC-1303: envInputs order does not fragment the key; undeclared env changes do not", async () => {
+    const executions = { count: 0 };
+    const cmdA = makeCommand(executions, { envInputs: ["RFC1303_B", "RFC1303_A"] });
+    const cmdB = makeCommand(executions, { envInputs: ["RFC1303_A", "RFC1303_B"] });
+    const cache = cacheCtx();
+    vi.stubEnv("RFC1303_A", "1");
+    vi.stubEnv("RFC1303_B", "2");
+
+    await executeRegisteredCommand(cmdA, makeContext(tmpDir, cache), []);
+    const hit = await executeRegisteredCommand(cmdB, makeContext(tmpDir, cache), []);
+    expect(hit.cached).toBe(true);
+    expect(executions.count).toBe(1);
+
+    // An env var the command does not declare must not touch the key.
+    vi.stubEnv("RFC1303_UNDECLARED", "x");
+    const still = await executeRegisteredCommand(cmdA, makeContext(tmpDir, cache), []);
+    expect(still.cached).toBe(true);
+    expect(executions.count).toBe(1);
+    vi.unstubAllEnvs();
   });
 
   test("--dry-run neither reads nor writes the cache", async () => {

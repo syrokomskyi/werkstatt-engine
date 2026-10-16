@@ -25,6 +25,7 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
 </CHANGE_SUMMARY>
 */
 
+import { createHash } from "node:crypto";
 import { dirname, join, relative, sep } from "node:path";
 
 import { byteHash, stableJsonHash } from "@warpgogol/werkstatt-engine/fingerprint";
@@ -82,6 +83,34 @@ export function computeFlagsHash(flags: Record<string, unknown>): string {
     if (!CACHE_INVISIBLE_FLAGS.has(name)) visible[name] = value;
   }
   return Object.keys(visible).length === 0 ? "" : stableJsonHash(visible);
+}
+
+/**
+ * RFC-1303: stable digest over the command's declared `envInputs` —
+ * `name=sha256(value||"")` pairs, sorted. Raw values are never hashed into
+ * the persisted key material (only their per-name digests). Empty string
+ * when the command declares no env inputs, keeping pre-RFC-1303 cache keys
+ * valid for unaffected commands.
+ */
+export function computeEnvDigest(envInputs: string[] | undefined): string {
+  if (!envInputs || envInputs.length === 0) return "";
+  const pairs = [...envInputs].sort().map(
+    (name) =>
+      `${name}=${createHash("sha256")
+        .update(process.env[name] ?? "")
+        .digest("hex")}`,
+  );
+  return stableJsonHash(pairs);
+}
+
+/** RFC-1303: mix the env digest into the base inputs hash. */
+function withEnv(inputsHash: string, envDigest: string): string {
+  return envDigest ? stableJsonHash({ inputsHash, envDigest }) : inputsHash;
+}
+
+/** RFC-1303: metaKey suffix — each env state owns its sidecar mapping. */
+function metaKeyEnvSuffix(envDigest: string): string {
+  return envDigest ? `:${envDigest}` : "";
 }
 
 /**
@@ -168,6 +197,7 @@ export async function readCommandResult(
 
   const reads = call.command.reads ?? [];
   const flagsHash = computeFlagsHash(call.flags);
+  const envDigest = computeEnvDigest(call.command.envInputs);
   const moduleResolved = await resolveModuleSrcDir(call.command, call.workspaceRoot, io);
   const moduleHashCache = cache.moduleHashCache ?? new Map<string, string>();
 
@@ -184,16 +214,18 @@ export async function readCommandResult(
       moduleResolved.srcDir,
       moduleHashCache,
       flagsHash,
+      envDigest,
     );
     if (fastPathResult) return fastPathResult;
   }
 
-  const { hash: inputsHash } = await computeInputsHash(
+  const { hash: baseInputsHash } = await computeInputsHash(
     reads,
     call.baseDir,
     call.workspaceRoot,
     cache.treeIndex,
   );
+  const inputsHash = withEnv(baseInputsHash, envDigest);
   const moduleHash = await getOrComputeModuleHash(
     moduleResolved,
     call.command,
@@ -248,12 +280,14 @@ export async function writeCommandResult(
 
   const reads = call.command.reads ?? [];
   const flagsHash = computeFlagsHash(call.flags);
-  const { hash: inputsHash, metadata } = await computeInputsHash(
+  const envDigest = computeEnvDigest(call.command.envInputs);
+  const { hash: baseInputsHash, metadata } = await computeInputsHash(
     reads,
     call.baseDir,
     call.workspaceRoot,
     cache.treeIndex,
   );
+  const inputsHash = withEnv(baseInputsHash, envDigest);
   const moduleResolved = await resolveModuleSrcDir(call.command, call.workspaceRoot);
   const moduleHash = await getOrComputeModuleHash(
     moduleResolved,
@@ -274,9 +308,11 @@ export async function writeCommandResult(
   await setCachedCommandResult(cache.layer, key, report, metadata);
 
   // RFC-0685: store metadata-to-inputsHash mapping for the mtime fast path.
+  // RFC-1303: envDigest suffixes the sidecar key so alternating env states
+  // keep their own mapping instead of overwriting each other.
   if (metadata.length > 0) {
     const metadataHash = stableJsonHash({ metadata });
-    const metaKey = `meta:${call.command.name}:${call.siteName ?? ""}:${metadataHash}`;
+    const metaKey = `meta:${call.command.name}:${call.siteName ?? ""}:${metadataHash}${metaKeyEnvSuffix(envDigest)}`;
     await cache.layer.set("command_results_meta", metaKey, inputsHash, Date.now(), inputsHash);
   }
 }
@@ -368,6 +404,7 @@ async function tryMtimeFastPath(
   moduleSrcDir: string,
   moduleHashCache: Map<string, string>,
   flagsHash: string,
+  envDigest: string,
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<KernelExecutionReport | null> {
   const treeIndex = cache.treeIndex;
@@ -391,7 +428,7 @@ async function tryMtimeFastPath(
   const metadataHash = stableJsonHash({ metadata: currentMetadata });
 
   // Look up the metadata-to-inputsHash mapping.
-  const metaKey = `meta:${command.name}:${siteName ?? ""}:${metadataHash}`;
+  const metaKey = `meta:${command.name}:${siteName ?? ""}:${metadataHash}${metaKeyEnvSuffix(envDigest)}`;
   const metaEntry = await cache.layer.get("command_results_meta", metaKey);
   if (!metaEntry) return null;
 

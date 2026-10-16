@@ -40,6 +40,7 @@ export {
   ScheduleError,
 } from "./runtime/pipeline-scheduler.ts";
 export { formatFailureDiagnostics } from "./runtime/diagnostics.ts";
+export { collectGitignoredPaths, writePatternToCheckPath } from "./runtime/closed-workpiece.ts";
 export {
   getOrBuildRegistry,
   getOrBuildWorkspaceRegistry,

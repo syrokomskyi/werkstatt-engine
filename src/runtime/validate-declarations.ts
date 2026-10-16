@@ -266,6 +266,58 @@ export function collectDeclarationDiagnostics(
       });
     }
 
+    // RFC-1303: declaration-shape checks for envInputs / cacheWrites. The
+    // sweep (undeclared reads) and git-ignore verification live in
+    // command.manifest.validate's site layer; these cover malformed entries.
+    const ENV_NAME_RE = /^[A-Z_][A-Z0-9_]*$/;
+    const seenEnvInputs = new Set<string>();
+    for (const envName of command.envInputs ?? []) {
+      if (!ENV_NAME_RE.test(envName)) {
+        diagnostics.push({
+          ruleId: "ENV-INPUT-01",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` declares envInputs entry \`${envName}\` that is not a valid env var name (^[A-Z_][A-Z0-9_]*$).`,
+        });
+      }
+      if (seenEnvInputs.has(envName)) {
+        diagnostics.push({
+          ruleId: "ENV-INPUT-01",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` declares envInputs entry \`${envName}\` twice.`,
+        });
+      }
+      seenEnvInputs.add(envName);
+    }
+
+    for (const prefix of command.cacheWrites ?? []) {
+      if (command.mutatesState !== false) {
+        diagnostics.push({
+          ruleId: "CACHE-WRITE-01",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` declares cacheWrites but is not \`mutatesState: false\` — the carve-out only applies to read-only commands (mutating commands write freely).`,
+        });
+      }
+      if (command.scope !== "app" && prefix.startsWith("<app>/")) {
+        diagnostics.push({
+          ruleId: "CACHE-WRITE-01",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` is workspace-scoped but declares cacheWrites entry \`${prefix}\` — \`<app>/\` prefixes only resolve for app-scope commands.`,
+        });
+      }
+      if (!prefix.endsWith("/")) {
+        diagnostics.push({
+          ruleId: "CACHE-WRITE-01",
+          severity: "warn",
+          command: commandName,
+          message: `Command \`${commandName}\` declares cacheWrites entry \`${prefix}\` that is not a directory prefix (must end with "/") — the carve-out is prefix-shaped, not file-shaped.`,
+        });
+      }
+    }
+
     if (isGenerateCommand || hasWrites) {
       if (command.generates === undefined) {
         diagnostics.push({
