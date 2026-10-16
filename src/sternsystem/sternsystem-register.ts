@@ -9,7 +9,6 @@ With --amend: update pin and open amend mission without creating a new registry 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0561: add --owner flag for VC subject id (did:web) on new registration and amend backfill.</item>
   <item>RFC-0902: reject TLD-suffixed IDs before writing any files.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
@@ -27,7 +26,22 @@ run: 129 PBP-TIMING-01 warnings across policies/offerings/documents/claims —
 the owner's contract-decision agenda; no timing values authored, no site gate
 flipped. Known registry gap: renewal.renewalPeriod/reminder are not ISO-shaped
 and escape the sweep (documented in the RFC evidence). Canary C10 active.</item>
-  <history>RFC-0354, RFC-0532</history>
+  <item>RFC-1294: require verbatim source provenance for external local facts (RFC-1294)
+
+localFacts[] entries gain sourceUrl/excerpt/excerptLang/scope/reviewedBy/
+reviewedAt. surface.evidence.validate sweeps every blueprint dataset record's
+localFacts once per source file and emits LOCALFACT-01 (missing
+sourceUrl/excerpt), LOCALFACT-02 (off-host sourceUrl — dot-boundary subdomains
+of the descriptor endpoint host pass), LOCALFACT-03 (normalized number absent
+from the verbatim excerpt), LOCALFACT-04 (stale asOf+reviewEvery, always a
+warning). systemManifestSchema gains provenance.gate (warn|enforce, absent =
+warn; new sites register enforce). The bake renders 'Geprüfte lokale Fakten'
+only when every rendered fact carries a human review record — otherwise the
+neutral 'Lokaler Kontext' — plus a Quellen block listing each distinct
+sourceUrl with its asOf date. Live warpgogol run: 40 LOCALFACT-01 warnings
+across the 12 city demand records — the owner's research backlog; no excerpts,
+review records, or gate flips authored. Canary C11 active.</item>
+  <history>RFC-0354, RFC-0532, RFC-0561</history>
 </CHANGE_SUMMARY>
 */
 
@@ -126,6 +140,8 @@ i18n:
 ${supported}
 legalJurisdiction: ${brief.legalJurisdiction}
 contractTerms:
+  gate: enforce
+provenance:
   gate: enforce
 ---
 `;
