@@ -30,6 +30,13 @@ import type {
   KernelCommandResult,
   KernelNextStep,
 } from "@warpgogol/werkstatt-shared/kernel";
+import {
+  fileHasCommandSignal,
+  findDefinitionAnchors,
+  maskSource,
+  NON_COMMAND_ALLOWLIST,
+  scanForbiddenCodepoints,
+} from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
 export interface CommandsValidateResult {
@@ -61,6 +68,13 @@ const FILE_DETECTION_PATTERNS = [
   // the single-line import regex below) and register no registry call.
   /\bKernelCommandDefinition\b/,
 ];
+
+const CMDGEN_IGNORE_RE = /\/\/\s*cmdgen-ignore/;
+// The CMDGEN-04 suspect net only applies to the generator's corpus — site src.
+// Engine/shared commands register via registry.registerCommand (a different,
+// non-anchored pattern), so the signal would false-positive there.
+const SITE_SRC_PREFIX = "packages/werkstatt-site/src/";
+const SITE_CHECKS_PREFIX = "packages/werkstatt-site/src/checks/";
 
 const RETURN_OBJECT_PATTERN = /return\s*\{/g;
 const EXIT_CODE_PATTERN = /exitCode\s*:\s*(?:(\d+)|(\w+))/;
@@ -252,11 +266,50 @@ async function scanFile(
   io: WorkspaceIO = createDefaultIO().io,
 ): Promise<Diagnostic[]> {
   const content = await io.readFile(filePath).catch(() => "");
-  if (!content || !isHandlerFile(content)) return [];
+  if (!content) return [];
 
   const diagnostics: Diagnostic[] = [];
   const commandName = inferCommandName(filePath, workspaceRoot);
   const relPath = relative(workspaceRoot, filePath);
+  const posixRel = relPath.split("\\").join("/");
+
+  // RFC-1304 CMDGEN-05: invisible/control codepoints are never legitimate in
+  // scanned sources — reported on the raw buffer, before the handler gate,
+  // never suppressible.
+  for (const hit of scanForbiddenCodepoints(content)) {
+    diagnostics.push({
+      ruleId: "CMDGEN-05",
+      severity: "error",
+      message: `Forbidden ${hit.name} codepoint (U+${hit.codepoint.toString(16).toUpperCase().padStart(4, "0")}) at offset ${hit.offset} in ${relPath}`,
+      file: relPath,
+      line: hit.line,
+      fixHint: `Remove the invisible byte — it desyncs the masked command scanner (RFC-1304).`,
+    });
+  }
+
+  // RFC-1304 CMDGEN-04: re-run the generator's suspect-file signal over its own
+  // corpus, so a file unreachable during generation is still caught here.
+  if (posixRel.startsWith(SITE_SRC_PREFIX) && !CMDGEN_IGNORE_RE.test(content)) {
+    const masked = maskSource(content);
+    if (
+      findDefinitionAnchors(masked).length === 0 &&
+      fileHasCommandSignal(masked) &&
+      !(
+        posixRel.startsWith(SITE_CHECKS_PREFIX) &&
+        NON_COMMAND_ALLOWLIST.has(posixRel.slice(SITE_CHECKS_PREFIX.length))
+      )
+    ) {
+      diagnostics.push({
+        ruleId: "CMDGEN-04",
+        severity: "error",
+        message: `File appears to contain a command definition but none was extracted in ${relPath}`,
+        file: relPath,
+        fixHint: `Check for unmaskable constructs (nested template literals, control bytes) or add a // cmdgen-ignore pragma if the file is not a command source (RFC-1304).`,
+      });
+    }
+  }
+
+  if (!isHandlerFile(content)) return diagnostics;
 
   const returnStarts = findReturnStatements(content);
   for (const { startIdx, line } of returnStarts) {

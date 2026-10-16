@@ -46,7 +46,7 @@ export const werkstattCommandsValidateModule: ModuleExport = {
       name: "werkstatt.commands.validate",
       mutatesState: false,
       contract: "werkstatt",
-      rules: [],
+      rules: ["CMDGEN-04", "CMDGEN-05"],
       modulePath: "packages/werkstatt-engine/os/werkstatt-commands-validate.module.ts",
       description:
         "Statically analyze kernel command handler return statements for DNA-82 compliance: explicit exitCode, [command.name]-prefixed summary, nextSteps on failure. Enforces RFC-0903.",

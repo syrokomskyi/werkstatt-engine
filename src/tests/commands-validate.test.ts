@@ -386,9 +386,9 @@ export const testDefCommand: KernelCommandDefinition = {
     const result = await runCommandsValidate(workspaceRoot, "error");
     const violations = result.data?.diagnostics ?? [];
     expect(violations.length).toBeGreaterThan(0);
-    expect(violations.some((d) => d.file === "packages/werkstatt-engine/src/checks/test-def.ts")).toBe(
-      true,
-    );
+    expect(
+      violations.some((d) => d.file === "packages/werkstatt-engine/src/checks/test-def.ts"),
+    ).toBe(true);
   });
 
   it("non-command-result returns are not flagged (module descriptors, internal objects)", async () => {
@@ -428,5 +428,58 @@ function helper(): { found: boolean; line: number } {
     const result = await runCommandsValidate(workspaceRoot, "error");
     const violations = result.data?.diagnostics ?? [];
     expect(violations.length).toBe(0);
+  });
+
+  it("RFC-1304 AC-5: a suspect file in the generator corpus emits CMDGEN-04", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-site/src/checks/suspect-file.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const looksLikeDef: KernelCommandDefinition = buildCommand();
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMDGEN-04")).toBe(true);
+  });
+
+  it("RFC-1304 AC-5: an invisible codepoint emits CMDGEN-05 with codepoint name and offset", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/nul-file.ts",
+      "export const x = 1;\n\x00export const y = 2;\n",
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    const hit = violations.find((d) => d.ruleId === "CMDGEN-05");
+    expect(hit).toBeDefined();
+    expect(hit!.message).toContain("NUL");
+    expect(hit!.message).toContain("offset 20");
+  });
+
+  it("RFC-1304: // cmdgen-ignore suppresses CMDGEN-04, and non-site trees never fire it", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-site/src/checks/ignored.ts",
+      `// cmdgen-ignore — authoring template, not a command source
+import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const looksLikeDef: KernelCommandDefinition = buildCommand();
+`,
+    );
+    // Engine-side def-shaped file — registerCommand-style modules are the
+    // engine's own pattern and must not trip the site-corpus suspect net.
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/def-shaped.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const looksLikeDef: KernelCommandDefinition = buildCommand();
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMDGEN-04")).toBe(false);
   });
 });
