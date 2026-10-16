@@ -12,14 +12,17 @@ sidecars, and the system-state onboarding provenance block.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
-  <item>Locale directories and i18n keys use the primary subtag (route segment); the full BCP 47 tag rides in i18n.supported.&lt;segment&gt;.tag (RFC-1282 mapping).</item>
+  <item>Locale directories and i18n keys use the primary subtag (route segment); the full BCP 47 tag rides in i18n.supported.&lt;segment&gt;.tag and .hreflang (RFC-1282 mapping).</item>
   <item>Only rights states the spec makes publishable without an operator decision (cleared, generated, licensed-stock) are copied; client-supplied, claimed and unknown stay in the bundle, and mood boards are design references, never site content.</item>
   <item>Every seeded file is serialized through canonical writers (sorted keys, RFC-0493 quoting) so the same intake yields byte-identical seeds (DNA-58).</item>
+  <item>The seeded system.md carries the enforce gate triple (contractTerms, provenance, publication) plus legalJurisdiction — the born-valid contract, no downstream repair.</item>
+  <item>Two entities resolving to one document path fail the plan — a silent overwrite is a validator defect, never a last-write-wins.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1307: introduce the deterministic intake seed planner.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
+  <item>RFC-1307: record review-fix decisions in compass headers</item>
 </CHANGE_SUMMARY>
 */
 
