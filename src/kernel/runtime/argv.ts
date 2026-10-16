@@ -26,6 +26,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 bare tokens until the next --flag, so `--files a b` resolves to ["a","b"]
 instead of KERNEL-ARG-01 on `b`; a bare positional not preceded by a string[]
 flag still diagnoses.</item>
+  <item>RFC-1306: kernelArgvFromFlags — serializes a delegated flag record into argv so ctx.invoke children pass through normal schema resolution (KERNEL-FLAG-02 on missing values).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -37,6 +38,28 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 
 const _VALUE_FLAG_NAMES = new Set(["root", "package", "history"]);
+
+/**
+ * RFC-1306: inverse of the flag parsers — serializes a flags record into the
+ * argv token form `resolveCommandFlags` accepts. Used by the `ctx.invoke`
+ * port to delegate to a sibling command by name. `true` → bare `--name`,
+ * `false` → `--name=false`, strings → `--name=value`, arrays → one
+ * `--name=value` per element (addFlagValue accumulates repeats).
+ */
+export function kernelArgvFromFlags(flags: Record<string, KernelFlagValue>): string[] {
+  const argv: string[] = [];
+  for (const [name, value] of Object.entries(flags)) {
+    if (value === undefined) continue;
+    if (value === true) {
+      argv.push(`--${name}`);
+    } else if (Array.isArray(value)) {
+      for (const item of value) argv.push(`--${name}=${item}`);
+    } else {
+      argv.push(`--${name}=${value}`);
+    }
+  }
+  return argv;
+}
 
 function addFlagValue(
   target: Record<string, KernelFlagValue>,

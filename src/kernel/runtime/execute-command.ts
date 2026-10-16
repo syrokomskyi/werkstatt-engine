@@ -26,6 +26,7 @@ KernelRuntimeContext.allSites populated from options.allSites at all three execu
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
   <item>RFC-1303: review REVIEW-CODE-2026-10-16-02 — scanner moves to werkstatt-shared/node (IO-01), workpieceEnv hashes into envDigest, saveCache tolerates KERNEL-META-01, ENV-INPUT-02 coverage notice, ratchet path-arg tightening</item>
+  <item>RFC-1306: executeRegisteredCommand populates ctx.invoke — thin wrapper over executeKernelCommand inheriting workspaceRoot/site/output/dryRun/io policy.</item>
   <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126, RFC-1133, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
@@ -55,7 +56,7 @@ import type {
   RemediationHint,
 } from "@warpgogol/werkstatt-shared/kernel";
 import { parse as yamlParse } from "yaml";
-import { parseKernelArgv, resolveCommandFlags } from "./argv.ts";
+import { kernelArgvFromFlags, parseKernelArgv, resolveCommandFlags } from "./argv.ts";
 import { resolveSiteFlagAlias } from "./flag-alias.ts";
 import { formatFailureDiagnostics } from "./diagnostics.ts";
 import { assertKnownOptionKeys, skippedExecutionReport, summarizeLogs } from "./shared.ts";
@@ -375,6 +376,23 @@ export async function executeRegisteredCommand(
   }
   const executionContext: KernelRuntimeContext =
     effectiveIo === context.io ? context : { ...context, io: effectiveIo };
+
+  // RFC-1306: sibling-command invocation port — delegates by name through
+  // executeKernelCommand so the child resolves its own flags and io adapter
+  // (mutatesState governs per command). Inherited: workspaceRoot, the
+  // explicit site selector, dryRun, outputFormat. The port never passes
+  // allSites — a delegated call always yields a single report.
+  executionContext.invoke = (commandName, flags = {}) =>
+    executeKernelCommand({
+      workspaceRoot: context.workspaceRoot,
+      commandName,
+      argv: kernelArgvFromFlags(flags),
+      dryRun: context.dryRun,
+      outputFormat: context.outputFormat,
+      ...(context.siteExplicit && context.site
+        ? { siteName: context.site.name, siteExplicit: true }
+        : {}),
+    }) as Promise<KernelExecutionReport>;
 
   async function runWithOptionalTimeout() {
     const execution = Promise.resolve(command.execute(input, executionContext));

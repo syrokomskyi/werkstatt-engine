@@ -127,6 +127,34 @@ export default {
           return { exitCode: 0, data: { wrote: false, readonly: context.io.readonly } };
         },
       },
+      {
+        name: "fixture.echo.flag",
+        modulePath: "test",
+        description: "RFC-1306: returns input.flags.msg — proves invoke flag serialization",
+        scope: "workspace",
+        mutatesState: false,
+        flags: {
+          msg: { kind: "string", description: "Echo this value" },
+        },
+        async execute(input) {
+          return { exitCode: 0, data: { msg: input.flags.msg } };
+        },
+      },
+      {
+        name: "fixture.invokes.child",
+        modulePath: "test",
+        description: "RFC-1306: calls context.invoke on a sibling — proves the executor-populated port",
+        scope: "workspace",
+        mutatesState: false,
+        async execute(_input, context) {
+          if (!context.invoke) return { exitCode: 1, data: { invokeMissing: true } };
+          const report = await context.invoke("fixture.echo.flag", { msg: "hello-sync" });
+          return {
+            exitCode: 0,
+            data: { childOk: report.ok, childExit: report.exitCode, msg: report.data?.msg },
+          };
+        },
+      },
     ],
     pipelines: [],
   }],
@@ -343,3 +371,26 @@ test("executor: dry-run renderedFiles carries accumulated append content", async
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test(
+  "RFC-1306: context.invoke delegates to a sibling command — flags serialize to the child's resolved input",
+  { timeout: 60_000 },
+  async () => {
+    const { root } = await fixtureWorkspace();
+    try {
+      const report = await executeKernelCommand({
+        workspaceRoot: root,
+        commandName: "fixture.invokes.child",
+        outputFormat: "json",
+      });
+      const single = Array.isArray(report) ? report[0]! : report;
+      expect(single.ok).toBe(true);
+      const data = single.data as { childOk: boolean; childExit: number; msg: string };
+      expect(data.childOk).toBe(true);
+      expect(data.childExit).toBe(0);
+      expect(data.msg).toBe("hello-sync");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
