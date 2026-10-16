@@ -6,14 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1219: preserve operations/ journals across the record-pre-reconcile-sha rewind — restore from pre-reset HEAD and re-commit before the merge (m000192 journal loss); probe failures are blocking (REVIEW-CODE-2026-10-07-16 F-2).</item>
-  <item>RFC-1221: count-transferred-commits derives mergedShas from the merge commit's parents (rev-list commitSha^2 --not commitSha^1 + workpiece membership) instead of preReconcileSha..FETCH_HEAD — survives journal resume and fold paths; preReconcileSha falls back to commitSha^1.</item>
-  <item>RFC-1221 follow-up: mergeCommitSha now records commitSha itself when commitSha is a merge commit (null otherwise) — the previous HEAD^1 capture ran after post-merge steps could commit, storing a post-merge parent instead of the merge commit.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>ADR-0110: post-reconcile divergence check classifies origin-side commits by PIPELINE_SUBJECT_PREFIXES (git log origin/main --not HEAD) — transient when all are pipeline-authored or none exist, real divergence otherwise; warning names sternsystem.sync as the remedy and never advises git reset --hard.</item>
   <item>ADR-0096 follow-up: runMissionBuild now calls bootstrapCommittedSnapshot before build.post — the ADR-0096 baseline commit existed only on the mission.validate path, so mission.build deadlocked on SNAP-02 for first-time missions with no committed behavior snapshot.</item>
   <item>RFC-1263</item>
-  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159, RFC-1218, warpgogol-m000196</history>
+  <item>RFC-1296</item>
+  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159, RFC-1218, RFC-1219, RFC-1221, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 */
 
@@ -76,6 +74,8 @@ import { checkDifferentKindOperation } from "../journal/index.ts";
 import type { OperationStep, OperationDefinition } from "../journal/index.ts";
 import type { MissionManifest } from "@warpgogol/werkstatt-engine/schemas";
 import { writeValidationState, buildValidatorStatesFromSteps } from "./validation-state.ts";
+import { computeDistFacts } from "./dist-facts.ts";
+import { validatorsFromPipelineReports, contractFullFromPrevious } from "./validation-report.ts";
 
 const STERNSYSTEM_DATA_PATHS = [
   "src/content",
@@ -441,13 +441,29 @@ function buildValidateNextSteps(
       ];
 }
 
+// RFC-1296: per-validator evidence summary (additive over RFC-1086 fields)
+export interface ValidationReportValidator {
+  name: string;
+  status: "pass" | "fail";
+  exitCode: number;
+  /** RFC-1296: which pipeline produced the step — "build.check" | "build.post". */
+  pipeline?: string;
+  errors?: number;
+  warnings?: number;
+  rules?: Record<string, { error: number; warning: number }>;
+}
+
 // RFC-1086: PreviousValidationReport — subset of validation-report.json read by --fast
 export interface PreviousValidationReport {
   schemaVersion: string;
   missionId: string;
   contractFull: {
     passed: boolean;
-    validators: Array<{ name: string; status: "pass" | "fail"; exitCode: number }>;
+    validators: ValidationReportValidator[];
+    /** RFC-1296: set when validators were copied from an earlier report. */
+    reusedFrom?: string;
+    /** RFC-1296: why a reuse-path report is not a pass. */
+    reason?: string;
   };
   build: {
     succeeded: boolean;
@@ -692,20 +708,12 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
               buildResult.stderr.trim() || `astro build exited ${buildResult.exitCode}`,
             );
           }
-          const buildOutput = buildResult.stdout;
           c.buildSucceeded = true;
-          const routeMatches = buildOutput.match(/\d+ page\(s\)/g);
-          if (routeMatches) {
-            const nums = routeMatches.map((m) => parseInt(m, 10));
-            c.routeCount = Math.max(...nums, 0);
-          }
-          const sitemapPath = path.join(c.workpieceDir, "dist", "sitemap-index.xml");
-          if (await c.io.exists(sitemapPath)) {
-            const { byteHashFile } = await import("@warpgogol/werkstatt-engine/fingerprint");
-            c.sitemapHash = await byteHashFile(sitemapPath);
-          } else {
-            c.sitemapHash = "sha256:no-sitemap";
-          }
+          // RFC-1296: honest dist facts — count rendered non-redirect pages and
+          // hash the sitemap at its real adapter-specific location.
+          const facts = await computeDistFacts(path.join(c.workpieceDir, "dist"), c.io);
+          c.routeCount = facts.routeCount;
+          c.sitemapHash = facts.sitemapHash;
         } catch (err) {
           c.buildError = err instanceof Error ? err.message : String(err);
           c.logger.info(`  Build failed: ${c.buildError}`);
@@ -730,15 +738,13 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
         // RFC-1086: skip build.post if --fast, no cascade, and previous report shows build succeeded
         if (c.fast && !c.cascadeRerun && c.previousReport && c.previousReport.build.succeeded) {
           c.logger.info("  Skipping build.post (passed in previous run)");
-          // Still need to write the validation report
+          // Still need to write the validation report.
+          // RFC-1296: reuse without validator evidence is not a pass.
           c.now = new Date().toISOString();
           const report = {
             schemaVersion: "1.0.0",
             missionId: c.missionId,
-            contractFull: {
-              passed: true,
-              validators: c.previousReport.contractFull.validators,
-            },
+            contractFull: contractFullFromPrevious(c.previousReport),
             build: {
               succeeded: true,
               routeCount: c.routeCount,
@@ -857,17 +863,14 @@ export function buildValidateSteps(_ctx: ValidateStepCtx): OperationStep<Validat
         c.now = new Date().toISOString();
         const passed = c.staticPassed && c.buildSucceeded;
         const buildDiagnostics = c.buildError ? buildFailureDiagnostics(c.buildError) : [];
+        // RFC-1296: per-validator diagnostics summary — errors/warnings per
+        // rule, and build.post steps are recorded too (tagged by pipeline).
         const report = {
           schemaVersion: "1.0.0",
           missionId: c.missionId,
           contractFull: {
             passed,
-            validators:
-              c.pipelineReport?.steps.map((s) => ({
-                name: s.commandName,
-                status: s.ok ? "pass" : "fail",
-                exitCode: s.exitCode,
-              })) ?? [],
+            validators: validatorsFromPipelineReports(c.pipelineReport, c.postPipelineReport),
           },
           build: {
             succeeded: c.buildSucceeded,
@@ -1067,29 +1070,23 @@ export async function runMissionValidate(
           await copyDir(distributionDistDir, workpieceDistDir, context.io);
         }
 
-        // Read build-manifest.json for routeCount and sitemapHash if available
-        let reusedRouteCount = 0;
-        let reusedSitemapHash = "sha256:reused";
-        try {
-          const buildManifestPath = path.join(distributionDir, "build-manifest.json");
-          if (await context.io.exists(buildManifestPath)) {
-            const manifestData = JSON.parse(await context.io.readFile(buildManifestPath));
-            reusedRouteCount = manifestData.routeCount ?? 0;
-            reusedSitemapHash = manifestData.sitemapHash ?? "sha256:reused";
-          }
-        } catch {
-          // Manifest missing or corrupt — use defaults
-        }
+        // RFC-1296: derive dist facts from the reused distribution tree, not
+        // the build-manifest — the tree is the evidence.
+        const distFacts = await computeDistFacts(distributionDistDir, context.io);
+
+        // RFC-1296: reuse the previous report's validator evidence; reuse
+        // without evidence is not a pass — the operator reruns a full validate.
+        const previousReport = await readPreviousValidationReport(evidenceDir, context.io);
 
         const now = new Date().toISOString();
         const reusedReport = {
           schemaVersion: "1.0.0",
           missionId,
-          contractFull: { passed: true, validators: [] },
+          contractFull: contractFullFromPrevious(previousReport),
           build: {
             succeeded: true,
-            routeCount: reusedRouteCount,
-            sitemapHash: reusedSitemapHash,
+            routeCount: distFacts.routeCount,
+            sitemapHash: distFacts.sitemapHash,
           },
           distributionReused: true,
           buildInputHash: storedHash,
@@ -1619,17 +1616,11 @@ export async function runMissionBuild(
       if (buildResult.exitCode !== 0) {
         throw new Error(buildResult.stderr.trim() || `astro build exited ${buildResult.exitCode}`);
       }
-      const buildOutput = buildResult.stdout;
-      const routeMatches = buildOutput.match(/\d+ page\(s\)/g);
-      if (routeMatches) {
-        const nums = routeMatches.map((m) => parseInt(m, 10));
-        buildRouteCount = Math.max(...nums, 0);
-      }
-      const sitemapPath = path.join(workpieceDir, "dist", "sitemap-index.xml");
-      if (await context.io.exists(sitemapPath)) {
-        const { byteHashFile } = await import("@warpgogol/werkstatt-engine/fingerprint");
-        buildSitemapHash = await byteHashFile(sitemapPath);
-      }
+      // RFC-1296: honest dist facts — count rendered non-redirect pages and
+      // hash the sitemap at its real adapter-specific location.
+      const facts = await computeDistFacts(path.join(workpieceDir, "dist"), context.io);
+      buildRouteCount = facts.routeCount;
+      buildSitemapHash = facts.sitemapHash;
     } catch (err) {
       buildError = err instanceof Error ? err.message : String(err);
       logger.info(`  Astro build failed: ${buildError}`);

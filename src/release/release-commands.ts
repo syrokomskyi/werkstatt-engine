@@ -6,12 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>REVIEW-CODE-2026-10-01-01: bootSmokeAppliesToAdapter resolves the adapter and reads bootSmokeCapable() — new static adapters opt out in their own file; unknown names keep boot-smoke (strict default).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
   <item>RFC-1290: rendered-text corpus + release text diff</item>
-  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931, RFC-0948, RFC-1097, warpgogol-m000196</history>
+  <item>RFC-1296</item>
+  <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931, RFC-0948, RFC-1097, RFC-1149, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 
 HARDCODED_VALUES_AUDIT (RFC-0980):
@@ -94,6 +94,7 @@ import {
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
 import { filterEnv, resolveAdapter } from "../leitstand/adapters/index.ts";
 import { runIntegrityBuildRecord } from "../integrity/integrity-commands.ts";
+import { writeContentWarnings } from "./content-warnings.ts";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   releaseManifestSchema,
@@ -374,6 +375,11 @@ export async function runReleasePrepare(
           }
         }
       }
+
+      // RFC-1296: content warning budget — warnings per content-contract rule
+      // plus the delta against the previous release. Increases require an
+      // operator's --warnings-ack in the editorial sign-off (EDIT-05).
+      await writeContentWarnings(workspaceRoot, stagingDir, systemId, releaseId, context.io);
 
       // RFC-0585: Run production build (or reuse distribution), capture snapshots, compute hashes
       const workpieceDir = path.join(missionDir, "workpiece");
