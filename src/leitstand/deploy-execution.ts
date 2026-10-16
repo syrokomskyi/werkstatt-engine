@@ -34,6 +34,7 @@ F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
   <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188</history>
+  <item>RFC-1297: buildAuthHeader re-exported from sternsystem/live-drift.ts (canonical home); gate selection uses gateForChannel.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -57,7 +58,11 @@ import {
 } from "./leitstand-commands.ts";
 import type { AuthorizeOutcome } from "./deploy-helpers.ts";
 import type { DeploymentEffectRecordV1 } from "../certification/deployment/authority.ts";
-import { buildEffectRecord, writeDeploymentEffectRecord } from "./deploy-helpers.ts";
+import {
+  buildEffectRecord,
+  writeDeploymentEffectRecord,
+  gateForChannel,
+} from "./deploy-helpers.ts";
 import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import {
   writeSystemStateSmart,
@@ -76,6 +81,12 @@ import {
 } from "../integrity/signing.ts";
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+// RFC-1297: canonical home moved to sternsystem/live-drift.ts so
+// sternsystem.validate / ship preflight / rollback share the same PIN header;
+// re-exported here so existing imports and test mocks keep working.
+import { buildAuthHeader } from "../sternsystem/live-drift.ts";
+
+export { buildAuthHeader };
 
 const noopLogger = {
   info: (_m: string) => {},
@@ -85,12 +96,6 @@ const noopLogger = {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export function buildAuthHeader(pin: string | null | undefined): Record<string, string> {
-  if (!pin) return {};
-  const credentials = btoa(`warp:${pin}`);
-  return { Authorization: `Basic ${credentials}` };
 }
 
 const HEALTH_CHECK_MAX_ATTEMPTS = 3;
@@ -334,8 +339,7 @@ export async function executeDeployPhases(
   let agentContractCheck: AgentContractCheckResult | undefined;
   let accessReconcile: DeployExecutionResult["accessReconcile"];
 
-  const gate =
-    channel === "dev" ? "dev-deploy" : channel === "alt" ? "propagate-alt" : "promote-main";
+  const gate = gateForChannel(channel);
 
   const _effectRecord = buildEffectRecord(
     ctx.operationId,

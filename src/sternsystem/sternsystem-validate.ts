@@ -30,6 +30,7 @@ F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
   <history>ADR-0082, ADR-0088, ADR-0091, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
+  <item>RFC-1297: LIVE-01/02 live-channel drift checks alongside ACCESS-01/02 — same transport-failure-warns semantics.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -65,6 +66,7 @@ import {
 import { collectEnvFiles } from "../mission/env-persist.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 import { readPassport } from "./registry-io.ts";
+import { readLiveChannelStates, liveDriftDiagnostics } from "./live-drift.ts";
 import { verifyPassport, buildPassportPayload, computePassportHash } from "./passport.ts";
 import {
   isBordbuchDriftBookkeepingOnly,
@@ -990,6 +992,30 @@ export async function runSternsystemValidate(
       await checkAccessProtection(entry, accessState, violations, warnings);
     } catch {
       // Non-fatal — access protection checks skipped
+    }
+
+    // RFC-1297: LIVE-01/02 — recorded (system-state.yaml lastPropagated) vs
+    // live (build-identity.json) release drift. Same transport-failure
+    // semantics as ACCESS-01: inconclusive probes warn, never violate.
+    try {
+      const liveStates = await readLiveChannelStates({
+        workspaceRoot,
+        systemId: entry.id,
+        io: context.io,
+      });
+      for (const d of liveDriftDiagnostics(liveStates, entry.id)) {
+        if (d.severity === "error") {
+          violations.push({
+            systemId: entry.id,
+            rule: d.ruleId,
+            message: d.fixHint ? `${d.message} — ${d.fixHint}` : d.message,
+          });
+        } else {
+          warnings.push({ systemId: entry.id, field: d.ruleId, message: d.message });
+        }
+      }
+    } catch {
+      // Non-fatal — live drift checks skipped
     }
 
     // RFC-1034: STERN-CONFIG-RESOLVE-01 — check if cache clone's kernel.config.ts can be loaded

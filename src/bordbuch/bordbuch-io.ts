@@ -14,6 +14,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1295</item>
   <history>RFC-0355, RFC-0473, RFC-0477, RFC-0574, RFC-0580, RFC-0583, RFC-0706, RFC-0715, RFC-0724, RFC-0994, RFC-1097</history>
+  <item>RFC-1297: leitstand actor gains deployment-rolled-back + live-state-reconciled kinds.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -71,7 +72,7 @@ const WRITER_ROLE_KINDS: Record<string, BordbuchEntryKind[]> = {
   ],
   release: ["release-ready", "release-rolled-back"],
   sternsystem: ["pin-update"],
-  leitstand: ["deployment"],
+  leitstand: ["deployment", "deployment-rolled-back", "live-state-reconciled"],
   notausgang: ["notausgang-export"],
   operator: ["operator-note", "erratum", "editorial-signoff"],
   runtime: ["pseo", "indexnow.submit"],

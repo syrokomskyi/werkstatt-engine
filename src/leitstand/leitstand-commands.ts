@@ -29,6 +29,7 @@ F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
   <history>REVIEW-CODE-2026, RFC-0358, RFC-0379, RFC-0587, RFC-0608, RFC-0624, RFC-0627, RFC-0628, RFC-0629, RFC-0634, RFC-0649, RFC-0652, RFC-0653, RFC-0656, RFC-0657, RFC-0665, RFC-0668, RFC-0689, RFC-0697, RFC-0698, RFC-0700, RFC-0747, RFC-0829, RFC-0842, RFC-0866, RFC-0927, RFC-0930, RFC-0948, RFC-1097, RFC-1126, RFC-1136, RFC-1138, RFC-1149, RFC-1188, RFC-1203</history>
+  <item>RFC-1297: fetchChannelBuildIdentity moved to sternsystem/live-drift.ts (shared live-probe); rollback effect record uses gateForChannel; succeeded site rollbacks call recordSiteRollback (lastPropagated + deployment-rolled-back Bordbuch).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -60,6 +61,7 @@ import {
   verifyCloudflareToken,
   BUILD_IDENTITY_PATH,
 } from "./cache-purge.ts";
+import { recordSiteRollback } from "./rollback-state.ts";
 import { artifactStorePreflight } from "../artifact-store/index.ts";
 import { resolveOutboundAgentClient } from "./wba-signer.ts";
 import { verifyBuildIdentitySignature } from "../integrity/signing.ts";
@@ -77,8 +79,10 @@ import {
   resolveArtifactHash,
   resolveGateDecisionPath,
   flagSite,
+  gateForChannel,
 } from "./deploy-helpers.ts";
 import { buildAuthHeader } from "./deploy-execution.ts";
+import { fetchChannelBuildIdentity } from "../sternsystem/live-drift.ts";
 import type { Sha256Digest } from "@warpgogol/werkstatt-shared/fingerprint";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
@@ -1897,11 +1901,12 @@ async function runSiteRollback(
       }
     }
 
-    // Write deployment effect record
+    // Write deployment effect record — RFC-1297: the record carries the
+    // channel's real gate, not a hardcoded dev-deploy.
     const effectRecord = buildEffectRecord(
       operationId,
       systemId,
-      "dev-deploy",
+      gateForChannel(channel),
       channel,
       "" as Sha256Digest,
       operationId,
@@ -1913,6 +1918,23 @@ async function runSiteRollback(
       rollbackTarget.releaseId,
     );
     await writeDeploymentEffectRecord(cacheCloneDir, effectRecord);
+
+    // RFC-1297: record the rollback outcome — lastPropagated[channel] names the
+    // release now live (state "rolled-back") and Bordbuch carries a
+    // deployment-rolled-back event. Without this, pipeline rollbacks diverged
+    // recorded vs live state silently.
+    let recordedReleaseId: string | null = null;
+    if (rollbackResult.state === "succeeded") {
+      const recorded = await recordSiteRollback({
+        workspaceRoot,
+        systemId,
+        channel,
+        operationId,
+        rollbackTarget,
+        io,
+      });
+      recordedReleaseId = recorded.releaseId;
+    }
 
     const completedAt = new Date().toISOString();
     const data: LeitstandRollbackData = {
@@ -1944,16 +1966,26 @@ async function runSiteRollback(
       } as unknown as KernelCommandResult<LeitstandRollbackData>;
     }
 
+    const nextSteps: Array<{ action: string; kind: "optional" | "required" }> = [
+      {
+        action: `Verify health: pnpm exec werkstatt run leitstand.health --site ${systemId} --channel ${channel}`,
+        kind: "optional",
+      },
+    ];
+    if (recordedReleaseId === null) {
+      // RFC-1297: the rollback succeeded but the live release could not be
+      // named — reality must be recorded deliberately by the operator.
+      nextSteps.push({
+        action: `Live release unknown after rollback — run leitstand.verify --site ${systemId}, then record reality: pnpm exec werkstatt run leitstand.state.reconcile --site ${systemId} --channel ${channel} --from-live --reason "…"`,
+        kind: "required",
+      });
+    }
+
     return {
       data,
       exitCode: 0,
       summary: `[leitstand.rollback] ${systemId}: rolled back to ${rollbackTarget.releaseId ?? "previous deployment"}${rollbackTarget.versionId ? ` (version ${rollbackTarget.versionId})` : ""}`,
-      nextSteps: [
-        {
-          action: `Verify health: pnpm exec werkstatt run leitstand.health --site ${systemId} --channel ${channel}`,
-          kind: "optional",
-        },
-      ],
+      nextSteps,
     } as unknown as KernelCommandResult<LeitstandRollbackData>;
   } finally {
     // Clean up temp directory
@@ -2600,72 +2632,6 @@ function flagNumberDefault(input: KernelCommandInput, key: string, defaultValue:
     if (!Number.isNaN(n)) return n;
   }
   return defaultValue;
-}
-
-async function fetchChannelBuildIdentity(
-  channel: Channel,
-  url: string,
-  authHeaders: Record<string, string>,
-  timeoutMs: number,
-  fetchImpl: typeof fetch = fetch,
-): Promise<{
-  reachable: boolean;
-  httpStatus: number | null;
-  buildIdentity: LeitstandVerifyChannel["buildIdentity"];
-  error: string | null;
-}> {
-  const base = url.replace(/\/$/, "");
-  const fetchUrl = `${base}${BUILD_IDENTITY_PATH}`;
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    timer = setTimeout(() => controller.abort(), timeoutMs);
-    const response = await fetchImpl(fetchUrl, {
-      headers: authHeaders,
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      return {
-        reachable: response.status < 500,
-        httpStatus: response.status,
-        buildIdentity: null,
-        error:
-          response.status === 404 ? "build-identity.json not found" : `HTTP ${response.status}`,
-      };
-    }
-    const body = (await response.json()) as {
-      distTreeHash?: string;
-      releaseId?: string;
-      missionId?: string;
-      buildTimestamp?: string;
-    };
-    return {
-      reachable: true,
-      httpStatus: response.status,
-      buildIdentity: {
-        distTreeHash: body.distTreeHash ?? null,
-        releaseId: body.releaseId ?? null,
-        missionId: body.missionId ?? null,
-        buildTimestamp: body.buildTimestamp ?? null,
-      },
-      error: null,
-    };
-  } catch (err) {
-    const isAbort = err instanceof Error && err.name === "AbortError";
-    return {
-      reachable: false,
-      httpStatus: null,
-      buildIdentity: null,
-      error: isAbort
-        ? `timeout after ${timeoutMs}ms`
-        : err instanceof Error
-          ? err.message
-          : String(err),
-    };
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }
 
 function emptyVerifyResult(

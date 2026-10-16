@@ -21,6 +21,7 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1284: sternsystem.validate declares ACCESS-01/02 rules + system-state.yaml in reads (REVIEW-CODE-2026-10-15-02 F5)</item>
   <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097</history>
+  <item>RFC-1297: sternsystem.validate declares LIVE-01/02 rules.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -114,10 +115,10 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         mutatesState: false,
         execOnReadOnly: true,
         contract: "sternsystem",
-        rules: ["HANDOVER-01", "JRN-01", "ACCESS-01", "ACCESS-02"],
+        rules: ["HANDOVER-01", "JRN-01", "ACCESS-01", "ACCESS-02", "LIVE-01", "LIVE-02"],
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         description:
-          "Validate registry invariants, bundle contract, pin file, and access-protection drift (ACCESS-01/02) for one or all Sternsystems (RFC-0354, RFC-1284). Flags: --id.",
+          "Validate registry invariants, bundle contract, pin file, access-protection drift (ACCESS-01/02), and recorded-vs-live release drift (LIVE-01/02) for one or all Sternsystems (RFC-0354, RFC-1284, RFC-1297). Flags: --id.",
         scope: "workspace",
         acceptsAllFlag: false,
         flags: {

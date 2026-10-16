@@ -18,6 +18,7 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
   <item>RFC-1219: --resume logs the interrupted failed step (status/failedStep from findIncompleteOperation); formatShipTransition renders op-interrupted as "[ship] interrupted at step — run with --resume" for live followers.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, warpgogol-m000175</history>
+  <item>RFC-1297: preflight step 2b — readLiveChannelStates + liveDriftDiagnostics; LIVE-01 aborts the ship with a resolve-first hint, LIVE-02 logs only.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -33,6 +34,7 @@ import { getOrBuildWorkspaceRegistry } from "../kernel/runtime/registry-cache.ts
 import { runOperation, findIncompleteOperation } from "../journal/index.ts";
 import type { OperationDefinition, OperationStep, StepResult } from "../journal/index.ts";
 import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
+import { readLiveChannelStates, liveDriftDiagnostics } from "../sternsystem/live-drift.ts";
 import { resolveMissionDir } from "../kernel/mission-resolver.ts";
 import { flagSite } from "./deploy-helpers.ts";
 
@@ -242,6 +244,35 @@ function buildPreflightStep(): OperationStep<ShipContext> {
         throw new Error(`preflight: leitstand.status failed: ${statusResult.summary ?? ""}`);
       }
       ctx.logger.info("  [ship] preflight: channel-drift report ok");
+
+      // 2b. RFC-1297: recorded-vs-live release drift — shipping on a false
+      // premise about what is live is worse than a blocked ship. LIVE-02
+      // (inconclusive probe) only logs.
+      let liveDiags: ReturnType<typeof liveDriftDiagnostics> | null = null;
+      try {
+        const liveStates = await readLiveChannelStates({
+          workspaceRoot: ctx.workspaceRoot,
+          systemId: ctx.systemId,
+          io: ctx.io,
+        });
+        liveDiags = liveDriftDiagnostics(liveStates, ctx.systemId);
+      } catch (err) {
+        ctx.logger.info(
+          `  [ship] preflight: live-drift check skipped (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+      if (liveDiags !== null) {
+        for (const d of liveDiags) {
+          if (d.severity === "warning") ctx.logger.info(`  [ship] preflight: ${d.message}`);
+        }
+        const drifted = liveDiags.filter((d) => d.severity === "error");
+        if (drifted.length > 0) {
+          throw new Error(
+            `preflight: live drift — ${drifted.map((d) => d.message).join("; ")}. Run leitstand.verify --site ${ctx.systemId} and resolve before shipping (RFC-1297).`,
+          );
+        }
+        ctx.logger.info("  [ship] preflight: live-drift check ok");
+      }
 
       // 3. Vectorize index ensure (best-effort, non-fatal — same pattern as deploy-execution.ts)
       try {

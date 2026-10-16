@@ -23,6 +23,7 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
   <item>RFC-1248: suppress transient releases/.werkstatt/ validator reads + complete PIPELINE-LOG rules declaration (RFC-1248 review r2)</item>
   <item>RFC-1284: register leitstand.access.suspend/resume; sternsystem.validate gains ACCESS-01/02 rules declaration</item>
   <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1190, RFC-1203</history>
+  <item>RFC-1297: registered leitstand.state.reconcile (--site/--channel/--from-live/--reason; mutatesState, requiresNetwork).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -70,6 +71,7 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
     runLeitstandAccessResume,
     runLeitstandAccessStatus,
   } = await import("./access-commands.ts");
+  const { runLeitstandStateReconcile } = await import("./state-reconcile.ts");
   return {
     name: "leitstand",
     version: "0.1.0",
@@ -338,6 +340,49 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         ],
         cacheable: false,
         execute: runLeitstandRollback,
+      },
+      {
+        name: "leitstand.state.reconcile",
+        coverage: "operator" as const,
+        modulePath: "packages/werkstatt-engine/src/leitstand/leitstand.module.ts",
+        generates: [],
+        description:
+          "Record the observed live release of one channel into system-state.yaml (state reconciled) and append a live-state-reconciled Bordbuch event — the sanctioned operator remedy for LIVE-01 drift (RFC-1297). Flags: --site, --channel dev|alt|main, --from-live, --reason <text>, [--json].",
+        scope: "workspace",
+        acceptsAllFlag: false,
+        mutatesState: true,
+        requiresNetwork: true,
+        flags: {
+          site: { kind: "string", required: true, description: "Sternsystem id." },
+          system: { kind: "string", description: "Alias for --site." },
+          channel: {
+            kind: "string",
+            required: true,
+            description: "Deployment channel: dev, alt, or main.",
+          },
+          "from-live": {
+            kind: "boolean",
+            required: true,
+            description:
+              "Read the release from the live build-identity.json — the only supported source.",
+          },
+          reason: {
+            kind: "string",
+            required: true,
+            description: "Accountable justification for recording the live state (>= 10 chars).",
+          },
+          json: { kind: "boolean", description: "Emit the result as JSON." },
+        },
+        writes: [
+          "../systems-cache/{system}/system-state.yaml",
+          "../systems-cache/{system}/bordbuch/events.ndjson",
+        ],
+        reads: [
+          "../systems-cache/{system}/system-config.yaml",
+          "../systems-cache/{system}/system-state.yaml",
+        ],
+        cacheable: false,
+        execute: runLeitstandStateReconcile,
       },
       {
         name: "leitstand.health",

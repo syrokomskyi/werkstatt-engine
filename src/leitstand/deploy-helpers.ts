@@ -21,6 +21,7 @@ resolveArtifactHash returns { hash, source } (flag | artifact.tar.gz | release.y
 resolveArtifactHash returns path alongside { hash, source } and all 4 leitstand log lines report the resolved file path (AC-4). New AC-bound tests: config-regenerate-drift-guard.test.ts (AC-1 warn + AC-6 strict no-write), runtime/tests/workpiece-env.test.ts (AC-2 precedence). RFC probe paths updated to actual test locations.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <history>RFC-0865, RFC-0866, RFC-0926</history>
+  <item>RFC-1297: added gateForChannel — the gate a channel deploy/rollback is recorded under.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -65,6 +66,11 @@ export function flagSite(input: { flags: Record<string, unknown> }): string | un
   const sys = input.flags["system"];
   if (typeof sys === "string") return sys;
   return undefined;
+}
+
+/** RFC-1297: the gate a channel deploy/rollback is recorded under. */
+export function gateForChannel(channel: "dev" | "alt" | "main"): CertificationGate {
+  return channel === "dev" ? "dev-deploy" : channel === "alt" ? "propagate-alt" : "promote-main";
 }
 
 export interface GateDecisionInput {
