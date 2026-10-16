@@ -10,6 +10,7 @@
   <item>REVIEW-CODE-2026-10-01-01: bootSmokeAppliesToAdapter resolves the adapter and reads bootSmokeCapable() — new static adapters opt out in their own file; unknown names keep boot-smoke (strict default).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
+  <item>RFC-1290: rendered-text corpus + release text diff</item>
   <history>ADR-0008, RFC-0357, RFC-0381, RFC-0480, RFC-0520, RFC-0522, RFC-0585, RFC-0596, RFC-0608, RFC-0655, RFC-0656, RFC-0845, RFC-0931, RFC-0948, RFC-1097, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 
@@ -78,6 +79,7 @@ import {
 import { runPipelinePhase, computeBuildInputHash } from "../handoff/build-pipeline-helpers.ts";
 import { evaluateCSurfaceGate } from "./c-surface-guard.ts";
 import { checkBreaksCDeclaration } from "./breaks-c-helper.ts";
+import { copyReleaseEvidence } from "./release-evidence.ts";
 import {
   runBehaviorSnapshotCapture,
   runBehaviorSnapshotDiff,
@@ -650,6 +652,36 @@ export async function runReleasePrepare(
         );
       } else {
         logger.warn(`  wrangler.jsonc not found — skipping boot-smoke (no worker to verify)`);
+      }
+
+      // RFC-1290: carry the workpiece's .werkstatt/release-evidence/*.json into
+      // the release and verify the text corpus hash against the staged dist —
+      // stale evidence is false evidence (DNA-106). Then record the
+      // release-to-release rendered-text diff via the site command by name.
+      await copyReleaseEvidence(workpieceDir, stagingDir, context.io);
+      try {
+        const textDiffResult = (await executeKernelCommand({
+          workspaceRoot,
+          commandName: "text.corpus.diff",
+          siteName: systemId,
+          argv: ["--to", "working", "--out", stagingDir],
+          outputFormat: "json",
+          siteExplicit: true,
+        })) as { exitCode?: number; summary?: string };
+        if ((textDiffResult.exitCode ?? 1) !== 0) {
+          throw new Error(
+            `[release.prepare] text.corpus.diff failed — ${textDiffResult.summary ?? "no summary"}`,
+          );
+        }
+        logger.info(`  text-diff recorded: ${textDiffResult.summary ?? ""}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // Non-site profiles carry no text.corpus.diff — absence is not failure.
+        if (message.includes("is not registered") || message.includes("No target site")) {
+          logger.info(`  text.corpus.diff not registered — skipping text-diff`);
+        } else {
+          throw err;
+        }
       }
 
       const now = new Date().toISOString();
