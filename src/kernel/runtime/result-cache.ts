@@ -22,6 +22,7 @@ RFC-0685 mtime fast path, and the RFC-1130 cacheBypassFlags gate.
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
   <item>RFC-1193: review findings (discriminated union, dead condition, fixture)</item>
+  <item>RFC-1303: review REVIEW-CODE-2026-10-16-02 — scanner moves to werkstatt-shared/node (IO-01), workpieceEnv hashes into envDigest, saveCache tolerates KERNEL-META-01, ENV-INPUT-02 coverage notice, ratchet path-arg tightening</item>
 </CHANGE_SUMMARY>
 */
 
@@ -92,12 +93,18 @@ export function computeFlagsHash(flags: Record<string, unknown>): string {
  * when the command declares no env inputs, keeping pre-RFC-1303 cache keys
  * valid for unaffected commands.
  */
-export function computeEnvDigest(envInputs: string[] | undefined): string {
+export function computeEnvDigest(
+  envInputs: string[] | undefined,
+  workpieceEnv?: ReadonlyMap<string, string>,
+): string {
   if (!envInputs || envInputs.length === 0) return "";
   const pairs = [...envInputs].sort().map(
     (name) =>
       `${name}=${createHash("sha256")
-        .update(process.env[name] ?? "")
+        // RFC-1126 resolution order: process.env wins, then the workpiece
+        // .env channel — hash the effective value so a .env-only change
+        // invalidates the cache like a process.env change (REVIEW-RFC-1303-02).
+        .update(process.env[name] ?? workpieceEnv?.get(name) ?? "")
         .digest("hex")}`,
   );
   return stableJsonHash(pairs);
@@ -151,6 +158,8 @@ export interface CommandResultCacheCall {
   baseDir: string;
   workspaceRoot: string;
   siteName: string | null;
+  /** Workpiece .env channel (RFC-1126) — hashed into envDigest alongside process.env. */
+  workpieceEnv?: ReadonlyMap<string, string>;
   force: boolean;
   dryRun: boolean;
 }
@@ -197,7 +206,7 @@ export async function readCommandResult(
 
   const reads = call.command.reads ?? [];
   const flagsHash = computeFlagsHash(call.flags);
-  const envDigest = computeEnvDigest(call.command.envInputs);
+  const envDigest = computeEnvDigest(call.command.envInputs, call.workpieceEnv);
   const moduleResolved = await resolveModuleSrcDir(call.command, call.workspaceRoot, io);
   const moduleHashCache = cache.moduleHashCache ?? new Map<string, string>();
 
@@ -280,7 +289,7 @@ export async function writeCommandResult(
 
   const reads = call.command.reads ?? [];
   const flagsHash = computeFlagsHash(call.flags);
-  const envDigest = computeEnvDigest(call.command.envInputs);
+  const envDigest = computeEnvDigest(call.command.envInputs, call.workpieceEnv);
   const { hash: baseInputsHash, metadata } = await computeInputsHash(
     reads,
     call.baseDir,

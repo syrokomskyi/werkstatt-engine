@@ -50,6 +50,7 @@ function makeContext(
   resultCache?: KernelResultCacheContext,
   force = false,
   dryRun = false,
+  workpieceEnv: ReadonlyMap<string, string> = EMPTY_WORKPIECE_ENV,
 ): KernelRuntimeContext {
   const { io, intents } = createDefaultIO();
   return {
@@ -67,7 +68,7 @@ function makeContext(
       commands: new Map(),
       pipelines: new Map(),
     } as unknown as ActualState,
-    workpieceEnv: EMPTY_WORKPIECE_ENV,
+    workpieceEnv,
     resultCache,
   };
 }
@@ -209,6 +210,34 @@ describe("RFC-1133: direct-path command-result cache", () => {
     const unset = await executeRegisteredCommand(cmd, ctx, []);
     expect(unset.cached).toBeFalsy();
     expect(executions.count).toBe(3);
+  });
+
+  test("RFC-1303 REVIEW-02: a workpieceEnv (.env channel) change busts the cache like process.env", async () => {
+    const executions = { count: 0 };
+    const cmd = makeCommand(executions, { envInputs: ["RFC1303_TEST_ENV"] });
+    const cache = cacheCtx();
+    delete process.env.RFC1303_TEST_ENV; // process.env unset → workpieceEnv channel decides
+
+    const envA = makeContext(tmpDir, cache, false, false, new Map([["RFC1303_TEST_ENV", "a"]]));
+    await executeRegisteredCommand(cmd, envA, []);
+    const envB = makeContext(tmpDir, cache, false, false, new Map([["RFC1303_TEST_ENV", "b"]]));
+    const miss = await executeRegisteredCommand(cmd, envB, []);
+    expect(miss.cached).toBeFalsy();
+    expect(executions.count).toBe(2);
+
+    // process.env wins over workpieceEnv — same effective value replays.
+    vi.stubEnv("RFC1303_TEST_ENV", "b");
+    const envStale = makeContext(
+      tmpDir,
+      cache,
+      false,
+      false,
+      new Map([["RFC1303_TEST_ENV", "zzz"]]),
+    );
+    const hit = await executeRegisteredCommand(cmd, envStale, []);
+    expect(hit.cached).toBe(true);
+    expect(executions.count).toBe(2);
+    vi.unstubAllEnvs();
   });
 
   test("RFC-1303: envInputs order does not fragment the key; undeclared env changes do not", async () => {

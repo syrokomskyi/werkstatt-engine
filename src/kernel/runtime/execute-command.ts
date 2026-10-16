@@ -14,7 +14,6 @@ resolves a workspace-scoped or app-scoped command from CLI options and runs it.
   <item>A command runs against its resolved runtime context — no ambient state is read.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
 
 Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
@@ -26,7 +25,8 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
 KernelRuntimeContext.allSites populated from options.allSites at all three executor context sites (workspace path, app-scope fast path, fallback registry path). executeRegisteredCommand injects input.flags.all = true when context.allSites and the command declares the flag — after flag resolution, before the RFC-1133 cache-key computation so cached and fresh executions see identical flags.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1260: resolve cache clones via system-config.yaml — package.json gate left the RFC-1025 fallback dead for every real clone; executor-guard mutating commands against mirror targets</item>
-  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126, RFC-1133</history>
+  <item>RFC-1303: review REVIEW-CODE-2026-10-16-02 — scanner moves to werkstatt-shared/node (IO-01), workpieceEnv hashes into envDigest, saveCache tolerates KERNEL-META-01, ENV-INPUT-02 coverage notice, ratchet path-arg tightening</item>
+  <history>ADR-0022, ADR-0087, KERNEL-FLAG-02, RFC-0303, RFC-0326, RFC-0579, RFC-0635, RFC-0842, RFC-0870, RFC-0960, RFC-1026, RFC-1027, RFC-1097, RFC-1126, RFC-1133, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -300,6 +300,7 @@ export async function executeRegisteredCommand(
     baseDir: context.site?.directory ?? context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     siteName: context.site?.name ?? null,
+    workpieceEnv: context.workpieceEnv,
     force: context.force ?? false,
     dryRun: context.dryRun ?? false,
   };
