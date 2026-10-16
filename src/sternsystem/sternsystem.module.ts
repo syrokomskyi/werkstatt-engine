@@ -7,21 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1141: KERNEL-FLAG-07 helper-mediated flag reads in kernel.flags.lint
-
-FLAG_READING_HELPERS registry (fixed flags | arg-position union) + findHelperMediatedFlagReads: schema-carrying commands calling a registered helper must declare every flag it reads. Seeds: resolveDeploymentMode fixed [mode]; flagString/readFlag arg 1. rules array now lists all four rule IDs (DNA-91). Declared the read flags on seven latent violators the rule caught: mode on llms.generate, semantic.parity, page.markdown.generate, deployment.gate.validate; mirrors on sternsystem.extract; gate-decision on leitstand.rollback; workpiece-dir on workpiece.imports.validate. 4 new tests (AC-1/2/4/5); lint lands green with zero KERNEL-FLAG-07.</item>
-  <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
-  <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
-
-Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
-follows the parsed selector. Guard renamed assertAllSitesAllowed ->
-assertAllFlagAccepted, message updated. 417 declaration sites + type
-surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1231: sternsystem.status opts into --all (acceptsAllFlag: true — selector lands in flags.all); sternsystem.sync flag renamed all -> all-branches so the reserved token stays gated off.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1284: sternsystem.validate declares ACCESS-01/02 rules + system-state.yaml in reads (REVIEW-CODE-2026-10-15-02 F5)</item>
-  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097</history>
   <item>RFC-1297: sternsystem.validate declares LIVE-01/02 rules.</item>
+  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
+  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097, RFC-1141, RFC-1173, RFC-1231</history>
 </CHANGE_SUMMARY>
 */
 
@@ -51,7 +42,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         modulePath: "packages/werkstatt-engine/src/sternsystem/sternsystem.module.ts",
         generates: [],
         description:
-          "Register a new Sternsystem: create system-config.yaml, system-state.yaml, pin, content stubs, open first mission, and trigger materialization (RFC-0354, RFC-0532, RFC-0790). Flags: --id, --cosmicStar, --repo, [--platform], [--mirror], [--owner], [--amend], [--amend-id].",
+          "Register a new Sternsystem from a validated werkstatt:intake/v1 bundle: create system-config.yaml, system-state.yaml (with onboarding provenance), pin, seed system.md + primary-locale business-profile PBP documents + publishable assets deterministically, open first mission, and trigger materialization (RFC-0354, RFC-0790, RFC-1307). Flags: --id, --cosmicStar, --intake, --biome, --mirrors, [--platform], [--owner], [--amend], [--amend-id].",
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
@@ -79,6 +70,16 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
             description:
               "VC subject id (did:web:<domain>#<key-version>) for site owner (RFC-0561).",
           },
+          intake: {
+            kind: "string",
+            description:
+              "werkstatt:intake/v1 bundle directory (required for new registration, rejected with --amend). Must pass onboarding.intake.validate (RFC-1307).",
+          },
+          biome: {
+            kind: "string",
+            description:
+              "Client biome id from biome.from-intake (required for new registration, rejected with --amend); checked via biome.contract.validate --biome (RFC-1307).",
+          },
           amend: {
             kind: "boolean",
             description: "Amend an existing Sternsystem instead of creating a new one.",
@@ -93,8 +94,13 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           "../systems-cache/{id}/system-state.yaml",
           "../systems-cache/{id}/system.pin.json",
           "../systems-cache/{id}/src/content/system.md",
+          "../systems-cache/{id}/src/content/business-profile/**",
         ],
-        reads: ["../systems-cache/*/system-config.yaml", "onboarding/{id}/.input/00-brief.md"],
+        reads: [
+          "../systems-cache/*/system-config.yaml",
+          "onboarding/{id}/.input/intake/**",
+          "packages/werkstatt-site/src/domain/ontology/biomes/*.yaml",
+        ],
         cacheable: false,
         execute: runSternsystemRegister,
       },

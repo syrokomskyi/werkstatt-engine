@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0354 §7.1 + RFC-0532: sternsystem.register — add a new Sternsystem to the fleet
-registry, create pin, content stubs, open first mission, and trigger materialization.
+<purpose>RFC-0354 §7.1 + RFC-1307: sternsystem.register — add a new Sternsystem to the fleet
+registry from a validated werkstatt:intake/v1 bundle: create pin, seed system.md, the
+primary-locale business profile and publishable assets deterministically, record the
+intake provenance, open the first mission, and trigger materialization.
 With --amend: update pin and open amend mission without creating a new registry entry.</purpose>
 <non-goals>
   <item>Do not introduce app-specific runtime composition or deployment behavior into this reusable package source file.</item>
@@ -9,7 +11,6 @@ With --amend: update pin and open amend mission without creating a new registry 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0902: reject TLD-suffixed IDs before writing any files.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1293: require timing semantics on time-bound policy fields via contractTerms.gate (RFC-1293)
@@ -41,11 +42,12 @@ neutral 'Lokaler Kontext' — plus a Quellen block listing each distinct
 sourceUrl with its asOf date. Live warpgogol run: 40 LOCALFACT-01 warnings
 across the 12 city demand records — the owner's research backlog; no excerpts,
 review records, or gate flips authored. Canary C11 active.</item>
-  <history>RFC-0354, RFC-0532, RFC-0561</history>
+  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
+  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902</history>
 </CHANGE_SUMMARY>
 */
 
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { cacheCloneCommit } from "../mission/mission-git-commit.ts";
 import type {
   KernelCommandInput,
@@ -54,7 +56,10 @@ import type {
   KernelFlagValue,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { StarCatalog, type StarName } from "@warpgogol/werkstatt-shared/ontology/cosmic";
-import { parseBriefFrontmatter } from "@warpgogol/werkstatt-shared/onboarding";
+import { intakeEnvelopeSchema } from "@warpgogol/werkstatt-shared/onboarding/intake";
+import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
+import { resolveIntakeExportSha256, validateIntakeBundle } from "../intake/intake-validate.ts";
+import { isSeedableAsset, planSeedFromIntake, type IntakeSeedPlan } from "./seed-from-intake.ts";
 import {
   discoverSystems,
   readSystemConfig,
@@ -62,6 +67,8 @@ import {
   hasAppsCollision,
   resolveMirrorPath,
   resolveCacheClonePath,
+  readSystemState,
+  writeSystemState,
 } from "./registry-io.ts";
 import { runSternsystemPin } from "./sternsystem-pin.ts";
 import { identityConfigPath } from "../identity/identity-io.ts";
@@ -83,6 +90,8 @@ export interface SternsystemRegisterData {
   };
   pinPath?: string;
   firstMissionId?: string;
+  /** RFC-1307: what register seeded from the intake. */
+  seed?: { intakeId: string; pbpDocuments: number; assets: number };
   diagnostics: string[];
 }
 
@@ -105,47 +114,105 @@ function makeInput(flags: Record<string, KernelFlagValue>): KernelCommandInput {
   return { flags, argv: [] };
 }
 
-export async function createContentStub(
-  workspaceRoot: string,
-  id: string,
-  systemDir: string,
-  cosmicStar?: string,
-  io: WorkspaceIO = createDefaultIO().io,
-): Promise<void> {
-  const briefPath = join(workspaceRoot, "onboarding", id, ".input", "00-brief.md");
-  if (!(await io.exists(briefPath))) return;
+/**
+ * Ask the site plugin, through the kernel registry, whether a biome id exists
+ * and passes its contract. Returns null when it does, else the reason.
+ */
+async function checkBiomeViaKernel(workspaceRoot: string, biomeId: string): Promise<string | null> {
+  const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+  const result = (await executeKernelCommand({
+    workspaceRoot,
+    commandName: "biome.contract.validate",
+    argv: [`--biome=${biomeId}`],
+    outputFormat: "json",
+  })) as { exitCode?: number; data?: { diagnostics?: Array<{ ruleId: string; message: string }> } };
+  if ((result.exitCode ?? 1) === 0) return null;
+  return (
+    result.data?.diagnostics?.map((d) => `${d.ruleId}: ${d.message}`).join("; ") ||
+    "biome.contract.validate failed"
+  );
+}
 
-  const raw = await io.readFile(briefPath);
-  let brief: ReturnType<typeof parseBriefFrontmatter>;
-  try {
-    brief = parseBriefFrontmatter(raw);
-  } catch {
-    return;
+/** Seams for tests — production code always uses the kernel-registry check. */
+export const registerDeps = { checkBiome: checkBiomeViaKernel, openMission: runMissionOpen };
+
+/**
+ * RFC-1307 preconditions for a new registration — run before any file write.
+ * Returns the parsed envelope, the intake.json digest, and the seedable asset
+ * bytes, or throws with an actionable message.
+ */
+export async function prepareIntakeSeed(
+  input: { id: string; cosmicStar: string; intakeDir: string; biomeId: string },
+  context: KernelRuntimeContext,
+): Promise<IntakeSeedPlan> {
+  const { io, workspaceRoot } = context;
+  const bundleDir = isAbsolute(input.intakeDir)
+    ? input.intakeDir
+    : resolve(workspaceRoot, input.intakeDir);
+
+  const exportInfo = await resolveIntakeExportSha256(io);
+  if (exportInfo === null) {
+    throw new Error(
+      "[sternsystem.register] intake.schema.generated.yaml is missing — run onboarding.intake.schema.export first",
+    );
+  }
+  const validation = await validateIntakeBundle(bundleDir, io, {
+    exportSha256: exportInfo.sha256,
+    bundleLabel: input.intakeDir,
+  });
+  const errors = validation.diagnostics.filter((d) => d.severity === "error");
+  if (errors.length > 0) {
+    const listed = errors
+      .slice(0, 10)
+      .map((d) => `${d.rule}: ${d.message}`)
+      .join("; ");
+    throw new Error(
+      `[sternsystem.register] intake ${input.intakeDir} fails onboarding.intake.validate (${errors.length} error(s)) — ${listed}`,
+    );
   }
 
-  const contentDir = join(systemDir, "src", "content");
-  await io.mkdir(contentDir);
+  const intakeBytes = await io.readFileBytes(join(bundleDir, "intake.json"));
+  const intake = intakeEnvelopeSchema.parse(JSON.parse(new TextDecoder().decode(intakeBytes)));
+  if (intake.systemId !== input.id) {
+    throw new Error(
+      `[sternsystem.register] intake systemId '${intake.systemId}' differs from --id '${input.id}' — provenance follows the envelope`,
+    );
+  }
 
-  const supported = brief.i18n.supported.map((l) => `    ${l}:\n      name: ${l}`).join("\n");
-  const systemMd = `---
-app: ${id}
-version: 1.0.0
-identity:
-  systemStar: ${cosmicStar ?? "Polaris"}
-  biome: handwerk-material-warm
-  domain: ${brief.client.domain}
-i18n:
-  default: ${brief.i18n.default}
-  supported:
-${supported}
-legalJurisdiction: ${brief.legalJurisdiction}
-contractTerms:
-  gate: enforce
-provenance:
-  gate: enforce
----
-`;
-  await io.writeFile(join(contentDir, "system.md"), systemMd);
+  // Biome check through the kernel registry — the engine never imports the
+  // site plugin or hardcodes its catalog path (RFC-1307, RFC-0769).
+  const biomeError = await registerDeps.checkBiome(workspaceRoot, input.biomeId);
+  if (biomeError !== null) {
+    throw new Error(
+      `[sternsystem.register] --biome '${input.biomeId}' rejected — ${biomeError}. Run biome.from-intake --id ${input.id} --family <family-id> first.`,
+    );
+  }
+
+  const assetBytes = new Map<string, Uint8Array>();
+  for (const asset of intake.assets.filter(isSeedableAsset)) {
+    assetBytes.set(asset.id, await io.readFileBytes(join(bundleDir, asset.file)));
+  }
+
+  return planSeedFromIntake({
+    intake,
+    intakeSha256: byteHash(intakeBytes),
+    systemId: input.id,
+    cosmicStar: input.cosmicStar,
+    biomeId: input.biomeId,
+    assetBytes,
+  });
+}
+
+async function writeSeedFiles(
+  systemDir: string,
+  plan: IntakeSeedPlan,
+  io: WorkspaceIO,
+): Promise<void> {
+  for (const file of plan.files) {
+    const target = join(systemDir, ...file.path.split("/"));
+    await io.mkdir(join(target, ".."));
+    await io.writeFile(target, file.content);
+  }
 }
 
 async function rollbackConfig(
@@ -203,6 +270,8 @@ export async function runSternsystemRegister(
   const owner = flagString(input, "owner");
   const isAmend = flagBool(input, "amend");
   const amendId = flagNumber(input, "amend-id");
+  const intakeDir = flagString(input, "intake");
+  const biomeId = flagString(input, "biome");
 
   if (!id) throw new Error("[sternsystem.register] requires --id <kebab-case-id>");
 
@@ -234,6 +303,12 @@ export async function runSternsystemRegister(
   }
 
   const diagnostics: string[] = [];
+
+  if (isAmend && (intakeDir !== undefined || biomeId !== undefined)) {
+    throw new Error(
+      "[sternsystem.register] --intake/--biome are for new registrations; --amend reads onboarding/<id>/.input/amend-<N>/",
+    );
+  }
 
   if (isAmend) {
     const _config = await readSystemConfig(workspaceRoot, id);
@@ -327,6 +402,20 @@ export async function runSternsystemRegister(
     notes: "",
   };
 
+  // RFC-1307: the intake bundle is the only input for a new Sternsystem (I3).
+  if (!intakeDir) {
+    throw new Error(
+      "[sternsystem.register] requires --intake <bundle-dir> — run onboarding.intake.validate --id <id> on onboarding/<id>/.input/intake first",
+    );
+  }
+  if (!biomeId) {
+    throw new Error(
+      "[sternsystem.register] requires --biome <biome-id> — run family.detect --id <id> and biome.from-intake --id <id> --family <family-id> first",
+    );
+  }
+  // RFC-1307: every intake precondition runs before the first write.
+  const seedPlan = await prepareIntakeSeed({ id, cosmicStar, intakeDir, biomeId }, context);
+
   const systemDir = resolveMirrorPath(workspaceRoot, mirrors[0].path);
   await context.io.mkdir(systemDir);
   await writeSystemConfig(workspaceRoot, id, newConfig);
@@ -343,8 +432,15 @@ export async function runSternsystemRegister(
     const pinPath = pinResult.data!.pinPath;
     pinCreated = true;
 
-    await createContentStub(workspaceRoot, id, systemDir, cosmicStar);
+    await writeSeedFiles(systemDir, seedPlan, context.io);
     contentCreated = true;
+    const state = await readSystemState(workspaceRoot, id, context.io);
+    await writeSystemState(
+      workspaceRoot,
+      id,
+      { ...state, onboarding: seedPlan.systemState.onboarding },
+      context.io,
+    );
 
     // Commit config, pin, and content to cache clone before mission.open
     // so syncCacheClone's git reset --hard doesn't wipe uncommitted files
@@ -379,7 +475,7 @@ export async function runSternsystemRegister(
       }
     }
 
-    const missionResult = await runMissionOpen(
+    const missionResult = await registerDeps.openMission(
       makeInput({ system: id, brief: `Initial onboarding for ${id}` }),
       context,
     );
@@ -443,6 +539,11 @@ export async function runSternsystemRegister(
         },
         pinPath,
         firstMissionId: missionId,
+        seed: {
+          intakeId: seedPlan.systemState.onboarding.intakeId,
+          pbpDocuments: seedPlan.pbpDocuments,
+          assets: seedPlan.assets,
+        },
         diagnostics,
       },
       exitCode: 0,

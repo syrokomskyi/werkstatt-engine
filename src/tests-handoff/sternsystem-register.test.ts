@@ -1,18 +1,23 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Tests for RFC-0532 sternsystem.register extensions: amend path validation, content stub creation, flag handling.</purpose>
+<purpose>Tests for sternsystem.register extensions: amend path validation, flag handling, rollback (RFC-0532); intake seeding lives in sternsystem-register-intake.test.ts (RFC-1307).</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0532 review fix: add tests for extended sternsystem.register — amend validation, content stub, flag parsing.</item>
+  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
 </CHANGE_SUMMARY>
 */
 
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runSternsystemRegister, createContentStub } from "../sternsystem/sternsystem-register.ts";
+import { cp } from "node:fs/promises";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { vi } from "vitest";
+import { registerDeps, runSternsystemRegister } from "../sternsystem/sternsystem-register.ts";
 import type { KernelCommandInput, KernelRuntimeContext } from "@warpgogol/werkstatt-engine/kernel";
 import { expectData } from "./helpers/kernel-result-helpers.ts";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
@@ -40,21 +45,6 @@ function makeContext(root: string): KernelRuntimeContext {
     dryRun: false,
   } as unknown as KernelRuntimeContext;
 }
-
-const VALID_BRIEF = `---
-client:
-  id: test-client
-  domain: example.com
-i18n:
-  default: de
-  supported:
-    - de
-    - en
-legalJurisdiction: DE
----
-
-# Test brief
-`;
 
 beforeEach(async () => {
   const testRoot = await mkdtemp(join(tmpdir(), "sternsystem-register-test-"));
@@ -121,41 +111,6 @@ test("register fails when mirrors is not provided (non-amend)", async () => {
   ).rejects.toThrow(/requires --mirrors/);
 });
 
-test("createContentStub creates system.md from brief", async () => {
-  const inputDir = join(workspaceRoot, "onboarding", "test-client", ".input");
-  await mkdir(inputDir, { recursive: true });
-  await writeFile(join(inputDir, "00-brief.md"), VALID_BRIEF, "utf8");
-
-  await mkdir(join(workspaceRoot, "systems", "test-client"), { recursive: true });
-
-  await createContentStub(
-    workspaceRoot,
-    "test-client",
-    join(workspaceRoot, "systems", "test-client"),
-  );
-
-  const systemMdPath = join(workspaceRoot, "systems", "test-client", "src", "content", "system.md");
-  expect(existsSync(systemMdPath)).toBe(true);
-
-  const systemMd = await readFile(systemMdPath, "utf8");
-  expect(systemMd).toContain("domain: example.com");
-  expect(systemMd).toContain("default: de");
-  expect(systemMd).toContain("legalJurisdiction: DE");
-});
-
-test("createContentStub is a no-op when brief does not exist", async () => {
-  await mkdir(join(workspaceRoot, "systems", "test-client"), { recursive: true });
-
-  await createContentStub(
-    workspaceRoot,
-    "test-client",
-    join(workspaceRoot, "systems", "test-client"),
-  );
-
-  const systemMdPath = join(workspaceRoot, "systems", "test-client", "src", "content", "system.md");
-  expect(existsSync(systemMdPath)).toBe(false);
-});
-
 test("register rejects TLD-suffixed IDs (RFC-0902)", async () => {
   await expect(
     runSternsystemRegister(
@@ -181,17 +136,36 @@ test("register rejects TLD-suffixed IDs with --amend (RFC-0902)", async () => {
 test("register rolls back registry entry when materialize fails", async () => {
   // Register will fail at mission.materialize because the mirrors point to a
   // non-existent local path — git clone fails immediately instead of hanging on SSH.
+  // RFC-1307: register needs a valid intake + biome before any write.
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
   const result = await runSternsystemRegister(
-    makeInput({ id: "test-bundle", cosmicStar: "Vega", mirrors: "./nonexistent-repo-path" }),
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "./nonexistent-repo-path",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
     makeContext(workspaceRoot),
   );
+  vi.restoreAllMocks();
 
   expect(expectData(result).status).toBe("fail");
   expect(result.exitCode).toBe(1);
   expect(expectData(result).diagnostics.some((d) => d.includes("failed"))).toBe(true);
 
-  // systems-cache should be cleaned up (no system-config.yaml for test-bundle)
-  const cacheDir = join(workspaceRoot, "..", "systems-cache", "test-bundle");
+  // systems-cache should be cleaned up (no system-config.yaml for dp7)
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
   const configPath = join(cacheDir, "system-config.yaml");
   expect(existsSync(configPath)).toBe(false);
 });
