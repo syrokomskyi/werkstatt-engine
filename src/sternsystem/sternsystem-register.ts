@@ -11,7 +11,6 @@ With --amend: update pin and open amend mission without creating a new registry 
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1293: require timing semantics on time-bound policy fields via contractTerms.gate (RFC-1293)
 
@@ -43,7 +42,8 @@ sourceUrl with its asOf date. Live warpgogol run: 40 LOCALFACT-01 warnings
 across the 12 city demand records — the owner's research backlog; no excerpts,
 review records, or gate flips authored. Canary C11 active.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
-  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902</history>
+  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
+  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 
@@ -57,6 +57,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { StarCatalog, type StarName } from "@warpgogol/werkstatt-shared/ontology/cosmic";
 import { intakeEnvelopeSchema } from "@warpgogol/werkstatt-shared/onboarding/intake";
+import { pbpSchemaById } from "@warpgogol/pbp/entities";
 import { byteHash } from "@warpgogol/werkstatt-shared/fingerprint";
 import { resolveIntakeExportSha256, validateIntakeBundle } from "../intake/intake-validate.ts";
 import { isSeedableAsset, planSeedFromIntake, type IntakeSeedPlan } from "./seed-from-intake.ts";
@@ -75,7 +76,7 @@ import { identityConfigPath } from "../identity/identity-io.ts";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
-import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 
 export interface SternsystemRegisterData {
@@ -170,6 +171,10 @@ export async function prepareIntakeSeed(
       `[sternsystem.register] intake ${input.intakeDir} fails onboarding.intake.validate (${errors.length} error(s)) — ${listed}`,
     );
   }
+  // Warnings are reported but do not block (RFC-1307).
+  for (const d of validation.diagnostics.filter((d) => d.severity === "warning")) {
+    context.logger.warn(`[sternsystem.register] intake ${d.rule}: ${d.message}`);
+  }
 
   const intakeBytes = await io.readFileBytes(join(bundleDir, "intake.json"));
   const intake = intakeEnvelopeSchema.parse(JSON.parse(new TextDecoder().decode(intakeBytes)));
@@ -186,6 +191,18 @@ export async function prepareIntakeSeed(
     throw new Error(
       `[sternsystem.register] --biome '${input.biomeId}' rejected — ${biomeError}. Run biome.from-intake --id ${input.id} --family <family-id> first.`,
     );
+  }
+
+  // DNA-103: every entity parses through its canonical schema before any asset
+  // bytes are read — a broken entity must outrank a missing asset file.
+  for (const entity of intake.pbp) {
+    const schema = pbpSchemaById[entity.schema];
+    if (!schema) {
+      throw new Error(
+        `[sternsystem.register] no canonical PBP schema for ${entity.schema} (${entity.id})`,
+      );
+    }
+    schema.parse(entity);
   }
 
   const assetBytes = new Map<string, Uint8Array>();
@@ -215,11 +232,7 @@ async function writeSeedFiles(
   }
 }
 
-async function rollbackConfig(
-  workspaceRoot: string,
-  id: string,
-  io: WorkspaceIO = createDefaultIO().io,
-): Promise<void> {
+async function rollbackConfig(workspaceRoot: string, id: string, io: WorkspaceIO): Promise<void> {
   const cacheClone = resolveCacheClonePath(workspaceRoot, id);
   const configPath = join(cacheClone, "system-config.yaml");
   if (await io.exists(configPath)) {
@@ -227,34 +240,85 @@ async function rollbackConfig(
   }
 }
 
-async function rollbackPin(
-  systemDir: string,
-  io: WorkspaceIO = createDefaultIO().io,
+async function rollbackSystemState(
+  workspaceRoot: string,
+  id: string,
+  io: WorkspaceIO,
 ): Promise<void> {
+  const cacheClone = resolveCacheClonePath(workspaceRoot, id);
+  const statePath = join(cacheClone, "system-state.yaml");
+  if (await io.exists(statePath)) {
+    await io.rm(statePath, { recursive: true });
+  }
+}
+
+async function rollbackPin(systemDir: string, io: WorkspaceIO): Promise<void> {
   const pinPath = join(systemDir, "system.pin.json");
   if (await io.exists(pinPath)) {
     await io.rm(pinPath, { recursive: true });
   }
 }
 
-async function rollbackContent(
-  systemDir: string,
-  io: WorkspaceIO = createDefaultIO().io,
-): Promise<void> {
+async function rollbackContent(systemDir: string, io: WorkspaceIO): Promise<void> {
   const contentPath = join(systemDir, "src", "content");
   if (await io.exists(contentPath)) {
     await io.rm(contentPath, { recursive: true });
   }
 }
 
-async function rollbackSystemDirIfEmpty(
-  systemDir: string,
-  io: WorkspaceIO = createDefaultIO().io,
-): Promise<void> {
+async function rollbackSystemDirIfEmpty(systemDir: string, io: WorkspaceIO): Promise<void> {
   if (!(await io.exists(systemDir))) return;
   const gitDir = join(systemDir, ".git");
   if (await io.exists(gitDir)) return;
   await io.rm(systemDir, { recursive: true });
+}
+
+/**
+ * Rewind the commits register pushed into the cache clone: the writeSystemState
+ * auto-commit, the scaffold commit and their pushes to the bare remote. When
+ * the clone had no commits before register (fresh repo), every local branch
+ * ref is register's own — drop them so HEAD returns to unborn, and delete the
+ * pushed branch on the remote. All steps are best-effort: file-level rollback
+ * still runs afterwards.
+ */
+async function rollbackGitHistory(
+  systemDir: string,
+  preRegisterSha: string | null,
+  io: WorkspaceIO,
+): Promise<void> {
+  const gitDir = join(systemDir, ".git");
+  if (!(await io.exists(gitDir))) return;
+  const git = (args: string[]) => io.exec("git", args, { cwd: systemDir, timeoutMs: 10000 });
+  try {
+    let branch = "main";
+    const remoteHead = await git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
+    if (remoteHead.exitCode === 0 && remoteHead.stdout.trim()) {
+      branch = remoteHead.stdout.trim().replace(/^origin\//, "");
+    }
+    if (preRegisterSha) {
+      await git(["reset", "--hard", preRegisterSha]);
+      // Rewind the remote branch register pushed to — the clone matched
+      // preRegisterSha before register, so the remote only has register's pushes.
+      await git(["push", "--force-with-lease", "origin", `HEAD:refs/heads/${branch}`]);
+    } else {
+      const refs = await git(["for-each-ref", "--format=%(refname)", "refs/heads"]);
+      const branchRefs = refs.stdout
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const ref of branchRefs) {
+        await git(["update-ref", "-d", ref]);
+      }
+      // Drop the staged index so leftover seed files stay plain untracked
+      // files for the file-level rollback to remove.
+      await git(["rm", "-r", "-f", "-q", "--cached", "."]);
+      for (const ref of branchRefs) {
+        await git(["push", "origin", `:${ref}`]);
+      }
+    }
+  } catch {
+    // Rollback is best-effort — the file-level helpers still run.
+  }
 }
 
 export async function runSternsystemRegister(
@@ -391,6 +455,17 @@ export async function runSternsystemRegister(
     return { path: entry, storageType: "non-bare" as const };
   });
 
+  // mirrors[0] is always the conventional non-bare cache clone — seeded files
+  // and registry config/state write into the same directory (AGENTS.md).
+  if (
+    mirrors[0].storageType !== "non-bare" ||
+    resolveMirrorPath(workspaceRoot, mirrors[0].path) !== resolveCacheClonePath(workspaceRoot, id)
+  ) {
+    throw new Error(
+      `[sternsystem.register] mirrors[0] must be the conventional non-bare cache clone '../systems-cache/${id}' — got '${mirrors[0].path}'`,
+    );
+  }
+
   const newConfig = {
     schemaVersion: "1.0.0" as const,
     id,
@@ -418,6 +493,16 @@ export async function runSternsystemRegister(
 
   const systemDir = resolveMirrorPath(workspaceRoot, mirrors[0].path);
   await context.io.mkdir(systemDir);
+  // Record the clone's pre-register HEAD so a failed registration can rewind
+  // the commits writeSystemState and the scaffold step make.
+  let preRegisterSha: string | null = null;
+  if (await context.io.exists(join(systemDir, ".git"))) {
+    const head = await context.io.exec("git", ["rev-parse", "HEAD"], {
+      cwd: systemDir,
+      timeoutMs: 10000,
+    });
+    preRegisterSha = head.exitCode === 0 ? head.stdout.trim() || null : null;
+  }
   await writeSystemConfig(workspaceRoot, id, newConfig);
 
   let pinCreated = false;
@@ -572,14 +657,18 @@ export async function runSternsystemRegister(
         );
       }
     }
+    // Git rewind first — restores tracked files to the pre-register state;
+    // the file-level helpers then remove any untracked leftovers.
+    await rollbackGitHistory(systemDir, preRegisterSha, context.io);
     if (contentCreated) {
-      await rollbackContent(systemDir);
+      await rollbackContent(systemDir, context.io);
     }
     if (pinCreated) {
-      await rollbackPin(systemDir);
+      await rollbackPin(systemDir, context.io);
     }
-    await rollbackConfig(workspaceRoot, id);
-    await rollbackSystemDirIfEmpty(systemDir);
+    await rollbackConfig(workspaceRoot, id, context.io);
+    await rollbackSystemState(workspaceRoot, id, context.io);
+    await rollbackSystemDirIfEmpty(systemDir, context.io);
 
     diagnostics.push(
       `sternsystem.register failed: ${error instanceof Error ? error.message : String(error)}`,

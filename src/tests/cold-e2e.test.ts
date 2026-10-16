@@ -8,6 +8,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0965: initial unit tests for cold run handler — interventions, timeout, dirty tree, confinement, success.</item>
+  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
 </CHANGE_SUMMARY>
 */
 
@@ -167,7 +168,11 @@ describe("werkstatt.e2e.cold", () => {
     mockReaddir = vi.fn(
       async () => [{ name: "m000001", isFile: () => false, isDirectory: () => true }] as never,
     );
-    mockReadFile = vi.fn(async () => "" as never);
+    mockReadFile = vi.fn(async (p: unknown) =>
+      String(p).endsWith("system.md")
+        ? ("---\ni18n:\n  default: de\n  supported:\n    de:\n      name: de\n      hreflang: de-DE\nidentity:\n  systemStar: Achernar\n  biome: handwerk-material-warm\nlegalJurisdiction: DE\npublication:\n  gate: enforce\ncontractTerms:\n  gate: enforce\nprovenance:\n  gate: enforce\n---\n" as never)
+        : ("" as never),
+    );
 
     mockedExec.mockImplementation((cmdInput: { commandName?: string }) => {
       const name = cmdInput?.commandName ?? "";

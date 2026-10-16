@@ -19,6 +19,7 @@ sidecars, and the system-state onboarding provenance block.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-1307: introduce the deterministic intake seed planner.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
+  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
 </CHANGE_SUMMARY>
 */
 
@@ -160,7 +161,9 @@ function buildSystemMd(input: IntakeSeedInput, primarySegment: string): string {
   for (const locale of intake.classification.locales) {
     const segment = localeSegment(locale.tag);
     supported[segment] =
-      segment === locale.tag ? { name: segment } : { name: segment, tag: locale.tag };
+      segment === locale.tag
+        ? { name: segment, hreflang: locale.tag }
+        : { name: segment, hreflang: locale.tag, tag: locale.tag };
   }
   const identity: Record<string, string> = {
     systemStar: input.cosmicStar,
@@ -174,6 +177,7 @@ function buildSystemMd(input: IntakeSeedInput, primarySegment: string): string {
     identity,
     i18n: { default: primarySegment, supported },
     legalJurisdiction: intake.classification.jurisdiction,
+    publication: { gate: "enforce" },
     contractTerms: { gate: "enforce" },
     provenance: { gate: "enforce" },
   };
@@ -223,6 +227,16 @@ export function planSeedFromIntake(input: IntakeSeedInput): IntakeSeedPlan {
   }
 
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+  // Two entities or assets resolving to one file would silently overwrite —
+  // fail at plan time so the defect is fixed in the intake, not masked.
+  const seenPaths = new Set<string>();
+  for (const file of files) {
+    if (seenPaths.has(file.path)) {
+      throw new Error(`[seed-from-intake] duplicate seed path ${file.path} — check entity ids`);
+    }
+    seenPaths.add(file.path);
+  }
 
   return {
     files,

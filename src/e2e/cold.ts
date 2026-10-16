@@ -11,7 +11,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0988: add handover-dry-run step — verifies prepare and complete dry-run commands work end-to-end without side effects.</item>
   <item>RFC-1189: step 1 — partyKindLabels schema contract
 
 Add required partyKindLabels record (all seven creditPartyKindSchema
@@ -22,12 +21,14 @@ completeness gate with schema tests.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
   <item>RFC-1307: step 5 — remove 00-brief.md path, onboarding.synthesize and brief.validate; cold run registers from intake</item>
-  <history>RFC-0965</history>
+  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
+  <history>RFC-0965, RFC-0988</history>
 </CHANGE_SUMMARY>
 */
 
 import os from "node:os";
 import path from "node:path";
+import YAML from "yaml";
 import type {
   KernelCommandInput,
   KernelCommandResult,
@@ -478,6 +479,43 @@ export async function runColdE2e(
             throw new Error(`sternsystem.register failed: ${result.summary ?? "unknown error"}`);
           }
 
+          // RFC-1307: the seeded system.md must validate as-born — assert the
+          // i18n/manifest contract instead of repairing it downstream.
+          const seededSystemMd = await context.io.readFile(
+            path.join(cachePath, "src", "content", "system.md"),
+          );
+          const fmStart = seededSystemMd.indexOf("---");
+          const fmEnd = seededSystemMd.lastIndexOf("---");
+          const seededFm = (
+            fmStart === -1 || fmEnd <= fmStart
+              ? null
+              : YAML.parse(seededSystemMd.slice(fmStart + 3, fmEnd))
+          ) as {
+            i18n?: { supported?: Record<string, { name?: string; hreflang?: string }> };
+            legalJurisdiction?: string;
+            publication?: { gate?: string };
+            contractTerms?: { gate?: string };
+            provenance?: { gate?: string };
+            identity?: { biome?: string };
+          } | null;
+          if (!seededFm || Object.keys(seededFm.i18n?.supported ?? {}).length === 0) {
+            throw new Error(
+              "register-site: seeded system.md has no i18n.supported entries — planner must emit valid i18n",
+            );
+          }
+          for (const [segment, entry] of Object.entries(seededFm.i18n?.supported ?? {})) {
+            if (!entry.name || !entry.hreflang) {
+              throw new Error(
+                `register-site: seeded i18n.supported.${segment} lacks name/hreflang — planner must emit valid i18n`,
+              );
+            }
+          }
+          if (seededFm.identity?.biome !== "handwerk-material-warm") {
+            throw new Error(
+              `register-site: seeded identity.biome is '${seededFm.identity?.biome}' — expected 'handwerk-material-warm'`,
+            );
+          }
+
           missionId = result.data?.firstMissionId ?? null;
           stepCtx.missionId = missionId;
         },
@@ -695,15 +733,6 @@ export async function runColdE2e(
                   if (!fm.includes("pages:")) {
                     fm +=
                       "\npages:\n  - pageId: home\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: ''\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
-                  }
-                  // Fix i18n config: scaffold creates supported.de without hreflang,
-                  // which causes validateI18nConfig to reject it and i18n.middleware.generate
-                  // to skip generating language-redirect.ts.
-                  if (fm.includes("i18n:") && !fm.includes("hreflang:")) {
-                    fm = fm.replace(
-                      /(i18n:\n  default: \w+\n  supported:\n    \w+:\n      name: \w+)\n/,
-                      "$1\n      hreflang: de-DE\n",
-                    );
                   }
                   return `---\n${fm}\n---`;
                 },

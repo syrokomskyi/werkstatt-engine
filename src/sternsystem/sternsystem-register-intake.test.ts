@@ -7,6 +7,7 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-1307: created.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
+  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
 </CHANGE_SUMMARY>
 */
 
@@ -190,8 +191,14 @@ describe("planSeedFromIntake (RFC-1307)", () => {
     const md = fileText(plan, "src/content/system.md");
     const fm = YAML.parse(md.slice(4, md.lastIndexOf("---")));
     expect(fm.i18n.default).toBe("ru");
-    expect(fm.i18n.supported).toEqual({ ru: { name: "ru" }, uz: { name: "uz", tag: "uz-Latn" } });
+    expect(fm.i18n.supported).toEqual({
+      ru: { name: "ru", hreflang: "ru" },
+      uz: { name: "uz", hreflang: "uz-Latn", tag: "uz-Latn" },
+    });
     expect(fm.legalJurisdiction).toBe("DE");
+    expect(fm.publication.gate).toBe("enforce");
+    expect(fm.contractTerms.gate).toBe("enforce");
+    expect(fm.provenance.gate).toBe("enforce");
     expect(fm.identity.biome).toBe("dp7-03");
     expect(fm.identity.domain, "an unconfirmed domain must stay unset").toBeUndefined();
   });
@@ -203,7 +210,7 @@ describe("planSeedFromIntake (RFC-1307)", () => {
       .filter((p) => p.endsWith(".md") && p.includes("business-profile"));
     expect(paths.sort()).toEqual([
       "src/content/business-profile/ru/business.md",
-      "src/content/business-profile/ru/organization/dp7.md",
+      "src/content/business-profile/ru/organization/legal-identity.md",
       "src/content/business-profile/ru/trust/claims/european-quality.md",
       "src/content/business-profile/ru/trust/claims/installation-warranty.md",
       "src/content/business-profile/ru/trust/evidence/src-01.md",
@@ -214,6 +221,48 @@ describe("planSeedFromIntake (RFC-1307)", () => {
     );
     expect(draft).toContain("id: claim/installation-warranty");
     expect(draft).toContain("status: draft");
+  });
+
+  it("singleton types keep type-named files: brand + legal-identity on the same slug do not collide", () => {
+    const json = fixtureJson();
+    json.pbp.push({
+      schema: "pbp/brand@1",
+      id: "brand/dp7",
+      type: "brand",
+      status: "published",
+      name: "DP7",
+      ownerBusinessRef: { ref: "business/dp7" },
+    });
+    const plan = planSeedFromIntake(seedInput(json));
+    expect(fileText(plan, "src/content/business-profile/ru/organization/brand.md")).toContain(
+      "id: brand/dp7",
+    );
+    expect(
+      fileText(plan, "src/content/business-profile/ru/organization/legal-identity.md"),
+    ).toContain("id: legal-identity/dp7");
+  });
+
+  it("rejects two entities resolving to the same document path", () => {
+    const json = fixtureJson();
+    json.pbp.push({
+      schema: "pbp/claim@1",
+      id: "claim/european-quality",
+      type: "claim",
+      status: "draft",
+      claimClass: "factual",
+      claimKind: "fact",
+      subject: { kind: "business", name: "DP7" },
+      statement: "dup",
+      statementLang: "ru",
+      governance: { authorityRef: "pbp/business@1:business/dp7" },
+    });
+    expect(() => planSeedFromIntake(seedInput(json))).toThrow(/duplicate seed path/);
+  });
+
+  it("rejects an entity id that does not yield a kebab-case slug", () => {
+    const json = fixtureJson();
+    json.pbp[3].id = "claim/Bad Slug";
+    expect(() => planSeedFromIntake(seedInput(json))).toThrow(/kebab-case slug/);
   });
 
   it("AC-6: two calls and a key-permuted intake yield byte-identical seeds", () => {

@@ -5,10 +5,12 @@
 <CHANGE_SUMMARY>
   <item>RFC-0532 review fix: add tests for extended sternsystem.register — amend validation, content stub, flag parsing.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
+  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
 </CHANGE_SUMMARY>
 */
 
 import { test, expect, beforeEach, afterEach } from "vitest";
+import { execSync } from "node:child_process";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -133,9 +135,7 @@ test("register rejects TLD-suffixed IDs with --amend (RFC-0902)", async () => {
   ).rejects.toThrow(/TLD suffix/);
 });
 
-test("register rolls back registry entry when materialize fails", async () => {
-  // Register will fail at mission.materialize because the mirrors point to a
-  // non-existent local path — git clone fails immediately instead of hanging on SSH.
+test("register rolls back registry entry, seeded files and system-state.yaml when mission.open fails", async () => {
   // RFC-1307: register needs a valid intake + biome before any write.
   const fixture = join(
     dirname(fileURLToPath(import.meta.url)),
@@ -148,11 +148,12 @@ test("register rolls back registry entry when materialize fails", async () => {
     recursive: true,
   });
   vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
   const result = await runSternsystemRegister(
     makeInput({
       id: "dp7",
       cosmicStar: "Vega",
-      mirrors: "./nonexistent-repo-path",
+      mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
       biome: "dp7-03",
     }),
@@ -164,8 +165,87 @@ test("register rolls back registry entry when materialize fails", async () => {
   expect(result.exitCode).toBe(1);
   expect(expectData(result).diagnostics.some((d) => d.includes("failed"))).toBe(true);
 
-  // systems-cache should be cleaned up (no system-config.yaml for dp7)
+  // systems-cache should be cleaned up entirely — config, seeded content and
+  // the system-state.yaml writeSystemState created.
   const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
-  const configPath = join(cacheDir, "system-config.yaml");
-  expect(existsSync(configPath)).toBe(false);
+  expect(existsSync(join(cacheDir, "system-config.yaml"))).toBe(false);
+  expect(existsSync(join(cacheDir, "system-state.yaml"))).toBe(false);
+  expect(existsSync(join(cacheDir, "system.pin.json"))).toBe(false);
+  expect(existsSync(join(cacheDir, "src", "content"))).toBe(false);
+});
+
+test("register rewinds clone commits to the pre-register HEAD on failure", async () => {
+  // Cache clone is a real git repo with a pre-existing commit — register's
+  // writeSystemState auto-commit and the scaffold commit must be rewound,
+  // not left on the branch.
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  await mkdir(cacheDir, { recursive: true });
+  const git = (args: string) =>
+    execSync(`git ${args}`, { cwd: cacheDir, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  git("init -b main");
+  git("config user.email test@test");
+  git("config user.name test");
+  await writeFile(join(cacheDir, "README.md"), "pre-register\n", "utf8");
+  git("add -A");
+  git('commit -m "pre-register"');
+  const preSha = git("rev-parse HEAD");
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    makeContext(workspaceRoot),
+  );
+  vi.restoreAllMocks();
+
+  expect(expectData(result).status).toBe("fail");
+  expect(git("rev-parse HEAD")).toBe(preSha);
+  expect(existsSync(join(cacheDir, "system-state.yaml"))).toBe(false);
+  expect(existsSync(join(cacheDir, "system-config.yaml"))).toBe(false);
+  expect(existsSync(join(cacheDir, "src", "content"))).toBe(false);
+  expect(existsSync(join(cacheDir, "README.md"))).toBe(true);
+});
+
+test("register rejects a non-conventional mirrors[0] before any write", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  await expect(
+    runSternsystemRegister(
+      makeInput({
+        id: "dp7",
+        cosmicStar: "Vega",
+        mirrors: "./nonexistent-repo-path",
+        intake: "onboarding/dp7/.input/intake",
+        biome: "dp7-03",
+      }),
+      makeContext(workspaceRoot),
+    ),
+  ).rejects.toThrow(/mirrors\[0\] must be the conventional/);
 });
