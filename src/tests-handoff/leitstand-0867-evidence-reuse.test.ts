@@ -7,6 +7,7 @@
   <item>RFC-0867: initial tests for evidence reuse — same hash, different hash, --force, stale, missing sidecar.</item>
   <item>Contract test: real evidence envelopes from runLeitstandCertify must pass evidenceEnvelopeV1Schema.safeParse — catches ID format mismatches that silently break reuse.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <item>RFC-1295</item>
 </CHANGE_SUMMARY>
 */
 
@@ -243,7 +244,7 @@ test("different artifact hash → producers execute", async () => {
   const result = await runLeitstandCertify(input, makeContext(join(tmpDir, "werkstatt")));
 
   expect(result.exitCode).toBe(0);
-  expect(result.data!.producerCount).toBe(1);
+  expect(result.data!.producerCount).toBe(2); // RFC-1295: + editorial-signoff producer
 });
 
 test("--force → producers execute even with matching hash", async () => {
@@ -266,7 +267,7 @@ test("--force → producers execute even with matching hash", async () => {
   const result = await runLeitstandCertify(input, makeContext(join(tmpDir, "werkstatt")));
 
   expect(result.exitCode).toBe(0);
-  expect(result.data!.producerCount).toBe(1);
+  expect(result.data!.producerCount).toBe(2); // RFC-1295: + editorial-signoff producer
 });
 
 test("stale evidence → producers execute", async () => {
@@ -288,7 +289,7 @@ test("stale evidence → producers execute", async () => {
   const result = await runLeitstandCertify(input, makeContext(join(tmpDir, "werkstatt")));
 
   expect(result.exitCode).toBe(0);
-  expect(result.data!.producerCount).toBe(1);
+  expect(result.data!.producerCount).toBe(2); // RFC-1295: + editorial-signoff producer
 });
 
 test("missing evidence sidecar → producers execute (no error)", async () => {
@@ -310,7 +311,7 @@ test("missing evidence sidecar → producers execute (no error)", async () => {
   const result = await runLeitstandCertify(input, makeContext(join(tmpDir, "werkstatt")));
 
   expect(result.exitCode).toBe(0);
-  expect(result.data!.producerCount).toBe(1);
+  expect(result.data!.producerCount).toBe(2); // RFC-1295: + editorial-signoff producer
 });
 
 test("contract: real evidence envelopes pass evidenceEnvelopeV1Schema validation", async () => {
@@ -333,7 +334,7 @@ test("contract: real evidence envelopes pass evidenceEnvelopeV1Schema validation
   const result = await runLeitstandCertify(input, makeContext(join(tmpDir, "werkstatt")));
 
   expect(result.exitCode).toBe(0);
-  expect(result.data!.producerCount).toBe(1);
+  expect(result.data!.producerCount).toBe(2); // RFC-1295: + editorial-signoff producer
 
   // Read the evidence sidecar written by certify
   const sidecarPath = join(cacheCloneDir, "gate-decisions", `${releaseId}-evidence.json`);

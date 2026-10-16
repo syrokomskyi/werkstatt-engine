@@ -47,7 +47,7 @@ describe("astroCertificationProfile", () => {
     const ctx = {
       pluginId: "werkstatt-site",
       profileId: "site",
-      registeredCommands: new Set(["mission.check"]),
+      registeredCommands: new Set(["mission.check", "editorial.review.verify"]),
     };
     const result = validateCertificationProfileV1(astroCertificationProfile, ctx);
     expect(result.valid).toBe(true);

@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-0865: initial minimal Astro certification profile.</item>
   <item>ADR-0083: profileId "site" is a logical id — no profiles/site.yaml; CERT-PROFILE-02 stays test-only until wired to a live command.</item>
+  <item>RFC-1295</item>
 </CHANGE_SUMMARY>
 */
 
@@ -31,6 +32,10 @@ function makeRequirement(
   index: number,
 ): CertificationRequirementV1 {
   const id = `astro-req-${String(index + 1).padStart(2, "0")}-${dimension}`;
+  // RFC-1295: editorial-localization is produced by the human editorial
+  // sign-off packet, not by mission.check — the check that satisfies it is
+  // editorial.review.verify evaluated at promote-main.
+  const editorial = dimension === "editorial-localization";
   return {
     id,
     title: `Astro ${dimension} Main-gate requirement`,
@@ -38,13 +43,18 @@ function makeRequirement(
     gates: ["promote-main"],
     classification: "required" as const,
     applicability: { kind: "always" as const },
-    producerId: "astro-mission-check",
+    producerId: editorial ? "editorial-signoff" : "astro-mission-check",
     evidenceSchema: "werkstatt/evidence@1",
     environments: ["dev", "alt", "main" as const],
-    reuse: {
-      environmentIndependent: false,
-      allowedFrom: ["dev", "alt"],
-    },
+    reuse: editorial
+      ? // A gate-bound human decision reuses nothing cross-environment —
+        // environmentIndependent: false + empty allowedFrom (CERT-PROFILE-06
+        // forbids environmentIndependent with empty allowedFrom).
+        { environmentIndependent: false, allowedFrom: [] }
+      : {
+          environmentIndependent: false,
+          allowedFrom: ["dev", "alt"],
+        },
     freshness: {
       maxAgeSeconds: null,
     },
@@ -57,11 +67,15 @@ function makeRequirement(
     driftAction: "retry" as const,
     remediation: {
       classification: "product-fix" as const,
-      ownerRole: "author-agent" as const,
-      reproduceCommand: `pnpm exec werkstatt run mission.check --site {site}`,
-      verificationCommand: `pnpm exec werkstatt run mission.validate --site {site}`,
+      ownerRole: editorial ? ("operator-agent" as const) : ("author-agent" as const),
+      reproduceCommand: editorial
+        ? `pnpm exec werkstatt run editorial.review.prepare --site {site} --release <release>`
+        : `pnpm exec werkstatt run mission.check --site {site}`,
+      verificationCommand: editorial
+        ? `pnpm exec werkstatt run editorial.review.verify --site {site} --release <release>`
+        : `pnpm exec werkstatt run mission.validate --site {site}`,
     },
-    normativeRefs: ["RFC-0865"],
+    normativeRefs: editorial ? ["RFC-0865", "RFC-1295"] : ["RFC-0865"],
   };
 }
 
@@ -79,6 +93,16 @@ export const astroCertificationProfile: CertificationProfileV1 = {
       id: "astro-mission-check",
       kind: "kernel-command",
       command: "mission.check",
+      outputSchema: "werkstatt/evidence@1",
+      versionSource: "package-version",
+      requiredPayloadRoles: ["check-result"],
+    },
+    // RFC-1295: human editorial sign-off — certify.ts dispatches
+    // editorial.review.verify against the release's packet.
+    "editorial-signoff": {
+      id: "editorial-signoff",
+      kind: "kernel-command",
+      command: "editorial.review.verify",
       outputSchema: "werkstatt/evidence@1",
       versionSource: "package-version",
       requiredPayloadRoles: ["check-result"],

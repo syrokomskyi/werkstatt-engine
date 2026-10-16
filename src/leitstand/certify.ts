@@ -8,17 +8,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RECOVERY-2026-10-04: mission.check timeouts raised to a shared 25min constant (was inner 5min race + outer 300s orchestrator timeout — a cold ~7-11min capture always exceeded both, racing a fail decision vs an "incomplete" no-decision return while abandoned mission.check processes kept running). Orchestrator timeout derives as +60s so the inner race still produces the diagnostic envelope deterministically.</item>
-  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
-
-RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
-
-2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RECOVERY-2026-10-05: stale-channel detection — resolveDevDeploymentRecord captures the releaseId of the latest succeeded dev record; detectMeasuredReleaseMismatch flags when a remote (non---base-url) certify would measure a different artifact than the candidate. Upfront logger.warn, measured-release reason in the gate decision, and a fail-summary hint pointing at the --base-url recovery path (warpgogol r000028 dev gate measured stale r000027).</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1284: crash-safe access protection — suspend-before-measure via durable accessPinSuspended marker, stale-marker entry resume (flag=true), finally-restore, pinManagement {suspended,resumed,staleResumed,restoreError}, isProtectedLiveTarget gating, cache-clone marker store (Q-6), flag=false+suspended proceeds without resume (Q-7)</item>
-  <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149</history>
+  <item>RFC-1295</item>
+  <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149, RFC-1190</history>
 </CHANGE_SUMMARY>
 */
 
@@ -569,9 +564,11 @@ export async function runLeitstandCertify(
       forceRequested,
     );
 
+    // RFC-1295: producer set derives from the profile's requirements — the
+    // editorial-signoff producer joins mission.check for editorial-localization.
     const producerNodes: ProducerDependencyNodeV1[] = [
-      { producerId: "astro-mission-check", dependsOn: [] },
-    ];
+      ...new Set(astroCertificationProfile.requirements.map((r) => r.producerId)),
+    ].map((producerId) => ({ producerId, dependsOn: [] }));
 
     const plan = planProducers(producerNodes);
     if (!plan.ok) {
@@ -760,6 +757,72 @@ export async function runLeitstandCertify(
             "mission.check skipped — no dev deployment URL available (first deploy or no open mission)",
           evidence: [],
         });
+      } else if (execInput.producerId === "editorial-signoff") {
+        // RFC-1295: human editorial sign-off is evaluated at promote-main only.
+        // At earlier gates the requirement defers with an info diagnostic —
+        // never enforced below main, never silently satisfied.
+        if (gate !== "main") {
+          diagnostics.push({
+            ruleId: "EDIT-00",
+            severity: "info",
+            message: "editorial sign-off is evaluated at the main gate only — deferred",
+            evidence: [],
+          });
+        } else {
+          try {
+            const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+            const result = await executeKernelCommand({
+              workspaceRoot: context.workspaceRoot,
+              commandName: "editorial.review.verify",
+              siteName: systemId,
+              argv: [`--release=${releaseId}`],
+              outputFormat: "json",
+              siteExplicit: true,
+            });
+            const reports = Array.isArray(result) ? result : [result];
+            let emitted = false;
+            for (const report of reports) {
+              const diags =
+                (report.data as { diagnostics?: unknown } | undefined)?.diagnostics ?? [];
+              for (const d of diags as Array<{
+                ruleId?: string;
+                severity?: "error" | "warning" | "info";
+                message?: string;
+              }>) {
+                emitted = true;
+                diagnostics.push({
+                  ruleId: d.ruleId ?? "EDIT-00",
+                  severity: d.severity ?? "error",
+                  message: d.message ?? "editorial.review.verify diagnostic",
+                  evidence: [],
+                });
+              }
+            }
+            const failed = reports.find((r) => !r.ok || r.exitCode !== 0);
+            if (failed && !emitted) {
+              diagnostics.push({
+                ruleId: "EDIT-01",
+                severity: "error",
+                message: `editorial.review.verify exited with code ${failed.exitCode}`,
+                evidence: [],
+              });
+            } else if (!failed && !emitted) {
+              diagnostics.push({
+                ruleId: "EDIT-00",
+                severity: "info",
+                message: "editorial sign-off verified",
+                evidence: [],
+              });
+            }
+          } catch (err) {
+            diagnostics.push({
+              ruleId: "EDIT-01",
+              severity: "error",
+              message: `editorial.review.verify failed: ${err instanceof Error ? err.message : String(err)}`,
+              evidence: [],
+            });
+          }
+        }
       }
 
       return {
