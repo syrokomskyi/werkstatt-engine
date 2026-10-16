@@ -9,29 +9,16 @@ With --amend: update pin and open amend mission without creating a new registry 
   <item>Do not introduce app-specific runtime composition or deployment behavior into this reusable package source file.</item>
   <item>Do not reimplement pin, mission.open, or mission.materialize logic — delegate to existing commands.</item>
 </non-goals>
+<!-- risk: delete -->
+<!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1294: require verbatim source provenance for external local facts (RFC-1294)
-
-localFacts[] entries gain sourceUrl/excerpt/excerptLang/scope/reviewedBy/
-reviewedAt. surface.evidence.validate sweeps every blueprint dataset record's
-localFacts once per source file and emits LOCALFACT-01 (missing
-sourceUrl/excerpt), LOCALFACT-02 (off-host sourceUrl — dot-boundary subdomains
-of the descriptor endpoint host pass), LOCALFACT-03 (normalized number absent
-from the verbatim excerpt), LOCALFACT-04 (stale asOf+reviewEvery, always a
-warning). systemManifestSchema gains provenance.gate (warn|enforce, absent =
-warn; new sites register enforce). The bake renders 'Geprüfte lokale Fakten'
-only when every rendered fact carries a human review record — otherwise the
-neutral 'Lokaler Kontext' — plus a Quellen block listing each distinct
-sourceUrl with its asOf date. Live warpgogol run: 40 LOCALFACT-01 warnings
-across the 12 city demand records — the owner's research backlog; no excerpts,
-review records, or gate flips authored. Canary C11 active.</item>
-  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
-  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N1/N2/N6/N7: rollback is ref-scoped — only refs absent from the pre-register snapshot are deleted, file-level deletes run before the git rewind, and captured bytes restore pre-existing config/state/pin that never reached a commit. The scaffold commit stages only register's own paths so untracked pre-existing files survive reset --hard. writeSystemConfig moves inside the guarded try; all forward git ops take the injected io; the scaffold push derives its branch from the captured origin HEAD.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: remote surgery is anchored on a pre-register ls-remote snapshot — a register-created remote branch is deleted (in place on local-path mirrors where receive-pack refuses), a moved pre-existing branch is restored to its captured sha with a lease pinned to the observed sha, and an untouched remote is left alone. Rollback removes only the seed paths register actually wrote, refuses to run on a dirty worktree, and a pre-existing clone dir is never deleted.</item>
-  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293</history>
+  <item>REVIEW-CODE-2026-10-16-10 O1/O2: dir-removal helper degrades to a typed kept-* outcome on readdir/rm failure instead of escaping, and the caller diagnostic names the real reason. Remote-ref deletes are lease-anchored on the remote sha observed by rollback and the in-place update-ref fallback re-verifies the ref before deleting — a ref that changed or appeared since the snapshot survives.</item>
+  <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
+  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -301,16 +288,33 @@ async function rollbackContent(systemDir: string, io: WorkspaceIO): Promise<void
 /**
  * Remove the clone dir only when it is git-less AND empty. Callers invoke this
  * solely for dirs register itself created — a pre-existing dir is never
- * removed, no matter its contents (REVIEW-CODE-2026-10-16-09 N8). Returns
- * whether the dir was removed so the caller can log the residue.
+ * removed, no matter its contents (REVIEW-CODE-2026-10-16-09 N8). Returns the
+ * outcome so the caller can log WHY a dir survived; a failed readdir/rm keeps
+ * the dir and never throws — rollback must not escape the catch handler with
+ * a secondary error (REVIEW-CODE-2026-10-16-10 O1).
  */
-async function rollbackSystemDirIfEmpty(systemDir: string, io: WorkspaceIO): Promise<boolean> {
-  if (!(await io.exists(systemDir))) return true;
+type DirRollbackOutcome = "removed" | "kept-git" | "kept-nonempty" | "kept-error";
+
+async function rollbackSystemDirIfEmpty(
+  systemDir: string,
+  io: WorkspaceIO,
+): Promise<DirRollbackOutcome> {
+  if (!(await io.exists(systemDir))) return "removed";
   const gitDir = join(systemDir, ".git");
-  if (await io.exists(gitDir)) return false;
-  if ((await io.readdir(systemDir)).length !== 0) return false;
-  await io.rm(systemDir, { recursive: true });
-  return true;
+  if (await io.exists(gitDir)) return "kept-git";
+  let entryCount: number;
+  try {
+    entryCount = (await io.readdir(systemDir)).length;
+  } catch {
+    return "kept-error";
+  }
+  if (entryCount !== 0) return "kept-nonempty";
+  try {
+    await io.rm(systemDir, { recursive: true });
+  } catch {
+    return "kept-error";
+  }
+  return "removed";
 }
 
 /** Git state captured before register's first write — rollback trusts only this. */
@@ -434,11 +438,21 @@ async function rollbackGitHistory(
     return;
   }
   const git = (args: string[]) => io.exec("git", args, { cwd: systemDir, timeoutMs: 10000 });
-  // Delete a remote ref: push first; when the remote is a local-path mirror
+  // Delete a remote ref: leased push first — the lease is anchored on the sha
+  // observed in the just-read remote snapshot, so a foreign push landing in the
+  // window between read and delete fails the lease instead of being removed
+  // (REVIEW-CODE-2026-10-16-10 O2). When the remote is a local-path mirror
   // (the systems-git convention) whose HEAD names the ref, receive-pack's
-  // denyDeleteCurrent refuses — the operator owns the dir, so delete in place.
-  const tryDeleteRemoteRef = async (refname: string): Promise<void> => {
-    const del = await git(["push", "origin", `:${refname}`]);
+  // denyDeleteCurrent refuses — the operator owns the dir, so verify the ref
+  // still holds the expected sha and delete in place; a moved ref is foreign
+  // and survives.
+  const tryDeleteRemoteRef = async (refname: string, expectedSha: string): Promise<void> => {
+    const del = await git([
+      "push",
+      `--force-with-lease=${refname}:${expectedSha}`,
+      "origin",
+      `:${refname}`,
+    ]);
     if (del.exitCode === 0) return;
     const url = await git(["remote", "get-url", "origin"]);
     const configured = url.exitCode === 0 ? url.stdout.trim() : "";
@@ -448,6 +462,14 @@ async function rollbackGitHistory(
     const resolved =
       remotePath && !isAbsolute(remotePath) ? join(systemDir, remotePath) : remotePath;
     if (resolved && (await io.exists(resolved))) {
+      const cur = await git(["-C", resolved, "rev-parse", "--verify", refname]);
+      const curSha = cur.exitCode === 0 ? cur.stdout.trim() : "";
+      if (curSha !== expectedSha) {
+        diagnostics.push(
+          `rollback: remote ${refname} moved since the last observation (${curSha.slice(0, 12) || "absent"}) — left untouched`,
+        );
+        return;
+      }
       const direct = await git(["-C", resolved, "update-ref", "-d", refname]);
       if (direct.exitCode === 0) return;
       diagnostics.push(
@@ -475,6 +497,9 @@ async function rollbackGitHistory(
     // moved a pre-existing branch → restore the captured sha with a lease
     // pinned to the sha just observed; remote untouched → nothing to do.
     const remoteKey = `refs/heads/${pre.branch}`;
+    // Remote state observed right now — read once, reused by the branch surgery
+    // AND the created-refs cleanup below (REVIEW-10 O2: deletes consult it too).
+    let nowRefs: Record<string, string> | null = null;
     if (pre.remoteRefs === null) {
       diagnostics.push(
         "rollback: remote refs were not captured — remote branch state left untouched",
@@ -486,7 +511,7 @@ async function rollbackGitHistory(
           `rollback: ls-remote failed — remote state unverifiable, remote left untouched (non-fatal): ${now.stderr.slice(0, 160)}`,
         );
       } else {
-        const nowRefs: Record<string, string> = {};
+        nowRefs = {};
         for (const line of now.stdout.split("\n")) {
           const [rsha, rref] = line.split("\t");
           const ref = rref?.trim();
@@ -497,8 +522,9 @@ async function rollbackGitHistory(
         const preRemoteSha = pre.remoteRefs[remoteKey];
         const nowSha = nowRefs[remoteKey];
         if (nowSha !== undefined && preRemoteSha === undefined) {
-          // Register created this remote branch — delete it.
-          await tryDeleteRemoteRef(remoteKey);
+          // Register created this remote branch — delete it, lease-anchored on
+          // the just-observed sha (O2).
+          await tryDeleteRemoteRef(remoteKey, nowSha);
         } else if (nowSha !== undefined && preRemoteSha !== undefined && nowSha !== preRemoteSha) {
           // Register moved a pre-existing remote branch — restore its captured
           // sha, lease-asserted on the sha observed moments ago (a concurrent
@@ -540,7 +566,9 @@ async function rollbackGitHistory(
         }
         // Remote counterpart: delete only when the pre-snapshot proves the
         // remote ref did not exist before register — a same-named remote
-        // branch predating register is not ours to remove (N9).
+        // branch predating register is not ours to remove (N9). The delete
+        // consults the just-read remote state: absent means nothing to remove,
+        // unverifiable means leave untouched (O2).
         if (pre.remoteRefs === null) {
           diagnostics.push(
             `rollback: remote refs uncaptured — remote ${ref} (if any) left untouched`,
@@ -548,7 +576,15 @@ async function rollbackGitHistory(
           continue;
         }
         if (pre.remoteRefs[ref] !== undefined) continue;
-        await tryDeleteRemoteRef(ref);
+        if (nowRefs === null) {
+          diagnostics.push(
+            `rollback: remote state unverifiable — remote ${ref} (if any) left untouched`,
+          );
+          continue;
+        }
+        const createdRemoteSha = nowRefs[ref];
+        if (createdRemoteSha === undefined) continue;
+        await tryDeleteRemoteRef(ref, createdRemoteSha);
       }
     }
     if (!pre.sha) {
@@ -999,11 +1035,15 @@ export async function runSternsystemRegister(
     // Only a dir register itself created is removed — and only when rollback
     // left it empty; a pre-existing dir is never touched (REVIEW-09 N8).
     if (!systemDirExisted) {
-      const removed = await rollbackSystemDirIfEmpty(systemDir, context.io);
-      if (!removed) {
+      const outcome = await rollbackSystemDirIfEmpty(systemDir, context.io);
+      if (outcome === "kept-git") {
+        diagnostics.push("rollback: system dir left in place — .git materialized during rollback");
+      } else if (outcome === "kept-nonempty") {
         diagnostics.push(
           "rollback: system dir left in place — not empty after file-level rollback",
         );
+      } else if (outcome === "kept-error") {
+        diagnostics.push("rollback: system dir left in place — could not inspect or remove it");
       }
     }
 

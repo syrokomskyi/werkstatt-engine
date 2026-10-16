@@ -3,12 +3,12 @@
 <purpose>Tests for sternsystem.register extensions: amend path validation, flag handling, rollback (RFC-0532); intake seeding lives in sternsystem-register-intake.test.ts (RFC-1307).</purpose>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0532 review fix: add tests for extended sternsystem.register — amend validation, content stub, flag parsing.</item>
-  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
-  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N1/N2: pre-existing content/refs/remote-branch survival on rollback + unborn-HEAD ref cleanup.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: non-git dir survival, remote-branch create-vs-rewind differentiation, dirty-worktree and seed-path-collision refusal.</item>
+  <item>REVIEW-CODE-2026-10-16-10 O1/O2: kept-error diagnostic on injected readdir failure (no throw escapes rollback); delete-push argv asserted lease-anchored on the observed remote sha.</item>
+  <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
+  <history>RFC-0532, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -453,6 +453,55 @@ test("register preserves a pre-existing non-git system dir and restores captured
   expect(existsSync(join(cacheDir, "system.pin.json"))).toBe(false);
 });
 
+test("rollback keeps the register-created dir when inspection fails (REVIEW-10 O1)", async () => {
+  const fixture = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+    "valid-minimal",
+  );
+  await cp(fixture, join(workspaceRoot, "onboarding", "dp7", ".input", "intake"), {
+    recursive: true,
+  });
+  // systems-cache/dp7 does NOT exist — register creates it, so rollback tries
+  // the dir-level removal. Inject a readdir failure on that exact path: the
+  // rollback must degrade to a kept-error diagnostic, never a thrown escape.
+  const cacheDir = join(workspaceRoot, "..", "systems-cache", "dp7");
+  const ctx = makeContext(workspaceRoot);
+  const baseIo = ctx.io;
+  ctx.io = {
+    ...baseIo,
+    readdir: async (p: string) => {
+      if (p === cacheDir) throw new Error("injected readdir failure");
+      return baseIo.readdir(p);
+    },
+  };
+
+  vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  const result = await runSternsystemRegister(
+    makeInput({
+      id: "dp7",
+      cosmicStar: "Vega",
+      mirrors: "../systems-cache/dp7:non-bare",
+      intake: "onboarding/dp7/.input/intake",
+      biome: "dp7-03",
+    }),
+    ctx,
+  );
+  vi.restoreAllMocks();
+
+  // A structured fail result — the injected error did not escape as a throw —
+  // and the diagnostic names the real reason (inspection/removal failure).
+  const data = expectData(result);
+  expect(data.status).toBe("fail");
+  expect(
+    (data.diagnostics as string[]).some((d) => d.includes("could not inspect or remove")),
+  ).toBe(true);
+  expect(existsSync(cacheDir)).toBe(true);
+});
+
 test("register deletes a remote branch it created and leaves the remote clean (REVIEW-09 N9)", async () => {
   const fixture = join(
     dirname(fileURLToPath(import.meta.url)),
@@ -485,6 +534,18 @@ test("register deletes a remote branch it created and leaves the remote clean (R
 
   vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
   vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+  // REVIEW-10 O2: capture every git push argv — the created-ref delete must be
+  // lease-anchored on the remote sha observed by rollback, not a bare :ref push.
+  const ctx = makeContext(workspaceRoot);
+  const baseIo = ctx.io;
+  const pushes: string[][] = [];
+  ctx.io = {
+    ...baseIo,
+    exec: async (cmd: string, args: string[], opts?: Parameters<typeof baseIo.exec>[2]) => {
+      if (cmd === "git" && args[0] === "push") pushes.push([...args]);
+      return baseIo.exec(cmd, args, opts);
+    },
+  };
   const result = await runSternsystemRegister(
     makeInput({
       id: "dp7",
@@ -493,7 +554,7 @@ test("register deletes a remote branch it created and leaves the remote clean (R
       intake: "onboarding/dp7/.input/intake",
       biome: "dp7-03",
     }),
-    makeContext(workspaceRoot),
+    ctx,
   );
   vi.restoreAllMocks();
 
@@ -501,6 +562,12 @@ test("register deletes a remote branch it created and leaves the remote clean (R
   expect(git("rev-parse HEAD")).toBe(preSha);
   // The register-created remote branch is gone — the remote is back to empty.
   expect(git("ls-remote origin 'refs/heads/*'")).toBe("");
+  // O2: the attempted delete push carries --force-with-lease anchored to the
+  // remote sha observed by rollback (the transport delete is refused by
+  // denyDeleteCurrent for local-path remotes, but the lease arg must be there).
+  const delPush = pushes.find((a) => a.some((x) => x.startsWith(":refs/heads/")));
+  expect(delPush).toBeDefined();
+  expect(delPush![1]).toMatch(/^--force-with-lease=refs\/heads\/main:[0-9a-f]{40}$/);
 });
 
 test("register leaves a diverged remote branch untouched when its pushes were rejected (REVIEW-09 N9)", async () => {
