@@ -7,12 +7,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1189: material.credits.public-text.validate joins the commit gate — unscoped over src/content/prose/ and src/content/site/ so generated-credits public-text leaks fail at commit time</item>
   <item>RFC-1199: fail-closed materialization preflight — MATERIALIZATION_IN_PROGRESS result when workpiece/.git/MATERIALIZATION-IN-PROGRESS exists or manifest.materializedAt is null; runs before the .git check, staging, and commit-gate validators</item>
   <item>RFC-1204: trigger effects.contract.validate unscoped on pages/prose staging</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
-  <history>ADR-0096, ADR-0104, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149, RFC-1159, RFC-1160, RFC-1185, warpgogol-m000196</history>
+  <item>RFC-1323: write-time comment-terminator safety — shared comment-safety seam, authored CS-08 reject, injected neutralization, header-region scan</item>
+  <history>ADR-0096, ADR-0104, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0594, RFC-0644, RFC-0797, RFC-0820, RFC-0878, RFC-1095, RFC-1149, RFC-1159, RFC-1160, RFC-1185, RFC-1189, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 */
 
@@ -626,6 +626,9 @@ export async function runMissionGitCommit(
             files: stagedFiles,
             text: stripConventionalPrefix(message),
             workpiece: workpieceDir,
+            // RFC-1323: the commit message is injected text — neutralize
+            // comment terminators instead of rejecting (non-fatal path).
+            injected: true,
           },
         },
         context,
@@ -640,6 +643,12 @@ export async function runMissionGitCommit(
       }
       for (const reminder of recordResult.data?.keyDecisionsReminders ?? []) {
         process.stderr.write(`[mission.git.commit] review KEY_DECISIONS in ${reminder}\n`);
+      }
+      // RFC-1323: disclose terminator neutralization on injected message text.
+      for (const file of recordResult.data?.neutralized ?? []) {
+        process.stderr.write(
+          `[mission.git.commit] compass.summary.record neutralized a comment terminator in the injected item for ${file}\n`,
+        );
       }
     } catch (err) {
       process.stderr.write(
