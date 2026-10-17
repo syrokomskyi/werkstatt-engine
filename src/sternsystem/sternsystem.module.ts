@@ -7,12 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1284: sternsystem.validate declares ACCESS-01/02 rules + system-state.yaml in reads (REVIEW-CODE-2026-10-15-02 F5)</item>
   <item>RFC-1297: sternsystem.validate declares LIVE-01/02 rules.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
-  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097, RFC-1141, RFC-1173, RFC-1231</history>
+  <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097, RFC-1141, RFC-1173, RFC-1231, RFC-1248</history>
 </CHANGE_SUMMARY>
 */
 
@@ -46,6 +46,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
+        idempotency: "rerun-safe",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem id." },
           cosmicStar: {
@@ -203,6 +204,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
+        idempotency: "rerun-safe",
         flags: {
           id: { kind: "string", required: true, description: "Sternsystem id." },
           direction: {

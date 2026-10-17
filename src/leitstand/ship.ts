@@ -8,12 +8,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1217: preflight unreconciled-workpiece gate — cache-side `git fetch <workpieceDir> <branch>` + `rev-list HEAD..FETCH_HEAD` blocks ship when the workpiece carries commits the cache clone has not merged (the exact range fetch-and-merge would pull). Open missions only (closed-mission plans skip reconcile, so there is no merge to predict); git-unreadable degrades to a warning; --allow-unreconciled is the manual-merge escape hatch.</item>
   <item>RFC-1219: --resume logs the interrupted failed step (status/failedStep from findIncompleteOperation); formatShipTransition renders op-interrupted as "[ship] interrupted at step — run with --resume" for live followers.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1297: preflight step 2b — readLiveChannelStates + liveDriftDiagnostics; LIVE-01 aborts the ship with a resolve-first hint, LIVE-02 logs only.</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, warpgogol-m000175</history>
+  <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, RFC-1207, warpgogol-m000175</history>
 </CHANGE_SUMMARY>
 */
 
@@ -563,9 +563,38 @@ export function buildShipPlan(input: {
   const allSteps: OperationStep<ShipContext>[] = [
     buildPreflightStep(),
     buildMissionValidateStep(),
-    buildSimpleStep("mission-reconcile", "mission.reconcile", (ctx) => [
-      `--mission=${ctx.missionId}`,
-    ]),
+    {
+      // RFC-1327: re-running ship after a successful reconcile must not
+      // re-merge — the reconciliation report records the folded workpiece head.
+      name: "mission-reconcile",
+      run: async (ctx: ShipContext) => {
+        const reportPath = `${ctx.missionDir}/evidence/reconciliation-report.json`;
+        try {
+          if (await ctx.io.exists(reportPath)) {
+            const report = JSON.parse(await ctx.io.readFile(reportPath)) as {
+              workpieceHeadAtReconcile?: string | null;
+            };
+            const headRes = await ctx.io.exec("git", ["rev-parse", "HEAD"], {
+              cwd: ctx.workpieceDir,
+            });
+            const head = headRes.exitCode === 0 ? headRes.stdout.trim() : "";
+            if (head && report.workpieceHeadAtReconcile === head) {
+              ctx.logger.info(
+                `  [ship] mission-reconcile: skipped (workpiece head ${head.slice(0, 8)} already reconciled)`,
+              );
+              return { missionId: ctx.missionId, skipped: true, reason: "already-reconciled" };
+            }
+          }
+        } catch {
+          // Report unreadable or non-git workpiece — run reconcile normally.
+        }
+        const result = await runShipPhase(ctx, "mission.reconcile", [`--mission=${ctx.missionId}`]);
+        if (result.exitCode !== 0) {
+          throw new Error(`mission.reconcile failed: ${result.summary ?? "unknown"}`);
+        }
+        return { missionId: ctx.missionId, skipped: false, ...(result.data ?? {}) };
+      },
+    },
     buildSimpleStep("mission-close", "mission.close", (ctx) => [`--mission=${ctx.missionId}`]),
     buildSimpleStep(
       "release-prepare",

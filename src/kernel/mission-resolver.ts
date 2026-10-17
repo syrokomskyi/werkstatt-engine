@@ -16,6 +16,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
+  <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,7 +31,10 @@ export async function resolveMissionDir(
   io: WorkspaceIO,
 ): Promise<string> {
   const primary = path.join(workspaceRoot, MISSIONS_DIR, missionId);
-  if (await io.exists(primary)) return primary;
+  // RFC-1327: a bare recreated dir (journal residue appended after archival)
+  // is not a mission dir — require mission.yaml before preferring primary,
+  // so post-archive reads still resolve the archived manifest.
+  if (await io.exists(path.join(primary, "mission.yaml"))) return primary;
 
   for (const state of ["closed", "aborted"]) {
     const archived = path.join(workspaceRoot, MISSIONS_DIR, "archive", state, missionId);

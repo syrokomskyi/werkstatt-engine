@@ -10,6 +10,7 @@
   <item>RFC-0913: initial module — CACHE_CLONE_GITIGNORE_SENTINEL, CACHE_CLONE_GENERATED_PATTERNS, CACHE_CLONE_ONLY_PATTERNS, restoreCacheCloneGitignore, untrackForbiddenGeneratedFiles.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1179: add releases/ to CACHE_CLONE_ONLY_PATTERNS so merge-restore keeps release evidence gitignored (ADR-0085 closed-workpiece exemption for deploy.smoke.run writes)</item>
+  <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
 </CHANGE_SUMMARY>
 */
 
@@ -91,6 +92,18 @@ export async function untrackForbiddenGeneratedFiles(
         { cwd: systemDir },
       );
       if (single.exitCode === 0) untracked.push(pattern);
+    }
+  }
+  // RFC-1327: untracked generated files left on disk become "dirty" again after
+  // the next reconcile's preReconcileSha rewind strips the .gitignore block —
+  // delete the regenerable copies so a re-run stays clean. Only the generated
+  // set is removed: forbidden/clone-only entries (releases/, operator files)
+  // may hold real evidence and are never deleted.
+  for (const pattern of CACHE_CLONE_GENERATED_PATTERNS) {
+    if (!untracked.includes(pattern)) continue;
+    const abs = path.join(systemDir, pattern);
+    if (await io.exists(abs)) {
+      await io.rm(abs, { recursive: true }).catch(() => {});
     }
   }
   return untracked;

@@ -6,16 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
-  <history>RFC-0355, RFC-0477, RFC-0480, RFC-0560, RFC-0580, RFC-0958</history>
+  <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <history>RFC-0355, RFC-0477, RFC-0480, RFC-0560, RFC-0580, RFC-0958, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 
@@ -71,6 +69,20 @@ export async function runMissionAbort(
 
   const manifest = await readMissionManifest(workspaceRoot, missionId);
 
+  // RFC-1327: re-running abort on an already-aborted mission is a no-op exit-0;
+  // only genuinely different terminal states (closed/released) stay an error.
+  if (manifest.state === "aborted") {
+    return {
+      data: {
+        missionId,
+        systemId: manifest.systemId,
+        state: "aborted",
+        alreadyAborted: true,
+      } as unknown as MissionAbortData,
+      exitCode: 0,
+      summary: `[mission.abort] ${missionId} already aborted — no-op`,
+    };
+  }
   if (manifest.state !== "open") {
     throw new Error(
       `[mission.abort] mission '${missionId}' is not open (state: ${manifest.state})`,

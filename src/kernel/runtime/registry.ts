@@ -13,7 +13,6 @@ discovered app, and resolve which app(s) a CLI invocation targets.
   <item>The registry builds ActualState from a loaded app — resolution is explicit, not ambient.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1147/RFC-1148: listStaticCommandSurface — static enumeration over the workspace registry plus SITE_MODULE_MAP replaces listRegisteredKernelCommand*; commandInfo drops the siteName param (provider union narrowed to workspace | site-module).</item>
   <item>RFC-1147: site-module materialization memoized via getOrBuildSiteModuleStates — one materialization per workspaceRoot instead of 18 dynamic imports per call.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
@@ -23,7 +22,8 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
-  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097, RFC-1138, RFC-1144</history>
+  <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <history>ADR-0022, RFC-0303, RFC-0960, RFC-1026, RFC-1038, RFC-1097, RFC-1138, RFC-1144, RFC-1147</history>
 </CHANGE_SUMMARY>
 */
 
@@ -219,6 +219,8 @@ function commandInfo(
     ...(command.cacheable !== undefined ? { cacheable: command.cacheable } : {}),
     ...(command.coverage ? { coverage: command.coverage } : {}),
     ...(command.coverageNote ? { coverageNote: command.coverageNote } : {}),
+    ...(command.idempotency ? { idempotency: command.idempotency } : {}),
+    ...(command.idempotencyNote ? { idempotencyNote: command.idempotencyNote } : {}),
     ...(command.gate ? { gate: command.gate } : {}),
     ...(command.validatesOutputs ? { validatesOutputs: command.validatesOutputs } : {}),
     ...(command.generates ? { generates: command.generates } : {}),
