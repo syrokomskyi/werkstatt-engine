@@ -8,12 +8,12 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-16-08 N3/N4: duplicate primary-segment and non-2-letter locale rejections.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
-  <history>RFC-1307</history>
+  <item>RFC-1307: seed intake assets into the pages domain so page credits match</item>
+  <history>REVIEW-CODE-2026, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -357,9 +357,7 @@ describe("planSeedFromIntake (RFC-1307)", () => {
 
   it("AC-10: copies a generated asset byte-exact with a sibling credits file", () => {
     const plan = planSeedFromIntake(seedInput(fixtureJson()));
-    const asset = plan.files.find(
-      (f) => f.path === "src/content/business-profile/ru/assets/ast-01.svg",
-    );
+    const asset = plan.files.find((f) => f.path === "src/content/pages/ru/assets/ast-01.svg");
     expect(asset).toBeDefined();
     expect(
       Buffer.from(asset!.content as Uint8Array).equals(
@@ -372,10 +370,9 @@ describe("planSeedFromIntake (RFC-1307)", () => {
         ),
       ),
     ).toBe(true);
-    const credits = YAML.parse(
-      fileText(plan, "src/content/business-profile/ru/assets/ast-01.credits.yaml"),
-    );
+    const credits = YAML.parse(fileText(plan, "src/content/pages/ru/assets/ast-01.credits.yaml"));
     expect(credits.sourceType).toBe("ai-generated");
     expect(credits.parties[0].kind).toBe("AIModel");
+    expect(credits.target.domain).toBe("pages");
   });
 });

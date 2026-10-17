@@ -3,7 +3,7 @@
 <purpose>RFC-1307: pure planner for sternsystem.register --intake — turns a
 validated werkstatt:intake/v1 envelope (plus pre-read asset bytes) into the exact
 files seeded into a new Sternsystem's cache clone: system.md, the primary-locale
-business-profile PBP documents, publishable assets with RFC-0220 credit
+business-profile PBP documents, publishable page assets with RFC-0220 credit
 sidecars, and the system-state onboarding provenance block.</purpose>
 <non-goals>
   <item>Do not read or write files, spawn processes, or read the clock — the command owns IO; this function is called twice by the determinism test.</item>
@@ -18,14 +18,14 @@ sidecars, and the system-state onboarding provenance block.</purpose>
   <item>The seeded system.md carries the enforce gate triple (contractTerms, provenance, publication) plus legalJurisdiction — the born-valid contract, no downstream repair.</item>
   <item>Two entities resolving to one document path fail the plan</item>
   <item>Two locale tags sharing a primary subtag fail the plan rather than silently overwriting an i18n entry,</item>
-  <item>Seeded credit sidecars declare target.domain "business-profile"</item>
+  <item>Seeded assets and credit sidecars live in the pages domain (pages/&lt;lang&gt;/assets) so page image references match their credits</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1307: record review-fix decisions in compass headers</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: reject duplicate locale primary segments and non-2-letter primary subtags at plan time instead of seeding born-invalid i18n; credit target.domain names business-profile — the tree the seeded asset actually lands in.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
+  <item>RFC-1307: seed intake assets into the pages domain so page credits match</item>
   <history>RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -126,12 +126,13 @@ export function isSeedableAsset(asset: IntakeAsset): boolean {
 
 function creditFor(asset: IntakeAsset, lang: string): Record<string, unknown> {
   const id = assetBaseName(asset);
-  // Seeded assets land under src/content/business-profile/<lang>/assets/ — the
-  // target domain must name the tree the file actually lives in (REVIEW-08 N5).
+  // Seeded assets land under src/content/pages/<lang>/assets/ — site imagery is
+  // consumed by pages, and the credit target domain must name the tree the file
+  // actually lives in (REVIEW-08 N5) so page references match their credit.
   const target = {
     kind: materialKindFor(asset.mediaType),
     id,
-    domain: "business-profile",
+    domain: "pages",
     lang,
   };
   if (asset.rights.state === "generated") {
@@ -255,7 +256,7 @@ export function planSeedFromIntake(input: IntakeSeedInput): IntakeSeedPlan {
   for (const asset of intake.assets.filter(isSeedableAsset)) {
     const bytes = input.assetBytes.get(asset.id);
     if (!bytes) throw new Error(`[seed-from-intake] missing bytes for seedable asset ${asset.id}`);
-    const base = `src/content/business-profile/${primarySegment}/assets/${assetBaseName(asset)}`;
+    const base = `src/content/pages/${primarySegment}/assets/${assetBaseName(asset)}`;
     files.push({ path: `${base}.${assetExtension(asset)}`, content: bytes });
     const credit = materialCreditSchema.parse(creditFor(asset, primarySegment));
     files.push({ path: `${base}.credits.yaml`, content: stringifyYaml(sortDeep(credit)) });
