@@ -13,12 +13,12 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-16-08 N1/N2/N6/N7: rollback is ref-scoped — only refs absent from the pre-register snapshot are deleted, file-level deletes run before the git rewind, and captured bytes restore pre-existing config/state/pin that never reached a commit. The scaffold commit stages only register's own paths so untracked pre-existing files survive reset --hard. writeSystemConfig moves inside the guarded try; all forward git ops take the injected io; the scaffold push derives its branch from the captured origin HEAD.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: remote surgery is anchored on a pre-register ls-remote snapshot — a register-created remote branch is deleted (in place on local-path mirrors where receive-pack refuses), a moved pre-existing branch is restored to its captured sha with a lease pinned to the observed sha, and an untouched remote is left alone. Rollback removes only the seed paths register actually wrote, refuses to run on a dirty worktree, and a pre-existing clone dir is never deleted.</item>
   <item>REVIEW-CODE-2026-10-16-10 O1/O2: dir-removal helper degrades to a typed kept-* outcome on readdir/rm failure instead of escaping, and the caller diagnostic names the real reason. Remote-ref deletes are lease-anchored on the remote sha observed by rollback and the in-place update-ref fallback re-verifies the ref before deleting — a ref that changed or appeared since the snapshot survives.</item>
   <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
-  <history>RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
+  <item>RFC-1307: initialise missing cache clone repo during register</item>
+  <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -339,6 +339,37 @@ interface PreRegisterGit {
    * guess at remote state (REVIEW-CODE-2026-10-16-09 N9).
    */
   remoteRefs: Record<string, string> | null;
+}
+
+/**
+ * A fresh Sternsystem has no cache clone repository yet: initialise it in
+ * place (`git init -b main`) with `origin` pointing at the local bare mirror
+ * (mirrors[1]), so the scaffold commit, its push and mission.open's Bordbuch
+ * commit have a repository to land in. An existing repository is left alone;
+ * an external-only mirrors[1] (URL) leaves the clone without origin.
+ * Returns true when register created the repository (rollback removes it).
+ */
+async function ensureCacheCloneRepo(
+  systemDir: string,
+  mirrors: ReadonlyArray<{ path: string; storageType: string }>,
+  workspaceRoot: string,
+  io: WorkspaceIO,
+): Promise<boolean> {
+  if (await io.exists(join(systemDir, ".git"))) return false;
+  const git = async (args: string[]) => {
+    const result = await io.exec("git", args, { cwd: systemDir, timeoutMs: 10000 });
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `[sternsystem.register] git ${args.join(" ")} exited ${result.exitCode}: ${result.stderr.slice(0, 200)}`,
+      );
+    }
+  };
+  await git(["init", "-b", "main"]);
+  const bare = mirrors[1];
+  if (bare?.storageType === "bare" && !/^[a-z]+:\/\/|^[^/]+@[^:]+:/i.test(bare.path)) {
+    await git(["remote", "add", "origin", resolveMirrorPath(workspaceRoot, bare.path)]);
+  }
+  return true;
 }
 
 /**
@@ -775,6 +806,7 @@ export async function runSternsystemRegister(
   // register itself created is (REVIEW-CODE-2026-10-16-09 N8).
   const systemDirExisted = await context.io.exists(systemDir);
   await context.io.mkdir(systemDir);
+  const repoInitialized = await ensureCacheCloneRepo(systemDir, mirrors, workspaceRoot, context.io);
   // Capture the clone's git state before the first write so a failed
   // registration can distinguish register's own files/commits from anything
   // that was already there (REVIEW-CODE-2026-10-16-08 N1/N2).
@@ -1031,6 +1063,17 @@ export async function runSternsystemRegister(
       diagnostics.push(
         `rollback: pre-existing file restore failed: ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}`,
       );
+    }
+    // A repository register initialised itself is register's own output —
+    // remove it so a re-run starts from the same git-less state.
+    if (repoInitialized) {
+      try {
+        await context.io.rm(join(systemDir, ".git"), { recursive: true });
+      } catch (rmErr) {
+        diagnostics.push(
+          `rollback: register-initialised .git could not be removed: ${rmErr instanceof Error ? rmErr.message : String(rmErr)}`,
+        );
+      }
     }
     // Only a dir register itself created is removed — and only when rollback
     // left it empty; a pre-existing dir is never touched (REVIEW-09 N8).

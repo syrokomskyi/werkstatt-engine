@@ -8,17 +8,19 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: created.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: duplicate primary-segment and non-2-letter locale rejections.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <item>RFC-1307: initialise missing cache clone repo during register</item>
+  <history>RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -152,6 +154,34 @@ describe("sternsystem.register --intake preconditions (RFC-1307)", () => {
     expect(state.onboarding.intakeId).toMatch(/^int_/);
     expect(state.onboarding.intakeSha256).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(result.data?.seed?.pbpDocuments).toBe(5);
+  });
+
+  it("initialises a missing cache clone repo with origin at the local bare mirror", async () => {
+    const bareDir = join(workspaceRoot, "..", "systems-git", "dp7");
+    await mkdir(bareDir, { recursive: true });
+    execFileSync("git", ["init", "--bare", "-b", "main", bareDir]);
+    vi.spyOn(registerDeps, "openMission").mockResolvedValue({
+      data: { missionId: "dp7-m000001" },
+      exitCode: 0,
+    } as unknown as Awaited<ReturnType<typeof registerDeps.openMission>>);
+    const result = await runSternsystemRegister(
+      input({ ...baseFlags(), mirrors: "../systems-cache/dp7:non-bare,../systems-git/dp7:bare" }),
+      context(workspaceRoot),
+    );
+    expect(result.data?.status).toBe("pass");
+    const origin = execFileSync("git", ["-C", cacheDir(), "remote", "get-url", "origin"], {
+      encoding: "utf8",
+    }).trim();
+    expect(origin).toBe(bareDir);
+    const log = execFileSync("git", ["-C", cacheDir(), "log", "--format=%s"], { encoding: "utf8" });
+    expect(log).toContain("sternsystem.register: scaffold dp7");
+  });
+
+  it("removes a register-initialised cache clone repo on rollback", async () => {
+    vi.spyOn(registerDeps, "openMission").mockRejectedValue(new Error("materialize failed"));
+    const result = await runSternsystemRegister(input(baseFlags()), context(workspaceRoot));
+    expect(result.data?.status).toBe("fail");
+    expect(existsSync(join(cacheDir(), ".git"))).toBe(false);
   });
 });
 
