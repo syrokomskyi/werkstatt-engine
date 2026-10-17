@@ -36,7 +36,13 @@ import {
 import { setRegistryCacheEnabled } from "../runtime/registry-cache.ts";
 import { flushFactoryTelemetry } from "../runtime/telemetry.ts";
 import { pipelineHint } from "../pipeline-hint.ts";
-import { argvRequestsHelp, argvRequestsJson, consumeCommonFlags, printUsage } from "./flags.ts";
+import {
+  argvRequestsHelp,
+  argvRequestsJson,
+  consumeCommonFlags,
+  printFilesModified,
+  printUsage,
+} from "./flags.ts";
 import { assertBatchHasNoPositional, BatchUsageError, runBatch } from "./batch.ts";
 // @ai-invariant: CLI execution must route through registered kernel commands and preserve typed flag parsing.
 
@@ -63,22 +69,6 @@ async function printCommandHelp(workspaceRoot: string, commandName: string): Pro
       console.log(`    --${flagName} <${flag.kind}>${requiredLabel} — ${flag.description}`);
     }
   }
-}
-
-/**
- * RFC-0326: print a `[Modified N file(s): ...] Re-read before editing.` line
- * to stdout in pretty mode when the report has a non-empty filesModified array.
- * In JSON mode, filesModified is already a top-level field on the report — no
- * extra printing needed.
- */
-function printFilesModified(
-  report: { filesModified?: string[] },
-  outputFormat: "pretty" | "json",
-): void {
-  if (outputFormat === "json") return;
-  const files = report.filesModified;
-  if (!files || files.length === 0) return;
-  console.log(`[Modified ${files.length} file(s): ${files.join(", ")}] Re-read before editing.`);
 }
 
 function printTopLevelError(error: unknown): void {

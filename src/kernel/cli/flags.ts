@@ -170,6 +170,22 @@ export function printUsage() {
   );
 }
 
+/**
+ * RFC-0326: print a `[Modified N file(s): ...] Re-read before editing.` line
+ * to stdout in pretty mode when the report has a non-empty filesModified array.
+ * In JSON mode, filesModified is already a top-level field on the report — no
+ * extra printing needed.
+ */
+export function printFilesModified(
+  report: { filesModified?: string[] },
+  outputFormat: "pretty" | "json",
+): void {
+  if (outputFormat === "json") return;
+  const files = report.filesModified;
+  if (!files || files.length === 0) return;
+  console.log(`[Modified ${files.length} file(s): ${files.join(", ")}] Re-read before editing.`);
+}
+
 export function isJsonFlagToken(entry: string): boolean {
   return (
     entry === "--json" ||

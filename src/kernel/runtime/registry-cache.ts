@@ -29,7 +29,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 import type { KernelAppConfig } from "@warpgogol/werkstatt-shared/kernel";
 import type { ActualState, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
-import { buildRegistry } from "./registry.ts";
+import { buildRegistry, type RegistryLoadOptions } from "./registry.ts";
 import { buildActualState } from "../../runtime/reconciler.ts";
 import { loadWorkspaceConfig } from "../discovery.ts";
 
@@ -45,15 +45,10 @@ let cacheEnabled = true;
  * When the cache is disabled (via `setRegistryCacheEnabled(false)`), always
  * builds a fresh actual state without reading from or writing to the cache.
  */
-export interface RegistryCacheLoadOptions {
-  /** RFC-1309: suppress `[registry]` cache-hit and module-loading preamble lines on stderr. */
-  quiet?: boolean;
-}
-
 export async function getOrBuildRegistry(
   cacheKey: string,
   config: KernelAppConfig,
-  options?: RegistryCacheLoadOptions,
+  options?: RegistryLoadOptions,
 ): Promise<ActualState> {
   if (cacheEnabled) {
     const cached = registryCache.get(cacheKey);
@@ -78,7 +73,7 @@ export async function getOrBuildRegistry(
  */
 export async function getOrBuildWorkspaceRegistry(
   workspaceRoot: string,
-  options?: RegistryCacheLoadOptions,
+  options?: RegistryLoadOptions,
 ): Promise<ActualState | undefined> {
   const config = await loadWorkspaceConfig(workspaceRoot, options);
   if (!config) return undefined;

@@ -21,7 +21,7 @@ import type {
   ExecuteKernelCommandOptions,
   KernelExecutionReport,
 } from "@warpgogol/werkstatt-shared/kernel";
-import { consumeCommonFlags } from "./flags.ts";
+import { consumeCommonFlags, printFilesModified } from "./flags.ts";
 
 /** Usage-level failure — manifests that are missing, unparseable, or shape-invalid. */
 export class BatchUsageError extends Error {
@@ -190,6 +190,9 @@ export async function runBatch(options: {
       exitCode = failedReport?.exitCode ?? 0;
       summary = reports[0]?.summary;
       status = exitCode === 0 ? "pass" : "fail";
+      for (const entryReport of reports) {
+        printFilesModified(entryReport, outputFormat);
+      }
     } catch (error) {
       // Unknown command names and resolution failures record as entry errors;
       // the batch continues unless --stop-on-fail.
