@@ -106,12 +106,20 @@ export async function discoverSiteWorkspaces(
 ): Promise<DiscoveredSiteWorkspace[]> {
   return discoverSitesFromResolver(workspaceRoot);
 }
-export async function loadKernelAppConfig(site: DiscoveredSiteWorkspace): Promise<KernelAppConfig> {
+export interface KernelConfigLoadOptions {
+  /** RFC-1309: suppress the `[config]` preamble lines on stderr. */
+  quiet?: boolean;
+}
+
+export async function loadKernelAppConfig(
+  site: DiscoveredSiteWorkspace,
+  options?: KernelConfigLoadOptions,
+): Promise<KernelAppConfig> {
   if (!site.configPath) {
     throw new Error(`No kernel config found for site \`${site.name}\`.`);
   }
 
-  process.stderr.write(`  [config] loading ${site.configPath} …\n`);
+  if (!options?.quiet) process.stderr.write(`  [config] loading ${site.configPath} …\n`);
   let moduleNamespace: Record<string, unknown>;
   try {
     moduleNamespace = await importConfigModule(pathToFileURL(site.configPath).href);
@@ -122,7 +130,7 @@ export async function loadKernelAppConfig(site: DiscoveredSiteWorkspace): Promis
       { cause: error },
     );
   }
-  process.stderr.write(`  [config] loaded ${site.configPath}\n`);
+  if (!options?.quiet) process.stderr.write(`  [config] loaded ${site.configPath}\n`);
   const candidate = unwrapConfig(moduleNamespace);
 
   if (!candidate || typeof candidate !== "object") {
@@ -141,6 +149,7 @@ export async function loadKernelAppConfig(site: DiscoveredSiteWorkspace): Promis
 }
 export async function loadWorkspaceConfig(
   workspaceRoot: string,
+  options?: KernelConfigLoadOptions,
 ): Promise<KernelAppConfig | undefined> {
   const toolsDirectory = path.join(workspaceRoot, "tools");
   const configPath = await resolveAppConfigPath(toolsDirectory);
@@ -149,7 +158,7 @@ export async function loadWorkspaceConfig(
     return undefined;
   }
 
-  process.stderr.write(`  [config] loading ${configPath} …\n`);
+  if (!options?.quiet) process.stderr.write(`  [config] loading ${configPath} …\n`);
   let moduleNamespace: Record<string, unknown>;
   try {
     moduleNamespace = await importConfigModule(pathToFileURL(configPath).href);
@@ -159,7 +168,7 @@ export async function loadWorkspaceConfig(
       cause: error,
     });
   }
-  process.stderr.write(`  [config] loaded ${configPath}\n`);
+  if (!options?.quiet) process.stderr.write(`  [config] loaded ${configPath}\n`);
   const candidate = unwrapConfig(moduleNamespace);
 
   if (!candidate || typeof candidate !== "object") {

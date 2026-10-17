@@ -117,13 +117,15 @@ function buildCollectErrorsReport(
   timing: KernelPipelineTimingSummary,
   prefix: string,
   siteName?: string,
+  quiet?: boolean,
 ): KernelPipelineReport {
   for (const name of collected.failedSteps) {
     const failedReport = reports.find((r) => r.commandName === name);
-    progressLine(`  [FAIL] ${name}: ${failedReport?.summary ?? "failed"}`);
+    progressLine(`  [FAIL] ${name}: ${failedReport?.summary ?? "failed"}`, quiet);
   }
   progressLine(
     `${prefix} pipeline ${pipelineName} — FAILED (${collected.failedSteps.length} step(s) failed, ${formatDuration(timing.totalDurationMs)})`,
+    quiet,
   );
   const report: KernelPipelineReport = {
     ...(siteName ? { siteName } : {}),
@@ -154,7 +156,10 @@ function pipelineFlagsToArgs(flags: Record<string, unknown> | undefined): string
   return args;
 }
 
-function progressLine(message: string): void {
+function progressLine(message: string, quiet?: boolean): void {
+  // RFC-1309: --quiet suppresses pipeline progress preamble; step diagnostics
+  // (logger.warn/error inside commands) are unaffected.
+  if (quiet) return;
   process.stderr.write(`${message}\n`);
 }
 
@@ -475,6 +480,7 @@ async function executePipelineForSite(
   const telemetryBatch: StepTelemetryRecord[] = [];
   progressLine(
     `[${site.name}] pipeline ${options.pipelineName} — ${totalSteps} step(s), concurrency ${concurrency}`,
+    options.quiet,
   );
 
   // RFC-0687: load cross-pipeline cache hits and set up run state.
@@ -511,6 +517,7 @@ async function executePipelineForSite(
   if (workpieceClosed) {
     progressLine(
       `[${site.name}] workpiece is closed (ADR-0085) — mutating steps run only when all writes are gitignored`,
+      options.quiet,
     );
   }
 
@@ -555,7 +562,7 @@ async function executePipelineForSite(
         if (options.outputFormat !== "json") {
           logger.section(`${site.name}: ${options.pipelineName} -> ${step.command}`);
         }
-        progressLine(`${stepLabel} ${step.command} …`);
+        progressLine(`${stepLabel} ${step.command} …`, options.quiet);
 
         const budgetedExpectedDurationMs = lookupExpectedDurationMs(
           budgets,
@@ -627,6 +634,7 @@ async function executePipelineForSite(
             : "";
         progressLine(
           `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}${taintedNote}`,
+          options.quiet,
         );
         // ADR-0023: collect telemetry in-memory; batch write at pipeline completion.
         // ADR-0085: closed-mission skips are excluded — a 0ms skip would
@@ -706,12 +714,14 @@ async function executePipelineForSite(
         timing,
         `[${site.name}]`,
         site.name,
+        options.quiet,
       );
     }
 
     if (failed) {
       progressLine(
         `[${site.name}] pipeline ${options.pipelineName} — FAILED at step ${failed.commandName} (${formatDuration(timing.totalDurationMs)})`,
+        options.quiet,
       );
       const failedReport: KernelPipelineReport = {
         siteName: site.name,
@@ -727,6 +737,7 @@ async function executePipelineForSite(
 
     progressLine(
       `[${site.name}] pipeline ${options.pipelineName} — DONE ${formatDuration(timing.totalDurationMs)} (${timing.stepCount} step(s), ${timing.timeoutCount} timeout(s))`,
+      options.quiet,
     );
 
     const doneReport: KernelPipelineReport = {
@@ -769,6 +780,7 @@ async function executePipelineForWorkspace(
   const telemetryBatch: StepTelemetryRecord[] = [];
   progressLine(
     `[workspace] pipeline ${options.pipelineName} — ${totalSteps} step(s), concurrency ${concurrency}`,
+    options.quiet,
   );
 
   // RFC-0687: load cross-pipeline cache hits and set up run state.
@@ -832,7 +844,7 @@ async function executePipelineForWorkspace(
         if (options.outputFormat !== "json") {
           logger.section(`workspace: ${options.pipelineName} -> ${step.command}`);
         }
-        progressLine(`${stepLabel} ${step.command} …`);
+        progressLine(`${stepLabel} ${step.command} …`, options.quiet);
 
         const budgetedExpectedDurationMs = lookupExpectedDurationMs(
           budgets,
@@ -871,6 +883,7 @@ async function executePipelineForWorkspace(
             : "";
         progressLine(
           `${stepLabel} ${step.command} — ${stepStatusLabel(report)} ${formatDuration(report.timing.durationMs)}${taintedNote}`,
+          options.quiet,
         );
         // ADR-0023: collect telemetry in-memory; batch write at pipeline completion.
         if (!step.skip && !report.cached && !isTransitiveSkip(report)) {
@@ -935,12 +948,15 @@ async function executePipelineForWorkspace(
         options.pipelineName,
         timing,
         `[workspace]`,
+        undefined,
+        options.quiet,
       );
     }
 
     if (failed) {
       progressLine(
         `[workspace] pipeline ${options.pipelineName} — FAILED at step ${failed.commandName} (${formatDuration(timing.totalDurationMs)})`,
+        options.quiet,
       );
       const failedReport: KernelPipelineReport = {
         pipelineName: options.pipelineName,
@@ -955,6 +971,7 @@ async function executePipelineForWorkspace(
 
     progressLine(
       `[workspace] pipeline ${options.pipelineName} — DONE ${formatDuration(timing.totalDurationMs)} (${timing.stepCount} step(s), ${timing.timeoutCount} timeout(s))`,
+      options.quiet,
     );
 
     const doneReport: KernelPipelineReport = {
@@ -984,6 +1001,7 @@ const EXECUTE_KERNEL_PIPELINE_OPTION_KEYS = [
   "concurrency",
   "flags",
   "collectErrors",
+  "quiet",
 ];
 
 /**
@@ -1020,16 +1038,18 @@ export async function executeKernelPipeline(
     EXECUTE_KERNEL_PIPELINE_OPTION_KEYS,
     "executeKernelPipeline options",
   );
-  progressLine(`pipeline ${options.pipelineName} — resolving target …`);
+  progressLine(`pipeline ${options.pipelineName} — resolving target …`, options.quiet);
 
   // Pre-resolved site workspace bypasses discovery (e.g. closed-mission workpieces
   // where registry.currentMission is null and discovery can't find the workpiece).
   if (options.siteWorkspace) {
     const site = options.siteWorkspace;
-    progressLine(`pipeline ${options.pipelineName} — 1 site(s): ${site.name}`);
-    progressLine(`[${site.name}] loading app runtime …`);
-    const { registry } = await loadAppRuntime(options.workspaceRoot, site);
-    progressLine(`[${site.name}] app runtime ready`);
+    progressLine(`pipeline ${options.pipelineName} — 1 site(s): ${site.name}`, options.quiet);
+    progressLine(`[${site.name}] loading app runtime …`, options.quiet);
+    const { registry } = await loadAppRuntime(options.workspaceRoot, site, {
+      quiet: options.quiet,
+    });
+    progressLine(`[${site.name}] app runtime ready`, options.quiet);
     const pipelineDecl = registry.pipelines.get(options.pipelineName);
     if (!pipelineDecl) {
       throw new Error(
@@ -1045,12 +1065,17 @@ export async function executeKernelPipeline(
   }
 
   if (!options.siteName && !(options.allSites ?? false)) {
-    const wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot);
+    const wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot, {
+      quiet: options.quiet,
+    });
     if (wsRegistry) {
-      progressLine(`pipeline ${options.pipelineName} — loading workspace registry …`);
+      progressLine(
+        `pipeline ${options.pipelineName} — loading workspace registry …`,
+        options.quiet,
+      );
       const wsPipelineDecl = wsRegistry.pipelines.get(options.pipelineName);
       if (wsPipelineDecl) {
-        progressLine(`pipeline ${options.pipelineName} — workspace registry ready`);
+        progressLine(`pipeline ${options.pipelineName} — workspace registry ready`, options.quiet);
         return executePipelineForWorkspace(
           wsRegistry,
           mergeCollectErrorsOption(options, wsPipelineDecl),
@@ -1072,14 +1097,17 @@ export async function executeKernelPipeline(
 
   progressLine(
     `pipeline ${options.pipelineName} — ${targetSites.length} site(s): ${targetSites.map((s) => s.name).join(", ")}`,
+    options.quiet,
   );
 
   const reports: KernelPipelineReport[] = [];
 
   for (const site of targetSites) {
-    progressLine(`[${site.name}] loading app runtime …`);
-    const { registry } = await loadAppRuntime(options.workspaceRoot, site);
-    progressLine(`[${site.name}] app runtime ready`);
+    progressLine(`[${site.name}] loading app runtime …`, options.quiet);
+    const { registry } = await loadAppRuntime(options.workspaceRoot, site, {
+      quiet: options.quiet,
+    });
+    progressLine(`[${site.name}] app runtime ready`, options.quiet);
     const pipelineDecl = registry.pipelines.get(options.pipelineName);
     if (!pipelineDecl) {
       throw new Error(

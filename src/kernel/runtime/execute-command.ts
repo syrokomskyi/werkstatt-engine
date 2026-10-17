@@ -614,6 +614,7 @@ const EXECUTE_KERNEL_COMMAND_OPTION_KEYS = [
   "force",
   "outputFormat",
   "siteExplicit",
+  "quiet",
 ];
 
 export async function executeKernelCommand(
@@ -641,7 +642,9 @@ export async function executeKernelCommand(
   let wsCommand: KernelCommandDefinition | undefined;
   let wsRegistry: ActualState | undefined;
   {
-    const workspaceConfig = await loadWorkspaceConfig(options.workspaceRoot);
+    const workspaceConfig = await loadWorkspaceConfig(options.workspaceRoot, {
+      quiet: options.quiet,
+    });
     if (workspaceConfig) {
       if (workspaceConfig.moduleLoaders) {
         let moduleName: string | undefined;
@@ -663,7 +666,9 @@ export async function executeKernelCommand(
       }
 
       if (!wsCommand) {
-        wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot);
+        wsRegistry = await getOrBuildWorkspaceRegistry(options.workspaceRoot, {
+          quiet: options.quiet,
+        });
         wsCommand = wsRegistry?.commands.get(options.commandName);
       }
 
@@ -675,7 +680,9 @@ export async function executeKernelCommand(
         // full workspace registry, not the module-scoped wsRegistry that may
         // have resolved this command (ecosystem.manifest parity, RFC-1249).
         const ownershipMap = await computeOwnershipMap(
-          (await getOrBuildWorkspaceRegistry(options.workspaceRoot)) ?? wsRegistry!,
+          (await getOrBuildWorkspaceRegistry(options.workspaceRoot, {
+            quiet: options.quiet,
+          })) ?? wsRegistry!,
         );
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
@@ -763,7 +770,9 @@ export async function executeKernelCommand(
         // full workspace registry, not the module-scoped wsRegistry that may
         // have resolved this command (ecosystem.manifest parity, RFC-1249).
         const ownershipMap = await computeOwnershipMap(
-          (await getOrBuildWorkspaceRegistry(options.workspaceRoot)) ?? wsRegistry!,
+          (await getOrBuildWorkspaceRegistry(options.workspaceRoot, {
+            quiet: options.quiet,
+          })) ?? wsRegistry!,
         );
         const context: KernelRuntimeContext = {
           workspaceRoot: options.workspaceRoot,
@@ -819,7 +828,7 @@ export async function executeKernelCommand(
       let siteRegistry: ActualState | undefined;
       let siteConfig: KernelAppConfig;
       try {
-        siteConfig = await loadKernelAppConfig(site);
+        siteConfig = await loadKernelAppConfig(site, { quiet: options.quiet });
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         throw new Error(
@@ -834,7 +843,9 @@ export async function executeKernelCommand(
       }
 
       if (!command) {
-        const { registry } = await loadAppRuntime(options.workspaceRoot, site);
+        const { registry } = await loadAppRuntime(options.workspaceRoot, site, {
+          quiet: options.quiet,
+        });
         siteRegistry = registry;
         command = registry.commands.get(options.commandName);
       }
@@ -862,7 +873,9 @@ export async function executeKernelCommand(
       const logger = createKernelLogger(outputFormat);
       const { io, intents } = createDefaultIO();
       const ownershipMap = await computeOwnershipMap(
-        (await getOrBuildWorkspaceRegistry(options.workspaceRoot)) ?? siteRegistry!,
+        (await getOrBuildWorkspaceRegistry(options.workspaceRoot, {
+          quiet: options.quiet,
+        })) ?? siteRegistry!,
       );
       const context: KernelRuntimeContext = {
         workspaceRoot: options.workspaceRoot,

@@ -36,11 +36,9 @@ import {
 import { setRegistryCacheEnabled } from "../runtime/registry-cache.ts";
 import { flushFactoryTelemetry } from "../runtime/telemetry.ts";
 import { pipelineHint } from "../pipeline-hint.ts";
+import { argvRequestsHelp, argvRequestsJson, consumeCommonFlags, printUsage } from "./flags.ts";
+import { assertBatchHasNoPositional, BatchUsageError, runBatch } from "./batch.ts";
 // @ai-invariant: CLI execution must route through registered kernel commands and preserve typed flag parsing.
-
-function argvRequestsHelp(argv: string[]): boolean {
-  return argv.some((entry) => entry === "--help" || entry === "-h");
-}
 
 /** RFC-0266: render one command's manifest entry (description + declared flags) for `--help`. */
 async function printCommandHelp(workspaceRoot: string, commandName: string): Promise<void> {
@@ -65,129 +63,6 @@ async function printCommandHelp(workspaceRoot: string, commandName: string): Pro
       console.log(`    --${flagName} <${flag.kind}>${requiredLabel} — ${flag.description}`);
     }
   }
-}
-
-function consumeCommonFlags(argv: string[]) {
-  const remaining: string[] = [];
-  let siteName: string | undefined;
-  let allSites = false;
-  let dryRun = false;
-  let force = false;
-  let noRegistryCache = false;
-  let concurrency: number | undefined;
-  let collectErrors = false;
-  let outputFormat: "pretty" | "json" = "pretty";
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const entry = argv[index];
-
-    if (entry === "--site") {
-      siteName = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (entry.startsWith("--site=")) {
-      siteName = entry.slice("--site=".length);
-      continue;
-    }
-
-    if (entry === "--all" || entry === "--all=true" || entry === "--all=1") {
-      allSites = true;
-      continue;
-    }
-
-    if (entry === "--dry-run" || entry === "--dry-run=true" || entry === "--dry-run=1") {
-      dryRun = true;
-      continue;
-    }
-
-    if (entry === "--force" || entry === "--force=true" || entry === "--force=1") {
-      force = true;
-      continue;
-    }
-
-    if (
-      entry === "--no-registry-cache" ||
-      entry === "--no-registry-cache=true" ||
-      entry === "--no-registry-cache=1"
-    ) {
-      noRegistryCache = true;
-      continue;
-    }
-
-    if (isJsonFlagToken(entry)) {
-      outputFormat = "json";
-      continue;
-    }
-
-    if (
-      entry === "--collect-errors" ||
-      entry === "--collect-errors=true" ||
-      entry === "--collect-errors=1"
-    ) {
-      collectErrors = true;
-      continue;
-    }
-
-    if (entry === "--concurrency") {
-      const value = argv[index + 1];
-      const parsed = Number.parseInt(value ?? "", 10);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        concurrency = parsed;
-        index += 1;
-      }
-      continue;
-    }
-
-    if (entry.startsWith("--concurrency=")) {
-      const parsed = Number.parseInt(entry.slice("--concurrency=".length), 10);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        concurrency = parsed;
-      }
-      continue;
-    }
-
-    remaining.push(entry);
-  }
-
-  return {
-    siteName,
-    allSites,
-    dryRun,
-    force,
-    noRegistryCache,
-    concurrency,
-    collectErrors,
-    outputFormat,
-    remaining,
-  };
-}
-
-function printUsage() {
-  console.log("werkstatt sites list [--json]");
-  console.log(
-    "werkstatt run <command> [--site <name>] [--all] [--dry-run] [--no-registry-cache] [--json|--output] [-- ...args]",
-  );
-  console.log(
-    "werkstatt pipeline <name> [--site <name>] [--all] [--dry-run] [--force] [--no-registry-cache] [--concurrency N] [--collect-errors] [--json]",
-  );
-}
-
-function isJsonFlagToken(entry: string): boolean {
-  return (
-    entry === "--json" ||
-    entry === "--json=true" ||
-    entry === "--json=1" ||
-    entry === "--output" ||
-    entry === "--output=json" ||
-    entry === "--output=true" ||
-    entry === "--output=1"
-  );
-}
-
-function argvRequestsJson(argv: string[]): boolean {
-  return argv.some(isJsonFlagToken);
 }
 
 /**
@@ -274,8 +149,46 @@ export async function main() {
   }
 
   if (subcommand === "run") {
-    const { siteName, allSites, dryRun, force, outputFormat, remaining } = consumeCommonFlags(rest);
+    const { siteName, allSites, dryRun, force, quiet, batch, stopOnFail, outputFormat, remaining } =
+      consumeCommonFlags(rest);
     const [commandName, ...argv] = remaining;
+
+    // RFC-1309: --batch executes a manifest of commands in this one process;
+    // it is mutually exclusive with a positional command name.
+    if (batch !== undefined) {
+      try {
+        assertBatchHasNoPositional(commandName ? [commandName, ...argv] : []);
+        const { report, exitCode } = await runBatch({
+          workspaceRoot,
+          manifestPath: batch,
+          globals: {
+            siteName,
+            allSites,
+            dryRun,
+            force,
+            quiet,
+            stopOnFail,
+            outputFormat,
+          },
+          execute: executeKernelCommand,
+        });
+        if (outputFormat === "json") {
+          console.log(JSON.stringify(report, null, 2));
+          process.exitCode = 0; // RFC-0972: JSON mode always exits 0
+        } else {
+          process.exitCode = exitCode;
+        }
+      } catch (error) {
+        if (error instanceof BatchUsageError) {
+          console.error(`usage error: ${error.message}`);
+          process.exitCode = 1;
+          return;
+        }
+        throw error;
+      }
+      return;
+    }
+
     if (!commandName) {
       printUsage();
       process.exitCode = 1;
@@ -295,6 +208,7 @@ export async function main() {
       allSites,
       dryRun,
       force,
+      quiet,
       outputFormat,
       argv,
     });
@@ -322,6 +236,7 @@ export async function main() {
       force,
       concurrency,
       collectErrors,
+      quiet,
       outputFormat,
       remaining: pipelineRemaining,
     } = consumeCommonFlags(rest);
@@ -339,6 +254,7 @@ export async function main() {
       allSites,
       dryRun,
       force,
+      quiet,
       outputFormat,
       ...(concurrency !== undefined ? { concurrency } : {}),
       ...(collectErrors ? { collectErrors: true } : {}),

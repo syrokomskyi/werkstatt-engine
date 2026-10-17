@@ -45,19 +45,25 @@ let cacheEnabled = true;
  * When the cache is disabled (via `setRegistryCacheEnabled(false)`), always
  * builds a fresh actual state without reading from or writing to the cache.
  */
+export interface RegistryCacheLoadOptions {
+  /** RFC-1309: suppress `[registry]` cache-hit and module-loading preamble lines on stderr. */
+  quiet?: boolean;
+}
+
 export async function getOrBuildRegistry(
   cacheKey: string,
   config: KernelAppConfig,
+  options?: RegistryCacheLoadOptions,
 ): Promise<ActualState> {
   if (cacheEnabled) {
     const cached = registryCache.get(cacheKey);
     if (cached) {
-      process.stderr.write(`  [registry] cache hit for ${cacheKey}\n`);
+      if (!options?.quiet) process.stderr.write(`  [registry] cache hit for ${cacheKey}\n`);
       return cached;
     }
   }
 
-  const registry = await buildRegistry(config);
+  const registry = await buildRegistry(config, options);
 
   if (cacheEnabled) {
     registryCache.set(cacheKey, registry);
@@ -72,11 +78,12 @@ export async function getOrBuildRegistry(
  */
 export async function getOrBuildWorkspaceRegistry(
   workspaceRoot: string,
+  options?: RegistryCacheLoadOptions,
 ): Promise<ActualState | undefined> {
-  const config = await loadWorkspaceConfig(workspaceRoot);
+  const config = await loadWorkspaceConfig(workspaceRoot, options);
   if (!config) return undefined;
   const cacheKey = `workspace:${workspaceRoot}`;
-  return getOrBuildRegistry(cacheKey, config);
+  return getOrBuildRegistry(cacheKey, config, options);
 }
 
 /**

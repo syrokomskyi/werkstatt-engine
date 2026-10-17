@@ -47,17 +47,25 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import type { ActualState, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
 
-export async function buildRegistry(config: KernelAppConfig): Promise<ActualState> {
+export interface RegistryLoadOptions {
+  /** RFC-1309: suppress `[registry]` loading/cache preamble lines on stderr. */
+  quiet?: boolean;
+}
+
+export async function buildRegistry(
+  config: KernelAppConfig,
+  options?: RegistryLoadOptions,
+): Promise<ActualState> {
   const exports: ModuleExport[] = [];
 
   if (config.modules) {
     for (const mod of config.modules) {
-      process.stderr.write(`  [registry] loading module ${mod.name} …\n`);
+      if (!options?.quiet) process.stderr.write(`  [registry] loading module ${mod.name} …\n`);
       exports.push(mod);
     }
   } else if (config.moduleLoaders) {
     for (const [moduleName, loader] of Object.entries(config.moduleLoaders)) {
-      process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
+      if (!options?.quiet) process.stderr.write(`  [registry] loading module ${moduleName} …\n`);
       const mod = await loader();
       assertModuleExport(mod, moduleName);
       exports.push(mod);
@@ -85,7 +93,12 @@ function assertModuleExport(
   mod: ModuleExport | undefined | null,
   loaderKey: string,
 ): asserts mod is ModuleExport {
-  if (mod === undefined || mod === null || typeof mod !== "object" || typeof mod.name !== "string") {
+  if (
+    mod === undefined ||
+    mod === null ||
+    typeof mod !== "object" ||
+    typeof mod.name !== "string"
+  ) {
     throw new Error(
       `Module loader \`${loaderKey}\` did not return a module (got ${
         mod === null ? "null" : typeof mod
@@ -119,10 +132,14 @@ export async function buildRegistryForModule(
   return emptyState;
 }
 
-export async function loadAppRuntime(workspaceRoot: string, site: DiscoveredSiteWorkspace) {
-  const config = await loadKernelAppConfig(site);
+export async function loadAppRuntime(
+  workspaceRoot: string,
+  site: DiscoveredSiteWorkspace,
+  options?: RegistryLoadOptions,
+) {
+  const config = await loadKernelAppConfig(site, options);
   const cacheKey = `site:${site.configPath}`;
-  const registry = await getOrBuildRegistry(cacheKey, config);
+  const registry = await getOrBuildRegistry(cacheKey, config, options);
   return { config, registry };
 }
 
