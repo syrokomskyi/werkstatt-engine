@@ -41,8 +41,7 @@ import {
 } from "@warpgogol/werkstatt-shared/kernel";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import {
-  partitionByBaseline,
-  VALIDATION_BASELINE_PATH,
+  applyValidationBaseline,
   type ValidationBaseline,
 } from "@warpgogol/werkstatt-shared/kernel";
 
@@ -487,19 +486,10 @@ export async function runCommandsValidate(
 
   // RFC-1316 delta mode: baseline-listed errors downgrade to info (known-debt);
   // --strict or a missing/unreadable baseline leaves everything blocking.
-  let debtCount = 0;
-  let baselineRef: string | undefined;
-  if (!options.strict && options.baseline !== undefined) {
-    const { debt } = partitionByBaseline(COMMAND_NAME, allDiagnostics, options.baseline);
-    if (debt.length > 0) {
-      const known = new Set(debt);
-      allDiagnostics = allDiagnostics.map((d) =>
-        known.has(d) ? { ...d, severity: "info" as const } : d,
-      );
-      debtCount = debt.length;
-    }
-    baselineRef = VALIDATION_BASELINE_PATH;
-  }
+  const partitioned = applyValidationBaseline(COMMAND_NAME, allDiagnostics, options);
+  allDiagnostics = partitioned.diagnostics;
+  const debtCount = partitioned.debt;
+  const baselineRef = partitioned.baselineRef;
 
   const errorCount = allDiagnostics.filter((d) => d.severity === "error").length;
   const hasErrors = errorCount > 0;
