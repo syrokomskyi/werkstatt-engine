@@ -13,13 +13,16 @@ sternsystem.validate, leitstand.ship preflight, and leitstand.rollback.</purpose
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — fetchChannelBuildIdentity/buildAuthHeader moved here from leitstand/deploy-execution.ts + leitstand-commands.ts; readLiveChannelStates + liveDriftDiagnostics added.</item>
   <item>RFC-1297</item>
+  <item>RFC-1297: keep the worker bundle free of live-drift and engine kernel imports</item>
 </CHANGE_SUMMARY>
 */
 
 import type { Diagnostic, WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel";
 import { readSystemConfigSmart, readSystemStateSmart } from "./registry-io.ts";
 
-export const BUILD_IDENTITY_PATH = "/.well-known/build-identity.json";
+import { BUILD_IDENTITY_PATH } from "./build-identity-path.ts";
+
+export { BUILD_IDENTITY_PATH };
 
 export type LiveChannelName = "dev" | "alt" | "main";
 const LIVE_CHANNELS: readonly LiveChannelName[] = ["dev", "alt", "main"];

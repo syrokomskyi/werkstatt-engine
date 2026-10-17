@@ -15,13 +15,15 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1297: BUILD_IDENTITY_PATH re-exported from sternsystem/live-drift.ts (canonical home).</item>
+  <item>RFC-1297: keep the worker bundle free of live-drift and engine kernel imports</item>
 </CHANGE_SUMMARY>
 */
 
 import type { RouteFact, PurgeResult } from "@warpgogol/werkstatt-engine/schemas";
-// RFC-1297: canonical home moved to sternsystem/live-drift.ts (shared live-state
-// module); re-exported here so existing leitstand/agent-gate imports keep working.
-import { BUILD_IDENTITY_PATH } from "../sternsystem/live-drift.ts";
+// RFC-1297: canonical home is the import-free sternsystem/build-identity-path.ts —
+// this module is reachable from the worker bundle (agent-gate health route), so it
+// must never import live-drift (registry-io → engine kernel → forge → Node-only deps).
+import { BUILD_IDENTITY_PATH } from "../sternsystem/build-identity-path.ts";
 
 export { BUILD_IDENTITY_PATH };
 const MAX_URLS_PER_BATCH = 30;
