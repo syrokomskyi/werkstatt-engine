@@ -29,6 +29,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
   <item>RFC-1306 review-r1: manifest write migrated ambient writeFileAtomic to context.io via writeFileIfChanged — dry-run/readonly interception + honest filesModified.</item>
+  <item>RFC-1320: dry-run now returns renderedFiles (canonical io-native dry-run contract) — generated.drift.validate --target=workspace can byte-verify the manifest instead of reporting render-unavailable.</item>
   <history>CMD-MAN-04, RFC-0266, RFC-1147</history>
 </CHANGE_SUMMARY>
 */
@@ -362,6 +363,7 @@ export async function runCommandManifestGenerate(
     command: "command.manifest.generate";
     commandCount: number;
     written: boolean;
+    renderedFiles?: Record<string, string>;
     diagnostics?: Diagnostic[];
   }>
 > {
@@ -387,17 +389,28 @@ export async function runCommandManifestGenerate(
     throw err;
   }
 
-  if (!dryRun) {
-    const outputPath = manifestFilePath(context.workspaceRoot);
-    // RFC-1306 review: write through the io port (atomic + mkdir built in) so
-    // the artifact write lands in filesModified, and skip byte-identical
-    // rewrites so a synced tree reports zero changes.
-    await writeFileIfChanged(
-      context.io,
-      outputPath,
-      `${buildGeneratedHeader({ filePath: MANIFEST_RELATIVE_PATH, ownerCommand: "command.manifest.generate" })}${yamlStringify(manifest)}\n`,
-    );
+  const content = `${buildGeneratedHeader({ filePath: MANIFEST_RELATIVE_PATH, ownerCommand: "command.manifest.generate" })}${yamlStringify(manifest)}\n`;
+
+  // RFC-1320: dry-run must surface renderedFiles — generated.drift.validate
+  // byte-compares the manifest through them (emit's EVIDENCE-FRESH gate).
+  if (dryRun) {
+    return {
+      data: {
+        command: "command.manifest.generate",
+        commandCount: manifest.commands.length,
+        written: false,
+        renderedFiles: { [MANIFEST_RELATIVE_PATH.replace(/\\/g, "/")]: content },
+      },
+      exitCode: 0,
+      summary: `[command.manifest.generate] dry-run — ${manifest.commands.length} command(s)`,
+    };
   }
+
+  const outputPath = manifestFilePath(context.workspaceRoot);
+  // RFC-1306 review: write through the io port (atomic + mkdir built in) so
+  // the artifact write lands in filesModified, and skip byte-identical
+  // rewrites so a synced tree reports zero changes.
+  await writeFileIfChanged(context.io, outputPath, content);
 
   return {
     data: {
