@@ -21,6 +21,7 @@ assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1304: AC-5 probes for CMDGEN-04/05 + review-r1 coverage — per-definition pairing (valid+dropped def), hybrid/factory satisfies, pragma-in-string non-suppression, CMD-SCAN-01 zero-corpus and unreadable-input via injected io.</item>
+  <item>RFC-1321: CMDGEN-06 fixtures — const-ref and expression name fields flagged, literal name clean.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -564,6 +565,106 @@ export const hidden: KernelCommandDefinition = buildCommand();
     const violations = result.data?.diagnostics ?? [];
     expect(violations.some((d) => d.ruleId === "CMD-SCAN-01" && d.severity === "error")).toBe(true);
     expect(result.exitCode).toBe(1);
+  });
+
+  it("RFC-1321 AC-1: a const-ref name field emits CMDGEN-06 naming the file", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/const-name.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+const COMMAND_NAME = "x.const";
+export const constNameCommand: KernelCommandDefinition = {
+  name: COMMAND_NAME,
+  modulePath: "packages/werkstatt-engine/src/const-name.ts",
+  description: "const-ref name",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0, summary: "[x.const] OK" }),
+};
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    const hit = violations.find((d) => d.ruleId === "CMDGEN-06");
+    expect(hit).toBeDefined();
+    expect(hit!.file).toBe("packages/werkstatt-engine/src/const-name.ts");
+    expect(hit!.message).toContain("COMMAND_NAME");
+  });
+
+  it("RFC-1321 AC-1: an expression name field emits CMDGEN-06", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/expr-name.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const exprNameCommand: KernelCommandDefinition = {
+  name: "x." + "expr",
+  modulePath: "packages/werkstatt-engine/src/expr-name.ts",
+  description: "expression name",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0, summary: "[x.expr] OK" }),
+};
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMDGEN-06")).toBe(true);
+  });
+
+  it("RFC-1321 AC-1: a literal name field emits no CMDGEN-06", async () => {
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/literal-name.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const literalNameCommand: KernelCommandDefinition = {
+  name: "x.literal",
+  modulePath: "packages/werkstatt-engine/src/literal-name.ts",
+  description: "literal name",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0, summary: "[x.literal] OK" }),
+};
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    expect(violations.some((d) => d.ruleId === "CMDGEN-06")).toBe(false);
+  });
+
+  it("RFC-1321 r1: a nested flag-key `name` before the field does not shadow it", async () => {
+    // `flags: { name: {…} }` ahead of `name:` must not false-positive, and a
+    // nested literal `name` must not hide a real non-literal top-level one.
+    writeHandlerFile(
+      workspaceRoot,
+      "packages/werkstatt-engine/src/nested-name.ts",
+      `import type { KernelCommandDefinition } from "@warpgogol/werkstatt-engine/kernel";
+export const nestedOk: KernelCommandDefinition = {
+  flags: { name: { kind: "string" } },
+  name: "x.nested-ok",
+  modulePath: "packages/werkstatt-engine/src/nested-name.ts",
+  description: "nested flag key named name",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0, summary: "[x.nested-ok] OK" }),
+};
+export const nestedBad: KernelCommandDefinition = {
+  flags: { name: "l" },
+  name: SHADOWED,
+  modulePath: "packages/werkstatt-engine/src/nested-name.ts",
+  description: "non-literal name behind a nested literal",
+  scope: "workspace",
+  execute: async () => ({ exitCode: 0, summary: "[x] OK" }),
+};
+`,
+    );
+
+    const result = await runCommandsValidate(workspaceRoot, "error");
+    const violations = result.data?.diagnostics ?? [];
+    const hits = violations.filter((d) => d.ruleId === "CMDGEN-06");
+    // Exactly one — the const-ref def; the nested flag key never shadowed
+    // either verdict.
+    expect(hits.length).toBe(1);
+    expect(hits[0]!.message).toContain("nestedBad");
+    expect(hits[0]!.message).toContain("SHADOWED");
   });
 
   it("RFC-1304 r1: an unreadable file emits a CMD-SCAN-01 warning, not silence", async () => {

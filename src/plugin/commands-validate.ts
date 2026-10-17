@@ -10,6 +10,7 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1321: CMDGEN-06 — non-literal KernelCommandDefinition name fields (const refs, expressions) are blocking diagnostics via shared isStringLiteralSource; mask+anchor scan lazily shared with CMDGEN-04.</item>
   <item>ADR-0105: detector gap fix — isHandlerFile missed self-describing KernelCommandDefinition
         files whose type imports span multiple lines; FILE_DETECTION_PATTERNS now includes
         KernelCommandDefinition and the import regex uses [^;]* to cross newlines.</item>
@@ -33,7 +34,10 @@ import type {
 } from "@warpgogol/werkstatt-shared/kernel";
 import {
   CMDGEN_IGNORE_RE,
+  fieldOffsets,
   findDefinitionAnchors,
+  isStringLiteralSource,
+  literalEnd,
   maskSource,
   NON_COMMAND_ALLOWLIST,
   scanForbiddenCodepoints,
@@ -309,6 +313,46 @@ async function scanFile(
     });
   }
 
+  // Lazily shared definition scan — CMDGEN-04 (site-src corpus) and CMDGEN-06
+  // (any scanned file) both consume the masked anchors; masking runs once.
+  let maskedCached: string | undefined;
+  let anchorsCached: ReturnType<typeof findDefinitionAnchors> | undefined;
+  const definitionScan = () => {
+    if (maskedCached === undefined) {
+      maskedCached = maskSource(content);
+      anchorsCached = findDefinitionAnchors(maskedCached);
+    }
+    return { masked: maskedCached, anchors: anchorsCached ?? [] };
+  };
+
+  // RFC-1321 CMDGEN-06: a non-literal `name:` (const ref, expression) lands its
+  // source text — not the resolved value — as the generated table key. Applies
+  // to every extracted definition in the scanned corpus, whichever package
+  // hosts it; the site generator fails closed on the same helper.
+  if (content.includes("KernelCommandDefinition")) {
+    const { masked, anchors } = definitionScan();
+    for (const anchor of anchors) {
+      const end = literalEnd(masked, anchor.openIdx);
+      if (end === -1) continue; // unbalanced — CMDGEN-04 reports the suspect file
+      const litMasked = masked.slice(anchor.openIdx, end);
+      const litRaw = content.slice(anchor.openIdx, end);
+      const nameOff = fieldOffsets(litMasked, "name");
+      if (!nameOff) continue;
+      const nameRaw = litRaw.slice(nameOff[0], nameOff[1]).trim();
+      if (!isStringLiteralSource(nameRaw, litMasked.slice(nameOff[0], nameOff[1]))) {
+        const line = content.slice(0, anchor.openIdx + nameOff[0]).split("\n").length;
+        diagnostics.push({
+          ruleId: "CMDGEN-06",
+          severity: "error",
+          message: `KernelCommandDefinition "${anchor.exportName}" declares a non-literal name field (${nameRaw}) in ${relPath}`,
+          file: relPath,
+          line,
+          fixHint: `Declare name: "<command.name>" literally — the generated command table keys off the declaration's source text, so a const ref lands its identifier as the key (RFC-1321).`,
+        });
+      }
+    }
+  }
+
   // RFC-1304 CMDGEN-04: re-run the generator's suspect-file signal over its own
   // corpus, so a file unreachable during generation is still caught here. The
   // pairing is per-definition: unpaired annotation/satisfies evidence flags the
@@ -317,8 +361,7 @@ async function scanFile(
     posixRel.startsWith(SITE_SRC_PREFIX) &&
     !CMDGEN_IGNORE_RE.test(maskSource(content, { keepComments: true }))
   ) {
-    const masked = maskSource(content);
-    const anchors = findDefinitionAnchors(masked);
+    const { masked, anchors } = definitionScan();
     const signals = unpairedCommandSignals(masked, anchors);
     if (
       signals.unpaired > 0 &&

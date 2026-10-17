@@ -8,9 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
 
@@ -20,6 +17,7 @@ assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1304: shared fail-loud scanner — CMDGEN-04/05 diagnostics via werkstatt-shared/kernel/command-source-scan.ts, CMD-SCAN-01 coverage notices, rules[] lists every emitted rule id</item>
+  <item>RFC-1321</item>
   <history>RFC-0903, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -52,6 +50,7 @@ export const werkstattCommandsValidateModule: ModuleExport = {
         "CMD-OUTPUT-03",
         "CMDGEN-04",
         "CMDGEN-05",
+        "CMDGEN-06",
         "CMD-SCAN-01",
       ],
       modulePath: "packages/werkstatt-engine/os/werkstatt-commands-validate.module.ts",
