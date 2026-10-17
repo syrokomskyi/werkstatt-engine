@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0763: unit tests for commitBordbuchProjections cleanup on mission.validate failure paths (build.prepare failure and validation failure).</purpose>
-  <keywords>RFC-0763, mission.validate, bordbuch, commitBordbuchProjections, failure path, cleanup, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0763: initial tests for bordbuch cleanup on build.prepare failure, validation failure, cleanup failure resilience, and non-bordbuch file safety.</item>

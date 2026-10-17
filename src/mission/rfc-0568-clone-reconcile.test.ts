@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0568: Integration tests for clone-based materialization and merge-based reconcile.</purpose>
-  <keywords>RFC-0568, clone, merge, reconcile, materialize, test, git</keywords>
+  <purpose>
+Unit tests for rfc 0568 clone reconcile covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0568: initial integration tests for investigateUntrackedFiles and merge-based reconcile flow.</item>

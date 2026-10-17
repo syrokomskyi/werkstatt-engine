@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0624: tests for cache-purge helpers — collectPurgeUrls, purgeCacheByUrls batching, non-blocking failure, missing zone ID.</purpose>
-  <keywords>RFC-0624, cache-purge, batching, cloudflare, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0624: add tests for collectPurgeUrls, purgeCacheByUrls batching, non-blocking failure, missing zone ID skip.</item>

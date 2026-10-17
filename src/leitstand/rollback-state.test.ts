@@ -3,7 +3,9 @@
 <purpose>RFC-1297: unit tests for recordSiteRollback — AC-1: lastPropagated
 records the rolled-back release with state "rolled-back"; AC-2: the Bordbuch
 carries one deployment-rolled-back event. Also pins gateForChannel.</purpose>
-<keywords>RFC-1297, recordSiteRollback, deployment-rolled-back, gateForChannel</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — AC-1/AC-2 probes.</item>

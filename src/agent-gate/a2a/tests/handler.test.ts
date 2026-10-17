@@ -1,11 +1,10 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-1114: the A2A conformance corpus — golden request/response pairs replayed through createAgentGate.handleA2a with fake ports. The pinned subset is SendMessage over JSON-RPC 2.0 with the A2A-Version header gate; the handler must satisfy these fixtures.</purpose>
-<keywords>RFC-1114, agent surface, gate, A2A, SendMessage, conformance, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">SendMessage happy path (completed task + receipt artifact), unknown capability, missing capability DataPart, malformed message, schema-violation rejected task, dispatch-failure failed task, preview task, rate limit + payload cap parity, A2A-Version gate, batch rejection, GET 405, idempotency replay, contextId echo, unknown method.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-1114: initial A2A conformance corpus.</item>
   <item>RFC-1114: minimal real A2A endpoint + honest agent card</item>

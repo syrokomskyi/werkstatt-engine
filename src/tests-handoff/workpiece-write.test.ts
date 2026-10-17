@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0555: tests for workpiece.write command handler.</purpose>
-<keywords>RFC-0555, workpiece, write, DNA-22, stdin, test</keywords>
+<purpose>
+Unit tests for workpiece write covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0555: initial unit tests for workpiece.write.</item>

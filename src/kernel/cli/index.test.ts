@@ -5,10 +5,15 @@
   <item>Do not boot a real workspace registry — registry behavior is asserted through buildRegistry's own stderr writes on a stub config.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-1309: AC-1/2/3/5 coverage — quiet preamble gating, sequential batch execution over one registry boot, failure aggregation naming the entry, manifest validation before any execution.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";

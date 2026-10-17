@@ -1,13 +1,11 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-RFC-1113 AC-2: JSON-RPC-level tests for the 2026-07-28 stateless MCP era —
-server/discover answers unconditionally, initialize returns
-UnsupportedProtocolVersionError, and every other method is gated on
-_meta["io.modelcontextprotocol/protocolVersion"] ∈ SUPPORTED_MCP_PROTOCOL_VERSIONS.
-Transport-level concerns (HTTP 400 mapping, MCP-Protocol-Version header
-consistency) are covered in ../../tests/gate.test.ts.
+Unit tests for handler covering its documented public contract and regression-sensitive edge cases.
 </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1113: replace load-verification shim with version-negotiation tests.</item>

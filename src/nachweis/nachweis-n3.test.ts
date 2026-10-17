@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0715/RFC-0871: unit tests for nachweis.key.ensure, nachweis.sign, nachweis.timestamp, nachweis.verify-signature, and N3 gate in nachweis.approve.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0715: initial N3 crypto verification unit tests.</item>

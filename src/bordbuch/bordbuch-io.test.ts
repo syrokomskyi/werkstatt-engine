@@ -1,9 +1,14 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Unit tests for appendBordbuchEntry duplicate mission-close/abort guard.</purpose>
+  <purpose>
+Unit tests for bordbuch io covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Guard against duplicate mission-close/abort in appendBordbuchEntry.</item>
+  <item>RFC-1311: carried legacy entry — Guard against duplicate mission-close/abort in appendBordbuchEntry.</item>
   <item>RFC-0994: add redactForBordbuch unit tests and integration test for redacted summary storage.</item>
 </CHANGE_SUMMARY>
 */

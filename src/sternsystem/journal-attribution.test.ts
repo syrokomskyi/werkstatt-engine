@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>ADR-0088: Unit tests for JRN-01 journal mission-attribution check in sternsystem.validate.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0088: initial unit tests for JRN-01 — op-started records in cache-clone operations/*.jsonl must carry non-empty missionId.</item>

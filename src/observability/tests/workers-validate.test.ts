@@ -18,7 +18,7 @@ stay fast, offline, and deterministic.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Post-refactor hardening: add concrete tests for the package's advertised vitest signal.</item>
+  <item>RFC-1311: carried legacy entry — Post-refactor hardening: add concrete tests for the package's advertised vitest signal.</item>
 </CHANGE_SUMMARY>
 */
 

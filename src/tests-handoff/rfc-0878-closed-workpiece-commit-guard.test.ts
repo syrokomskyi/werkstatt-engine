@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
   <purpose>RFC-0878: Tests for closed-workpiece commit guard — .closed sentinel file
   blocks all commits (raw git, MISSION_GIT_COMMIT bypass, and commitWorkpieceIfDirty).</purpose>
-  <keywords>RFC-0878, closed, workpiece, sentinel, commit, guard, hook</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0878: initial tests for .closed sentinel — hook blocks raw git commit, hook blocks MISSION_GIT_COMMIT bypass, commitWorkpieceIfDirty throws on closed workpiece.</item>

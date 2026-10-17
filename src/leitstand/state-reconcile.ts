@@ -5,7 +5,9 @@ of one channel into system-state.yaml (state "reconciled") and append a
 live-state-reconciled Bordbuch event. It is the sanctioned, operator-driven
 remedy for LIVE-01 drift: reality is recorded deliberately, with a reason —
 never auto-legitimized.</purpose>
-<keywords>RFC-1297, leitstand.state.reconcile, LIVE-01, live-state-reconciled, system-state</keywords>
+<non-goals>
+  <item>Not a contract source of truth — callers depend on the module's exported API, not this file's internals.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — --site/--channel/--from-live/--reason; probes build-identity.json live, writes lastPropagated state "reconciled", appends live-state-reconciled Bordbuch event.</item>

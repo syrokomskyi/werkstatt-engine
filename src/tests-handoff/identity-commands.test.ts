@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0558: unit tests for identity command handlers.</purpose>
+  <purpose>
+Unit tests for identity commands covering identity commands; identity.bootstrap; identity.credential.issue + verify + revoke.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0558: initial identity command handler tests.</item>

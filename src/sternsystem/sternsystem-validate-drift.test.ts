@@ -6,11 +6,9 @@
     violation; DRIFT-01 (content drift) and other rules stay warnings per the
     ADR-0082 cleanup caveat.
   </purpose>
-  <responsibilities>
-    <item>Red: DRIFT-02 diagnostic lands in violations, not warnings.</item>
-    <item>Green: DRIFT-01 diagnostic lands in warnings, not violations.</item>
-    <item>Green: missing ruleId/message fall back to DRIFT field + generic message.</item>
-  </responsibilities>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1149: phase 1b — initial tests for DRIFT-02 promotion routing.</item>

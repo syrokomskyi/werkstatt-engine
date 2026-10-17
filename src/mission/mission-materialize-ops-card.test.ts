@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-1265: verify mission.materialize invokes ops.card.generate so every fresh workpiece carries a current .werkstatt/ops-card.yaml (AC-3).</purpose>
-<keywords>RFC-1265, mission.materialize, ops.card.generate, ops-card, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1265: initial test — ops.card.generate invoked with --site during materialize; failure is non-fatal.</item>

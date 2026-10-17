@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1051: test RFC-0885 migrator — consent status mapping, evidence-source display defaults, idempotency.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1051: initial rfc-0885 migrator test.</item>

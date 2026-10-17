@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0619: regression test verifying force: true is passed to executeKernelPipeline during mission materialization, bypassing stale command-result cache from previous workpiece attempts.</purpose>
-<keywords>RFC-0619, mission.materialize, force, cache bypass, regression</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0619: initial regression test — asserts force: true is passed to executeKernelPipeline.</item>

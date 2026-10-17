@@ -3,7 +3,9 @@
 <purpose>RFC-1263: mission.content-edit composite tests — eligibility routing (AC-2),
 gate ordering + drift stop (AC-1/AC-3), shared reconcile/close precondition
 (AC-4), fastLane manifest record + bordbuch lane (AC-6), advisory activation.</purpose>
-<keywords>RFC-1263, content fast-lane, mission.content-edit, eligibility, fastLane</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1263: initial test file.</item>

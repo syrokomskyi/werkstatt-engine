@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0615: unit tests for behavior snapshot auto-regeneration on SNAP-01 in mission.validate.</purpose>
-<keywords>RFC-0615, mission.validate, SNAP-01, behavior snapshot, auto-regeneration, dirty workpiece, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0615: initial tests for SNAP-01 auto-regeneration, dirty workpiece skip, non-SNAP-01 skip, and persistent failure.</item>

@@ -2,6 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-1307 AC-13: the 00-brief.md registration path is gone — no live
 source under any package src directory imports parseBriefFrontmatter or BriefFrontmatter.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1307: created.</item>

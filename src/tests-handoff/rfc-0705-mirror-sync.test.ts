@@ -4,7 +4,9 @@
     RFC-0705: unit tests for mirror sync enforcement in mission.reconcile and
     mission.close — verifies non-fatal sync in reconcile and blocking check in close.
   </purpose>
-  <keywords>RFC-0705, mission.reconcile, mission.close, sternsystem.sync, mirrorSync</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0705: initial tests for mirror sync in reconcile and blocking check in close.</item>

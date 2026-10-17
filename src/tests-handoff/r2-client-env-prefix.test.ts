@@ -1,3 +1,17 @@
+/*
+<MODULE_CONTRACT>
+<purpose>
+Unit tests for r2 client env prefix covering resolveR2ConfigFromEnv — envPrefix (RFC-0713).
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
+</MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the r2 suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
+*/
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resolveR2ConfigFromEnv, MissingEnvError } from "../evidence/r2-client.ts";
 

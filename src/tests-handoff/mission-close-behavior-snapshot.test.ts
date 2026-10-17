@@ -1,8 +1,12 @@
 // @vitest-environment node
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0991: unit tests for behavior-snapshot-refresh step in mission.close.</purpose>
-  <keywords>RFC-0991, mission.close, behavior-snapshot-refresh, behavior.snapshot.generate, test</keywords>
+  <purpose>
+Unit tests for mission close behavior snapshot covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0991: initial tests for behavior-snapshot-refresh step — calls generate with siteName, skip flag, non-fatal failure.</item>

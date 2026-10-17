@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0656: Unit tests for stable-mode normalizers (PDF, source map, JSON) and fingerprintTree stable mode.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0656: initial stable normalizer test suite.</item>

@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0379: HTML normalizer tests — verify dynamic attribute stripping, whitespace invariance, stable hash.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0379: initial HTML normalizer tests.</item>

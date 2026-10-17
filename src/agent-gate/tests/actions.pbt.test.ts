@@ -1,16 +1,15 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0347: property-based tests for validateAgainstCapabilitySchema invariants.</purpose>
-  <keywords>RFC-0347, PBT, fast-check, agent-gate, validation</keywords>
-  <responsibilities>
-    <item>Verify non-object input always fails validation.</item>
-    <item>Verify unknown properties are always reported as errors.</item>
-    <item>Verify required field absence is always reported.</item>
-    <item>Verify a valid object with all required fields passes.</item>
-  </responsibilities>
+  <purpose>
+Unit tests for actionspbt — actions.pbt covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="pbt-agent-gate-validation">Property-based tests for schema validation invariants.</entry></MODULE_MAP>
-<CHANGE_SUMMARY><item>RFC-0347: initial PBT illustrative example for agent-gate validation invariants.</item></CHANGE_SUMMARY>
+<CHANGE_SUMMARY>
+  <item>RFC-0347: initial PBT illustrative example for agent-gate validation invariants.</item>
+</CHANGE_SUMMARY>
 */
 
 import { test, expect } from "vitest";

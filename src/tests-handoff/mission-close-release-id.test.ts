@@ -5,7 +5,9 @@
     CloseReport includes releaseId and appendBordbuchEntry receives it as a
     top-level option.
   </purpose>
-  <keywords>RFC-0655, mission.close, releaseId, CloseReport, bordbuch</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0655: initial tests for CloseReport.releaseId field and bordbuch top-level option.</item>

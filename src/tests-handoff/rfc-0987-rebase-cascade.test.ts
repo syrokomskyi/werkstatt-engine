@@ -5,7 +5,9 @@
     Tests Fix 1 (rebase abort in commitAndPushBordbuch), Fix 2 (pushed flag in bordbuch.repair),
     Fix 3 (mission.open pre-preflight auto-recover), Fix 4 (symbolic-ref branch resolution).
   </purpose>
-  <keywords>RFC-0987, rebase, cascade, bordbuch, mission.open, syncCacheClone, force-with-lease</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0987: initial tests for all 5 fixes.</item>

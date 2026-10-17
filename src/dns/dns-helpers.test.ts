@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0753: unit tests for DNS helpers — recordsMatch, resolveZoneDomainForSystem, flagString, flagBoolean.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0753: initial DNS helper tests.</item>

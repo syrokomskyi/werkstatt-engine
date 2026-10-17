@@ -3,6 +3,9 @@
   <purpose>RFC-1284: Unit tests for leitstand.access.suspend and
   leitstand.access.resume — crash-safe suspension markers, normalization in
   protect/unprotect, and per-channel failure semantics.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1284: initial — suspension marker lifecycle coverage.</item>

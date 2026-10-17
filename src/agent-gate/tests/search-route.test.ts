@@ -1,11 +1,12 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1115: AC-1/AC-2 tests for runAgentSearch — flattened citation SearchResult shape and measured tookMs.</purpose>
-<keywords>RFC-1115, agent surface, semantic search, SearchResult, tookMs, test</keywords>
+<purpose>
+Unit tests for search route covering RFC-1115 AC-1: flattened citation SearchResult; RFC-1115 AC-2: tookMs is measured, not hardcoded.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">flat result shape, unmatched ids skipped, tookMs from injected clock, empty matches.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-1115: initial search-route tests.</item>
 </CHANGE_SUMMARY>

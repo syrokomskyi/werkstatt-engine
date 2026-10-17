@@ -8,6 +8,9 @@ carries a presentation hash and no claim values (AC-5); a cryptographically
 valid VP bound to a different agentId is presentation-invalid (AC-8); an
 expired credential is presentation-invalid (AC-9).
 </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1213: initial test coverage.</item>

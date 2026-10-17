@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-1034: Test STERN-CONFIG-RESOLVE-01 warning in sternsystem.validate.</purpose>
+  <purpose>
+Unit tests for sternsystem validate config resolve covering RFC-1034: STERN-CONFIG-RESOLVE-01.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1034: initial tests for config resolution warning.</item>

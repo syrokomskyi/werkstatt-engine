@@ -4,7 +4,9 @@
     Unit tests for RFC-0886: granular consent commands, screenshot upload, and
     per-artifact publication gates.
   </purpose>
-  <keywords>RFC-0886, nachweis, granular-consent, screenshot, display-consent, gate, unit-test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0886: initial tests for granular consent, screenshot upload, display-consent-consistent gate condition, NACHWEIS-DISPLAY-CONSENT-01 validation, manifest display/websiteUrl.</item>

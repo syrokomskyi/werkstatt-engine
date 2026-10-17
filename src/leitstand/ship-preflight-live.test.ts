@@ -3,7 +3,9 @@
 <purpose>RFC-1297 AC-5: leitstand.ship preflight throws a live-drift error when
 the stubbed channel states contain a recorded-vs-live mismatch (LIVE-01).
 readLiveChannelStates is injected via a module seam — no network in tests.</purpose>
-<keywords>RFC-1297, leitstand.ship, preflight, LIVE-01, live drift</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — AC-5 probe.</item>

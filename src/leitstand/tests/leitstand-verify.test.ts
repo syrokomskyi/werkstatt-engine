@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0930: unit tests for leitstand.verify command — fetches build-identity.json from live channels, compares distTreeHash cross-channel, optionally compares against local system-state.yaml.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0930: initial tests for leitstand.verify command covering all-match success, hash drift, unreachable channel, local mismatch, single-channel filter, access-protected channel, 404, no deployment config, --no-compare-local, and fetch timeout.</item>

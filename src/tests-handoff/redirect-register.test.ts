@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0896: tests for redirect.register command handler — idempotency, new registration, mismatched DNS, mismatched redirect rule, missing env.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0896: initial redirect.register tests.</item>

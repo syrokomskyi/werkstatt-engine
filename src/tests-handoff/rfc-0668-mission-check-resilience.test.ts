@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0668: tests for runMissionCheckWithResilience — timeout, retry on infrastructure error, no-retry on content violations.</purpose>
-  <keywords>RFC-0668, mission.check, timeout, retry, resilience, leitstand, dev-deploy, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0668: test runMissionCheckWithResilience wrapper — retry on exit 2, no retry on exit 1, timeout not retryable, unexpected throw retried.</item>

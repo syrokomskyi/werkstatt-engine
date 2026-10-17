@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1203: unit tests for leitstand.channels — the relabeling alias of leitstand.status covering result parity, summary/data relabeling, shared flag declaration, and failure delegation.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1203: initial tests for leitstand.channels covering exit-code/channel-data parity with leitstand.status, [leitstand.channels] summary prefix + data.aliasedTo, shared flags object identity on both declarations, and identical missing-site failure.</item>

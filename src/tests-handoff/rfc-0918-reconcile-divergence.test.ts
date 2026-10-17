@@ -5,7 +5,9 @@
     verifies divergenceWarning is set when cache clone HEAD differs from origin/main,
     is null when they match, and remains null on git command failure.
   </purpose>
-  <keywords>RFC-0918, mission.reconcile, divergenceWarning, divergence, origin/main</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0918: initial tests for post-push divergence check in mission.reconcile.</item>

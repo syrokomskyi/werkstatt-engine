@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0866: executeDeployPhases runs the 13-phase deployment pipeline with channel-specific logic.</purpose>
-  <keywords>RFC-0866, leitstand, deploy-execution, pipeline, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0866: initial test for executeDeployPhases with null adapter and dev channel.</item>

@@ -7,13 +7,9 @@
     failures are warnings, never violations; suspended systems skip the probe.
     ACCESS-02 warns on suspension markers older than one hour.
   </purpose>
-  <responsibilities>
-    <item>Red: declared pin + channel answers 200 → ACCESS-01 violation.</item>
-    <item>Green: declared pin + channel answers 401 → no finding.</item>
-    <item>Green: transport-error → ACCESS-01 warning, not violation.</item>
-    <item>Green: suspension marker present → probe skipped entirely.</item>
-    <item>Green: marker older than 1h → ACCESS-02 warning; fresh marker → none.</item>
-  </responsibilities>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1284: initial — ACCESS-01/02 coverage for checkAccessProtection.</item>

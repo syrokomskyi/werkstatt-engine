@@ -9,7 +9,9 @@
     (a2b4770/412ebe06: empty mergedShas, null/self preReconcileSha → folded
     workpiece commits later flagged as external edits).
   </purpose>
-  <keywords>RFC-1221, mission.reconcile, mergedShas, fold, resume, external-edit-guard</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1221: initial test — fold-path mergedShas from merge parents, resume path, no-op entry shape, rev-list failure non-fatal, guard replay.</item>

@@ -3,7 +3,9 @@
   <purpose>RFC-1105: PBT test for the share-path-rewrite migrator —
   verifies idempotency (f(f(x)) == f(x)) over arbitrary file content and that
   non-share specifiers are never touched.</purpose>
-  <keywords>RFC-1105, migrator, pbt, idempotency, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1105: initial PBT test for share-path-rewrite migrator.</item>

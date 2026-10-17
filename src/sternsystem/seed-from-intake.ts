@@ -12,13 +12,13 @@ sidecars, and the system-state onboarding provenance block.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <KEY_DECISIONS>
-  <item>Locale directories and i18n keys use the primary subtag (route segment); the full BCP 47 tag rides in i18n.supported.&lt;segment&gt;.tag and .hreflang (RFC-1282 mapping).</item>
-  <item>Only rights states the spec makes publishable without an operator decision (cleared, generated, licensed-stock) are copied; client-supplied, claimed and unknown stay in the bundle, and mood boards are design references, never site content.</item>
+  <item>Locale directories and i18n keys use the primary subtag (route segment); the full BCP 47 tag rides in i18n.supported.&lt;segment&gt;.tag.</item>
+  <item>Only rights states the spec makes publishable without an operator decision (cleared, generated, licensed-stock) are copied; client-supplied, claimed</item>
   <item>Every seeded file is serialized through canonical writers (sorted keys, RFC-0493 quoting) so the same intake yields byte-identical seeds (DNA-58).</item>
   <item>The seeded system.md carries the enforce gate triple (contractTerms, provenance, publication) plus legalJurisdiction — the born-valid contract, no downstream repair.</item>
-  <item>Two entities resolving to one document path fail the plan — a silent overwrite is a validator defect, never a last-write-wins.</item>
-  <item>Two locale tags sharing a primary subtag fail the plan rather than silently overwriting an i18n entry, and a non-2-letter primary subtag is rejected — both would birth an invalid i18n config (REVIEW-08 N3/N4).</item>
-  <item>Seeded credit sidecars declare target.domain "business-profile" — the content tree the seeded asset physically lands in — so credits-gallery and material validators resolve the same path (REVIEW-08 N5).</item>
+  <item>Two entities resolving to one document path fail the plan</item>
+  <item>Two locale tags sharing a primary subtag fail the plan rather than silently overwriting an i18n entry,</item>
+  <item>Seeded credit sidecars declare target.domain "business-profile"</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>

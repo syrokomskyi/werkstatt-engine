@@ -2,9 +2,10 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0221 §6: tests for capability diff tiering — green/yellow/red and intent remap,
 keyed by the unique uni.registry entry id (semanticId is not unique across layers).</purpose>
-<keywords>RFC-0221, capability diff, tier, intent, id key, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">unchanged/bumped(+migrator)/removed(+intent) tiers; id-keyed.</entry></MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-0221: initial capability-diff tests.</item>
   <item>RFC-0221: re-key on unique entry id after the e2e run exposed semanticId collisions.</item>

@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0968: End-to-end handover test simulating two werkstatt instances
 (sender + recipient) performing a full prepare → complete cycle.</purpose>
-<keywords>RFC-0968, handover, e2e, integration, cross-instance</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial E2E handover test.</item>

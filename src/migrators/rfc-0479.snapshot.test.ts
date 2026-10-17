@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0479: snapshot test for the rfc-0479 bootstrapping migrator — verifies
 the pin cursor transformation produces deterministic output on real data shapes.</purpose>
-<keywords>RFC-0479, migrator, snapshot, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0479: initial snapshot test for bootstrapping migrator.</item>

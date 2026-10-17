@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0578: tests for buildFailureDiagnostics pattern matching in mission.validate.</purpose>
-<keywords>RFC-0578, BUILD-01, buildFailureDiagnostics, pattern matching, test</keywords>
+<purpose>
+Unit tests for build failure diagnostics covering buildFailureDiagnostics. It also guards the documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0578: add unit tests for buildFailureDiagnostics pattern matching.</item>

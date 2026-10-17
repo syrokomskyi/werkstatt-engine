@@ -2,10 +2,13 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0221 §4.1: tests for the version-compare matrix — the downgrade-refusal gate
 and the packages-drift flag.</purpose>
-<keywords>RFC-0221, version compare, downgrade, drift, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">in-sync / catch-up / refuse-downgrade + drift.</entry></MODULE_MAP>
-<CHANGE_SUMMARY><item>RFC-0221: initial matrix tests.</item></CHANGE_SUMMARY>
+<CHANGE_SUMMARY>
+  <item>RFC-0221: initial matrix tests.</item>
+</CHANGE_SUMMARY>
 */
 
 import { test, expect } from "vitest";

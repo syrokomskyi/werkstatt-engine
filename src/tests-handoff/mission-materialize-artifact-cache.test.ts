@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0659: regression tests verifying workpiece artifact cache behavior — cache hit skips build.prepare.dev, --force bypasses cache, cache write on miss, stale state fallback.</purpose>
-<keywords>RFC-0659, mission.materialize, artifact cache, cache hit, cache miss, --force, build.prepare.dev skip</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0659: initial tests — cache hit skips build.prepare.dev, --force bypasses cache read, cache write on miss, stale state file fallback.</item>

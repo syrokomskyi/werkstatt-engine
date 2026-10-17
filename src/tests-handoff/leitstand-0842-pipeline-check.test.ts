@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0865: leitstand.pipeline.check returns pipeline steps without transition block.</purpose>
-  <keywords>RFC-0865, leitstand, pipeline-check, certification, test</keywords>
+  <purpose>
+Unit tests for leitstand 0842 pipeline check covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0865: update pipeline-check test to assert successful return with steps.</item>

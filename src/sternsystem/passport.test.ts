@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0966: Unit tests for passport core logic — buildPassportPayload,
 signPassport, verifyPassport, computePassportHash, derivePublicKey.</purpose>
-<keywords>RFC-0966, passport, signing, ed25519, unit test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0966: initial passport unit tests.</item>

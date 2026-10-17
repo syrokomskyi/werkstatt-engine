@@ -4,7 +4,9 @@
     Unit tests for RFC-0880: NACHWEIS-SLUG-01 validation rule that enforces
     mandatory explicit slug in frontmatter of Nachweis evidence records.
   </purpose>
-  <keywords>RFC-0880, nachweis, slug, NACHWEIS-SLUG-01, validation, unit-test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0880: initial tests for NACHWEIS-SLUG-01 — slug absent, empty, whitespace, present, draft, non-Nachweis kind.</item>

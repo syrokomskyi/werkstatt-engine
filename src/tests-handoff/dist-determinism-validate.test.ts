@@ -4,7 +4,9 @@
     RFC-0656: unit tests for dist.determinism.validate — tests flag validation,
     release dist, mission workpiece dist, missing dist, and non-deterministic file detection.
   </purpose>
-  <keywords>RFC-0656, dist.determinism.validate, determinism, stable hash</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0656: initial dist.determinism.validate tests covering flag validation, release/mission dist resolution, and non-deterministic file detection.</item>

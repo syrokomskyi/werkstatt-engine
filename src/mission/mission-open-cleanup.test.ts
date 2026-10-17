@@ -1,9 +1,12 @@
 /*
 <MODULE_CONTRACT>
   <purpose>Test that mission.open cleans up mission directories on bordbuch push failure.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Bug fix: mission.open cleans up stale mission dir on bordbuch push failure.</item>
+  <item>RFC-1311: carried legacy entry — Bug fix: mission.open cleans up stale mission dir on bordbuch push failure.</item>
 </CHANGE_SUMMARY>
 */
 

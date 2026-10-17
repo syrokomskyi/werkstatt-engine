@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0866: leitstand.dev-deploy auto-resolves --gate-decision from conventional path.</purpose>
-  <keywords>RFC-0866, leitstand, dev-deploy, certification, gate-decision, test</keywords>
+  <purpose>
+Unit tests for leitstand 0689 cache snapshot covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0865: update cache-snapshot dev-deploy test to assert --gate-decision requirement.</item>

@@ -1,5 +1,6 @@
 /*
 <MODULE_CONTRACT>
+
 <purpose>onboarding.intake.schema.export (RFC-1281): render the
 werkstatt:intake/v1 JSON Schema from the Zod source-of-truth model
 (renderIntakeSchemaExport) and write the vendored artifact
@@ -11,6 +12,7 @@ value INTAKE-10 compares against.</purpose>
   <item>Do not hand-edit the artifact — the Zod model is the source of truth (spec D2).</item>
   <item>Do not emit JSON — the contract's persisted form is YAML (AMD-001 §1, RFC-0376).</item>
 </non-goals>
+</MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1281: created — onboarding.intake.schema.export command.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>

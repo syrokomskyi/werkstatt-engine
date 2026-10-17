@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0574: Unit tests for mirror topology validation rules in sternsystem.validate.</purpose>
-<keywords>RFC-0574, mirrors, validate, validation rules, unit test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0574: initial unit tests for mirror validation rules.</item>

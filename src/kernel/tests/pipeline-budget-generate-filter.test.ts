@@ -18,8 +18,19 @@ RFC-0963: unit tests for pipeline.budget.generate fleet filtering — retired
 apps are filtered out when not in fleet/fleet.sites.yaml, and empty fleet
 produces an empty budgets file.
 </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the pipeline suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 const TELEMETRY_RELATIVE_PATH = join(
   "node_modules",

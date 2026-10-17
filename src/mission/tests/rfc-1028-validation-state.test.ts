@@ -17,6 +17,9 @@ import type { KernelExecutionReport } from "@warpgogol/werkstatt-shared/kernel";
     RFC-1028: Test validation-state.ts — path resolution, read/write round-trip,
     and buildValidatorStatesFromSteps conversion.
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1028: initial tests for validation-state.ts helpers.</item>

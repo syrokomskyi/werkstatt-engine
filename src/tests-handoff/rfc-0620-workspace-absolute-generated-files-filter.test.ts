@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0620: regression tests verifying workspace-absolute generated files are filtered from mission materialization data-path copy.</purpose>
-<keywords>RFC-0620, mission.materialize, ownership map, workspace-absolute, generated files, filter</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0620: initial regression tests — bordbuch files filtered, mock entry filtered, authored files preserved.</item>

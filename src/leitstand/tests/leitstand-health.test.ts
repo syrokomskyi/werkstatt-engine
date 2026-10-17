@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-1136: unit tests for runLeitstandHealth releaseId resolution — state-file lookup, --release override, and the no-release-recorded path.</purpose>
+  <purpose>
+Unit tests for leitstand health covering runLeitstandHealth (RFC-1136). It also guards the documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1136: initial tests covering AC-1 (releaseId resolved from lastPropagated), AC-2 (--release override), AC-3 (explicit unknown when no release recorded).</item>

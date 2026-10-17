@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0895/RFC-0926: leitstand.rollback accepts --to-release (RFC-0926) but still rejects --gate-decision. Native wrangler rollback targets the previous version automatically, or a specific Worker Version ID when --to-release is provided.</purpose>
-  <keywords>RFC-0895, leitstand, rollback, to-release, gate-decision, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0865: update rollback test to assert --to-release requirement.</item>

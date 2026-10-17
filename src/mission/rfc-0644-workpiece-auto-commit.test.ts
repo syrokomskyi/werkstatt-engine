@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0644: Unit tests for commitWorkpieceIfDirty helper — auto-commit dirty workpiece before mission.reconcile.</purpose>
-  <keywords>RFC-0644, workpiece, auto-commit, reconcile, test, git</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0644: initial unit tests for commitWorkpieceIfDirty — dirty, clean, and idempotent scenarios.</item>

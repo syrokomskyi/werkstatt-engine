@@ -2,7 +2,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1086: Unit tests for --fast flag incremental validation in mission.validate.</purpose>
-  <keywords>RFC-1086, mission.validate, fast, incremental, skip, cascade, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1086: initial unit tests for --fast flag — skip passed phases, cascade re-run, fallback on missing/corrupt/mismatched report.</item>

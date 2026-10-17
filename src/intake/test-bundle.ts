@@ -1,5 +1,6 @@
 /*
 <MODULE_CONTRACT>
+
 <purpose>RFC-1281: buildIntakeBundle — materialize a complete, valid
 werkstatt:intake/v1 hand-over bundle through WorkspaceIO for tests and the
 committed fixtures/valid-minimal directory. Hashes are computed (not
@@ -8,6 +9,7 @@ evidence-ledger hash, provenance.contractSnapshot and MANIFEST.sha256.</purpose>
 <non-goals>
   <item>Do not ship production logic — this is a test fixture builder only.</item>
 </non-goals>
+</MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1281: created — buildIntakeBundle fixture builder with mutate/manifestTransform hooks.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>

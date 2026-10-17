@@ -1,7 +1,8 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Unit tests for werkstatt.e2e.cold command handler (RFC-0965).</purpose>
-  <keywords>e2e, cold, test, RFC-0965</keywords>
+  <purpose>
+Unit tests for cold e2e covering werkstatt.e2e.cold. It also guards the documented public contract and regression-sensitive edge cases.
+</purpose>
   <non-goals>
     <item>Does not test real git clone or pnpm install — all external calls are mocked.</item>
   </non-goals>

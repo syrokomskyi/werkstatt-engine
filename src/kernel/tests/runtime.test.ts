@@ -14,25 +14,20 @@ import {
   <purpose>
     Verify foundational kernel runtime behaviors such as argv parsing, app discovery, and workspace root resolution.
   </purpose>
-  <responsibilities>
-    <item>Assert stable parsing semantics for mixed args and flags.</item>
-    <item>Assert kernel app discovery from a temporary workspace fixture.</item>
-    <item>Assert upward workspace-root resolution.</item>
-  </responsibilities>
   <non-goals>
     <item>Do not cover app-specific command behavior here.</item>
   </non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="argv-test">Flag and args parsing expectations.</entry>
-  <entry key="discovery-test">Kernel app discovery fixture test.</entry>
-  <entry key="workspace-root-test">Workspace root traversal test.</entry>
-</MODULE_MAP>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
-  <item>Backfill reduced Compass scaffolding on the kernel runtime tests file.</item>
+  <item>RFC-1311: carried legacy entry — Backfill reduced Compass scaffolding on the kernel runtime tests file.</item>
   <item>RFC-0246: Pin targetless workspace pipeline execution from root kernel config.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 test("parseKernelArgv separates args and flags", () => {
   const parsed = parseKernelArgv([

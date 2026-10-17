@@ -4,7 +4,9 @@
 real warpgogol-com content data and verifies all 60 reference patterns are
 correctly migrated, de/ PBP entities are created, presentation fields are
 populated, and the legacy business/ directory is deleted.</purpose>
-<keywords>RFC-0483, migrator, snapshot, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0483: initial snapshot test for content migrator.</item>

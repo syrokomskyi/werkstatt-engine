@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0634: tests for leitstand.propagate dev-URL build-identity verification logic.</purpose>
-  <keywords>RFC-0634, propagate, build-identity, verification, test</keywords>
+  <purpose>
+Unit tests for rfc 0634 propagate dev verification covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0634: add tests for dev build-identity verification in leitstand.propagate.</item>

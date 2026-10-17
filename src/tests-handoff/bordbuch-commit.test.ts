@@ -4,7 +4,9 @@
     RFC-0626: unit tests for bordbuch.commit — tests commitBordbuchProjections
     helper and runBordbuchCommit command handler.
   </purpose>
-  <keywords>RFC-0626, bordbuch.commit, commitBordbuchProjections</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0626: initial bordbuch.commit tests.</item>

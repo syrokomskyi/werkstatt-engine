@@ -1,8 +1,12 @@
 // @vitest-environment node
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0973: Unit tests for --force cache clearance in mission.validate.</purpose>
-  <keywords>RFC-0973, mission.validate, force, cache-clear, test</keywords>
+  <purpose>
+Unit tests for mission validate force clear covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0973: initial unit tests for --force auto-clears all caches and stale artifacts.</item>

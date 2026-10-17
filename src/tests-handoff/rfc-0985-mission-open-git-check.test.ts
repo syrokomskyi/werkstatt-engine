@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0985: unit tests for mission.open pre-flight git check (Measure 4) and crash-safe rollback marker (Measure 7).</purpose>
-  <keywords>RFC-0985, mission.open, detached HEAD, rebase-merge, rollback marker, crash-safe</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0985: initial tests for pre-flight git sanity check and rollback marker.</item>

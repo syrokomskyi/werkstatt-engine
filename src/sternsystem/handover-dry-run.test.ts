@@ -3,7 +3,9 @@
 <purpose>RFC-0988: Unit tests for --dry-run flag on sternsystem.handover.prepare
 and sternsystem.handover.complete. Verifies side-effect-free behavior, preview data,
 and error cases.</purpose>
-<keywords>RFC-0988, dry-run, handover, testing, side-effect-free</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0988: initial dry-run unit tests for handover prepare and complete.</item>

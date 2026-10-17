@@ -14,11 +14,19 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
     Verify ADR-0022 process-lifetime registry cache behavior: cache hit on second call,
     cache disabled by setRegistryCacheEnabled(false), and clearRegistryCache invalidation.
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>ADR-0022: initial test for process-lifetime registry cache.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 const mockModule: ModuleExport = {
   name: "test-module",

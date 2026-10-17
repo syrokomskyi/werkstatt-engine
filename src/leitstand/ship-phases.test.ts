@@ -3,7 +3,9 @@
 <purpose>RFC-1263 AC-5: regression pin — leitstand.ship still runs the full
 mission.validate before any lifecycle/deploy phase; the content fast lane
 relaxes only the pre-ship reconcile/close precondition, never ship.</purpose>
-<keywords>RFC-1263, leitstand.ship, mission.validate, deploy gate</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1263: initial pin — validate precedes reconcile/close in ship.</item>

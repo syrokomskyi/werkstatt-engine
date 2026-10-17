@@ -5,7 +5,9 @@
     verifies sync is called when mirrors > 2, sync failure is non-fatal, and
     sync is skipped when mirrors <= 2.
   </purpose>
-  <keywords>RFC-0762, mission.close, sternsystem.sync, mirrorSync, CloseReportMirror</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0762: initial tests for post-close sternsystem.sync in mission.close.</item>

@@ -13,13 +13,21 @@ import { deriveModuleBasePath } from "../runtime/registry.ts";
     RFC-1028: Test composite cache key format, parse round-trip, and
     deriveModuleBasePath resolution logic.
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-1028: initial tests for composite cache key and deriveModuleBasePath.</item>
   <item>RFC-1133: cache direct executeKernelCommand executions with flag-keyed results</item>
   <item>RFC-1193: bound module hashing to src/os roots with constant fallbacks</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 test("buildCommandResultCacheKey produces composite string with 6 colon-separated parts", () => {
   const key: CommandResultCacheKey = {

@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1149: phase 1b — DRIFT-02 diagnostics promoted from warnings to violations (blocking); DRIFT-01 stays warning per ADR-0082 cleanup caveat.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
   <item>RFC-1284: ACCESS-01/02 diagnostics in sternsystem.validate
@@ -29,8 +28,8 @@ F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
 F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
-  <history>ADR-0082, ADR-0088, ADR-0091, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097</history>
   <item>RFC-1297: LIVE-01/02 live-channel drift checks alongside ACCESS-01/02 — same transport-failure-warns semantics.</item>
+  <history>ADR-0082, ADR-0088, ADR-0091, DRIFT-01, DRIFT-02, RFC-0354, RFC-0480, RFC-0520, RFC-0561, RFC-0648, RFC-0792, RFC-0822, RFC-0870, RFC-0902, RFC-0966, RFC-0968, RFC-1097, RFC-1149</history>
 </CHANGE_SUMMARY>
 */
 

@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0796: unit tests for checkWorkspaceGlobsForStalePackages pre-flight guard in mission.materialize.</purpose>
-  <keywords>RFC-0796, workspace glob, stale package, materialize guard</keywords>
+  <purpose>
+Unit tests for rfc 0796 materialize glob guard covering RFC-0796: checkWorkspaceGlobsForStalePackages.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0796: initial tests for workspace glob stale package guard.</item>

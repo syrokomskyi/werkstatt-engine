@@ -8,7 +8,9 @@
     dimension mapping, unknown dimension preservation, and ingest delegation.
     Uses mocked fetch — no real Cloudflare API calls.
   </purpose>
-  <keywords>RFC-0875, nachweis, cloudflare, agent-readiness, url-scanner, unit-test, polling, mock-fetch</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0875: initial tests for nachweis.measure.cloudflare-agent-readiness command handler.</item>

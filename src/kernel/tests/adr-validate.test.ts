@@ -16,15 +16,19 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
     Regression coverage for ADR validation rules that need both docs/adrs and
     docs/rfcs fixture state.
   </purpose>
-  <responsibilities>
-    <item>Assert an ADR can be superseded by a broader RFC decision.</item>
-    <item>Assert a missing RFC superseder is still reported.</item>
-  </responsibilities>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
-  <item>Post-refactor hardening: cover cross-domain ADR supersession by RFC id.</item>
+  <item>RFC-1311: carried legacy entry — Post-refactor hardening: cover cross-domain ADR supersession by RFC id.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 const noopLogger: KernelLogger = {
   section() {},

@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0500: PBT for the ratgeber topics→articles migrator —
 verifies idempotency f(f(x))==f(x) on synthetic fixture data.</purpose>
-<keywords>RFC-0500, migrator, PBT, property-based test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0500: initial PBT for topics→articles migrator.</item>

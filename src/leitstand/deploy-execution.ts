@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1188: fo-review fix — outbound client resolved once per channel invocation and shared by health/freshness/feature-smoke instead of three independent resolutions</item>
   <item>RFC-1190: evidence.sync fail-closed when evidence/axiom + evidence-metadata.json exist (throws EVIDENCE_SYNC_FAILED, failingPhase "evidence-sync") and a clean no-op when absent — replaces the swallowed-error branch that reported deploy success while uploading nothing; axiomStatus/axiomExitCode + missionContext surfaced on DeployExecutionResult.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
@@ -33,8 +32,8 @@ F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
 F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
-  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188</history>
   <item>RFC-1297: buildAuthHeader re-exported from sternsystem/live-drift.ts (canonical home); gate selection uses gateForChannel.</item>
+  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188</history>
 </CHANGE_SUMMARY>
 */
 

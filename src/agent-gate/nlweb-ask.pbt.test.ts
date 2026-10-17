@@ -2,13 +2,9 @@
 <MODULE_CONTRACT>
   <purpose>RFC-1165 / DNA-101: property-based tests for the pure helpers of the
   NLWeb /ask core — invariants over arbitrary inputs, not hand-picked cases.</purpose>
-  <responsibilities>
-    <item>resolveAcceptLanguage: output always within supported ∪ {default}; deterministic; undefined → default.</item>
-    <item>nlwebMirrorPath: output ends .jsonld, no leading slash, root → index.jsonld; deterministic.</item>
-    <item>parseNlwebRequest: never throws on arbitrary input; status always 400 on failure; valid requests round-trip trimmed text.</item>
-    <item>noAnswerSentence: always non-empty for arbitrary lang tokens; deterministic.</item>
-    <item>nlwebQueryId: 16-hex chars; deterministic per (site, lang, text); input-sensitive.</item>
-  </responsibilities>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1165: created — PBT coverage for nlweb-ask pure helpers (fo-review DNA-101 follow-up).</item>

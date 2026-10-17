@@ -6,7 +6,9 @@
     ref is missing, and that no warning is logged when mirrors are in sync or
     when no external mirrors are configured.
   </purpose>
-  <keywords>RFC-0995, leitstand, promote, mirror, sync, pre-flight, warning</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0995: initial tests for checkMirrorSyncPreFlight pure function.</item>

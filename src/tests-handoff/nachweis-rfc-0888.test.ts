@@ -3,7 +3,9 @@
   <purpose>
     Unit tests for RFC-0888: sichtpass Bordbuch event kind for Sichtpass lifecycle audit trail.
   </purpose>
-  <keywords>RFC-0888, sichtpass, bordbuch, nachweis, manifest, publish, withdraw, unit-test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0888: initial tests for sichtpass Bordbuch entry append in manifest.generate, publish, and withdraw.</item>

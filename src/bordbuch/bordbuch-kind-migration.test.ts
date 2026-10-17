@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0724: unit tests for deprecated bordbuch kind migration — verifies readBordbuch normalizes release-published to release-ready, and validateBordbuch accepts hashes computed with the deprecated kind.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0724: initial deprecated kind migration tests.</item>

@@ -1,5 +1,6 @@
 /*
 <MODULE_CONTRACT>
+
 <purpose>RFC-1281: onboarding.intake.validate — deterministic INTAKE-01…11
 validation of a werkstatt:intake/v1 hand-over bundle (INTAKE-CONTRACT). Rule
 order is fixed: INTAKE-01 (manifest/hash integrity) and INTAKE-02 (envelope
@@ -10,9 +11,10 @@ node:crypto sha256.</purpose>
   <item>Do not vendor PBP entity shapes — INTAKE-03 delegates to pbpSchemaById (DNA-103).</item>
   <item>Do not write files — the command is read-only; the bundle is immutable on arrival.</item>
 </non-goals>
+</MODULE_CONTRACT>
 <KEY_DECISIONS>
-  <item>contractSnapshot is compared to the sha256 of the vendored export resolved via import.meta.resolve("@warpgogol/werkstatt-shared/onboarding/intake.schema.generated.yaml") — a missing export fails the command with a remediation hint instead of silently skipping INTAKE-10.</item>
-  <item>Verbatim substring checks (INTAKE-05) run against text-typed evidence items only (text/*, application/json, message/rfc822); a binary-only source is an error, an unresolvable sourceRef is left to INTAKE-04.</item>
+  <item>contractSnapshot is compared to the sha256 of the vendored export resolved via import.meta.resolve("@warpgogol/werkstatt-shared/onboarding/intake.schema.generated.yaml")</item>
+  <item>Verbatim substring checks (INTAKE-05) run against text-typed evidence items only (text/*, application/json, message/rfc822); a binary-only source is an error,.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
   <item>RFC-1281: created — validateIntakeBundle (INTAKE-01…11) + runIntakeValidate command + resolveIntakeExportSha256.</item>

@@ -3,7 +3,9 @@
   <purpose>RFC-0529: PBT test for the content reference brace-to-braceless migrator —
   verifies idempotency (f(f(x)) == f(x)) over arbitrary SternsystemData with
   brace-delimited content references in markdown and yaml files.</purpose>
-  <keywords>RFC-0529, migrator, pbt, idempotency, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0529: initial PBT test for content reference brace-to-braceless migrator.</item>

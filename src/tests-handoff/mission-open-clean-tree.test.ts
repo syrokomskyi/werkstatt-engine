@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0580: integration test verifying git status is clean after mission.open.</purpose>
-<keywords>RFC-0580, integration, mission.open, git status, clean</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0580: initial integration test for clean working tree after mission.open.</item>

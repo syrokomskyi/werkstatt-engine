@@ -1,10 +1,11 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-RFC-1212 AC-5/AC-6 tests: a dispatched metered call journals exactly one
-AgentUsageRecord (capability id + caller identity + free-window verdict);
-unmetered, preview ("none"), dispatch-failed, and replayed calls emit none.
+Unit tests for usage covering its documented public contract and regression-sensitive edge cases.
 </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1212: initial test coverage.</item>

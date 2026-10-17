@@ -4,7 +4,9 @@
 verify must agree with sternsystem.validate PASSPORT-03 on bordbuchHead
 staleness: bookkeeping-only drift and post-handover head drift are tolerated;
 any other entry appended after the recorded head fails verify.</purpose>
-<keywords>ADR-0094, passport, verify, staleness, handover, bordbuch</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0094: initial verify drift-tolerance tests.</item>

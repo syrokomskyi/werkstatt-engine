@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0652: unit tests for mission.cleanup age-based Axiom evidence cleanup.</purpose>
-  <keywords>RFC-0652, mission.cleanup, evidence, retention, axiom, cleanup</keywords>
+  <purpose>
+Unit tests for rfc 0652 mission cleanup evidence retention covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0652: initial tests for age-based Axiom evidence cleanup in mission.cleanup.</item>

@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>Test RFC-0952: defensive guards in mission.materialize for missing manifest and currentMission state.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0952: test Guard 1 (missing manifest error) and Guard 2 (currentMission auto-set).</item>

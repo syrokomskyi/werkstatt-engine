@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0968: Unit tests for HANDOVER-01/02/03/04/05 validation rules in sternsystem.validate.</purpose>
-<keywords>RFC-0968, handover, validate, HANDOVER, unit test</keywords>
+<purpose>
+Unit tests for handover validate covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover validate unit tests.</item>

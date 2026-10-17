@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0801: unit tests for mission.close — verifies mission.archive is NOT called after close (auto-archive removed).</purpose>
-  <keywords>RFC-0801, mission.close, auto-archive, mission.archive</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0801: rewrite tests — assert mission.archive is NOT called from mission.close; remove --skip-auto-archive and closeReport.archive tests.</item>

@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1295: certify producer wiring — the editorial-localization requirement is produced by editorial-signoff (editorial.review.verify), and the derived producer node set covers both producers.</purpose>
-  <keywords>RFC-1295, leitstand, certify, editorial-signoff, producer, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1295: initial test — profile requirement→producer binding + derived producer-node set.</item>

@@ -2,7 +2,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0976: Unit tests for auto-commit of generated artifacts after successful validation.</purpose>
-  <keywords>RFC-0976, mission.validate, auto-commit, skip-auto-commit, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0976: initial unit tests for auto-commit on full-build and distribution-reuse paths.</item>

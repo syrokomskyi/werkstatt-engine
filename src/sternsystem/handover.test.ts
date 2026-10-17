@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0968: Unit tests for handover authorization logic — signing, verification,
 file IO, expiry, hash determinism, forgery detection, and bordbuch duplicate rejection.</purpose>
-<keywords>RFC-0968, handover, authorization, ed25519, unit test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0968: initial handover unit tests.</item>

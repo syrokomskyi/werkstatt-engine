@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0931: unit tests for build-identity.json signing, release-pubkey.json writing, and signature verification.</purpose>
+  <purpose>
+Unit tests for leitstand sign covering RFC-0931: signBuildIdentity; RFC-0931: writeReleasePublicKey; RFC-0931: verifyBuildIdentitySignature.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0931: initial tests for signBuildIdentity, writeReleasePublicKey, verifyBuildIdentitySignature, and leitstand.verify --verify-signature.</item>

@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0481: PBT test for the rfc-0481 content migrator — verifies
 idempotency (f(f(x)) == f(x)) over the business singleton transformation.</purpose>
-<keywords>RFC-0481, migrator, pbt, idempotency, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0481: initial PBT test for content migrator.</item>

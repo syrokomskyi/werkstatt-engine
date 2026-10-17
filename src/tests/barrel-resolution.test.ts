@@ -1,7 +1,12 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-1104 AC-5: verify every preserved engine package specifier still resolves the sunk contract cluster — retargeted barrels and forwarding modules must surface the same symbols now owned by @warpgogol/werkstatt-shared.</purpose>
-  <non-goals>Does not test behavior of the symbols — only that the specifier surface resolves.</non-goals>
+  <purpose>
+Unit tests for barrel resolution covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+  <non-goals>
+  <item>Does not test behavior of the symbols — only that the specifier surface resolves.</item>
+</non-goals>
+
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1104: initial barrel-resolution test covering kernel, kernel/types, kernel/workspace-io, runtime/desired-state, schemas, signing, fingerprint, component specifiers.</item>

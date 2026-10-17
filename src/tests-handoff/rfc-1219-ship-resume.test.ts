@@ -5,7 +5,9 @@
     op-interrupted journal that --resume picks up at the failed step, and a
     completed later op does not mask the interrupted one (warpgogol-m000192).
   </purpose>
-  <keywords>RFC-1219, leitstand, ship, resume, op-interrupted, journal</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1219: initial tests — op-interrupted marker, resume at failed step, masking regression.</item>

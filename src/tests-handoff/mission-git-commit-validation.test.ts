@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0594: unit and integration tests for pre-commit content validation in mission.git.commit.</purpose>
-<keywords>RFC-0594, mission.git.commit, pre-commit, validation, gate, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0096: bootstrap committed behavior snapshot before build.post</item>
@@ -643,7 +645,7 @@ test("staged changes preserved on validation failure", async () => {
 const WORKPIECE_TS_WITH_HEADER = `/*
 <MODULE_CONTRACT>
 <purpose>Workpiece feature module for record integration coverage.</purpose>
-<non-goals><item>No production logic.</item></non-goals>
+
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0001: initial.</item>

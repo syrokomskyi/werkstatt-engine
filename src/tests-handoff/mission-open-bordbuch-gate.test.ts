@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0593: unit test verifying bordbuch.validate pre-flight gate in mission.open.</purpose>
-<keywords>RFC-0593, bordbuch, validation, gate, mission.open</keywords>
+<purpose>
+Unit tests for mission open bordbuch gate covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0593: initial test for bordbuch.validate pre-flight gate in mission.open.</item>

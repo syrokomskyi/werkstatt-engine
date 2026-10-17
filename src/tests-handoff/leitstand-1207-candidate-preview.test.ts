@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1207: leitstand.certify candidate-preview tests — target resolution modes, fail-closed missing artifact, preview teardown, no real wrangler dev spawns.</purpose>
-  <keywords>RFC-1207, leitstand, certify, candidate-preview, wrangler dev, measurement target, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1207: initial test suite for candidate-preview certification (AC-1..AC-5, AC-7).</item>

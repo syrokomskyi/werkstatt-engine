@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0658: unit tests for installBordbuchPreCommitHook — verifies hook installation, idempotency, and script content.</purpose>
-  <keywords>RFC-0658, bordbuch, pre-commit, hook, cache clone</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0658: initial tests for installBordbuchPreCommitHook.</item>

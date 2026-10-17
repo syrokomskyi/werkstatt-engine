@@ -1,11 +1,12 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1116: AC-1/AC-2 tests for runAgentHealth — AgentHealth payload shape, 200/503 semantics, degraded rules.</purpose>
-<keywords>RFC-1116, agent surface, health endpoint, AgentHealth, test</keywords>
+<purpose>
+Unit tests for health route covering RFC-1116 AC-1: healthy surface → 200 + full AgentHealth shape; RFC-1116 AC-2: missing dispatch binding → degraded + 503; dispatch requirement gating (actions-aware).
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">healthy → 200 + all fields; missing dispatch token → degraded 503; manifest/knowledge/search degraded edges.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-1116: initial health-route tests.</item>
 </CHANGE_SUMMARY>

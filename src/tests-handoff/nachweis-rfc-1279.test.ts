@@ -5,7 +5,9 @@
     (record-approved, n3-met, legal-content-check-passed) to the evaluated record's
     metadata.slug — cross-record attestation contamination is fail-closed.
   </purpose>
-  <keywords>RFC-1279, nachweis, gate-v2, bordbuch, slug-scope, contamination, unit-test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1279: initial tests — foreign-approval contamination, own-slug parity, slug-less fail-closed, publish refusal, machine-field approval predicate.</item>

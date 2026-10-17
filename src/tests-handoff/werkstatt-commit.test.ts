@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0580: unit tests for commitWerkstattSideEffects helper.</purpose>
-<keywords>RFC-0580, commitWerkstattSideEffects, test, idempotent, staging</keywords>
+<purpose>
+Unit tests for werkstatt commit covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0580: initial unit tests for commitWerkstattSideEffects.</item>

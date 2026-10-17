@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0913: integration test simulating real-world reconcile→close lifecycle with freshness guard.</purpose>
-<keywords>RFC-0913, integration, reconcile, close, freshness, gitignore, end-to-end</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0913: initial integration test — simulate reconcile→operator-commit→close-blocks→re-reconcile→close-succeeds lifecycle.</item>

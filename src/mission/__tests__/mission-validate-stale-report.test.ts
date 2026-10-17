@@ -2,7 +2,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1020: Unit tests for stale validation-report.json deletion at the start of runMissionValidate on non-force runs.</purpose>
-  <keywords>RFC-1020, mission.validate, stale-report, validation-report, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1020: initial unit tests for stale validation-report.json deletion on non-force runs.</item>

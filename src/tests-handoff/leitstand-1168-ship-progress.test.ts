@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-1168: leitstand.ship stderr progress — onTransition seam in runOperation, step-line format, preamble hints (AC-1, AC-2).</purpose>
-  <keywords>RFC-1168, leitstand, ship, progress, stderr, journal, onTransition</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1168: initial tests — onTransition record stream, formatShipTransition line shapes, shipPreambleLines journal/watch hints.</item>

@@ -5,7 +5,9 @@ rollback succeeds, lastPropagated[&lt;channel&gt;] must name the release now liv
 (state "rolled-back", healthy null until re-verified) and the Bordbuch must
 carry a deployment-rolled-back event — before this RFC, leitstand.rollback left
 both untouched, letting live and recorded state diverge silently.</purpose>
-<keywords>RFC-1297, leitstand.rollback, rolled-back, deployment-rolled-back, system-state, bordbuch</keywords>
+<non-goals>
+  <item>Not a contract source of truth — callers depend on the module's exported API, not this file's internals.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — recordSiteRollback writes lastPropagated + appends deployment-rolled-back; reconciles live releaseId via readLiveChannelStates when the rollback target is unknown.</item>

@@ -3,7 +3,9 @@
 <purpose>RFC-1264 AC-1/AC-6: mission.close runs the mission-digest step pre-bordbuch,
 links the artifact path into the close bordbuch event, and surfaces it in the
 close report; --skip-digest is the audited escape hatch.</purpose>
-<keywords>RFC-1264, mission digest, mission.close, close report, bordbuch</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1264: initial test file.</item>

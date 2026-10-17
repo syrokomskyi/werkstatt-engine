@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0635: unit tests for distribution reuse in mission.validate when build-input-hash matches.</purpose>
-<keywords>RFC-0635, mission.validate, distribution reuse, build-input-hash, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0635: initial tests for distribution reuse paths in mission.validate.</item>

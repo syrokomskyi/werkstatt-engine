@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0584: Unit tests for bordbuch delete-modify conflict auto-resolution in mission.reconcile.</purpose>
-  <keywords>RFC-0584, bordbuch, conflict, auto-resolve, delete-modify, merge, reconcile, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0584: initial tests for bordbuch-only conflict auto-resolution, non-bordbuch hard-failure, and mixed conflict hard-failure.</item>

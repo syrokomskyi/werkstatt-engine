@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0820: unit tests for three-level silent no-op mission loss prevention guards.</purpose>
-<keywords>RFC-0820, mission.git.commit, mission.close, mission.reconcile, zero-commit, no-op guard</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0820: initial tests for three-level no-op guard (git.commit warning, close zero-commit block, reconcile zero-transfer warning).</item>

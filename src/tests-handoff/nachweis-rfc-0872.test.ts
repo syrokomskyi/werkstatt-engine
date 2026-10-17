@@ -5,7 +5,9 @@
     evidence kind, conditional consent revocation, manifest observation identity,
     and locale drift detection.
   </purpose>
-  <keywords>RFC-0872, nachweis, technical-assessment, gate-v2, policy, locale-drift, unit-test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0872: initial tests for policy resolution, gate V2, technical-assessment validation, withdraw, manifest, locale drift.</item>

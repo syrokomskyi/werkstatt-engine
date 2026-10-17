@@ -1,10 +1,12 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0221/RFC-0479: tests for the materialization pure core — bundle→app path mapping.
-Migrator chain application tests moved to migrators.test.ts (RFC-0479).</purpose>
-<keywords>RFC-0221, materialize, path mapping, test</keywords>
+<purpose>
+Unit tests for materialize covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">toAppRelative path mapping.</entry></MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-0221: initial materialization tests.</item>
   <item>RFC-0479: removed applyMigratorChain tests — migrated to migrators.test.ts.</item>

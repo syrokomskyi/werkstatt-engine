@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0560: Unit tests for Ed25519 signed commit creation.</purpose>
-  <keywords>RFC-0560, signed-commit, ed25519, test, git</keywords>
+  <purpose>
+Unit tests for signed commit covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0560: initial unit tests for createSignedCommit.</item>

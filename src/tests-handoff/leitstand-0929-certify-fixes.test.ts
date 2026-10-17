@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0929: tests for leitstand.certify accessPin pre-flight check and tryReuseEvidence status=fail skip.</purpose>
-  <keywords>RFC-0929, leitstand, certify, accessPin, evidence reuse, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0929: test accessPin pre-flight check blocks certify before producer execution.</item>

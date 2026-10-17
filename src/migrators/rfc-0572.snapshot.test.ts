@@ -3,7 +3,9 @@
   <purpose>RFC-0572: snapshot test for the contact form revert migrator —
   verifies that applying the migrator removes emailField/phoneField and re-adds
   contactRequirementMessage, and that a second application is idempotent.</purpose>
-  <keywords>RFC-0572, migrator, snapshot, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0572: initial snapshot test for contact form revert migrator.</item>

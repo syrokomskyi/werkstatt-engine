@@ -9,8 +9,14 @@
  *     <item>Only validators whose command contract is in CONTENT_CONTRACTS
  *           contribute — infrastructure checks are not content warnings.</item>
  *   </change_rules>
- * </MODULE_CONTRACT>
- */
+ * <non-goals>
+  <item>Not a contract source of truth — callers depend on the module's exported API, not this file's internals.</item>
+</non-goals>
+</MODULE_CONTRACT>
+ <CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — repairs pre-existing contract debt surfaced by the test-file scaffold rollout.</item>
+</CHANGE_SUMMARY>
+*/
 
 /**
  * Contracts whose diagnostics describe rendered/editorial content quality.

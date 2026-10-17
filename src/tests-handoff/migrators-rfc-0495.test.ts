@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0495: idempotency and no-op tests for the rfc-0495 migrator.</purpose>
-<keywords>RFC-0495, migrator, idempotency, test</keywords>
+<purpose>
+Unit tests for migrators rfc 0495 covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0495: initial idempotency and no-op tests for rfc-0495 migrator.</item>

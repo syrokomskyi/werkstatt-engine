@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0585: tests for release.ready distTreeHash guard and dist directory check.</purpose>
-<keywords>RFC-0585, release.ready, distTreeHash, dist guard, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0585: add unit tests for release.ready distTreeHash pending guard and missing dist directory guard.</item>

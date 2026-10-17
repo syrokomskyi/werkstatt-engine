@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0520: unit tests for checkBreaksCDeclaration helper.</purpose>
+<purpose>
+Unit tests for breaks c helper covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0520: initial unit tests for breaksC frontmatter parsing.</item>

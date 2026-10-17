@@ -11,13 +11,21 @@ import type { ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
     same command name across modules throws COMPOSITION-02. Prevents pipeline crashes when two modules
     accidentally register the same command (RFC-0816).
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-0816: initial regression test for duplicate command registration.</item>
   <item>RFC-1038: migrated from registerCommand to populateFromModule.</item>
   <item>RFC-1038: migrated from KernelRegistry.populateFromModule to buildActualState.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 const noopExecute = async (): Promise<KernelCommandResult<unknown>> => ({
   exitCode: 0,

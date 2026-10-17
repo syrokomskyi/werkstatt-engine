@@ -17,24 +17,19 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
     bidirectional supersession (V-12), status/date coupling (V-16), strict
     supersededBy (V-17), and related[] referential integrity (V-18).
   </purpose>
-  <responsibilities>
-    <item>Build temporary docs/rfcs fixtures and run runRfcValidate against them.</item>
-    <item>Assert each new rule fires on a violating fixture and is silent on a clean one.</item>
-  </responsibilities>
   <non-goals>
     <item>Do not re-test V-01..V-11, V-13..V-15 (covered implicitly elsewhere).</item>
   </non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="V-12-test">One-directional vs bidirectional supersession edges.</entry>
-  <entry key="V-16-test">status implemented without implementedAt.</entry>
-  <entry key="V-17-test">supersededBy set with non-superseded status.</entry>
-  <entry key="V-18-test">related pointing at a nonexistent RFC.</entry>
-</MODULE_MAP>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>New test file added by RFC-0153 to cover the new validator rules.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 const noopLogger: KernelLogger = {
   section() {},

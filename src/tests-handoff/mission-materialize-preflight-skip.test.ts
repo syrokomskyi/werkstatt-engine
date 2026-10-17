@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0597: unit tests for materialization state file preflight skip logic in mission.materialize.</purpose>
-<keywords>RFC-0597, mission.materialize, preflight, skip, state file, cache clone HEAD</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0597: initial tests for state-file-based preflight skip and --skip-preflight flag precedence.</item>

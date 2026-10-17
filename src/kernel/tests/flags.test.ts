@@ -6,28 +6,21 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io
 /*
 <MODULE_CONTRACT>
   <purpose>
-    RFC-0260: verify typed kernel command flag schemas — resolveCommandFlags
-    resolution, error diagnostics, and the strict executeKernelCommand options guard.
-  </purpose>
-  <responsibilities>
-    <item>Assert resolveCommandFlags parses declared boolean/string/string[] flags correctly.</item>
-    <item>Assert KERNEL-FLAG-01/02/03 fire for unknown, missing-value, and missing-required flags.</item>
-    <item>Assert schema-less commands still parse via the unchanged heuristic parseKernelArgv path.</item>
-    <item>Assert executeKernelCommand rejects unknown option keys with a nearest-key hint (regression: commit 8b3e62ab).</item>
-  </responsibilities>
+Unit tests for flags covering its documented public contract and regression-sensitive edge cases.
+</purpose>
   <non-goals>
     <item>Do not cover the kernel.flags.lint static scan here — see site-kernel-checks tests.</item>
   </non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="resolveCommandFlags-tests">Flag resolution: boolean/string/inline/passthrough/errors.</entry>
-  <entry key="parseKernelArgv-golden-test">Schema-less commands parse unchanged.</entry>
-  <entry key="executeKernelCommand-options-guard-test">Regression test for commit 8b3e62ab.</entry>
-</MODULE_MAP>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-0260: initial test suite, written before the rfc.* migration lands.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 function fixtureCommand(flags: KernelCommandDefinition["flags"]): KernelCommandDefinition {
   return {

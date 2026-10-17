@@ -3,7 +3,9 @@
 <purpose>ADR-0092: Unit tests for passport staleness helpers —
 isBordbuchDriftBookkeepingOnly and dropTrailingBookkeepingEntries over real
 bordbuch entries appended via appendBordbuchEntry.</purpose>
-<keywords>ADR-0092, passport, staleness, bordbuch, mirror-sync, unit test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0092: initial staleness helper tests.</item>

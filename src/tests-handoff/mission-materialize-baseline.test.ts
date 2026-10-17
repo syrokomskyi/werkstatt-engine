@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0617: unit test verifying compass.audit.baseline --workpiece is called during mission.materialize.</purpose>
-<keywords>RFC-0617, mission.materialize, compass.audit.baseline, workpiece, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0617: initial test verifying compass.audit.baseline is called with --workpiece flag after codegen.</item>

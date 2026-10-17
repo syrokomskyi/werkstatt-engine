@@ -13,6 +13,7 @@
   <item>RFC-1309: extracted from cli/index.ts so batch.ts and unit tests can import the parser without invoking main(); added --quiet, --batch, --stop-on-fail.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant flag tokenizers stay pure — no I/O, no registry access; all effects flow through the caller
 
 export interface CommonFlags {
   siteName: string | undefined;

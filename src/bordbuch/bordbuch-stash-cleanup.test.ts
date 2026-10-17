@@ -5,10 +5,12 @@
     Verifies that stashes are dropped after failed stash pop and on push failure,
     preventing stale stash accumulation in cache clones.
   </purpose>
-  <keywords>stash, cleanup, bordbuch, commitAndPushBordbuch</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>Initial: regression test for stash drop after failed pop and on push failure.</item>
+  <item>RFC-1311: carried legacy entry — Initial: regression test for stash drop after failed pop and on push failure.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
 </CHANGE_SUMMARY>
 */

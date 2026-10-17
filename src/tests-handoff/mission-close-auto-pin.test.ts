@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0703: unit test for mission.close auto-pin behavior — verifies sternsystem.pin is called.</purpose>
-  <keywords>RFC-0703, mission.close, sternsystem.pin, auto-pin</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0703: initial test for mission.close auto-pin via sternsystem.pin.</item>

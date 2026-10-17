@@ -1,10 +1,13 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0221: tests for the x.y.z semver comparison and range membership.</purpose>
-<keywords>RFC-0221, semver, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">compareSemver ordering + inOpenClosedRange bounds.</entry></MODULE_MAP>
-<CHANGE_SUMMARY><item>RFC-0221: initial semver tests.</item></CHANGE_SUMMARY>
+<CHANGE_SUMMARY>
+  <item>RFC-0221: initial semver tests.</item>
+</CHANGE_SUMMARY>
 */
 
 import { test, expect } from "vitest";

@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>Tests for sternsystem.status currentMission field (RFC-1063).</purpose>
+  <purpose>
+Unit tests for sternsystem status covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1063: behavioral tests for currentMission null and non-null cases.</item>

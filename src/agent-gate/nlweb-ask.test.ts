@@ -9,6 +9,9 @@ sourcing — all with stubbed ports; no astro/cloudflare imports.
   <item>No HTTP/adapter tests — createAgentNlwebRoute lives in astro.ts.</item>
 </non-goals>
 </MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the nlweb suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
 */
 
 import { describe, expect, it } from "vitest";

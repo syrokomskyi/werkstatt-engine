@@ -3,7 +3,9 @@
   <purpose>RFC-0938/RFC-1284: tests for leitstand.certify access PIN management —
   suspend-before-measure, resume-in-finally, stale-marker resume on entry,
   target-aware gating (candidate-preview never touches ACCESS_PIN).</purpose>
-  <keywords>RFC-0938, RFC-1284, leitstand, certify, accessPin, accessPinSuspended, auto-manage, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>

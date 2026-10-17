@@ -22,8 +22,19 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io
   fixtures exercise the rules with no real git needed; one integration test
   runs over a temp git repository for range resolution + merge exemption.
 </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the commit suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 function commit(overrides: Partial<CommitRecord>): CommitRecord {
   return { hash: "abcdef1234567890", parents: ["parent1"], subject: "", body: "", ...overrides };

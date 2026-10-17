@@ -3,6 +3,9 @@
 <purpose>RFC-0504: snapshot test for the rfc-0504 migrator — verifies the
 article frontmatter and prose body content match expected snapshots after
 migration on a clean run.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0504: initial snapshot test for rfc-0504 migrator.</item>

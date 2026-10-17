@@ -1,14 +1,15 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0290: tests for the closed-schema-subset interpreter + IntegrationEvent builder.</purpose>
-<keywords>RFC-0290, agent surface, gate, actions, test</keywords>
+<purpose>
+Unit tests for actions covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">required/unknown-property/type/format/length validation, event building.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial action interpreter tests.</item>
-  <item>Post-refactor hardening: cover prototype-key unknown property validation.</item>
+  <item>RFC-1311: carried legacy entry — Post-refactor hardening: cover prototype-key unknown property validation.</item>
   <item>RFC-1186: step 4 — manifest bound set, formBinding stamp, gate formId tagging</item>
 </CHANGE_SUMMARY>
 */

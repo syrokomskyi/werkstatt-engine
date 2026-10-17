@@ -15,9 +15,6 @@ consolidation candidates (contracts with more than one validator).
   <item>The inventory is generated from the registry — docs/validator-inventory.generated.yaml is the single output.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1200: VALIDATOR_NAME_PATTERN gains .probe — a11y.axe.probe is a blocking read-only gate whose declared rules must appear in the inventory (AC-7).</item>
   <item>RFC-1144: run read-only steps to completion in collect-errors pipeline mode
 
@@ -25,7 +22,7 @@ Scheduler: collectErrors option on executeScheduledSteps — read-only steps (Sc
   <item>RFC-1200: add a11y.axe.probe pre-deploy axe probe and register in postbuild pipeline</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
   <item>RFC-1306 review-r1: inventory write migrated ambient writeFileAtomic to context.io via writeFileIfChanged — dry-run/readonly interception + honest filesModified.</item>
-  <history>RFC-0963, RFC-1097</history>
+  <history>CONTRACT-02, CONTRACT-03, CS-07, PURPOSE-02, RFC-0963, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
 

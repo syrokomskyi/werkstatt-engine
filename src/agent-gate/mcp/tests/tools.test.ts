@@ -1,11 +1,12 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1115: AC-4 tests for buildToolsList — agentGuidance rendered into tool descriptions, RFC-1112 fallback preserved when absent.</purpose>
-<keywords>RFC-1115, MCP, tools/list, agentGuidance, test</keywords>
+<purpose>
+Unit tests for tools covering RFC-1115 AC-4: agentGuidance in tool descriptions.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">guidance composition, sideEffect-none fallback, no-guidance write fallback, knowledge tools.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-1115: replace load-verification shim with behavioral tests.</item>
 </CHANGE_SUMMARY>

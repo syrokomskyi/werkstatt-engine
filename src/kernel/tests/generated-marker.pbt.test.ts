@@ -1,22 +1,21 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>ADR-0019: property-based tests for stripGeneratedMarker — structural
-  invariance across arbitrary HTML/CSS inputs.</purpose>
-  <keywords>ADR-0019, PBT, fast-check, generated-marker, stripGeneratedMarker, tag balance, comment isolation, idempotency</keywords>
-  <responsibilities>
-    <item>Verify tag balance preservation: balanced structural tags in input remain balanced in output.</item>
-    <item>Verify comment isolation: non-marker comments and non-comment content are preserved.</item>
-    <item>Verify idempotency: strip(strip(x)) === strip(x).</item>
-    <item>Verify no content creation: output does not contain HTML tags not present in input.</item>
-  </responsibilities>
+  <purpose>
+Unit tests for generated marker.pbt covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="pbt-generated-marker">Property-based tests for stripGeneratedMarker structural invariance.</entry>
-</MODULE_MAP>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>ADR-0019: initial PBT tests for stripGeneratedMarker — 4 properties.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 import { test, expect } from "vitest";
 import fc from "fast-check";

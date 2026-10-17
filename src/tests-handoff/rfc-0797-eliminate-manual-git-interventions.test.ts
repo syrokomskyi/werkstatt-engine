@@ -5,7 +5,9 @@
     verifies auto-commit dirty workpiece, pre-mirror-check sync, --skip-auto-sync flag,
     and commitCacheCloneIfDirty helper.
   </purpose>
-  <keywords>RFC-0797, mission.close, commitWorkpieceIfDirty, commitCacheCloneIfDirty, skip-auto-sync, sternsystem.sync</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0797: initial tests for auto-commit workpiece, pre-mirror-check sync, --skip-auto-sync flag, and commitCacheCloneIfDirty helper.</item>

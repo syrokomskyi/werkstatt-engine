@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0614: regression tests for bordbuch/ and public/.well-known/bordbuch* delete/modify conflict auto-resolution in mission.reconcile.</purpose>
-<keywords>RFC-0614, RFC-0584, reconcile, bordbuch, conflict, auto-resolution, delete-modify</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0614: add regression tests for bordbuch/ and public/.well-known/bordbuch* conflict auto-resolution.</item>

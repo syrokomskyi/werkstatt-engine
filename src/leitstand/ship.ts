@@ -8,17 +8,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
-
-RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
-
-2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1217: preflight unreconciled-workpiece gate — cache-side `git fetch <workpieceDir> <branch>` + `rev-list HEAD..FETCH_HEAD` blocks ship when the workpiece carries commits the cache clone has not merged (the exact range fetch-and-merge would pull). Open missions only (closed-mission plans skip reconcile, so there is no merge to predict); git-unreadable degrades to a warning; --allow-unreconciled is the manual-merge escape hatch.</item>
   <item>RFC-1219: --resume logs the interrupted failed step (status/failedStep from findIncompleteOperation); formatShipTransition renders op-interrupted as "[ship] interrupted at step — run with --resume" for live followers.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, warpgogol-m000175</history>
   <item>RFC-1297: preflight step 2b — readLiveChannelStates + liveDriftDiagnostics; LIVE-01 aborts the ship with a resolve-first hint, LIVE-02 logs only.</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, warpgogol-m000175</history>
 </CHANGE_SUMMARY>
 */
 

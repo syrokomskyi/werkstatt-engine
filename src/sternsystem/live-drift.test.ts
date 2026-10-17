@@ -4,7 +4,9 @@
 liveDriftDiagnostics. AC-3: live ≠ recorded produces a LIVE-01 error. AC-4:
 unreachable produces a LIVE-02 warning. Channels without lastPropagated are
 skipped.</purpose>
-<keywords>RFC-1297, LIVE-01, LIVE-02, live drift, build-identity</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — AC-3/AC-4 probes.</item>

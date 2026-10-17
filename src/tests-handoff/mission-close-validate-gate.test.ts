@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0593: unit test verifying mission.validate inline gate in mission.close and state re-check inside locks.</purpose>
-<keywords>RFC-0593, mission.close, validation, gate, lock, re-check</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0593: initial test for mission.validate inline gate in mission.close.</item>

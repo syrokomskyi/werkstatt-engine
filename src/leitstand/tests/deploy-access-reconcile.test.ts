@@ -4,7 +4,9 @@
   executeDeployPhases — re-asserts the declared pin on dev/alt channels after a
   successful deploy, skips suspended/unprotected/main, and degrades failures to
   a non-fatal diagnostic on the result.</purpose>
-  <keywords>RFC-1284, accessPin, deploy-execution, reconcile, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1284: initial — deploy-time ACCESS_PIN reconcile coverage (AC-7).</item>

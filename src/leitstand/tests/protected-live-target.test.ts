@@ -7,12 +7,9 @@
     configured dev/alt channel URL, with a ^(dev|alt)[.-] prefix fallback for
     hosts absent from channel config; candidate-preview never qualifies).
   </purpose>
-  <responsibilities>
-    <item>Green: --target channel → true; candidate without --base-url → false.</item>
-    <item>Green: --base-url hostname matching configured dev/alt URL → true.</item>
-    <item>Green: --base-url on unrelated host → false.</item>
-    <item>Green: config unreadable → ^(dev|alt)[.-] fallback decides.</item>
-  </responsibilities>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1284: initial — AC-12 predicate coverage (REVIEW-CODE-2026-10-15-02 F6).</item>

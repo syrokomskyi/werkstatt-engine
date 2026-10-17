@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0635: unit tests for build.check phase in mission.build.</purpose>
-<keywords>RFC-0635, mission.build, build.check, pipeline, test</keywords>
+<purpose>
+Unit tests for mission build check phase covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0635: initial tests for build.check phase addition to mission.build.</item>

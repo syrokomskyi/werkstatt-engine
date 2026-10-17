@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0566: unit tests for deploy commands — atomicity, hash verification, first-deploy, rollback, immutability.</purpose>
-  <keywords>deploy, test, atomic, swap, rollback, verify, gc, immutability</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0566: initial deploy unit tests.</item>

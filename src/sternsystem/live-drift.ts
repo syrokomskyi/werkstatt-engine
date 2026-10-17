@@ -6,7 +6,9 @@ release actually served by each channel's build-identity.json. Owns the factored
 fetch helper (previously private to leitstand-commands.ts), the PIN auth-header
 builder, and the LIVE-01/LIVE-02 diagnostic projection consumed by
 sternsystem.validate, leitstand.ship preflight, and leitstand.rollback.</purpose>
-<keywords>RFC-1297, LIVE-01, LIVE-02, live drift, build-identity, lastPropagated, reconcile</keywords>
+<non-goals>
+  <item>Not a contract source of truth — callers depend on the module's exported API, not this file's internals.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — fetchChannelBuildIdentity/buildAuthHeader moved here from leitstand/deploy-execution.ts + leitstand-commands.ts; readLiveChannelStates + liveDriftDiagnostics added.</item>

@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0522: tests for dirty cache clone guard in mission.reconcile.</purpose>
-<keywords>RFC-0522, reconcile, cache clone, dirty guard, test</keywords>
+<purpose>
+Unit tests for reconcile cache clone guard covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0522: add unit tests for dirty cache clone guard and non-git fallback.</item>

@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>ADR-0030: unit test verifying mission.open throws when commitAndPushBordbuch fails to commit or push.</purpose>
-<keywords>ADR-0030, bordbuch, push, commit, mission.open, guard</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>ADR-0030: initial tests for commit failure and push failure guards in mission.open.</item>

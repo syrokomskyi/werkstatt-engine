@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>Test RFC-0951: mission.open auto-materializes the workpiece and rolls back on failure.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0951: test auto-materialization success and rollback on failure.</item>

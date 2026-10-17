@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0597: unit tests for mission.close writing .materialization-state.json and copying .cache/ to cache clone.</purpose>
-<keywords>RFC-0597, mission.close, materialization state, cache, media cache</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0597: initial tests for state file write and .cache/ copy in mission.close.</item>

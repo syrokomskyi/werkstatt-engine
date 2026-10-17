@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0652: unit tests for mission.close mandatory evidence.sync integration.</purpose>
-  <keywords>RFC-0652, mission.close, evidence.sync, skip-evidence-sync, EVIDENCE_SYNC_FAILED</keywords>
+  <purpose>
+Unit tests for rfc 0652 mission close evidence sync covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0652: initial tests for mandatory evidence sync in mission.close.</item>

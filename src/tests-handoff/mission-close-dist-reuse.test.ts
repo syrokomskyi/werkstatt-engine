@@ -6,7 +6,9 @@
     matches. Confirms the dist-reuse path (RFC-0635) is active during close's
     inline validation — runMissionValidate is called without force: true.
   </purpose>
-  <keywords>RFC-0918, RFC-0635, mission.close, dist-reuse, distribution, build-input-hash, inline validate</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0918: initial integration test for dist-reuse path during mission.close inline validate.</item>

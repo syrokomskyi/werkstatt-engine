@@ -3,6 +3,9 @@
 <purpose>RFC-1307 tests for sternsystem.register --intake: preconditions before
 any write (AC-1, AC-2, AC-5), the deterministic seed planner (AC-3, AC-4, AC-6,
 AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1307: created.</item>

@@ -11,28 +11,21 @@ import {
 /*
 <MODULE_CONTRACT>
 <purpose>
-  RFC-0336: unit tests for buildGeneratedHeader() and the extended
-  stripGeneratedMarker() advisory-block round trip, across the four comment
-  styles generators use (.ts line-slash, .txt line-hash, .md block-html,
-  .css block-css).
+Unit tests for generated marker covering its documented public contract and regression-sensitive edge cases.
 </purpose>
-<keywords>RFC-0336, generated marker, advisory header, strip, round-trip</keywords>
-<responsibilities>
-  <item>Assert buildGeneratedHeader() picks the right comment syntax per extension.</item>
-  <item>Assert stripGeneratedMarker() removes the full block and reports changed: true.</item>
-  <item>Assert hasGeneratedMarker() still detects the block via the plain marker substring.</item>
-</responsibilities>
 <non-goals>
   <item>Do not test individual generator call sites — see each generator's own test file.</item>
 </non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="round-trip tests">One per comment style plus a legacy single-line compatibility check.</entry>
-</MODULE_MAP>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-0336: initial implementation.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 test("buildGeneratedHeader: .ts uses line-slash comments", () => {
   const header = buildGeneratedHeader({

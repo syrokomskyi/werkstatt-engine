@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0479: PBT test for the rfc-0479 bootstrapping migrator — verifies
 idempotency (f(f(x)) == f(x)) over the pin cursor transformation.</purpose>
-<keywords>RFC-0479, migrator, pbt, idempotency, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0479: initial PBT test for bootstrapping migrator.</item>

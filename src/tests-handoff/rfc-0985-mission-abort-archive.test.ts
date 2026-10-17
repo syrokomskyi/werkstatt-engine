@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0985: unit tests for mission.abort archival (Measure 1) and cache clone state commit (Measure 3).</purpose>
-  <keywords>RFC-0985, mission.abort, archive, cache clone, system-state</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0985: initial tests for abort archival and cache clone state commit.</item>

@@ -3,6 +3,9 @@
 <purpose>RFC-0968/RFC-1124: tests for sternsystem.handover.complete — dry-run
 shim plus the RFC-1124 Worker-unreachable path (handover completes, journaled
 retry entry written).</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1124: AC-3/AC-7 coverage — Worker unreachable completes handover with journaled retry.</item>

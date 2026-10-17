@@ -7,7 +7,9 @@
     non-numeric pass/fail), bundle construction, and ingest delegation.
     Uses synthetic LHR fixtures — no real Lighthouse runs.
   </purpose>
-  <keywords>RFC-0874, nachweis, lighthouse, measure, unit-test, LHR, aggregation, median</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0874: initial tests for nachweis.measure.lighthouse command handler.</item>

@@ -2,6 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0508: PBT test for the rfc-0508 migrator — verifies idempotency
 (f(f(x)) == f(x)) and that Participant fields are correctly added to Person records.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0508: initial PBT test for rfc-0508 migrator idempotency and field addition.</item>

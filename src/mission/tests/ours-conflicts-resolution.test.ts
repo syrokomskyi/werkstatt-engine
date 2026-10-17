@@ -8,6 +8,9 @@
     tracked from the workpiece side, DU conflict — the case that failed real
     reconciles with "pathspec did not match" before the fix).
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>warpgogol-m000196: initial tests — real temp git repos, DU absent-in-HEAD and UU present-in-HEAD scenarios.</item>

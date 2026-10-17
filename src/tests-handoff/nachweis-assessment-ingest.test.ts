@@ -6,7 +6,9 @@
     observation conflict, credential detection, system mismatch, R2 upload, PBP write,
     Bordbuch append, and JSON output.
   </purpose>
-  <keywords>RFC-0873, nachweis, assessment, ingest, unit-test, idempotency, path-traversal, credentials</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0873: initial tests for nachweis.assessment.ingest command handler.</item>

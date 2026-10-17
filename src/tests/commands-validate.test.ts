@@ -4,7 +4,6 @@
 RFC-0903: Unit tests for werkstatt.commands.validate static analysis.
 Covers CMD-OUTPUT-01/02/03 rules, helper-exempt returns, and --mode flag.
 </purpose>
-<keywords>test, commands-validate, RFC-0903, DNA-82</keywords>
 <non-goals>
   <item>Does not test against the real codebase — uses synthetic test fixtures.</item>
 </non-goals>

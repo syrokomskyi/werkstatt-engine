@@ -1,16 +1,15 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0347: property-based tests for semver comparison invariants.</purpose>
-  <keywords>RFC-0347, PBT, fast-check, semver, property-based testing</keywords>
-  <responsibilities>
-    <item>Verify antisymmetry: compare(a,b) === -compare(b,a).</item>
-    <item>Verify reflexivity: compare(a,a) === 0.</item>
-    <item>Verify transitivity: a < b && b < c => a < c.</item>
-    <item>Verify idempotent parse round-trip.</item>
-  </responsibilities>
+  <purpose>
+Unit tests for semverpbt — semver.pbt covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="pbt-semver">Property-based tests for compareSemver + parseSemver.</entry></MODULE_MAP>
-<CHANGE_SUMMARY><item>RFC-0347: initial PBT illustrative example for semver invariants.</item></CHANGE_SUMMARY>
+<CHANGE_SUMMARY>
+  <item>RFC-0347: initial PBT illustrative example for semver invariants.</item>
+</CHANGE_SUMMARY>
 */
 
 import { test, expect } from "vitest";

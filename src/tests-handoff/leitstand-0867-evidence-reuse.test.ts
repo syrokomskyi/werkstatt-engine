@@ -1,11 +1,15 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0867: test evidence reuse by artifact hash in leitstand.certify.</purpose>
-  <keywords>RFC-0867, leitstand, certify, evidence, cache, reuse, test</keywords>
+  <purpose>
+Unit tests for leitstand 0867 evidence reuse covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0867: initial tests for evidence reuse — same hash, different hash, --force, stale, missing sidecar.</item>
-  <item>Contract test: real evidence envelopes from runLeitstandCertify must pass evidenceEnvelopeV1Schema.safeParse — catches ID format mismatches that silently break reuse.</item>
+  <item>RFC-1311: carried legacy entry — Contract test: real evidence envelopes from runLeitstandCertify must pass evidenceEnvelopeV1Schema.safeParse — catches ID format mismatches that silently break reuse.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1295</item>
 </CHANGE_SUMMARY>

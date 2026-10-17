@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0866: leitstand.propagate resolves gate decision at conventional path by default; fails when file not found.</purpose>
-  <keywords>RFC-0866, leitstand, propagate, gate-decision, conventional path, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0865: update propagate test to assert --gate-decision requirement.</item>

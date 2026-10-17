@@ -1,3 +1,17 @@
+/*
+<MODULE_CONTRACT>
+<purpose>
+Unit tests for certification foundation.integration covering CERT-INTEGRATION-01: values snapshotted by RFC-0849; CERT-INTEGRATION-02: identity digests match canonical hash; CERT-INTEGRATION-03: evaluation cut excludes future authority.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
+</MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the certification suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
+*/
+
 import { describe, it, expect } from "vitest";
 import {
   snapshotCanonicalJsonObjectV1,

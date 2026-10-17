@@ -3,7 +3,9 @@
 <purpose>RFC-0500: snapshot test for the ratgeber topics→articles migrator —
 verifies that topics are moved to articles, sections are converted to prose,
 frontmatter fields are renamed, and FAQ-only entries are removed.</purpose>
-<keywords>RFC-0500, migrator, snapshot, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0500: initial snapshot test for topics→articles migrator.</item>

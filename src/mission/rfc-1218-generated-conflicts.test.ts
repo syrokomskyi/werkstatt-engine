@@ -6,7 +6,9 @@
     authored paths still abort, and every auto-resolved path is recorded in the
     merge commit body and the mission-reconcile bordbuch metadata.
   </purpose>
-  <keywords>RFC-1218, mission.reconcile, merge conflicts, generated paths, autoResolvedPaths</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1218: initial tests for generated-path auto-resolution.</item>

@@ -7,7 +7,9 @@
     remote ref must push directly, and true divergence must integrate via
     rebase --rebase-merges so merge-commit topology is preserved.
   </purpose>
-  <keywords>bordbuch, commitAndPushBordbuch, rebase, merge-topology, divergence</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>Initial: RFC-1223 push-topology regression suite (ancestor/missing/diverged/conflict fixtures).</item>

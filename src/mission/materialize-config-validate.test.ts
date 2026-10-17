@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0840: Unit tests for materialize.config.validate command handler.</purpose>
-  <keywords>RFC-0840, materialize-config-validate, MAT-CONFIG-01, MAT-CONFIG-02, test</keywords>
+  <purpose>
+Unit tests for materialize config validate covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0840: initial unit tests for runMaterializeConfigValidate.</item>

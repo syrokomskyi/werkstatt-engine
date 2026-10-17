@@ -2,6 +2,9 @@
 <MODULE_CONTRACT>
   <purpose>Test RFC-0954: rescueWorkpieceEdits preserves uncommitted and unpushed
   workpiece edits before re-materialization overwrites the workpiece directory.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0954: test rescue of dirty workpiece, new commits, no-op cases, merge failure backup, and bordbuch evidence fallback.</item>

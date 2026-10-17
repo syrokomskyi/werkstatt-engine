@@ -2,6 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0502: snapshot test for the rfc-0502 migrator — verifies the
 author record file content matches the expected snapshot on a clean run.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0502: initial snapshot test for rfc-0502 migrator.</item>

@@ -2,9 +2,12 @@
 <MODULE_CONTRACT>
 <purpose>RFC-1035: unit tests for IsolationManager and CapabilityBridge.
   Covers AC-1 through AC-11 plus edge cases (ISOLATION-06, 07, 08).</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-<item>RFC-1035: initial test suite for isolation manager and capability bridge.</item>
+  <item>RFC-1035: initial test suite for isolation manager and capability bridge.</item>
 </CHANGE_SUMMARY>
 */
 

@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0840: Unit tests for operator config file persistence and restoration.</purpose>
-  <keywords>RFC-0840, operator-config-files, persist, restore, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0840: initial unit tests for persistOperatorConfigFiles and restoreOperatorConfigFiles.</item>

@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0866: leitstand.certify produces GateDecisionV1 JSON via certification orchestration.</purpose>
-  <keywords>RFC-0866, leitstand, certify, gate-decision, certification, test</keywords>
+  <purpose>
+Unit tests for leitstand 0866 certify covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0866: initial test for leitstand.certify command flag validation.</item>

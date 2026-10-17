@@ -3,6 +3,9 @@
 <purpose>RFC-0504: PBT test for the rfc-0504 migrator — verifies idempotency
 (f(f(x)) == f(x)) by running the migrator twice and checking the result is
 identical.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0504: initial PBT test for rfc-0504 migrator idempotency.</item>

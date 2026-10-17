@@ -2,7 +2,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0972: unit tests for CLI-level --json exit code policy. Verifies that process.exitCode is 0 when --json is passed, regardless of command/pipeline success or failure.</purpose>
-<keywords>RFC-0972, CLI, exit code, --json, outputFormat</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0972: initial tests — command/pipeline paths, json/pretty modes, success/failure.</item>

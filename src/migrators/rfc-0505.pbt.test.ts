@@ -3,6 +3,9 @@
 <purpose>RFC-0505: PBT test for the rfc-0505 migrator — verifies idempotency
 (f(f(x)) == f(x)) by running the migrator twice and checking the result is
 identical. Also verifies sidecar-to-claim-record transformation and sidecar deletion.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0505: initial PBT test for rfc-0505 migrator idempotency.</item>

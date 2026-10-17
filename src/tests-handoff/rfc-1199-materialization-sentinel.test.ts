@@ -4,7 +4,9 @@
   refuses raw commits during the window, setup-staging writes the sentinel into
   the cloned .git, git-init-commit deletes it after the baseline commit and is
   idempotent on resume.</purpose>
-  <keywords>RFC-1199, materialization, sentinel, commit, guard, hook, race</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1199: initial tests — hook refuse/allow during sentinel window, setup-staging sentinel write, git-init-commit sentinel delete + idempotent resume skip.</item>

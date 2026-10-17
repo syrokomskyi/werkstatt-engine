@@ -11,13 +11,12 @@ RFC-0751: findServiceEntry helper (preserved, reads from services/registry.yaml)
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1159: step 3 — io.exec exit-code sweep via execOrThrow</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1284: default system state gains accessPinSuspended: null — the durable suspension marker read/written via the non-smart cache-clone store (Q-6)</item>
   <item>REVIEW-CODE-2026-10-16-08 N6: writeSystemState threads the caller's WorkspaceIO through its internal git add/commit/push instead of falling back to the ambient adapter, and reports push failures through an injected warn channel.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>REVIEW-CODE-2026-10-16-09 N11: writeSystemState pushes via array-args execOrThrow — the remote-derived branch name never reaches a shell-interpolated command string.</item>
-  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966, RFC-0967, RFC-0981, RFC-1097, RFC-1149</history>
+  <history>ADR-0040, RFC-0354, RFC-0574, RFC-0751, RFC-0790, RFC-0794, RFC-0966, RFC-0967, RFC-0981, RFC-1097, RFC-1149, RFC-1159</history>
 </CHANGE_SUMMARY>
 */
 

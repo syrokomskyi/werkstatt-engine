@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
 <purpose>RFC-0488: snapshot test for the material credits provenance registry migrator —
 verifies transformation on representative credit sidecar fixtures.</purpose>
-<keywords>RFC-0488, migrator, snapshot, test, material-credits</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0488: initial snapshot test for material credits migrator.</item>

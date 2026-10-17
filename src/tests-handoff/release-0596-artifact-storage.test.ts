@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0596: tests for storeArtifactCore extraction, automatic artifact storage in release.ready, and release.validate artifact check.</purpose>
-<keywords>RFC-0596, storeArtifactCore, release.ready, artifact storage, release.validate, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0596: add unit tests for storeArtifactCore (lock-free, idempotent, systemId), release.ready artifact-before-transition, and release.validate ready-artifact check.</item>

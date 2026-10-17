@@ -1,3 +1,17 @@
+/*
+<MODULE_CONTRACT>
+<purpose>
+Unit tests for boot smoke integration covering runBootSmoke integration (ADR-0067).
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
+</MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the boot suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
+*/
+
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { runBootSmoke, planBootSmokeRequests } from "../boot-smoke.ts";

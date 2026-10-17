@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0852: Core strict/bounds/locator/redaction/canonical-data fixtures for the engine-owned Diagnostic schema.</purpose>
+<purpose>
+Unit tests for diagnostic schema covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0852: initial test suite covering positive, negative, boundary, locator, redaction, and canonical-data cases.</item>

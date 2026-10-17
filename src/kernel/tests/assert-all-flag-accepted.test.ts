@@ -9,7 +9,14 @@ import type { KernelCommandDefinition } from "@warpgogol/werkstatt-shared/kernel
     (covers false and undefined), allows --all when acceptsAllFlag is true, and is inactive
     when allSites is false (RFC-0842).
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-0842: initial unit test for the --all guard in executeKernelCommand.</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
@@ -20,6 +27,7 @@ assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 function makeCmd(acceptsAllFlag?: boolean): KernelCommandDefinition {
   return {

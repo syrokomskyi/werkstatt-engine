@@ -1,11 +1,12 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0290: the conformance corpus — golden request/response pairs replayed through createAgentGate with fake ports. Fixtures were written from the pinned MCP spec before the handler; the handler must satisfy them. RFC-1113: the corpus speaks the 2026-07-28 stateless era — every request carries _meta["io.modelcontextprotocol/protocolVersion"].</purpose>
-<keywords>RFC-0290, RFC-0291, RFC-1113, agent surface, gate, MCP, conformance, test</keywords>
+<purpose>
+Unit tests for gate covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">server/discover, initialize rejection, per-request version gate, header consistency, ping, tools/list, tools/call (knowledge+action+errors), resources/*, method-not-found, batch rejection, GET 405, HTTP action route, rate limiting (429), identity passthrough, freshness _meta, MCP size cap.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-0290: initial conformance corpus.</item>
   <item>RFC-0291: add rate limiting, identity, freshness, MCP size cap tests.</item>

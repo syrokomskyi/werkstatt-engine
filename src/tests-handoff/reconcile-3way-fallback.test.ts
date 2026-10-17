@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0522: tests for git am --3way fallback logic in mission.reconcile patch loop.</purpose>
-<keywords>RFC-0522, reconcile, 3way, git am, fallback, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0522: add unit tests for 3-way fallback and both-fail error.</item>

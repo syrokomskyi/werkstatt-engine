@@ -4,7 +4,9 @@
     RFC-0655: unit tests for release.state.validate — tests all five consistency
     checks with pass/fail scenarios plus edge cases.
   </purpose>
-  <keywords>RFC-0655, release.state.validate, consistency, validator</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0655: initial release.state.validate tests covering all five checks and edge cases.</item>

@@ -3,7 +3,9 @@
 <purpose>RFC-1297: leitstand.state.reconcile handler — writes lastPropagated
 with state "reconciled" and a live-state-reconciled Bordbuch event when live ≠
 recorded; exits 1 when the live identity is unreachable.</purpose>
-<keywords>RFC-1297, leitstand.state.reconcile, live-state-reconciled</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — handler test.</item>

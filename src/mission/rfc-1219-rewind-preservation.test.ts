@@ -7,7 +7,9 @@
     mid-run ship journal was committed by auto-commit-cache-clone, then wiped
     by the rewind, leaving an orphan step-failed and no resumable op.
   </purpose>
-  <keywords>RFC-1219, mission.reconcile, journal, reset --hard, operations, resume</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1219: initial test — journal preservation across pre-reconcile rewind.</item>

@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>Unit tests for sternsystem.register — RFC-1125 identity + signing-key preflight (AC-3): register blocks before any file ops when werkstatt.identity.json or the signing key is missing.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1125: preflight tests — missing identity, missing key, and combined-missing cases all throw with an identity.bootstrap fixHint.</item>

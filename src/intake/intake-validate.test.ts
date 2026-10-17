@@ -9,6 +9,7 @@ INTAKE-11 warning-only contract (status stays pass).</purpose>
 <non-goals>
   <item>Do not test the kernel flag plumbing — handler-level usage checks are covered by the module declaration and manual probes.</item>
 </non-goals>
+</MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1281: created — one describe per INTAKE rule + committed-fixture pass test.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>

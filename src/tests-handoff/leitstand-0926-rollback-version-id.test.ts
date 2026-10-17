@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0926: Test Worker Version ID parsing, release-to-version-ID lookup, and default previous-release rollback behavior.</purpose>
-  <keywords>RFC-0926, leitstand, rollback, worker-version-id, to-release, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0926: initial tests for extractWorkerVersionId, resolveRollbackVersionId, and runWranglerRollback with versionId.</item>

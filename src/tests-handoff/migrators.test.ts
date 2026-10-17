@@ -1,34 +1,19 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0479: tests for the RFC-id-keyed migrator registry — selection, ordering, and id parsing.</purpose>
-<keywords>RFC-0479, migrator, registry, test</keywords>
+<purpose>
+Unit tests for migrators covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">migratorsToApply filtering + numericRfcId parsing.</entry></MODULE_MAP>
 <CHANGE_SUMMARY>
-  <item>RFC-0221: initial migrator-registry tests.</item>
-  <item>RFC-0479: rewritten for new RFC-id-keyed registry.</item>
-  <item>RFC-0481: updated counts for rfc-0481 migrator registration.</item>
-  <item>RFC-0483: updated counts for rfc-0483 migrator registration.</item>
-  <item>RFC-0488: updated counts for rfc-0488 migrator registration.</item>
-  <item>RFC-0492: updated counts for rfc-0492 migrator registration.</item>
-  <item>RFC-0495: updated counts for rfc-0495 migrator registration.</item>
-  <item>RFC-0496: updated counts for rfc-0496 migrator registration.</item>
-  <item>RFC-0497: updated counts for rfc-0497 migrator registration.</item>
-  <item>RFC-0498: updated counts for rfc-0498 migrator registration.</item>
-  <item>RFC-0500: updated counts for rfc-0500 migrator registration.</item>
-  <item>RFC-0501: updated counts for rfc-0501 migrator registration.</item>
-  <item>RFC-0502: updated counts for rfc-0502 migrator registration.</item>
-  <item>RFC-0504: updated counts for rfc-0504 migrator registration.</item>
-  <item>RFC-0505: updated counts for rfc-0505 migrator registration.</item>
-  <item>RFC-0506: updated counts for rfc-0506 migrator registration.</item>
-  <item>RFC-0508: updated counts for rfc-0508 migrator registration.</item>
-  <item>RFC-0512: updated counts for rfc-0512 migrator registration.</item>
-  <item>RFC-0514: updated counts for rfc-0514 migrator registration.</item>
   <item>RFC-0529: updated counts for rfc-0529 migrator registration.</item>
   <item>RFC-0548: updated counts for rfc-0548 migrator registration.</item>
   <item>RFC-0572: updated counts for rfc-0572 migrator registration.</item>
   <item>RFC-0757: updated counts for rfc-0757 migrator registration.</item>
   <item>RFC-0885: updated counts for rfc-0885 migrator registration.</item>
+  <history>RFC-0221, RFC-0479, RFC-0481, RFC-0483, RFC-0488, RFC-0492, RFC-0495, RFC-0496, RFC-0497, RFC-0498, RFC-0500, RFC-0501, RFC-0502, RFC-0504, RFC-0505, RFC-0506, RFC-0508, RFC-0512, RFC-0514</history>
 </CHANGE_SUMMARY>
 */
 

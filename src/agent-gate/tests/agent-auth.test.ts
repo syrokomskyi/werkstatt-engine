@@ -1,11 +1,12 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1187: authorization-server core tests — EdDSA JWT primitives, challenge/register/token handlers, protected-route Bearer gate, elevated-tier pipeline behavior, anonymous fallback on registry outage.</purpose>
-<keywords>RFC-1187, agent surface, gate, oauth, registration, jwt, test</keywords>
+<purpose>
+Unit tests for agent auth covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP>
-  <entry key="tests">jwt roundtrip + rejections, challenge/register flows, token issuance + TTL, 401 + WWW-Authenticate, whoami/rotate, elevated limits + verifiedAgentId, redis-outage anonymous fallback.</entry>
-</MODULE_MAP>
 <CHANGE_SUMMARY>
   <item>RFC-1187: initial agent-auth tests.</item>
   <item>RFC-1187: phases 1-3 — contracts, Redis registry, AS core + Bearer pipeline</item>

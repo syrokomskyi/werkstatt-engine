@@ -2,7 +2,9 @@
 <MODULE_CONTRACT>
   <purpose>RFC-0497: snapshot test for the no-op migrator — verifies that
   applying the migrator to a representative workpiece leaves all files unchanged.</purpose>
-  <keywords>RFC-0497, migrator, snapshot, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0497: initial snapshot test for no-op migrator.</item>

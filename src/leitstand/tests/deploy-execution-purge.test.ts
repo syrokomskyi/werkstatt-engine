@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-1092: Tests for adapter-aware purge step in executeDeployPhases.</purpose>
-  <keywords>RFC-1092, purge, adapter, deploy-execution</keywords>
+  <purpose>
+Unit tests for deploy execution purge covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1092: initial tests for purgeCapable() adapter interface and pipeline behavior.</item>

@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0796: unit tests for stale symlink and archive/ filtering in deriveNextMissionNumberSafe and mission.cleanup --older-than.</purpose>
-  <keywords>RFC-0796, stale symlink, archive, deriveNextMissionNumberSafe, mission.cleanup</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0796: initial tests for stale symlink guards in mission number derivation and cleanup.</item>

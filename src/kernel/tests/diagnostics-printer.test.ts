@@ -5,16 +5,19 @@
     Exercises all four precedence shapes (diagnostics / violations / findings
     / details), the 50-line cap, and the empty/missing fallback paths.
   </purpose>
-  <responsibilities>
-    <item>Pin the precedence order so a future refactor cannot silently swap it.</item>
-    <item>Pin the indent prefix shape that the logger consumes.</item>
-    <item>Pin the 50-line cap and the truncation footer.</item>
-  </responsibilities>
   <non-goals>
     <item>Do not assert on logger console output here — that is logger.ts territory.</item>
   </non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the diagnostics suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 import { test, expect } from "vitest";
 import { formatFailureDiagnostics } from "../runtime.ts";

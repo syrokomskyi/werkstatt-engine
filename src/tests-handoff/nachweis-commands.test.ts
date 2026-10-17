@@ -4,7 +4,9 @@
     Unit tests for nachweis command handlers (RFC-0707, RFC-0714, RFC-0715).
     Tests cover entitlement skip, dry-run, validation, manifest generation, consent update, publish gate, withdraw, resolveDefaultLang error paths, and consent c.id fallback matching.
   </purpose>
-  <keywords>RFC-0707, RFC-0714, RFC-0715, nachweis, unit-test, entitlement, dry-run, gate, consent, resolveDefaultLang</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0707: initial nachweis unit tests.</item>

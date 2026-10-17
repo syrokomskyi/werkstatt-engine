@@ -5,6 +5,9 @@ RFC-1210: unit tests for remediation.signal.ingest — trust boundary (SIG-02),
 routing (auto-mission / action-pack / suppressed-autonomy-off / deduped /
 rate-capped), and dedup ledger behavior.
   </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1210: initial tests — all ingest routes against a tmp workspace fixture with injected openMission.</item>

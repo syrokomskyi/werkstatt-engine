@@ -10,7 +10,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0903: initial implementation of werkstatt.commands.validate static analysis.</item>
   <item>ADR-0105: detector gap fix — isHandlerFile missed self-describing KernelCommandDefinition
         files whose type imports span multiple lines; FILE_DETECTION_PATTERNS now includes
         KernelCommandDefinition and the import regex uses [^;]* to cross newlines.</item>
@@ -22,6 +21,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1304: shared fail-loud scan — CMDGEN-05 forbidden-codepoint sweep on raw source, CMDGEN-04 per-definition suspect pairing over the site-src corpus via werkstatt-shared/kernel/command-source-scan.ts (line-anchored comment-aware pragma), CMD-SCAN-01 warnings on unreadable dirs/files and an error on a zero-file corpus; io is injectable for coverage-failure tests.</item>
+  <history>RFC-0903</history>
 </CHANGE_SUMMARY>
 */
 

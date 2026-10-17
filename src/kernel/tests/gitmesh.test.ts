@@ -1,16 +1,21 @@
 /*
 <MODULE_CONTRACT>
 <purpose>
-RFC-0563: Unit tests for the git-mesh subsystem. Tests config validation,
-auto-creation, convergence algorithm selection, non-fast-forward detection,
-lock acquisition, status behind/ahead counting, and verify signature counting.
-All tests use mocks — no real git operations.
+Unit tests for gitmesh covering its documented public contract and regression-sensitive edge cases.
 </purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
 <CHANGE_SUMMARY>
   <item>RFC-0563: initial implementation — unit tests for gitmesh config, sync, status, verify.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 import { test, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";

@@ -20,7 +20,6 @@ single source of truth for its documentation, IO, and pipeline membership.
   <item>Deduplication is fail-closed (CMD-MAN-04): same-name commands across providers merge only when semantic fields agree.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1147: static command surface — providers[]/siteScope schema, fail-closed CMD-MAN-04 dedup, runtimeState removed.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -30,7 +29,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
   <item>RFC-1306 review-r1: manifest write migrated ambient writeFileAtomic to context.io via writeFileIfChanged — dry-run/readonly interception + honest filesModified.</item>
-  <history>RFC-0266</history>
+  <history>CMD-MAN-04, RFC-0266, RFC-1147</history>
 </CHANGE_SUMMARY>
 */
 

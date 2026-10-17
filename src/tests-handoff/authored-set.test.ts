@@ -1,11 +1,15 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0221: tests for the Compass-complete partition's generated-public-artifact matcher
-(sitemap/robots/feed/llms/ai/pseo outputs that lack the RFC-0081 marker).</purpose>
-<keywords>RFC-0221, authored partition, generated public, test</keywords>
+<purpose>
+Unit tests for authored set covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">isGeneratedPublicArtifact include/exclude cases.</entry></MODULE_MAP>
-<CHANGE_SUMMARY><item>RFC-0221: cover generator public outputs missed by marker detection.</item></CHANGE_SUMMARY>
+<CHANGE_SUMMARY>
+  <item>RFC-0221: cover generator public outputs missed by marker detection.</item>
+</CHANGE_SUMMARY>
 */
 
 import { test, expect } from "vitest";

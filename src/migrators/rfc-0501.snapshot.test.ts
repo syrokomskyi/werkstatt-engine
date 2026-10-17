@@ -3,7 +3,9 @@
   <purpose>RFC-0501: snapshot test for the article status review migrator — verifies
   that applying the migrator to a representative workpiece sets published articles to
   review-required while leaving draft articles unchanged.</purpose>
-  <keywords>RFC-0501, migrator, snapshot, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0501: initial snapshot test for article status review migrator.</item>

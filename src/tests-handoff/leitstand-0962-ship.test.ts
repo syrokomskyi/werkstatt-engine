@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0962: leitstand.ship composite command handler tests — success, failure, resume, --until boundaries, self-healing.</purpose>
-  <keywords>RFC-0962, leitstand, ship, composite, test, resume, journal</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0962 fo-fix: added --until alt, --until main, invalid --until, releaseId restoration on resume tests; fixed resume test for stepResults including skipped steps.</item>

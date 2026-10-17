@@ -13,6 +13,7 @@
   <item>RFC-1309: new batch runner — manifest loading (run/argv entry forms), per-entry flag override through consumeCommonFlags, stop-on-fail, aggregate exit codes, JSON payload per RFC-0972.</item>
 </CHANGE_SUMMARY>
 */
+// @ai-invariant batch entries execute strictly sequentially — the shared registry cache assumes serial command execution
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";

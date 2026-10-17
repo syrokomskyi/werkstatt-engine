@@ -1,6 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0870: Unit tests for STERN-MANIFEST-01 check in sternsystem.validate.</purpose>
+<purpose>
+Unit tests for manifest presence covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0870: initial unit tests for manifest presence check.</item>

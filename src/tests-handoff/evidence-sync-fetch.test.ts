@@ -4,7 +4,9 @@
     RFC-0651: unit tests for evidence.sync and evidence.fetch command handlers.
     Tests cover dry-run, missing env, invalid evidence, upload, download, list, and --no-raw.
   </purpose>
-  <keywords>RFC-0651, evidence.sync, evidence.fetch, r2, unit-test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial evidence sync and fetch unit tests.</item>

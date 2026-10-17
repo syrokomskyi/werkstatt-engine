@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0608: tests for build-identity.json written by release.prepare into dist/client/.well-known/.</purpose>
-  <keywords>RFC-0608, build-identity, release.prepare, test</keywords>
+  <purpose>
+Unit tests for release 0608 build identity covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0608: add tests verifying build-identity.json structure matches buildIdentitySchema.</item>

@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0927: leitstand.hotfix.dev-deploy composite command handler tests — phase skipping, fallback, failure modes.</purpose>
-  <keywords>RFC-0927, leitstand, hotfix, dev-deploy, composite, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0927: initial test suite for hotfix composite command.</item>

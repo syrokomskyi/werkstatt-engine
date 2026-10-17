@@ -4,7 +4,9 @@
     RFC-0651: optional integration test for evidence.sync and evidence.fetch against a real R2 bucket.
     Skips automatically when R2_AXIOM_ACCOUNT_ID is not set in the environment.
   </purpose>
-  <keywords>RFC-0651, evidence, integration, r2</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0651: initial integration test — skips when R2 credentials are absent.</item>

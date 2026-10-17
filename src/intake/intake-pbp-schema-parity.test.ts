@@ -4,7 +4,13 @@
 verdict from the canonical pbpSchemaById Zod schema and from the exported
 werkstatt:intake/v1 JSON Schema $defs (Ajv draft 2020-12), so external
 producers can validate pbp[] entities without the werkstatt checkout.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the intake suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
 */
 
 import Ajv2020 from "ajv/dist/2020.js";

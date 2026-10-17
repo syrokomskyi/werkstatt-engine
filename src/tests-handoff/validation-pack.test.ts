@@ -1,10 +1,13 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-0221: tests for the golden validation-pack diff — route/sitemap/llms/score drift.</purpose>
-<keywords>RFC-0221, validation pack, diff, golden, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
-<MODULE_MAP><entry key="tests">diffValidationPacks clean + each drift dimension.</entry></MODULE_MAP>
-<CHANGE_SUMMARY><item>RFC-0221: initial validation-pack diff tests.</item></CHANGE_SUMMARY>
+<CHANGE_SUMMARY>
+  <item>RFC-0221: initial validation-pack diff tests.</item>
+</CHANGE_SUMMARY>
 */
 
 import { test, expect } from "vitest";

@@ -1,7 +1,11 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-0913: unit tests for reconcile-freshness gate in mission.close.</purpose>
-<keywords>RFC-0913, mission.close, reconcile-freshness, skip-reconcile-check, workpieceHeadAtReconcile</keywords>
+<purpose>
+Unit tests for mission freshness gate covering its documented public contract and regression-sensitive edge cases.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0913: initial tests for reconcile-freshness gate — blocks on mismatch, passes on match, fails closed on missing report, escape hatch works.</item>

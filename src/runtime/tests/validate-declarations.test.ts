@@ -1,3 +1,17 @@
+/*
+<MODULE_CONTRACT>
+<purpose>
+Unit tests for validate declarations covering RFC-1173: collectDeclarationDiagnostics — MUTATES-STATE-DECLARED; RFC-1173: collectDeclarationDiagnostics — MUTATES-STATE-WRITES-MISMATCH.
+</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
+</MODULE_CONTRACT>
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the validate suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
+*/
+
 import "./load-verification.test.ts";
 
 import { describe, expect, it, vi } from "vitest";

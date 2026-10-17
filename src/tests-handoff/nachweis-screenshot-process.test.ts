@@ -1,7 +1,8 @@
 /*
 <MODULE_CONTRACT>
-<purpose>Unit tests for RFC-0891 — nachweis.screenshot.process command handler.</purpose>
-<keywords>RFC-0891, nachweis, screenshot, process, unit-test, crop, webp</keywords>
+<purpose>
+Unit tests for nachweis screenshot process covering RFC-0891: nachweis.screenshot.process; RFC-0891: resolveNachweisScreenshotDisplayR2Path.
+</purpose>
 <non-goals>
   <item>Does not test sharp image processing — sharp is mocked.</item>
   <item>Does not test R2 network calls — R2 client is mocked.</item>

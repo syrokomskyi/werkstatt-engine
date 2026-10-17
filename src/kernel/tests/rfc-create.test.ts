@@ -18,14 +18,19 @@ import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel";
     lowercase `id: rfc-NNNN` and `# rfc-NNNN:` heading, tripping V-01 (id format)
     and V-15 (title/heading mismatch) on every new file.
   </purpose>
-  <responsibilities>
-    <item>Copy the real RFC templates into a temp workspace and run runRfcCreate.</item>
-    <item>Assert the emitted id/heading use the uppercase RFC-NNNN form.</item>
-    <item>Assert the filename slug stays lowercase rfc-NNNN-&lt;kebab&gt;.md.</item>
-    <item>Assert runRfcValidate reports zero violations for the new file.</item>
-  </responsibilities>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
+<KEY_DECISIONS>
+  <item>Fixtures stay inline and minimal so each case states its own setup.</item>
+</KEY_DECISIONS>
+
+<CHANGE_SUMMARY>
+  <item>RFC-1311: Compass header sweep — declares the rfc suite's contract for test-file scaffold coverage.</item>
+</CHANGE_SUMMARY>
 */
+// @ai-invariant fixtures must not couple to internals beyond the public surface under test
 
 const noopLogger: KernelLogger = {
   section() {},

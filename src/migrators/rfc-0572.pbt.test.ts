@@ -3,7 +3,9 @@
   <purpose>RFC-0572: PBT test for the contact form revert migrator —
   verifies idempotency (f(f(x)) == f(x)) over arbitrary SternsystemData with
   send-message page blocks.</purpose>
-  <keywords>RFC-0572, migrator, pbt, idempotency, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0572: initial PBT test for contact form revert migrator.</item>

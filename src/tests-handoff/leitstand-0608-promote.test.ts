@@ -1,7 +1,9 @@
 /*
 <MODULE_CONTRACT>
   <purpose>RFC-0866: leitstand.promote resolves gate decision and main-verification-decision at conventional paths by default.</purpose>
-  <keywords>RFC-0866, leitstand, promote, gate-decision, conventional path, main-verification, test</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0865: update promote test to assert --gate-decision and --main-verification-decision requirement.</item>

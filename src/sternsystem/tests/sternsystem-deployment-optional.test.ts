@@ -1,6 +1,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>Unit tests for deployment-optional Sternsystem semantics (RFC-1125) — a system without deployment.channels validates clean and leitstand commands degrade gracefully instead of crashing.</purpose>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1125: deployment-optional tests — validate emits no deployment violations without deployment config; leitstand.health returns state "unknown" rather than throwing.</item>

@@ -2,7 +2,9 @@
 /*
 <MODULE_CONTRACT>
 <purpose>RFC-1256: unit tests for mission.deploy-preflight command handler — aggregated step dispatch against a mission workpiece, per-step status aggregation, RFC-1157 site-module fallback, unavailable commands, workpiece context targeting.</purpose>
-<keywords>RFC-1256, mission.deploy-preflight, deploy-preflight, aggregated probe, workpiece</keywords>
+<non-goals>
+  <item>Not a contract source of truth — the module under test owns the authoritative behavior; fixtures are minimal scaffolding only.</item>
+</non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1256: initial tests — all-pass, failing-step aggregation, unavailable commands, site-module fallback, missing --mission, missing workpiece, workpiece context, warning-only pass.</item>
