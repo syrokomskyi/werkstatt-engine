@@ -9,6 +9,7 @@ Unit tests for external edit guard covering its documented public contract and r
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0520: initial unit tests for Bordbuch-vs-git-log external edit guard.</item>
+  <item>ADR-0093: treat the register birth commit as pipeline-authored in the external-edit guard</item>
 </CHANGE_SUMMARY>
 */
 
@@ -218,6 +219,17 @@ test("multiple reconcile entries accumulate mergedShas across missions", () => {
       },
     ],
     gitLogShas: ["merge02", "wp002", "wp003", "merge01", "wp001"],
+    rangeShas: [],
+  });
+  expect(result.verdict).toBe("pass");
+});
+
+test("the sternsystem.register birth commit is pipeline-authored → verdict: pass", () => {
+  const result = evaluateExternalEditGate({
+    systemId,
+    bordbuchEntries: [],
+    gitLogShas: ["e6031e0"],
+    gitLogSubjects: ["sternsystem.register: scaffold dp7"],
     rangeShas: [],
   });
   expect(result.verdict).toBe("pass");

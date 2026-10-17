@@ -6,14 +6,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0086 follow-up: whitelist deployment-operations:, gate-decisions:, journal: subjects — ship ops journals, gate decision records, and journal-abandon sweeps are committed into the cache clone by commitCacheCloneIfDirty and the ship journal machinery, so they are pipeline-authored bookkeeping like the existing entries.</item>
   <item>RFC-0520 follow-up: read bordbuch `kind` field (the `type` field never existed — guard was silently dead) and whitelist pipeline bookkeeping subject prefixes so machine-authored commits pass.</item>
   <item>ADR-0093: trace metadata.mergedShas[] from mission-reconcile entries — every merged workpiece commit counts as pipeline-authored, not just the merge head in commitSha.</item>
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>ADR-0110: implement ADR-0110 — classify post-reconcile divergence by PIPELINE_SUBJECT_PREFIXES; sync remedy, never reset --hard; plus ADR-0096 bootstrapCommittedSnapshot on mission.build path (SNAP-02)</item>
-  <history>ADR-0091</history>
+  <item>ADR-0093: treat the register birth commit as pipeline-authored in the external-edit guard</item>
+  <history>ADR-0086, ADR-0091</history>
 </CHANGE_SUMMARY>
 */
 
@@ -40,6 +40,8 @@ export const PIPELINE_SUBJECT_PREFIXES = [
   "deployment-operations:",
   "gate-decisions:",
   "journal:",
+  // The birth commit sternsystem.register writes before any Bordbuch entry exists.
+  "sternsystem.register:",
 ];
 
 export interface ExternalEditGuardInput {
