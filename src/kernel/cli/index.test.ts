@@ -20,7 +20,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { KernelExecutionReport, ModuleExport } from "@warpgogol/werkstatt-shared/kernel";
-import { consumeCommonFlags, isJsonFlagToken } from "./flags.ts";
+import {
+  COMMON_CLI_FLAG_NAMES,
+  consumeCommonFlags,
+  isJsonFlagToken,
+  argvRequestsHelp,
+} from "./flags.ts";
 import {
   assertBatchHasNoPositional,
   BatchUsageError,
@@ -90,6 +95,30 @@ describe("consumeCommonFlags — RFC-1309 flags", () => {
     expect(flags.outputFormat).toBe("json");
     expect(flags.quiet).toBe(true);
     expect(flags.batch).toBe("b.yaml");
+  });
+
+  it("COMMON_CLI_FLAG_NAMES stays in sync with the envelope parsers (RFC-1313 drift guard)", () => {
+    // Every listed name must be consumed by exactly one envelope surface:
+    // consumeCommonFlags, isJsonFlagToken, or argvRequestsHelp. A flag added
+    // to a parser without updating the const fails here, and vice versa.
+    for (const name of COMMON_CLI_FLAG_NAMES) {
+      if (name === "h") {
+        expect(argvRequestsHelp(["-h"])).toBe(true);
+        continue;
+      }
+      if (name === "help") {
+        expect(argvRequestsHelp(["--help"])).toBe(true);
+        continue;
+      }
+      if (name === "json" || name === "output") {
+        expect(isJsonFlagToken(`--${name}`)).toBe(true);
+        continue;
+      }
+      const valueFlags = new Set(["site", "concurrency", "batch"]);
+      const argv = valueFlags.has(name) ? [`--${name}`, "4"] : [`--${name}`];
+      const flags = consumeCommonFlags(argv);
+      expect(flags.remaining).toEqual([]);
+    }
   });
 });
 

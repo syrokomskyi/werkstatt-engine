@@ -30,6 +30,32 @@ export interface CommonFlags {
   remaining: string[];
 }
 
+/**
+ * CLI-envelope flag names consumed before `run` dispatches — the union of
+ * `consumeCommonFlags`, `isJsonFlagToken`, and `argvRequestsHelp` surfaces.
+ * These tokens never reach `resolveCommandFlags`, so a documented
+ * `werkstatt run <cmd> --flag` carrying one is valid even when the command's
+ * own schema omits it. command.docs.lint (RFC-1313) derives its exemption
+ * set from this list + KERNEL_UNIVERSAL_FLAGS — never a hardcoded copy.
+ * Keep in sync with the parsers below (drift-guarded in index.test.ts).
+ */
+export const COMMON_CLI_FLAG_NAMES = [
+  "site",
+  "all",
+  "dry-run",
+  "force",
+  "no-registry-cache",
+  "concurrency",
+  "collect-errors",
+  "quiet",
+  "batch",
+  "stop-on-fail",
+  "json",
+  "output",
+  "help",
+  "h",
+] as const;
+
 export function consumeCommonFlags(argv: string[]): CommonFlags {
   const remaining: string[] = [];
   let siteName: string | undefined;

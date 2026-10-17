@@ -25,6 +25,7 @@ Sweep batch 4: 73 Compass headers on headerless engine files (certification, com
 
 export * from "./discovery.ts";
 export * from "./workspace-discovery.ts";
+export { COMMON_CLI_FLAG_NAMES } from "./cli/flags.ts";
 export {
   resolveSiteWorkspace,
   type SiteWorkspace,
@@ -223,6 +224,7 @@ export {
   SITE_MODULE_MAP,
   workshopModuleLoaders,
   siteModuleLoaders,
+  forgeModuleLoaders,
   type WorkshopModuleMap,
   type WorkshopModuleDescriptor,
 } from "./module-map.ts";
