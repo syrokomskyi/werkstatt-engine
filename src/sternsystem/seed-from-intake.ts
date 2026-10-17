@@ -21,11 +21,11 @@ sidecars, and the system-state onboarding provenance block.</purpose>
   <item>Seeded credit sidecars declare target.domain "business-profile"</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1307: record review-fix decisions in compass headers</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: reject duplicate locale primary segments and non-2-letter primary subtags at plan time instead of seeding born-invalid i18n; credit target.domain names business-profile — the tree the seeded asset actually lands in.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
+  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <history>RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -52,6 +52,12 @@ export interface IntakeSeedInput {
   systemId: string;
   cosmicStar: string;
   biomeId: string;
+  /**
+   * Host seeded into identity.domain when the intake has no confirmed domain
+   * (operator decision, e.g. a workers.dev host). Never overrides a domain
+   * the intake confirms.
+   */
+  domainFallback?: string;
   /** Asset id → file bytes, pre-read by the command for every seedable asset. */
   assetBytes: ReadonlyMap<string, Uint8Array>;
 }
@@ -199,7 +205,7 @@ function buildSystemMd(input: IntakeSeedInput, primarySegment: string): string {
     systemStar: input.cosmicStar,
     biome: input.biomeId,
   };
-  const domain = intake.classification.domain;
+  const domain = intake.classification.domain ?? input.domainFallback;
   if (typeof domain === "string") identity.domain = domain;
   const frontmatter = {
     app: input.systemId,

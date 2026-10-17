@@ -8,11 +8,11 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: duplicate primary-segment and non-2-letter locale rejections.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
+  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <history>RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -59,6 +59,7 @@ const baseFlags = () => ({
   cosmicStar: "Achernar",
   mirrors: "../systems-cache/dp7:non-bare",
   intake: "onboarding/dp7/.input/intake",
+  domain: "dp7.example.org",
   biome: "dp7-03",
 });
 
@@ -134,6 +135,23 @@ describe("sternsystem.register --intake preconditions (RFC-1307)", () => {
     expect(existsSync(join(cacheDir(), "system-config.yaml"))).toBe(false);
   });
 
+  it("refuses an intake without a confirmed domain when --domain is absent, without writing any file", async () => {
+    const { domain: _omit, ...flags } = baseFlags();
+    await expect(runSternsystemRegister(input(flags), context(workspaceRoot))).rejects.toThrow(
+      /no confirmed domain/,
+    );
+    expect(existsSync(join(cacheDir(), "system-config.yaml"))).toBe(false);
+  });
+
+  it("refuses a --domain that is not a bare host name", async () => {
+    await expect(
+      runSternsystemRegister(
+        input({ ...baseFlags(), domain: "https://dp7.example.org/" }),
+        context(workspaceRoot),
+      ),
+    ).rejects.toThrow(/not a bare lowercase host name/);
+  });
+
   it("rejects --intake together with --amend", async () => {
     await expect(
       runSternsystemRegister(
@@ -154,6 +172,8 @@ describe("sternsystem.register --intake preconditions (RFC-1307)", () => {
     expect(state.onboarding.intakeId).toMatch(/^int_/);
     expect(state.onboarding.intakeSha256).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(result.data?.seed?.pbpDocuments).toBe(5);
+    const systemMd = readFileSync(join(cacheDir(), "src", "content", "system.md"), "utf8");
+    expect(systemMd).toContain("domain: dp7.example.org");
   });
 
   it("initialises a missing cache clone repo with origin at the local bare mirror", async () => {

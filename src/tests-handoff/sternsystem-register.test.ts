@@ -6,12 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-16-08 N1/N2: pre-existing content/refs/remote-branch survival on rollback + unborn-HEAD ref cleanup.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: non-git dir survival, remote-branch create-vs-rewind differentiation, dirty-worktree and seed-path-collision refusal.</item>
   <item>REVIEW-CODE-2026-10-16-10 O1/O2: kept-error diagnostic on injected readdir failure (no throw escapes rollback); delete-push argv asserted lease-anchored on the observed remote sha.</item>
   <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
-  <history>RFC-0532, RFC-1307</history>
+  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
+  <history>REVIEW-CODE-2026, RFC-0532, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -161,6 +161,7 @@ test("register rolls back registry entry, seeded files and system-state.yaml whe
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -216,6 +217,7 @@ test("register rewinds clone commits to the pre-register HEAD on failure", async
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -268,6 +270,7 @@ test("register preserves pre-existing tracked content, untracked files and state
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -326,6 +329,7 @@ test("register keeps pre-existing branch refs and rewinds the pushed remote bran
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -369,6 +373,7 @@ test("register on an unborn HEAD deletes only register-created refs (REVIEW-08 N
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -402,6 +407,7 @@ test("register rejects a non-conventional mirrors[0] before any write", async ()
         cosmicStar: "Vega",
         mirrors: "./nonexistent-repo-path",
         intake: "onboarding/dp7/.input/intake",
+        domain: "dp7.example.org",
         biome: "dp7-03",
       }),
       makeContext(workspaceRoot),
@@ -439,6 +445,7 @@ test("register preserves a pre-existing non-git system dir and restores captured
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -489,6 +496,7 @@ test("rollback keeps the register-created dir when inspection fails (REVIEW-10 O
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     ctx,
@@ -555,6 +563,7 @@ test("register deletes a remote branch it created and leaves the remote clean (R
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     ctx,
@@ -624,6 +633,7 @@ test("register leaves a diverged remote branch untouched when its pushes were re
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),
@@ -671,6 +681,7 @@ test("register refuses to run on a dirty cache clone before any write (REVIEW-09
         cosmicStar: "Vega",
         mirrors: "../systems-cache/dp7:non-bare",
         intake: "onboarding/dp7/.input/intake",
+        domain: "dp7.example.org",
         biome: "dp7-03",
       }),
       makeContext(workspaceRoot),
@@ -705,6 +716,7 @@ test("register refuses to overwrite a pre-existing file at a planned seed path (
       cosmicStar: "Vega",
       mirrors: "../systems-cache/dp7:non-bare",
       intake: "onboarding/dp7/.input/intake",
+      domain: "dp7.example.org",
       biome: "dp7-03",
     }),
     makeContext(workspaceRoot),

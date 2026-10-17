@@ -7,11 +7,11 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1231: sternsystem.status opts into --all (acceptsAllFlag: true — selector lands in flags.all); sternsystem.sync flag renamed all -> all-branches so the reserved token stays gated off.</item>
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1284: sternsystem.validate declares ACCESS-01/02 rules + system-state.yaml in reads (REVIEW-CODE-2026-10-15-02 F5)</item>
   <item>RFC-1297: sternsystem.validate declares LIVE-01/02 rules.</item>
   <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
+  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097, RFC-1141, RFC-1173, RFC-1231</history>
 </CHANGE_SUMMARY>
 */
@@ -79,6 +79,11 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
             kind: "string",
             description:
               "Client biome id from biome.from-intake (required for new registration, rejected with --amend); checked via biome.contract.validate --biome (RFC-1307).",
+          },
+          domain: {
+            kind: "string",
+            description:
+              "Site host seeded into identity.domain when the intake carries no confirmed domain (e.g. a provisional <worker>.<account>.workers.dev host); rejected with --amend.",
           },
           amend: {
             kind: "boolean",

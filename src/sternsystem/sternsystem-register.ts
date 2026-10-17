@@ -13,11 +13,11 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: remote surgery is anchored on a pre-register ls-remote snapshot — a register-created remote branch is deleted (in place on local-path mirrors where receive-pack refuses), a moved pre-existing branch is restored to its captured sha with a lease pinned to the observed sha, and an untouched remote is left alone. Rollback removes only the seed paths register actually wrote, refuses to run on a dirty worktree, and a pre-existing clone dir is never deleted.</item>
   <item>REVIEW-CODE-2026-10-16-10 O1/O2: dir-removal helper degrades to a typed kept-* outcome on readdir/rm failure instead of escaping, and the caller diagnostic names the real reason. Remote-ref deletes are lease-anchored on the remote sha observed by rollback and the in-place update-ref fallback re-verifies the ref before deleting — a ref that changed or appeared since the snapshot survives.</item>
   <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
+  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -118,7 +118,13 @@ export const registerDeps = { checkBiome: checkBiomeViaKernel, openMission: runM
  * bytes, or throws with an actionable message.
  */
 export async function prepareIntakeSeed(
-  input: { id: string; cosmicStar: string; intakeDir: string; biomeId: string },
+  input: {
+    id: string;
+    cosmicStar: string;
+    intakeDir: string;
+    biomeId: string;
+    domain?: string;
+  },
   context: KernelRuntimeContext,
 ): Promise<IntakeSeedPlan> {
   const { io, workspaceRoot } = context;
@@ -159,6 +165,25 @@ export async function prepareIntakeSeed(
     );
   }
 
+  // Materialization needs a site host (public.infrastructure.generate, astro
+  // site URL) — refuse before any write instead of failing mid-materialize.
+  const intakeDomain = intake.classification.domain ?? null;
+  if (input.domain !== undefined && intakeDomain !== null && input.domain !== intakeDomain) {
+    throw new Error(
+      `[sternsystem.register] --domain '${input.domain}' conflicts with the intake's confirmed domain '${intakeDomain}' — the intake wins; drop --domain`,
+    );
+  }
+  if (intakeDomain === null && input.domain === undefined) {
+    throw new Error(
+      "[sternsystem.register] the intake carries no confirmed domain — pass --domain <host> (e.g. the provisional <worker>.<account>.workers.dev host) until the real domain is decided",
+    );
+  }
+  if (input.domain !== undefined && !/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(input.domain)) {
+    throw new Error(
+      `[sternsystem.register] --domain '${input.domain}' is not a bare lowercase host name (no scheme, no path)`,
+    );
+  }
+
   // Biome check through the kernel registry — the engine never imports the
   // site plugin or hardcodes its catalog path (RFC-1307, RFC-0769).
   const biomeError = await registerDeps.checkBiome(workspaceRoot, input.biomeId);
@@ -191,6 +216,7 @@ export async function prepareIntakeSeed(
     systemId: input.id,
     cosmicStar: input.cosmicStar,
     biomeId: input.biomeId,
+    ...(input.domain !== undefined ? { domainFallback: input.domain } : {}),
     assetBytes,
   });
 }
@@ -646,6 +672,7 @@ export async function runSternsystemRegister(
   const amendId = flagNumber(input, "amend-id");
   const intakeDir = flagString(input, "intake");
   const biomeId = flagString(input, "biome");
+  const domainFlag = flagString(input, "domain");
 
   if (!id) throw new Error("[sternsystem.register] requires --id <kebab-case-id>");
 
@@ -678,9 +705,9 @@ export async function runSternsystemRegister(
 
   const diagnostics: string[] = [];
 
-  if (isAmend && (intakeDir !== undefined || biomeId !== undefined)) {
+  if (isAmend && (intakeDir !== undefined || biomeId !== undefined || domainFlag !== undefined)) {
     throw new Error(
-      "[sternsystem.register] --intake/--biome are for new registrations; --amend reads onboarding/<id>/.input/amend-<N>/",
+      "[sternsystem.register] --intake/--biome/--domain are for new registrations; --amend reads onboarding/<id>/.input/amend-<N>/",
     );
   }
 
@@ -799,7 +826,10 @@ export async function runSternsystemRegister(
     );
   }
   // RFC-1307: every intake precondition runs before the first write.
-  const seedPlan = await prepareIntakeSeed({ id, cosmicStar, intakeDir, biomeId }, context);
+  const seedPlan = await prepareIntakeSeed(
+    { id, cosmicStar, intakeDir, biomeId, ...(domainFlag ? { domain: domainFlag } : {}) },
+    context,
+  );
 
   const systemDir = resolveMirrorPath(workspaceRoot, mirrors[0].path);
   // A pre-existing clone dir is NEVER removed by rollback — only a dir
