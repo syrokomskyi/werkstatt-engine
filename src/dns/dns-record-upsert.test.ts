@@ -450,3 +450,25 @@ describe("RECOVERY-2026-10-04: upsert best-fit live matching", () => {
     expect(result.data?.summary.skipped).toBe(1);
   });
 });
+
+describe("provisional workers.dev hosts", () => {
+  it("treats a workers.dev zone as not applicable without calling Cloudflare", async () => {
+    vi.mocked(loadDnsRecordFile).mockResolvedValue({
+      zone: "dp7.syrokomskyi.workers.dev",
+      records: [
+        rec({
+          type: "SVCB",
+          name: "_index._agents.dp7.syrokomskyi.workers.dev",
+          content: "1 dp7.syrokomskyi.workers.dev alpn=h2 port=443",
+        }),
+      ],
+    } as never);
+    const result = await runDnsRecordUpsert(
+      { argv: [], flags: { system: "dp7" } } as unknown as KernelCommandInput,
+      { io: createDefaultIO().io, workspaceRoot: "/test" } as unknown as KernelRuntimeContext,
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain("not applicable");
+    expect(vi.mocked(createDnsRecord)).not.toHaveBeenCalled();
+  });
+});

@@ -94,6 +94,23 @@ export async function runDnsRecordUpsert(
     };
   }
 
+  // A provisional Cloudflare *.workers.dev host has no DNS zone the site
+  // controls — there is nothing to upsert until the real domain is live.
+  if (/(^|\.)workers\.dev$/i.test(declaration.zone)) {
+    return {
+      data: {
+        command: "dns.record.upsert",
+        systemId,
+        zone: declaration.zone,
+        dryRun,
+        results: [],
+        summary: { created: 0, updated: 0, skipped: 0, total: 0, errors: 0 },
+      },
+      exitCode: 0,
+      summary: `[dns.record.upsert] ${systemId}: not applicable — '${declaration.zone}' is a provisional workers.dev host without a DNS zone`,
+    };
+  }
+
   const { systems } = await discoverSystems(workspaceRoot);
   let zoneId: string;
   try {
