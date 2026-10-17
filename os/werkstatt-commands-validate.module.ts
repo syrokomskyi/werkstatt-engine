@@ -37,6 +37,7 @@ import {
   runCommandsValidate,
   type CommandsValidateResult,
 } from "../src/plugin/commands-validate.ts";
+import { loadValidationBaseline } from "@warpgogol/werkstatt-shared/kernel";
 
 export const werkstattCommandsValidateModule: ModuleExport = {
   name: "werkstatt-commands-validate",
@@ -47,6 +48,7 @@ export const werkstattCommandsValidateModule: ModuleExport = {
       name: "werkstatt.commands.validate",
       mutatesState: false,
       contract: "werkstatt",
+      baselineEligible: true,
       rules: [
         "CMD-OUTPUT-01",
         "CMD-OUTPUT-02",
@@ -72,11 +74,18 @@ export const werkstattCommandsValidateModule: ModuleExport = {
           description: "Output diagnostics as JSON.",
           default: false,
         },
+        strict: {
+          kind: "boolean",
+          description:
+            "Ignore docs/validation-baseline.generated.yaml — report baseline-recorded debt as full violations (RFC-1316).",
+          default: false,
+        },
       },
       reads: [
         "packages/werkstatt-engine/src/**",
         "packages/werkstatt-site/src/**",
         "packages/werkstatt-shared/src/**",
+        "docs/validation-baseline.generated.yaml",
       ],
       cacheable: false,
       async execute(
@@ -84,7 +93,14 @@ export const werkstattCommandsValidateModule: ModuleExport = {
         context: KernelRuntimeContext,
       ): Promise<KernelCommandResult<CommandsValidateResult>> {
         const mode = (input.flags.mode as "error" | "warning") ?? "error";
-        return runCommandsValidate(context.workspaceRoot, mode);
+        const strict = input.flags.strict === true;
+        const baseline = strict
+          ? undefined
+          : await loadValidationBaseline(context.workspaceRoot, context.io);
+        return runCommandsValidate(context.workspaceRoot, mode, context.io, {
+          strict,
+          baseline,
+        });
       },
     },
   ],
