@@ -13,11 +13,11 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-16-09 N8/N9/N12: remote surgery is anchored on a pre-register ls-remote snapshot — a register-created remote branch is deleted (in place on local-path mirrors where receive-pack refuses), a moved pre-existing branch is restored to its captured sha with a lease pinned to the observed sha, and an untouched remote is left alone. Rollback removes only the seed paths register actually wrote, refuses to run on a dirty worktree, and a pre-existing clone dir is never deleted.</item>
   <item>REVIEW-CODE-2026-10-16-10 O1/O2: dir-removal helper degrades to a typed kept-* outcome on readdir/rm failure instead of escaping, and the caller diagnostic names the real reason. Remote-ref deletes are lease-anchored on the remote sha observed by rollback and the in-place update-ref fallback re-verifies the ref before deleting — a ref that changed or appeared since the snapshot survives.</item>
   <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
+  <item>RFC-1307: seed default operator config files at registration</item>
   <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -47,6 +47,7 @@ import {
   writeSystemState,
 } from "./registry-io.ts";
 import { runSternsystemPin } from "./sternsystem-pin.ts";
+import { OPERATOR_CONFIG_FILES } from "../mission/operator-config-files.ts";
 import { identityConfigPath } from "../identity/identity-io.ts";
 import { runMissionOpen } from "../mission/mission-open.ts";
 import { runMissionAbort } from "../mission/mission-abort.ts";
@@ -396,6 +397,34 @@ async function ensureCacheCloneRepo(
     await git(["remote", "add", "origin", resolveMirrorPath(workspaceRoot, bare.path)]);
   }
   return true;
+}
+
+/**
+ * Default content for the required operator config files (RFC-0840). A fresh
+ * system has none, and workpiece.config.presence.check would fail the first
+ * mission.validate; register seeds them into its scaffold commit (missions
+ * track and reconcile later edits). Operators tune them in missions.
+ */
+export const OPERATOR_CONFIG_DEFAULTS: Readonly<
+  Record<(typeof OPERATOR_CONFIG_FILES)[number], string>
+> = {
+  ".lighthouse-budget-ignore":
+    "# RFC-0833 LH-12 escape hatch: one JS bundle name per line that is emitted\n# but intentionally not referenced by any page. Seeded empty at registration.\n",
+  "src/image-delivery.config.yaml":
+    "# RFC-0830 IMG-DELIVERY escape-hatch overrides.\n# Each entry needs: srcPattern, rules[], reason. Seeded empty at registration.\noverrides: []\n",
+};
+
+/** Write missing operator config defaults; returns the paths register created. */
+async function seedOperatorConfigDefaults(systemDir: string, io: WorkspaceIO): Promise<string[]> {
+  const created: string[] = [];
+  for (const rel of OPERATOR_CONFIG_FILES) {
+    const target = join(systemDir, ...rel.split("/"));
+    if (await io.exists(target)) continue;
+    await io.mkdir(join(target, ".."));
+    await io.writeFile(target, OPERATOR_CONFIG_DEFAULTS[rel]);
+    created.push(target);
+  }
+  return created;
 }
 
 /**
@@ -868,6 +897,8 @@ export async function runSternsystemRegister(
   // Paths register actually wrote — rollback removes ONLY these, never a
   // pre-existing file that happens to share a planned path (REVIEW-09 N12).
   const seededPaths: string[] = [];
+  // Untracked operator config defaults register created — removed on rollback.
+  const operatorConfigCreated: string[] = [];
 
   try {
     // Inside the guarded scope: a config-write failure must not orphan the
@@ -885,6 +916,7 @@ export async function runSternsystemRegister(
 
     contentCreated = true;
     await writeSeedFiles(systemDir, seedPlan, context.io, seededPaths);
+    operatorConfigCreated.push(...(await seedOperatorConfigDefaults(systemDir, context.io)));
     // readSystemState may throw on a malformed PRE-EXISTING state file — that
     // file must survive rollback untouched, so the flag arms only once
     // register itself is about to write.
@@ -910,6 +942,11 @@ export async function runSternsystemRegister(
           "system-state.yaml",
           "system.pin.json",
           ...seedPlan.files.map((f) => f.path),
+          // Operator config defaults register created ride the scaffold commit,
+          // like every later mission that edits them (reconcile tracks them).
+          ...OPERATOR_CONFIG_FILES.filter((rel) =>
+            operatorConfigCreated.includes(join(systemDir, ...rel.split("/"))),
+          ),
         ];
         const existingSeedPaths: string[] = [];
         for (const p of seedPaths) {
@@ -1060,6 +1097,9 @@ export async function runSternsystemRegister(
     // up front guarantees pre-existing content survives (REVIEW-08 N2).
     if (contentCreated) {
       await rollbackSeedFiles(systemDir, seededPaths, context.io);
+      for (const created of operatorConfigCreated) {
+        if (await context.io.exists(created)) await context.io.rm(created);
+      }
       // register created src/content entirely — the dir goes away; if it
       // pre-existed, only register's files were removed.
       if (!contentDirExisted) {

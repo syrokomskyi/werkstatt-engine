@@ -8,11 +8,11 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: duplicate primary-segment and non-2-letter locale rejections.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
+  <item>RFC-1307: seed default operator config files at registration</item>
   <history>RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -174,6 +174,10 @@ describe("sternsystem.register --intake preconditions (RFC-1307)", () => {
     expect(result.data?.seed?.pbpDocuments).toBe(5);
     const systemMd = readFileSync(join(cacheDir(), "src", "content", "system.md"), "utf8");
     expect(systemMd).toContain("domain: dp7.example.org");
+    expect(readFileSync(join(cacheDir(), "src", "image-delivery.config.yaml"), "utf8")).toContain(
+      "overrides: []",
+    );
+    expect(existsSync(join(cacheDir(), ".lighthouse-budget-ignore"))).toBe(true);
   });
 
   it("initialises a missing cache clone repo with origin at the local bare mirror", async () => {
