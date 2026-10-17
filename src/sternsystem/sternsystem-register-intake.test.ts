@@ -8,11 +8,11 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed intake assets into the pages domain so page credits match</item>
+  <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
   <history>REVIEW-CODE-2026, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -178,6 +178,9 @@ describe("sternsystem.register --intake preconditions (RFC-1307)", () => {
       "overrides: []",
     );
     expect(existsSync(join(cacheDir(), ".lighthouse-budget-ignore"))).toBe(true);
+    expect(readFileSync(join(cacheDir(), "src", "csp-sinks.allowlist.yaml"), "utf8")).toContain(
+      "_astro/schemas.*.js",
+    );
   });
 
   it("initialises a missing cache clone repo with origin at the local bare mirror", async () => {

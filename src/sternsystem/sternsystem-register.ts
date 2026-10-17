@@ -13,11 +13,11 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>REVIEW-CODE-2026-10-16-10 O1/O2: dir-removal helper degrades to a typed kept-* outcome on readdir/rm failure instead of escaping, and the caller diagnostic names the real reason. Remote-ref deletes are lease-anchored on the remote sha observed by rollback and the in-place update-ref fallback re-verifies the ref before deleting — a ref that changed or appeared since the snapshot survives.</item>
   <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
+  <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
   <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -414,14 +414,35 @@ export const OPERATOR_CONFIG_DEFAULTS: Readonly<
     "# RFC-0830 IMG-DELIVERY escape-hatch overrides.\n# Each entry needs: srcPattern, rules[], reason. Seeded empty at registration.\noverrides: []\n",
 };
 
-/** Write missing operator config defaults; returns the paths register created. */
+/**
+ * Site-level defaults every Astro site needs from its first build: the CSP sink
+ * allowlist disposition for the platform schema chunk (guarded `new Function`
+ * capability probe emitted into every site bundle). Dispositions stay per-site
+ * (csp.sinks.validate never blesses sinks itself); this only seeds the common one.
+ */
+export const SITE_BIRTH_DEFAULTS: Readonly<Record<string, string>> = {
+  "src/csp-sinks.allowlist.yaml": [
+    "version: 1",
+    "entries:",
+    '  - filePattern: "_astro/schemas.*.js"',
+    "    disposition: accepted-debt",
+    "    note: \"Platform schema bundle carries a guarded new Function('') capability probe (try/catch + UA check); no user-controlled markup reaches it.\"",
+    "",
+  ].join("\n"),
+};
+
+/** Write missing operator config and site birth defaults; returns the paths register created. */
 async function seedOperatorConfigDefaults(systemDir: string, io: WorkspaceIO): Promise<string[]> {
   const created: string[] = [];
-  for (const rel of OPERATOR_CONFIG_FILES) {
+  const defaults: Array<[string, string]> = [
+    ...OPERATOR_CONFIG_FILES.map((rel): [string, string] => [rel, OPERATOR_CONFIG_DEFAULTS[rel]]),
+    ...Object.entries(SITE_BIRTH_DEFAULTS),
+  ];
+  for (const [rel, content] of defaults) {
     const target = join(systemDir, ...rel.split("/"));
     if (await io.exists(target)) continue;
     await io.mkdir(join(target, ".."));
-    await io.writeFile(target, OPERATOR_CONFIG_DEFAULTS[rel]);
+    await io.writeFile(target, content);
     created.push(target);
   }
   return created;
@@ -944,7 +965,7 @@ export async function runSternsystemRegister(
           ...seedPlan.files.map((f) => f.path),
           // Operator config defaults register created ride the scaffold commit,
           // like every later mission that edits them (reconcile tracks them).
-          ...OPERATOR_CONFIG_FILES.filter((rel) =>
+          ...[...OPERATOR_CONFIG_FILES, ...Object.keys(SITE_BIRTH_DEFAULTS)].filter((rel) =>
             operatorConfigCreated.includes(join(systemDir, ...rel.split("/"))),
           ),
         ];
