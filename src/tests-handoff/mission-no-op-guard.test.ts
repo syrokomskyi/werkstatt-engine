@@ -408,3 +408,25 @@ test("Level 3: countOperatorCommits detects operator commits", async () => {
   expect(result.hasOperatorCommits).toBe(true);
   expect(result.commitCount).toBeGreaterThanOrEqual(1);
 });
+
+test("Level 3: countOperatorCommits ignores system history and pipeline commits before and after the materialize baseline", async () => {
+  const { countOperatorCommits } = await import("../mission/mission-git-commit.ts");
+  const dir = mkdtempSync(join(tmpdir(), "op-commits-"));
+  const commit = (msg: string) =>
+    execSync(`git commit --allow-empty -m ${JSON.stringify(msg)}`, { cwd: dir, stdio: "pipe" });
+  try {
+    gitInit(dir);
+    commit("feat(content): earlier mission work");
+    commit("materialize from pin 6.0.0");
+    commit("Bordbuch: mission-open sys-m000002");
+    commit("system-state: update sys");
+    expect((await countOperatorCommits(dir, null)).commitCount).toBe(0);
+
+    commit("feat(content): this mission's work");
+    const result = await countOperatorCommits(dir, null);
+    expect(result.commitCount).toBe(1);
+    expect(result.commits[0]).toContain("this mission's work");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

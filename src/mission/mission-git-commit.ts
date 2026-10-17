@@ -33,6 +33,7 @@ import { readMissionManifest, resolveMissionDir } from "./mission-io.ts";
 import { MATERIALIZATION_SENTINEL } from "./mission-materialize.ts";
 import { createSignedCommit } from "./signed-commit.ts";
 import { readBordbuch } from "../bordbuch/bordbuch-io.ts";
+import { PIPELINE_SUBJECT_PREFIXES } from "../sternsystem/external-edit-guard.ts";
 
 export interface MissionGitCommitData {
   missionId: string;
@@ -292,6 +293,33 @@ export async function countOperatorCommits(
 ): Promise<OperatorCommitsResult> {
   if (!(await io.exists(path.join(workpieceDir, ".git")))) {
     return { hasOperatorCommits: false, commitCount: 0, commits: [] };
+  }
+
+  // Workpieces materialized from a cache clone carry the whole system history;
+  // the newest "materialize from pin" commit marks where this mission starts.
+  // Commits after it count as operator work unless their subject is
+  // pipeline-authored (Bordbuch:, system-state:, cache-clone:, …).
+  const baselineResult = await io.exec(
+    "git",
+    ["log", "-n", "1", "--format=%H", "--grep=^materialize from pin", "HEAD"],
+    { cwd: workpieceDir },
+  );
+  const baselineSha = baselineResult.exitCode === 0 ? baselineResult.stdout.trim() : "";
+  if (baselineSha) {
+    const sinceResult = await io.exec("git", ["log", "--format=%h %s", `${baselineSha}..HEAD`], {
+      cwd: workpieceDir,
+    });
+    if (sinceResult.exitCode === 0) {
+      const commits = sinceResult.stdout
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .filter((line) => {
+          const subject = line.slice(line.indexOf(" ") + 1);
+          return !PIPELINE_SUBJECT_PREFIXES.some((prefix) => subject.startsWith(prefix));
+        });
+      return { hasOperatorCommits: commits.length > 0, commitCount: commits.length, commits };
+    }
   }
 
   const rootResult = await io.exec("git", ["rev-list", "--max-parents=0", "HEAD"], {
