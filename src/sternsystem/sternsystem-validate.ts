@@ -558,9 +558,17 @@ export async function runSternsystemValidate(
 
       if (await context.io.exists(bareRepoPath)) {
         try {
-          const remoteResult = await context.io.exec("git", ["remote", "get-url", "mirror"], {
+          // sternsystem.sync names the remote for mirrors[2] `mirror-0`
+          // (mirror-<i> per external mirror); older systems also carry a
+          // legacy `mirror` remote — accept either, prefer the sync name.
+          let remoteResult = await context.io.exec("git", ["remote", "get-url", "mirror-0"], {
             cwd: bareRepoPath,
           });
+          if (remoteResult.exitCode !== 0) {
+            remoteResult = await context.io.exec("git", ["remote", "get-url", "mirror"], {
+              cwd: bareRepoPath,
+            });
+          }
           if (remoteResult.exitCode !== 0) throw new Error(remoteResult.stderr.trim());
           const remoteUrl = remoteResult.stdout.trim();
           if (entry.mirrors.length > 2 && remoteUrl !== entry.mirrors[2].path) {
