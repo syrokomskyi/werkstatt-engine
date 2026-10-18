@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1324: cold-run defect: handover-dry-run ran complete as sender — recipient key swap for HANDOVER-04</item>
   <item>RFC-1324: cold-run defect: ship-closed skipped mission.reconcile — RFC-1217 gate correctly blocked unreconciled workpiece</item>
   <item>RFC-1324: cold-run defect: ship-closed needs mission.validate before reconcile</item>
+  <item>RFC-1324: cold-run defect: compose stage missed passport.key.ensure/emit — sole-owned .well-known artifacts</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -890,6 +890,19 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
         };
         await applyDir(compositionSrc, "");
         // FAB-SEAM-END: compose
+
+        // First-mission composer duties beyond authored content (wg-onboard
+        // qa-log): the passport key pair and .well-known artifacts are
+        // sole-owned by passport.key.ensure/passport.emit and must exist
+        // before any build.prepare run — generated.files.validate blocks on
+        // their absence at mission.git.commit time.
+        await runSubCommand(
+          env.cloneRoot,
+          "passport.key.ensure",
+          [`--site=${env.systemId}`],
+          env.logger,
+        );
+        await runSubCommand(env.cloneRoot, "passport.emit", [`--site=${env.systemId}`], env.logger);
 
         await runSubCommand(
           env.cloneRoot,
