@@ -8,14 +8,14 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1284: crash-safe access protection — suspend-before-measure via durable accessPinSuspended marker, stale-marker entry resume (flag=true), finally-restore, pinManagement {suspended,resumed,staleResumed,restoreError}, isProtectedLiveTarget gating, cache-clone marker store (Q-6), flag=false+suspended proceeds without resume (Q-7)</item>
   <item>RFC-1295</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
-  <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149, RFC-1190</history>
+  <item>RFC-1324: certify diagnostics surface the inner command summary — mission.check / editorial.review.verify failures name the real reason instead of a bare exit code</item>
+  <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149, RFC-1190, RFC-1207</history>
 </CHANGE_SUMMARY>
 */
 
@@ -730,7 +730,7 @@ export async function runLeitstandCertify(
               diagnostics.push({
                 ruleId: "MISSION-CHECK-01",
                 severity: "error",
-                message: `mission.check exited with code ${failed.exitCode}`,
+                message: `mission.check exited with code ${failed.exitCode}${failed.summary ? `: ${failed.summary}` : ""}`,
                 evidence: [],
               });
             } else {
@@ -806,7 +806,7 @@ export async function runLeitstandCertify(
               diagnostics.push({
                 ruleId: "EDIT-01",
                 severity: "error",
-                message: `editorial.review.verify exited with code ${failed.exitCode}`,
+                message: `editorial.review.verify exited with code ${failed.exitCode}${failed.summary ? `: ${failed.summary}` : ""}`,
                 evidence: [],
               });
             } else if (!failed && !emitted) {
