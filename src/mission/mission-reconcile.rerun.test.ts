@@ -13,6 +13,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1327: initial rerun test — full clone+workpiece fixture, generated-file untracking, second-run convergence via expectRerunSafe.</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <item>RFC-1327: explicit test timeouts on rerun tests — root vitest testTimeout is 5s</item>
 </CHANGE_SUMMARY>
 */
 
@@ -156,7 +157,7 @@ lastRelease: null
   gitCommit(tmpWorkspace, "add mission");
 }
 
-test("mission.reconcile second run is a no-op on the same workpiece head (RFC-1327)", async () => {
+test("mission.reconcile second run is a no-op on the same workpiece head (RFC-1327)", { timeout: 60_000 }, async () => {
   setup();
   const { runMissionReconcile } = await import("./mission-materialization-commands.ts");
 

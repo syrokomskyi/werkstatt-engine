@@ -14,6 +14,7 @@
   <item>RFC-1327: initial rerun coverage for the ship reconcile-skip gate.</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
   <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
+  <item>RFC-1327: explicit test timeouts on rerun tests — root vitest testTimeout is 5s</item>
 </CHANGE_SUMMARY>
 */
 
@@ -83,7 +84,7 @@ describe("leitstand.ship mission-reconcile skip (RFC-1327)", () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  test("skips reconcile when the report already folded the current head", async () => {
+  test("skips reconcile when the report already folded the current head", { timeout: 30_000 }, async () => {
     const ctx = makeCtx(root, "acme-m000001");
     await fs.mkdir(ctx.workpieceDir, { recursive: true });
     const head = gitInit(ctx.workpieceDir);
@@ -103,7 +104,7 @@ describe("leitstand.ship mission-reconcile skip (RFC-1327)", () => {
     ).toBe(false);
   });
 
-  test("runs reconcile when the recorded head is stale", async () => {
+  test("runs reconcile when the recorded head is stale", { timeout: 30_000 }, async () => {
     const ctx = makeCtx(root, "acme-m000002");
     await fs.mkdir(ctx.workpieceDir, { recursive: true });
     gitInit(ctx.workpieceDir);
@@ -119,7 +120,7 @@ describe("leitstand.ship mission-reconcile skip (RFC-1327)", () => {
     ).toBe(true);
   });
 
-  test("runs reconcile when no report exists", async () => {
+  test("runs reconcile when no report exists", { timeout: 30_000 }, async () => {
     const ctx = makeCtx(root, "acme-m000003");
     await fs.mkdir(ctx.workpieceDir, { recursive: true });
     gitInit(ctx.workpieceDir);

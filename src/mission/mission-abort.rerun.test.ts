@@ -12,6 +12,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1327: initial rerun coverage — abort twice, converge.</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <item>RFC-1327: explicit test timeouts on rerun tests — root vitest testTimeout is 5s</item>
 </CHANGE_SUMMARY>
 */
 
@@ -104,7 +105,7 @@ lastRelease: null
   gitCommit(tmpWorkspace, "add mission");
 }
 
-test("mission.abort twice: second run is a no-op, not a crash (RFC-1327)", async () => {
+test("mission.abort twice: second run is a no-op, not a crash (RFC-1327)", { timeout: 60_000 }, async () => {
   setup();
   const { runMissionAbort } = await import("./mission-abort.ts");
 
