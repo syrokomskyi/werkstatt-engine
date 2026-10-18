@@ -7,6 +7,7 @@ identity:
     address: "Chausseestraße 86, 10115 Berlin, DE"
     email: "e2e-valid@example.com"
 
+
 i18n:
   supported:
     ru: { name: "Русский" }

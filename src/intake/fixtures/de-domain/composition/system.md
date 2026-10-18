@@ -7,6 +7,12 @@ identity:
     address: "Friedrichstraße 12, 10117 Berlin, DE"
     email: "e2e-demowerk@example.com"
 
+verification:
+  google:
+    method: meta-tag
+    token: "google-site-verification=e2e_fixture_de_domain"
+
+
 i18n:
   supported:
     de: { name: "Deutsch" }

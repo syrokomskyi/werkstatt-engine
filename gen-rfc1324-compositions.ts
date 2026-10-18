@@ -12,6 +12,7 @@
   <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
   <item>RFC-1324: pin Atlas in home planets[] — B-02 requires every used block component declared (faq-list -> Atlas)</item>
   <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
+  <item>RFC-1324: cold-run defect: confirmed-domain fixtures need a verification.google block in the overlay (SEARCH-VERIFY-01 errors on non-provisional hosts)</item>
   <history>RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -50,6 +51,10 @@ interface FixtureSpec {
   businessId: string;
   /** composer-authored contact email */
   email: string;
+  /** confirmed real domain in intake.json — when set, the overlay declares a
+      search-verification block (SEARCH-VERIFY-01 errors without it on a
+      non-provisional host); provisional fixtures leave it unset */
+  domain?: string;
   /** composer-authored place entity */
   place: {
     street: string;
@@ -135,11 +140,18 @@ ${routes}
     responsibleName: "${spec.legalName}"
     address: "${spec.place.street} ${spec.place.streetNumber}, ${spec.place.postalCode} ${spec.place.locality}, ${spec.place.countryCode}"
     email: "${spec.email}"`;
+  // A confirmed-domain site is a real search property — the composer carries a
+  // verification block (dp7 parity); the fixture token is a placeholder-shaped
+  // value, honest for the e2e host and replaced by the real GSC token at go-live.
+  const verification = spec.domain
+    ? `\nverification:\n  google:\n    method: meta-tag\n    token: "google-site-verification=e2e_fixture_${spec.name.replaceAll("-", "_")}"\n`
+    : "";
   return `---
 identity:
   tagline: "${spec.tagline[spec.segments[0]!]}"
   ctaTarget: contacts
 ${legal}
+${verification}
 
 i18n:
   supported:
@@ -976,6 +988,7 @@ const fixtures: FixtureSpec[] = [
     legalName: "E2E Demowerk GmbH",
     businessId: "demowerk",
     email: "e2e-demowerk@example.com",
+    domain: "e2e-de-domain.warpgogol.com",
     place: {
       street: "Friedrichstraße",
       streetNumber: "12",
@@ -1130,6 +1143,7 @@ const fixtures: FixtureSpec[] = [
     legalName: "E2E Latinworks LLC",
     businessId: "latinworks",
     email: "e2e-latinworks@example.com",
+    domain: "e2e-latin-only.warpgogol.com",
     place: {
       street: "SW Morrison Street",
       streetNumber: "1500",

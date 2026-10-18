@@ -7,6 +7,12 @@ identity:
     address: "SW Morrison Street 1500, 97205 Portland, US"
     email: "e2e-latinworks@example.com"
 
+verification:
+  google:
+    method: meta-tag
+    token: "google-site-verification=e2e_fixture_latin_only"
+
+
 i18n:
   supported:
     en: { name: "English" }
