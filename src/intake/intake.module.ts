@@ -11,6 +11,12 @@ and onboarding.intake.schema.export (JSON Schema artifact producers vendor).</pu
 <CHANGE_SUMMARY>
   <item>RFC-1281: initial intake module — onboarding.intake.validate + onboarding.intake.schema.export.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
+  <item>RFC-1328: harden intake contract — publication safety + locale-native facts
+
+AMD-005: isPublicPbpEntity gates every projection channel (compiler resolveProfile,
+semantic-loader, Astro loaders); INTAKE-12..15 blocking rules (internal markers,
+statementByLocale coverage, WebP rasters, closed palette); Unicode tokenizer +
+evidence-id strip in family.detect; per-locale seed documents; w2 producer handoff.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -28,7 +34,7 @@ export async function createIntakeModule(): Promise<ModuleExport> {
         name: "onboarding.intake.validate",
         modulePath: "packages/werkstatt-engine/src/intake/intake.module.ts",
         description:
-          "Validate a werkstatt:intake/v1 hand-over bundle (RFC-1281): manifest/hash integrity, envelope schema, PBP entities, referential integrity, verbatim quotes, gaps, locales, biome axes, assets, provenance, cost report (INTAKE-01..11). Exactly one of `--id` or `--bundle` is required.",
+          "Validate a werkstatt:intake/v1 hand-over bundle (RFC-1281 + AMD-005/RFC-1328): manifest/hash integrity, envelope schema, PBP entities, referential integrity, verbatim quotes, gaps, locales, biome axes, assets, provenance, cost report, public-safe text, locale-native statements, WebP rasters, closed palette (INTAKE-01..15). Exactly one of `--id` or `--bundle` is required.",
         contract: "onboarding-intake",
         rules: [
           "INTAKE-01",
@@ -42,6 +48,10 @@ export async function createIntakeModule(): Promise<ModuleExport> {
           "INTAKE-09",
           "INTAKE-10",
           "INTAKE-11",
+          "INTAKE-12",
+          "INTAKE-13",
+          "INTAKE-14",
+          "INTAKE-15",
         ],
         scope: "workspace",
         flags: {

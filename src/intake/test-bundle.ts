@@ -11,6 +11,7 @@ evidence-ledger hash, provenance.contractSnapshot and MANIFEST.sha256.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1328: fixture conformant to AMD-005 — uz-Latn statementByLocale, localeNeutral entities, closed palette (surface).</item>
   <item>RFC-1281: created — buildIntakeBundle fixture builder with mutate/manifestTransform hooks.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
 </CHANGE_SUMMARY>
@@ -90,6 +91,7 @@ function defaultEnvelope(sourceSha: string, assetSha: string): Record<string, un
         type: "business",
         status: "published",
         name: "DP7",
+        localeNeutral: true,
         legalIdentityRef: { ref: "pbp/legal-identity@1:legal-identity/dp7" },
       },
       {
@@ -98,6 +100,7 @@ function defaultEnvelope(sourceSha: string, assetSha: string): Record<string, un
         type: "legal-identity",
         status: "published",
         legalName: "DP7 Digitalprojekt GmbH",
+        localeNeutral: true,
       },
       {
         schema: "pbp/evidence-source@1",
@@ -131,6 +134,9 @@ function defaultEnvelope(sourceSha: string, assetSha: string): Record<string, un
         subject: { kind: "business", name: "DP7" },
         statement: "Европейское качество — доступное каждому",
         statementLang: "ru",
+        statementByLocale: {
+          "uz-Latn": "Yevropa sifati — hammaga qulay",
+        },
         evidenceRefs: {
           src: { ref: "pbp/evidence-source@1:evidence-source/src-01" },
         },
@@ -234,7 +240,7 @@ function defaultEnvelope(sourceSha: string, assetSha: string): Record<string, un
         cornerRadius: "4px",
         borderWeight: "1px",
       },
-      palette: { brand: "#1a3a5c", ink: "#111111", paper: "#f7f5f0" },
+      palette: { brand: "#1a3a5c", ink: "#111111", surface: "#f7f5f0" },
       fonts: [
         {
           family: "Inter",

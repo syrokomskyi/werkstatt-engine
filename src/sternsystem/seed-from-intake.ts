@@ -21,6 +21,7 @@ sidecars, and the system-state onboarding provenance block.</purpose>
   <item>Seeded assets and credit sidecars live in the pages domain (pages/&lt;lang&gt;/assets) so page image references match their credits</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>RFC-1328/AMD-005: per-locale document variants (statementByLocale values, localeNeutral verbatim clones); envelope-only fields stripped before the strict pbp parse.</item>
   <item>RFC-1307: record review-fix decisions in compass headers</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: reject duplicate locale primary segments and non-2-letter primary subtags at plan time instead of seeding born-invalid i18n; credit target.domain names business-profile — the tree the seeded asset actually lands in.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
@@ -78,6 +79,36 @@ export interface IntakeSeedPlan {
 /** Primary subtag of a BCP 47 tag — the route segment and content directory. */
 export function localeSegment(tag: string): string {
   return tag.split("-")[0]!;
+}
+
+/**
+ * AMD-005/RFC-1328: the entity field a locale variant replaces — `statement`
+ * wins over `summary`; `description` has no locale channel and is dropped
+ * from clones (the primary-language text never ships under another locale).
+ */
+const STATEMENT_FIELDS = ["statement", "summary"] as const;
+
+/**
+ * Per-locale document for one entity, or undefined when the entity has no
+ * facts for that locale (it surfaces in the primary tree until the producer
+ * emits the locale — Q-4). A document is seeded when the entity carries a
+ * `statementByLocale` value for the tag or is marked `localeNeutral`
+ * (names, identifiers, addresses — verbatim clone).
+ */
+function localeVariantDocument(
+  entity: IntakeEnvelope["pbp"][number],
+  canonicalEntity: Record<string, unknown>,
+  tag: string,
+): Record<string, unknown> | undefined {
+  const statementField = STATEMENT_FIELDS.find((f) => typeof canonicalEntity[f] === "string");
+  const variant = entity.statementByLocale?.[tag];
+  if (typeof variant === "string" && variant.length > 0 && statementField) {
+    const clone = { ...canonicalEntity, [statementField]: variant };
+    delete clone["description"];
+    return clone;
+  }
+  if (entity.localeNeutral === true) return { ...canonicalEntity };
+  return undefined;
 }
 
 function sortDeep(value: unknown): unknown {
@@ -236,6 +267,7 @@ export function planSeedFromIntake(input: IntakeSeedInput): IntakeSeedPlan {
   ];
 
   let pbpDocuments = 0;
+  const nonPrimaryLocales = intake.classification.locales.filter((l) => l.role !== "primary");
   for (const entity of intake.pbp) {
     const schema = pbpSchemaById[entity.schema];
     if (!schema) {
@@ -243,13 +275,37 @@ export function planSeedFromIntake(input: IntakeSeedInput): IntakeSeedPlan {
         `[seed-from-intake] no canonical PBP schema for ${entity.schema} (${entity.id})`,
       );
     }
-    const parsed = schema.parse(entity) as Record<string, unknown>;
+    // statementByLocale/localeNeutral are envelope-only (AMD-005) — the
+    // frozen pbp/*@1 strict schemas never see them.
+    const {
+      statementByLocale: _statementByLocale,
+      localeNeutral: _localeNeutral,
+      ...canonicalEntity
+    } = entity as Record<string, unknown>;
+    const parsed = schema.parse(canonicalEntity) as Record<string, unknown>;
     const rel = pbpDocumentPath(primarySegment, { type: entity.type, id: entity.id });
     files.push({
       path: `src/content/business-profile/${rel}`,
       content: serializePbpDocument(parsed),
     });
     pbpDocuments++;
+
+    // RFC-1328 (AMD-005): locale variants carry statementByLocale values —
+    // the document schema is unchanged, only the statement value differs.
+    for (const locale of nonPrimaryLocales) {
+      const variant = localeVariantDocument(entity, canonicalEntity, locale.tag);
+      if (!variant) continue;
+      const parsedVariant = schema.parse(variant) as Record<string, unknown>;
+      const variantRel = pbpDocumentPath(localeSegment(locale.tag), {
+        type: entity.type,
+        id: entity.id,
+      });
+      files.push({
+        path: `src/content/business-profile/${variantRel}`,
+        content: serializePbpDocument(parsedVariant),
+      });
+      pbpDocuments++;
+    }
   }
 
   let assets = 0;

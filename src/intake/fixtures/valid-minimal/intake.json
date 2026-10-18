@@ -37,6 +37,7 @@
       "type": "business",
       "status": "published",
       "name": "DP7",
+      "localeNeutral": true,
       "legalIdentityRef": {
         "ref": "pbp/legal-identity@1:legal-identity/dp7"
       }
@@ -46,7 +47,8 @@
       "id": "legal-identity/dp7",
       "type": "legal-identity",
       "status": "published",
-      "legalName": "DP7 Digitalprojekt GmbH"
+      "legalName": "DP7 Digitalprojekt GmbH",
+      "localeNeutral": true
     },
     {
       "schema": "pbp/evidence-source@1",
@@ -85,6 +87,9 @@
       },
       "statement": "Европейское качество — доступное каждому",
       "statementLang": "ru",
+      "statementByLocale": {
+        "uz-Latn": "Yevropa sifati — hammaga qulay"
+      },
       "evidenceRefs": {
         "src": {
           "ref": "pbp/evidence-source@1:evidence-source/src-01"
@@ -223,7 +228,7 @@
     "palette": {
       "brand": "#1a3a5c",
       "ink": "#111111",
-      "paper": "#f7f5f0"
+      "surface": "#f7f5f0"
     },
     "fonts": [
       {
@@ -264,7 +269,7 @@
     "producer": "site-werkstatt",
     "producerVersion": "0.1.0",
     "runId": "run-2026-10-15-01",
-    "contractSnapshot": "sha256:da381646a3770d2f01d9f6f3b03cdc5a14a501d0081f0d1535eae98d669de0b9",
+    "contractSnapshot": "sha256:0afea4405268826b0fc7cd053849b81ec3ec1d97ee7fb4a51e3aa4e10b6d5d9c",
     "inputs": [
       {
         "path": ".input/client-knowledge-base.json",

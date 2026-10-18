@@ -1,9 +1,9 @@
 /*
 <MODULE_CONTRACT>
-<purpose>RFC-1281 AC-3…AC-6: rule-level tests for validateIntakeBundle — one
-describe per rule INTAKE-01…11, each building the valid bundle via
-buildIntakeBundle and breaking exactly one rule. Covers the committed
-fixtures/valid-minimal pass case, the single-byte verbatim mutation
+<purpose>RFC-1281 AC-3…AC-6 + RFC-1328 AC-1…AC-3: rule-level tests for
+validateIntakeBundle — one describe per rule INTAKE-01…15, each building the
+valid bundle via buildIntakeBundle and breaking exactly one rule. Covers the
+committed fixtures/valid-minimal pass case, the single-byte verbatim mutation
 (INTAKE-05), the invalid-PBP path shape (/pbp/<index>, INTAKE-03), and the
 INTAKE-11 warning-only contract (status stays pass).</purpose>
 <non-goals>
@@ -11,6 +11,7 @@ INTAKE-11 warning-only contract (status stays pass).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1328: INTAKE-12…15 describes — public-safe text, locale-native statements, WebP rasters, closed palette.</item>
   <item>RFC-1281: created — one describe per INTAKE rule + committed-fixture pass test.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
   <item>RFC-1281: resolve valid-minimal fixture path relative to test file</item>
@@ -233,6 +234,123 @@ describe("INTAKE-10 — provenance completeness", () => {
     });
     expect(result.status).toBe("fail");
     expect(rules(result)).toContain("INTAKE-10");
+  });
+});
+
+describe("INTAKE-12 — public-safe free text (RFC-1328 AC-1)", () => {
+  it("published summary containing GAP-08 fails", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        (seed.envelope.pbp as Record<string, unknown>[])[0].summary =
+          "Pending client answer — see GAP-08";
+      },
+    });
+    expect(result.status).toBe("fail");
+    const d12 = result.diagnostics.filter((d) => d.rule === "INTAKE-12");
+    expect(d12.length).toBeGreaterThanOrEqual(1);
+    expect(d12[0].path).toBe("/pbp/0/summary");
+  });
+
+  it("draft entity free text is not scanned", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        const pbp = seed.envelope.pbp as Record<string, unknown>[];
+        const draft = pbp.find((e) => e.status === "draft")!;
+        draft.statement = "Still blocked by GAP-04 internally";
+      },
+    });
+    expect(result.status).toBe("pass");
+    expect(result.diagnostics.some((d) => d.rule === "INTAKE-12")).toBe(false);
+  });
+
+  it("bare word 'source' never trips the anchored marker", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        const business = (seed.envelope.pbp as Record<string, unknown>[])[0];
+        business.summary = "Your source for quality hardware";
+        business.statementByLocale = { "uz-Latn": "Sifatli uskunalar manbai" };
+      },
+    });
+    expect(result.status).toBe("pass");
+    expect(result.diagnostics.some((d) => d.rule === "INTAKE-12")).toBe(false);
+  });
+});
+
+describe("INTAKE-13 — locale-native statements (RFC-1328)", () => {
+  it("published statement without the site locale fails", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        const pbp = seed.envelope.pbp as Record<string, unknown>[];
+        delete pbp.find((e) => e.id === "claim/european-quality")!.statementByLocale;
+      },
+    });
+    expect(result.status).toBe("fail");
+    const d13 = result.diagnostics.filter((d) => d.rule === "INTAKE-13");
+    expect(d13.length).toBeGreaterThanOrEqual(1);
+    expect(d13.some((d) => d.message.includes("uz-Latn"))).toBe(true);
+  });
+
+  it("localeNeutral exempts a statement-bearing entity", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        const pbp = seed.envelope.pbp as Record<string, unknown>[];
+        const claim = pbp.find((e) => e.id === "claim/european-quality")!;
+        delete claim.statementByLocale;
+        claim.localeNeutral = true;
+      },
+    });
+    expect(result.status).toBe("pass");
+    expect(result.diagnostics.some((d) => d.rule === "INTAKE-13")).toBe(false);
+  });
+
+  it("entities without a statement field are exempt", async () => {
+    const result = await buildAndValidate();
+    expect(result.status).toBe("pass");
+    expect(result.diagnostics.some((d) => d.rule === "INTAKE-13")).toBe(false);
+  });
+});
+
+describe("INTAKE-14 — raster assets are WebP (RFC-1328 AC-2)", () => {
+  it("image/jpeg asset fails", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        (seed.envelope.assets as Record<string, unknown>[])[0].mediaType = "image/jpeg";
+      },
+    });
+    expect(result.status).toBe("fail");
+    expect(rules(result)).toContain("INTAKE-14");
+  });
+
+  it("image/svg+xml vector is exempt", async () => {
+    const result = await buildAndValidate();
+    expect(result.status).toBe("pass");
+    expect(result.diagnostics.some((d) => d.rule === "INTAKE-14")).toBe(false);
+  });
+});
+
+describe("INTAKE-15 — closed palette vocabulary (RFC-1328 AC-3)", () => {
+  it("palette key 'secondary' fails", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        const visual = seed.envelope.visual as { palette: Record<string, string> };
+        visual.palette.secondary = "#ff8800";
+      },
+    });
+    expect(result.status).toBe("fail");
+    const d15 = result.diagnostics.filter((d) => d.rule === "INTAKE-15");
+    expect(d15.length).toBeGreaterThanOrEqual(1);
+    expect(d15[0].path).toBe("/visual/palette/secondary");
+  });
+
+  it("'background' is inside the closed vocabulary", async () => {
+    const result = await buildAndValidate({
+      mutate: (seed) => {
+        const visual = seed.envelope.visual as { palette: Record<string, string> };
+        visual.palette.background = "#ffffff";
+      },
+    });
+    expect(result.status).toBe("pass");
+    expect(result.diagnostics.some((d) => d.rule === "INTAKE-15")).toBe(false);
   });
 });
 

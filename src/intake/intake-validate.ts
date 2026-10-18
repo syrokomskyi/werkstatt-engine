@@ -1,12 +1,12 @@
 /*
 <MODULE_CONTRACT>
 
-<purpose>RFC-1281: onboarding.intake.validate — deterministic INTAKE-01…11
-validation of a werkstatt:intake/v1 hand-over bundle (INTAKE-CONTRACT). Rule
-order is fixed: INTAKE-01 (manifest/hash integrity) and INTAKE-02 (envelope
-schema, unknown major fails closed) run first; INTAKE-03…11 run only when both
-produced no errors. All file access goes through WorkspaceIO; hashing is
-node:crypto sha256.</purpose>
+<purpose>RFC-1281/RFC-1328: onboarding.intake.validate — deterministic INTAKE-01…15
+validation of a werkstatt:intake/v1 hand-over bundle (INTAKE-CONTRACT +
+AMD-005). Rule order is fixed: INTAKE-01 (manifest/hash integrity) and
+INTAKE-02 (envelope schema, unknown major fails closed) run first;
+INTAKE-03…15 run only when both produced no errors. All file access goes
+through WorkspaceIO; hashing is node:crypto sha256.</purpose>
 <non-goals>
   <item>Do not vendor PBP entity shapes — INTAKE-03 delegates to pbpSchemaById (DNA-103).</item>
   <item>Do not write files — the command is read-only; the bundle is immutable on arrival.</item>
@@ -17,6 +17,7 @@ node:crypto sha256.</purpose>
   <item>Verbatim substring checks (INTAKE-05) run against text-typed evidence items only (text/*, application/json, message/rfc822); a binary-only source is an error,.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>RFC-1328/AMD-005: INTAKE-12…15 — anchored internal-marker scan on published free text, locale-native statementByLocale coverage, WebP-only rasters, closed palette vocabulary; envelope-only fields stripped before the strict pbp parse (INTAKE-03).</item>
   <item>RFC-1281: created — validateIntakeBundle (INTAKE-01…11) + runIntakeValidate command + resolveIntakeExportSha256.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
 </CHANGE_SUMMARY>
@@ -27,7 +28,7 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { pbpSchemaById } from "@warpgogol/pbp/entities";
-import { biomeAxesSchema } from "@warpgogol/werkstatt-shared/ontology";
+import { biomeAxesSchema, biomePaletteSchema } from "@warpgogol/werkstatt-shared/ontology";
 import {
   INTAKE_SCHEMA_ID,
   intakeEnvelopeSchema,
@@ -52,9 +53,33 @@ export const INTAKE_RULE_IDS = [
   "INTAKE-09",
   "INTAKE-10",
   "INTAKE-11",
+  "INTAKE-12",
+  "INTAKE-13",
+  "INTAKE-14",
+  "INTAKE-15",
 ] as const;
 
 export type IntakeRuleId = (typeof INTAKE_RULE_IDS)[number];
+
+/**
+ * AMD-005/RFC-1328: evidence-ledger id shape in free text. Anchored — bare
+ * words ("source", "gap") never match; only `PREFIX-digits` forms do.
+ */
+const INTERNAL_MARKER_RE = /\b(SRC|CLM|GAP|OPD|DEF|CHK|AST)-\d+/;
+
+/** Free-text fields INTAKE-12 scans on published entities (AMD-005). */
+const PBP_FREE_TEXT_FIELDS = ["statement", "summary", "description"] as const;
+
+/**
+ * AMD-005/RFC-1328: `visual.palette` keys must come from the canonical biome
+ * palette vocabulary (`biomePaletteSchema.shape` keys — DNA-103 single source)
+ * plus `background`, which aliases into the site background upstream
+ * (`biome.from-intake` INTAKE_PALETTE_ALIASES).
+ */
+const CLOSED_PALETTE_KEYS: ReadonlySet<string> = new Set([
+  ...Object.keys(biomePaletteSchema.shape),
+  "background",
+]);
 
 export interface IntakeDiagnostic {
   rule: IntakeRuleId;
@@ -325,7 +350,14 @@ export async function validateIntakeBundle(
         );
         continue;
       }
-      const r = canonical.safeParse(entity);
+      // AMD-005: statementByLocale/localeNeutral are envelope-level fields —
+      // the frozen pbp/*@1 schemas never see them (strict parse).
+      const {
+        statementByLocale: _statementByLocale,
+        localeNeutral: _localeNeutral,
+        ...canonicalEntity
+      } = entity as Record<string, unknown>;
+      const r = canonical.safeParse(canonicalEntity);
       if (!r.success) {
         for (const issue of r.error.issues) {
           error(
@@ -681,6 +713,72 @@ export async function validateIntakeBundle(
         `provenance.cost.total $${env.provenance.cost.total} exceeds budget $${budget}`,
         "/provenance/cost/total",
       );
+    }
+
+    // --- INTAKE-12: public-safe free text on published entities (AMD-005) --
+    // Anchored on the evidence-ledger id shape — bare words never match.
+    for (const [i, entity] of env.pbp.entries()) {
+      if (entity.status !== "published") continue;
+      for (const field of PBP_FREE_TEXT_FIELDS) {
+        const value = (entity as Record<string, unknown>)[field];
+        if (typeof value === "string" && INTERNAL_MARKER_RE.test(value)) {
+          error(
+            "INTAKE-12",
+            `published entity '${entity.id}' ${field} contains an internal marker`,
+            `/pbp/${i}/${field}`,
+          );
+        }
+      }
+    }
+
+    // --- INTAKE-13: locale-native statements (AMD-005) ---------------------
+    // The root statement field is the primary-locale value; statementByLocale
+    // must cover the rest, unless the statement is locale-neutral.
+    const nonPrimaryLocaleTags = env.classification.locales
+      .filter((l) => l.role !== "primary")
+      .map((l) => l.tag);
+    for (const [i, entity] of env.pbp.entries()) {
+      if (entity.status !== "published" || entity.localeNeutral === true) continue;
+      const e = entity as Record<string, unknown>;
+      const carriesStatement =
+        typeof e["statement"] === "string" || typeof e["summary"] === "string";
+      if (!carriesStatement) continue;
+      const byLocale = (e["statementByLocale"] ?? {}) as Record<string, unknown>;
+      for (const tag of nonPrimaryLocaleTags) {
+        if (typeof byLocale[tag] !== "string" || byLocale[tag] === "") {
+          error(
+            "INTAKE-13",
+            `published entity '${entity.id}' has no statementByLocale value for site locale '${tag}' — localise the statement or mark localeNeutral`,
+            `/pbp/${i}/statementByLocale`,
+          );
+        }
+      }
+    }
+
+    // --- INTAKE-14: raster assets are WebP (AMD-005) -----------------------
+    for (const [i, asset] of env.assets.entries()) {
+      if (
+        asset.mediaType.startsWith("image/") &&
+        asset.mediaType !== "image/webp" &&
+        asset.mediaType !== "image/svg+xml"
+      ) {
+        error(
+          "INTAKE-14",
+          `asset '${asset.id}' mediaType '${asset.mediaType}' is a raster type — the platform serves image/webp only`,
+          `/assets/${i}/mediaType`,
+        );
+      }
+    }
+
+    // --- INTAKE-15: closed palette vocabulary (AMD-005) --------------------
+    for (const key of Object.keys(env.visual.palette)) {
+      if (!CLOSED_PALETTE_KEYS.has(key)) {
+        error(
+          "INTAKE-15",
+          `visual.palette key '${key}' is outside the closed biome vocabulary — map it to a canonical key before emitting`,
+          `/visual/palette/${key}`,
+        );
+      }
     }
   }
 

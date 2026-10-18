@@ -8,6 +8,7 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1328: uz variant/localeNeutral seed coverage; pbpDocuments 5→8.</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed intake assets into the pages domain so page credits match</item>
@@ -175,7 +176,7 @@ describe("sternsystem.register --intake preconditions (RFC-1307)", () => {
     const state = YAML.parse(readFileSync(join(cacheDir(), "system-state.yaml"), "utf8"));
     expect(state.onboarding.intakeId).toMatch(/^int_/);
     expect(state.onboarding.intakeSha256).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(result.data?.seed?.pbpDocuments).toBe(5);
+    expect(result.data?.seed?.pbpDocuments).toBe(8);
     const systemMd = readFileSync(join(cacheDir(), "src", "content", "system.md"), "utf8");
     expect(systemMd).toContain("domain: dp7.example.org");
     expect(readFileSync(join(cacheDir(), "src", "image-delivery.config.yaml"), "utf8")).toContain(
@@ -280,6 +281,9 @@ describe("planSeedFromIntake (RFC-1307)", () => {
       "src/content/business-profile/ru/trust/claims/european-quality.md",
       "src/content/business-profile/ru/trust/claims/installation-warranty.md",
       "src/content/business-profile/ru/trust/evidence/src-01.md",
+      "src/content/business-profile/uz/business.md",
+      "src/content/business-profile/uz/organization/legal-identity.md",
+      "src/content/business-profile/uz/trust/claims/european-quality.md",
     ]);
     const draft = fileText(
       plan,
@@ -287,6 +291,33 @@ describe("planSeedFromIntake (RFC-1307)", () => {
     );
     expect(draft).toContain("id: claim/installation-warranty");
     expect(draft).toContain("status: draft");
+  });
+
+  it("RFC-1328: uz variant carries statementByLocale, localeNeutral clones verbatim", () => {
+    const plan = planSeedFromIntake(seedInput(fixtureJson()));
+    // Variant path — the statement field takes the locale's value.
+    const uzClaim = fileText(
+      plan,
+      "src/content/business-profile/uz/trust/claims/european-quality.md",
+    );
+    expect(uzClaim).toContain("Yevropa sifati");
+    expect(uzClaim).not.toContain("Европейское качество");
+    expect(uzClaim).toContain("status: published");
+    // Envelope-only fields never reach the seeded document.
+    expect(uzClaim).not.toContain("statementByLocale");
+    // localeNeutral path — verbatim clone.
+    const uzBusiness = fileText(plan, "src/content/business-profile/uz/business.md");
+    expect(uzBusiness).toContain("name: DP7");
+    expect(uzBusiness).not.toContain("localeNeutral");
+    // No variant and not localeNeutral → no non-primary doc.
+    expect(
+      plan.files.some((f) => f.path === "src/content/business-profile/uz/trust/evidence/src-01.md"),
+    ).toBe(false);
+    expect(
+      plan.files.some(
+        (f) => f.path === "src/content/business-profile/uz/trust/claims/installation-warranty.md",
+      ),
+    ).toBe(false);
   });
 
   it("singleton types keep type-named files: brand + legal-identity on the same slug do not collide", () => {

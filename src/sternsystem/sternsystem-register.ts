@@ -13,6 +13,7 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1328: strip envelope-only statementByLocale/localeNeutral before the strict pbp/*@1 parse in prepareIntakeSeed.</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
@@ -232,7 +233,14 @@ export async function prepareIntakeSeed(
         `[sternsystem.register] no canonical PBP schema for ${entity.schema} (${entity.id})`,
       );
     }
-    schema.parse(entity);
+    // AMD-005: statementByLocale/localeNeutral are envelope-level — strip
+    // before the frozen pbp/*@1 strict parse.
+    const {
+      statementByLocale: _statementByLocale,
+      localeNeutral: _localeNeutral,
+      ...canonicalEntity
+    } = entity as Record<string, unknown>;
+    schema.parse(canonicalEntity);
   }
 
   const assetBytes = new Map<string, Uint8Array>();
