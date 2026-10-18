@@ -20,17 +20,12 @@ single source of truth for its documentation, IO, and pipeline membership.
   <item>Deduplication is fail-closed (CMD-MAN-04): same-name commands across providers merge only when semantic fields agree.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: step 6 — compass.migrate codemod run
-
-Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
   <item>RFC-1306 review-r1: manifest write migrated ambient writeFileAtomic to context.io via writeFileIfChanged — dry-run/readonly interception + honest filesModified.</item>
   <item>RFC-1320: dry-run now returns renderedFiles (canonical io-native dry-run contract) — generated.drift.validate --target=workspace can byte-verify the manifest instead of reporting render-unavailable.</item>
-  <history>CMD-MAN-04, RFC-0266, RFC-1147</history>
+  <item>RFC-1334: steps 1-3 — shared structural reachability, reachableVia in the command manifest, coverage validator on the shared scan</item>
+  <history>CMD-MAN-04, RFC-0266, RFC-1097, RFC-1147</history>
 </CHANGE_SUMMARY>
 */
 
@@ -38,7 +33,14 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { buildGeneratedHeader } from "./generated-marker.ts";
-import { writeFileIfChanged } from "@warpgogol/werkstatt-shared/kernel";
+import {
+  computeCommandReachability,
+  INVOKER_SOURCE_GLOBS,
+  isInvokerSource,
+  writeFileIfChanged,
+  type ReachabilityEdge,
+} from "@warpgogol/werkstatt-shared/kernel";
+import { globSync, readFileSync } from "node:fs";
 import { listStaticCommandSurface } from "./runtime.ts";
 import type {
   CheckResult,
@@ -74,6 +76,8 @@ export interface CommandManifestEntry {
   writes: string[];
   validatesOutputs: string[];
   pipelines: string[];
+  /** RFC-1334: structural reachability (pipeline | invoker | coverage), sorted. */
+  reachableVia: ReachabilityEdge[];
 }
 
 export interface CommandManifest {
@@ -205,6 +209,19 @@ export async function buildCommandManifest(
   }
 
   const entries = dedupCommandEntries(surface.commands, pipelinesByCommand);
+
+  // RFC-1334: invocation literals in source decide invoker edges — reading
+  // sources makes the manifest drift (CMD-MAN-01) when an invocation changes.
+  const sources = new Map<string, string>();
+  for (const pattern of INVOKER_SOURCE_GLOBS) {
+    for (const rel of globSync(pattern, { cwd: workspaceRoot })) {
+      const normalized = String(rel).replace(/\\/g, "/");
+      if (!isInvokerSource(normalized) || sources.has(normalized)) continue;
+      sources.set(normalized, readFileSync(join(workspaceRoot, normalized), "utf8"));
+    }
+  }
+  const reachability = computeCommandReachability({ commands: entries, sources });
+  for (const entry of entries) entry.reachableVia = reachability.get(entry.name) ?? [];
 
   const withoutHash: Omit<CommandManifest, "meta"> & {
     meta: Omit<CommandManifest["meta"], "contentHash">;
@@ -344,6 +361,7 @@ function dedupCommandEntries(
       writes: representative.writes ?? [],
       validatesOutputs: representative.validatesOutputs ?? [],
       pipelines: [...(pipelinesByCommand.get(name) ?? [])].sort(),
+      reachableVia: [],
     });
   }
 
