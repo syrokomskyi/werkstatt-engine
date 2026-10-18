@@ -17,6 +17,7 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
+  <item>RFC-1324: share resolveSystemIdForMission — drops the duplicated `split("-m")[0]` derivation that broke on mid-slug "-m" system ids.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,7 +27,7 @@ import type {
   KernelCommandResult,
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
-import { discoverSystems, readSystemState } from "../sternsystem/registry-io.ts";
+import { resolveSystemIdForMission } from "./resolve-system-id.ts";
 import { createR2Client, resolveR2ConfigFromEnv, MissingEnvError } from "./r2-client.ts";
 
 export interface EvidenceFetchResult {
@@ -61,21 +62,6 @@ function flagString(input: KernelCommandInput, key: string): string | undefined 
 function flagBool(input: KernelCommandInput, key: string): boolean {
   const v = input.flags[key];
   return v === true || v === "true";
-}
-
-async function resolveSystemId(workspaceRoot: string, missionId: string): Promise<string> {
-  const { systems } = await discoverSystems(workspaceRoot);
-  for (const sys of systems) {
-    try {
-      const state = await readSystemState(workspaceRoot, sys.id);
-      if (state.currentMission === missionId) {
-        return sys.id;
-      }
-    } catch {
-      // State not available for this system — skip
-    }
-  }
-  return missionId.includes("-m") ? missionId.split("-m")[0] : missionId;
 }
 
 function parseRunTimestampFromKey(key: string, prefix: string): string | null {
@@ -118,7 +104,7 @@ export async function runEvidenceFetch(
     throw err;
   }
 
-  const systemId = await resolveSystemId(workspaceRoot, missionId);
+  const systemId = await resolveSystemIdForMission(workspaceRoot, missionId, context.io);
   const client = createR2Client(r2Config);
 
   if (listMode) {

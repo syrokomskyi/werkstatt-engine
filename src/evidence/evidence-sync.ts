@@ -10,9 +10,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
@@ -21,7 +18,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>ADR-0025, RFC-0651, RFC-1190, RFC-1202</history>
+  <item>RFC-1324: cold-run defect — resolveSystemId split on bare "-m" cut `e2e-valid-minimal-m000001` to `e2e-valid`, then SYSTEM_MISMATCH blocked evidence.sync after a closed mission (currentMission scan misses post-close). Shared resolveSystemIdForMission now reads mission.yaml first.</item>
+  <history>ADR-0025, RFC-0651, RFC-1097, RFC-1190, RFC-1202</history>
 </CHANGE_SUMMARY>
 */
 
@@ -33,7 +31,7 @@ import type {
 } from "@warpgogol/werkstatt-engine/kernel";
 import { resolveMissionDir } from "@warpgogol/werkstatt-engine/kernel";
 import { collectFiles } from "@warpgogol/werkstatt-shared/node/fs";
-import { discoverSystems, readSystemState } from "../sternsystem/registry-io.ts";
+import { resolveSystemIdForMission } from "./resolve-system-id.ts";
 import { createR2Client, resolveR2ConfigFromEnv, MissingEnvError } from "./r2-client.ts";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 
@@ -145,22 +143,6 @@ async function readEvidenceMetadata(
   return parsed;
 }
 
-async function resolveSystemId(workspaceRoot: string, missionId: string): Promise<string> {
-  const { systems } = await discoverSystems(workspaceRoot);
-  for (const sys of systems) {
-    try {
-      const state = await readSystemState(workspaceRoot, sys.id);
-      if (state.currentMission === missionId) {
-        return sys.id;
-      }
-    } catch {
-      // State not available for this system — skip
-    }
-  }
-  const systemId = missionId.includes("-m") ? missionId.split("-m")[0] : missionId;
-  return systemId;
-}
-
 export async function runEvidenceSync(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
@@ -192,7 +174,7 @@ export async function runEvidenceSync(
   // flag that contradicts the resolved system is a hard error, not a silent
   // override — an R2 prefix under the wrong system corrupts the archive layout.
   const siteFlag = flagString(input, "site") ?? flagString(input, "system");
-  const resolvedSystemId = await resolveSystemId(workspaceRoot, missionId);
+  const resolvedSystemId = await resolveSystemIdForMission(workspaceRoot, missionId, context.io);
   if (siteFlag && siteFlag !== resolvedSystemId) {
     throw new Error(
       `[evidence.sync] SYSTEM_MISMATCH: --site '${siteFlag}' contradicts resolved systemId '${resolvedSystemId}' for mission '${missionId}'`,
