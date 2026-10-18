@@ -11,6 +11,7 @@
   <item>RFC-1324</item>
   <item>RFC-1324: cold-run defect: fixture page descriptions under semantic.drift 50-char SEO floor</item>
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
+  <item>RFC-1324: declare legal pageIds in system.md overlay — scaffold emits files, composer owns the route registry (B-04)</item>
 </CHANGE_SUMMARY>
 */
 // Run: pnpm exec tsx gen-rfc1324-compositions.ts (from packages/werkstatt-engine)
@@ -61,6 +62,8 @@ interface FixtureSpec {
   skipLinkLabel: Record<string, string>;
   nativeNames: Record<string, string>;
   segments: string[];
+  /** legalJurisdiction regimes legal.scaffold emits — manifest-only page entries, files are scaffold-owned */
+  legalPages?: string[];
   pages: PageSpec[];
   proseTexts: Record<string, Record<string, string>>; // proseId -> seg -> body
   navLabels: Record<string, Record<string, string>>; // pageId -> seg -> label
@@ -93,6 +96,24 @@ ${routes}
       - { cosmicPlanet: ${p.planet}, pin: "latest" }`;
     })
     .join("\n\n");
+  // legal.scaffold sole-owns the page files; the composer declares their routes.
+  // Slugs stay German in every locale — the binding-language convention.
+  const legalPages = (spec.legalPages ?? [])
+    .map((pageId) => {
+      const routes = spec.segments.map((s) => `      ${s}: "${pageId}"`).join("\n");
+      return `  - pageId: ${pageId}
+    semanticType: legal
+    output:
+      sitemap: { category: legal, lastmod: "2026-10-17", includeLastmod: false }
+      llms: exclude
+    routes:
+${routes}
+    cosmicStar: Polaris
+    planets:
+      - { cosmicPlanet: Hyperion, pin: "latest" }`;
+    })
+    .join("\n\n");
+  const allPages = legalPages ? `${pages}\n\n${legalPages}` : pages;
   const i18n = spec.segments
     .map((s) => `    ${s}: { name: "${spec.nativeNames[s] ?? s}" }`)
     .join("\n");
@@ -117,7 +138,7 @@ sharedContext:
     - home
 
 pages:
-${pages}
+${allPages}
 
 growth:
   vendor:
@@ -755,6 +776,7 @@ const fixtures: FixtureSpec[] = [
       countryCode: "DE",
     },
     segments: ["ru", "uz"],
+    legalPages: ["impressum", "datenschutz"],
     nativeNames: { ru: "Русский", uz: "Oʻzbekcha" },
     tagline: { ru: "Проверяемое качество по честной цене" },
     defaultDescription: {
@@ -873,6 +895,7 @@ const fixtures: FixtureSpec[] = [
       countryCode: "DE",
     },
     segments: ["de", "en"],
+    legalPages: ["impressum", "datenschutz"],
     nativeNames: { de: "Deutsch", en: "English" },
     tagline: { de: "Nachweisbare Qualität zum fairen Preis" },
     defaultDescription: {

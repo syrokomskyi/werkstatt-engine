@@ -65,6 +65,30 @@ pages:
     planets:
       - { cosmicPlanet: Makemake, pin: "latest" }
 
+  - pageId: impressum
+    semanticType: legal
+    output:
+      sitemap: { category: legal, lastmod: "2026-10-17", includeLastmod: false }
+      llms: exclude
+    routes:
+      de: "impressum"
+      en: "impressum"
+    cosmicStar: Polaris
+    planets:
+      - { cosmicPlanet: Hyperion, pin: "latest" }
+
+  - pageId: datenschutz
+    semanticType: legal
+    output:
+      sitemap: { category: legal, lastmod: "2026-10-17", includeLastmod: false }
+      llms: exclude
+    routes:
+      de: "datenschutz"
+      en: "datenschutz"
+    cosmicStar: Polaris
+    planets:
+      - { cosmicPlanet: Hyperion, pin: "latest" }
+
 growth:
   vendor:
     adapter: "null"
