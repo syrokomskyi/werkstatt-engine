@@ -34,6 +34,7 @@ pages:
     cosmicStar: Polaris
     planets:
       - { cosmicPlanet: Hyperion, pin: "latest" }
+      - { cosmicPlanet: Atlas, pin: "latest" }
 
   - pageId: about
     semanticType: about

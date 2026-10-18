@@ -7,11 +7,11 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324</item>
   <item>RFC-1324: cold-run defect: fixture page descriptions under semantic.drift 50-char SEO floor</item>
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <item>RFC-1324: declare legal pageIds in system.md overlay — scaffold emits files, composer owns the route registry (B-04)</item>
   <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
+  <item>RFC-1324: pin Atlas in home planets[] — B-02 requires every used block component declared (faq-list -> Atlas)</item>
   <history>RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -93,6 +93,12 @@ function systemMdOverlay(spec: FixtureSpec): string {
     .map((p) => {
       const routes = spec.segments.map((s) => `      ${s}: "${p.routes[s] ?? ""}"`).join("\n");
       const llms = p.llmsExclude ? "\n      llms: exclude" : "";
+      // B-02: planets[] must pin every component the page's blocks use —
+      // home's faq-list block resolves to the Atlas section.
+      const usedPlanets = [p.planet, ...(p.pageId === "home" && spec.faq ? ["Atlas"] : [])];
+      const planets = usedPlanets
+        .map((planet) => `      - { cosmicPlanet: ${planet}, pin: "latest" }`)
+        .join("\n");
       return `  - pageId: ${p.pageId}
     semanticType: ${p.semanticType}
     output:
@@ -101,7 +107,7 @@ function systemMdOverlay(spec: FixtureSpec): string {
 ${routes}
     cosmicStar: ${p.star}
     planets:
-      - { cosmicPlanet: ${p.planet}, pin: "latest" }`;
+${planets}`;
     })
     .join("\n\n");
   // legal.scaffold sole-owns the page files; the composer declares their routes.
