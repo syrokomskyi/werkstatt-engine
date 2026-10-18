@@ -7,10 +7,10 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1138: scope all remaining exempt entries — 15 site-plugin commands to check (ALL_COMMANDS), nachweis.manifest.generate to nachweis, sichtpass.generate to sichtpass; stops stale-entry warnings in registries without those modules.</item>
   <item>RFC-1173: declare mutatesState on all kernel commands — collectDeclarationDiagnostics emits error-severity MUTATES-STATE-DECLARED, command.manifest.validate is the blocking consumer in packages.check, sweep declares the flag on every command definition (factories hardcode false for read-only check specs)</item>
   <item>RFC-1177: GENERATOR_OWNERSHIP_EXEMPT += csp.hashes.generate (check) — rewrites emitted dist/client/_headers in place, owns no generated artifact.</item>
   <item>RFC-1264</item>
+  <item>RFC-1324: fix GENERATOR-EXEMPT-STALE — cloudflare.permissions.generate exemption rescoped check → leitstand (its registering module); yaml whitelist += werkstatt.cloudflare.json.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
   <history>RFC-1038, RFC-1097, RFC-1138</history>
 </CHANGE_SUMMARY>
@@ -185,7 +185,7 @@ export const GENERATOR_OWNERSHIP_EXEMPT: ReadonlyArray<{
     command: "cloudflare.permissions.generate",
     reason:
       "Registry surface renderer (RFC-1326): rewrites marked cloudflare-permissions sections inside operator-owned .env.example and docs/engineering/workshop-setup.md — partial-file rewrites, no app-scoped generated artifact.",
-    module: "check",
+    module: "leitstand",
   },
 ];
 
