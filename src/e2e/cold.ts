@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1324: cold-run defect: handover-dry-run ran complete as sender — recipient key swap for HANDOVER-04</item>
   <item>RFC-1324: cold-run defect: ship-closed skipped mission.reconcile — RFC-1217 gate correctly blocked unreconciled workpiece</item>
   <item>RFC-1324: cold-run defect: ship-closed needs mission.validate before reconcile</item>
   <item>RFC-1324: cold-run defect: compose stage missed passport.key.ensure/emit — sole-owned .well-known artifacts</item>
+  <item>RFC-1324: cold-run defect: system.md merge emitted YAML-1.1-ambiguous scalars unquoted (lastmod date)</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -395,7 +395,21 @@ export function mergeSystemMdFrontmatter(seededRaw: string, overlayRaw: string):
   const overlay = parseFm(overlayRaw);
   const merged = mergeVal(seeded.fm, overlay.fm) as Record<string, unknown>;
   const body = overlay.rest.trim().length > 0 ? overlay.rest : seeded.rest;
-  return `---\n${YAML.stringify(merged)}---${body.endsWith("\n") ? body : `${body}\n`}`;
+  // The emitter is YAML 1.2 (unquoted `2026-10-17` stays a string), but Astro's
+  // frontmatter loader is YAML 1.1 — bare date/yes-no/number-looking strings
+  // re-parse as timestamps/booleans and fail strict zod string fields (e.g.
+  // pages[].output.sitemap.lastmod). Quote every 1.1-ambiguous scalar.
+  const doc = new YAML.Document(merged);
+  const ambiguous =
+    /^\d{4}-\d{2}-\d{2}([T ]\S*)?$|^(?:true|false|yes|no|on|off|null|~)$|^-?\d+(?:\.\d+)?$/i;
+  YAML.visit(doc.contents, {
+    Scalar: (_key, node) => {
+      if (typeof node.value === "string" && ambiguous.test(node.value)) {
+        node.type = "QUOTE_DOUBLE";
+      }
+    },
+  });
+  return `---\n${doc.toString()}---${body.endsWith("\n") ? body : `${body}\n`}`;
 }
 
 function cfSecretsPresent(secrets: ColdSecrets): boolean {
