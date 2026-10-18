@@ -20,7 +20,6 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: zero-fabrication restructure — ColdStage[] runner, fixture matrix, intake staging + compose seams, deploy/probe/teardown/abort legs, skipped-status reporting</item>
   <item>RFC-1189: step 1 — partyKindLabels schema contract
 
 Add required partyKindLabels record (all seven creditPartyKindSchema
@@ -31,7 +30,8 @@ completeness gate with schema tests.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
-  <history>RFC-0965, RFC-0988, RFC-1307</history>
+  <item>RFC-1324: cold-run defect: handover-dry-run ran complete as sender — recipient key swap for HANDOVER-04</item>
+  <history>RFC-0965, RFC-0988, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
 
@@ -47,7 +47,7 @@ import type {
   KernelRuntimeContext,
 } from "@warpgogol/werkstatt-engine/kernel";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
-import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
+import { generateKeyPair, toHex, toPem } from "@warpgogol/werkstatt-engine/signing";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
 import {
@@ -769,14 +769,18 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
       name: "handover-dry-run",
       requiresMission: true,
       run: async () => {
-        const recipientPublicKey = toHex((await generateKeyPair()).publicKey);
+        // The recipient is a second keypair — prepare runs as the sender (site
+        // key), complete runs as the recipient: HANDOVER-04 derives the public
+        // key from SIGNING_PRIVATE_KEY and requires it to be the authorized
+        // recipient's, so the env var swaps to the recipient PEM for that call.
+        const recipient = await generateKeyPair();
         const prepareResult = (await executeKernelCommand({
           workspaceRoot: env.cloneRoot,
           commandName: "sternsystem.handover.prepare",
           argv: [
             `--id=${env.systemId}`,
             "--recipient-identity=human:e2e-recipient",
-            `--recipient-public-key=${recipientPublicKey}`,
+            `--recipient-public-key=${toHex(recipient.publicKey)}`,
             "--dry-run",
             "--json",
           ],
@@ -793,20 +797,31 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
         if (!prepareResult.data?.dryRun || !prepareResult.data?.signedAuthorization) {
           throw new Error("handover-dry-run: prepare --dry-run did not return signedAuthorization");
         }
-        const completeResult = (await executeKernelCommand({
-          workspaceRoot: env.cloneRoot,
-          commandName: "sternsystem.handover.complete",
-          argv: [
-            `--id=${env.systemId}`,
-            "--dry-run",
-            `--authorization-data=${JSON.stringify(prepareResult.data.signedAuthorization)}`,
-            "--json",
-          ],
-          outputFormat: "json",
-        })) as {
+        const senderKey = process.env.SIGNING_PRIVATE_KEY;
+        process.env.SIGNING_PRIVATE_KEY = toPem(recipient.privateKey, "private");
+        let completeResult: {
           exitCode?: number;
           data?: { dryRun?: boolean; newPassportHashPreview?: string };
         };
+        try {
+          completeResult = (await executeKernelCommand({
+            workspaceRoot: env.cloneRoot,
+            commandName: "sternsystem.handover.complete",
+            argv: [
+              `--id=${env.systemId}`,
+              "--dry-run",
+              `--authorization-data=${JSON.stringify(prepareResult.data.signedAuthorization)}`,
+              "--json",
+            ],
+            outputFormat: "json",
+          })) as typeof completeResult;
+        } finally {
+          if (senderKey === undefined) {
+            delete process.env.SIGNING_PRIVATE_KEY;
+          } else {
+            process.env.SIGNING_PRIVATE_KEY = senderKey;
+          }
+        }
         if (completeResult.exitCode !== 0) {
           throw new Error(
             `handover-dry-run: complete --dry-run failed with exit code ${completeResult.exitCode}`,
