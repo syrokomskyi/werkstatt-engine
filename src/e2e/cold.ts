@@ -20,12 +20,12 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1324: cold-run defect: handover-dry-run ran complete as sender — recipient key swap for HANDOVER-04</item>
   <item>RFC-1324: cold-run defect: ship-closed skipped mission.reconcile — RFC-1217 gate correctly blocked unreconciled workpiece</item>
-  <history>RFC-0965, RFC-0988, RFC-1189, RFC-1307, RFC-1324</history>
+  <item>RFC-1324: cold-run defect: ship-closed needs mission.validate before reconcile</item>
+  <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
 
@@ -904,8 +904,14 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
       requiresMission: true,
       run: async () => {
         // Workpiece commits must reach the cache clone before ship (RFC-1217
-        // unreconciled-commit gate) — the real lifecycle is commit → reconcile →
-        // ship, so reconcile runs here rather than bypassing the gate.
+        // unreconciled-commit gate) — the real lifecycle is commit → validate →
+        // reconcile → ship, so both run here rather than bypassing the gate.
+        await runSubCommand(
+          env.cloneRoot,
+          "mission.validate",
+          [`--mission=${env.missionId}`],
+          env.logger,
+        );
         await runSubCommand(
           env.cloneRoot,
           "mission.reconcile",
