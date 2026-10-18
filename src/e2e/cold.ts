@@ -25,6 +25,7 @@
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
   <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
+  <item>RFC-1324: provision ../pipelines sibling into the clone root so optional axiom link deps resolve and gated probes (a11y.axe) actually execute</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -615,6 +616,20 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
         await execChecked(env.io, "git", ["clone", parentWorkspaceRoot, env.cloneRoot], {
           timeoutMs: 60000,
         });
+        // Environment provisioning (not site content): the workspace declares
+        // optional axiom link deps via ../pipelines — a sibling of the source
+        // repo. Providing the same sibling layout lets the optional packages
+        // resolve so gates that consume them (a11y.axe.probe) actually run;
+        // when absent, pnpm skips the optionalDeps and the probes stay inert.
+        const pipelinesSrc = path.join(dirname(parentWorkspaceRoot), "pipelines");
+        if (await env.io.exists(pipelinesSrc)) {
+          await execChecked(
+            env.io,
+            "git",
+            ["clone", pipelinesSrc, path.join(env.coldRoot, "pipelines")],
+            { timeoutMs: 60000 },
+          );
+        }
         await env.io.mkdir(env.cacheRoot);
         await env.io.mkdir(env.gitRoot);
       },
