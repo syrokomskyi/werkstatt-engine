@@ -13,11 +13,13 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: REVIEW-CODE-2026-10-16-10 O1-O3: typed kept-* outcome for rollback dir removal, lease-anchored remote-ref deletes with in-place verify, footer-promo suffix matcher with deterministic extension preference</item>
   <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
   <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -54,6 +56,9 @@ import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
+import { isProvisionalHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
+import { deriveProvisionalDeployment, type ProvisionalDeployment } from "./provisional-host.ts";
+import { resolveSubdomainEnv } from "../subdomain/subdomain-helpers.ts";
 
 export interface SternsystemRegisterData {
   command: "sternsystem.register";
@@ -127,7 +132,7 @@ export async function prepareIntakeSeed(
     domain?: string;
   },
   context: KernelRuntimeContext,
-): Promise<IntakeSeedPlan> {
+): Promise<IntakeSeedPlan & { provisionalDeployment?: ProvisionalDeployment }> {
   const { io, workspaceRoot } = context;
   const bundleDir = isAbsolute(input.intakeDir)
     ? input.intakeDir
@@ -176,12 +181,28 @@ export async function prepareIntakeSeed(
   }
   if (intakeDomain === null && input.domain === undefined) {
     throw new Error(
-      "[sternsystem.register] the intake carries no confirmed domain — pass --domain <host> (e.g. the provisional <worker>.<account>.workers.dev host) until the real domain is decided",
+      "[sternsystem.register] the intake carries no confirmed domain — pass --domain <host> (e.g. the provisional <worker>.<account>.workers.dev host) until the real domain is decided", // site-host: operator-facing guidance text, not host classification
     );
   }
   if (input.domain !== undefined && !/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(input.domain)) {
     throw new Error(
       `[sternsystem.register] --domain '${input.domain}' is not a bare lowercase host name (no scheme, no path)`,
+    );
+  }
+
+  // RFC-1325: a provisional workers.dev host is a first-class birth host —
+  // verify the account + worker-name availability and derive the deployment
+  // block before any write.
+  const effectiveDomain = intakeDomain ?? input.domain;
+  let provisionalDeployment: ProvisionalDeployment | undefined;
+  if (effectiveDomain !== undefined && isProvisionalHost(effectiveDomain)) {
+    const env = await resolveSubdomainEnv();
+    provisionalDeployment = await deriveProvisionalDeployment(
+      input.id,
+      effectiveDomain,
+      io,
+      workspaceRoot,
+      env,
     );
   }
 
@@ -211,7 +232,7 @@ export async function prepareIntakeSeed(
     assetBytes.set(asset.id, await io.readFileBytes(join(bundleDir, asset.file)));
   }
 
-  return planSeedFromIntake({
+  const plan = planSeedFromIntake({
     intake,
     intakeSha256: byteHash(intakeBytes),
     systemId: input.id,
@@ -220,6 +241,7 @@ export async function prepareIntakeSeed(
     ...(input.domain !== undefined ? { domainFallback: input.domain } : {}),
     assetBytes,
   });
+  return provisionalDeployment === undefined ? plan : { ...plan, provisionalDeployment };
 }
 
 async function writeSeedFiles(
@@ -927,7 +949,14 @@ export async function runSternsystemRegister(
     // Flags mark "write begun", not "write succeeded" — a mid-write throw
     // leaves partial output that rollback must still remove.
     configCreated = true;
-    await writeSystemConfig(workspaceRoot, id, newConfig, context.io);
+    await writeSystemConfig(
+      workspaceRoot,
+      id,
+      seedPlan.provisionalDeployment === undefined
+        ? newConfig
+        : { ...newConfig, deployment: seedPlan.provisionalDeployment },
+      context.io,
+    );
 
     const pinInput: Record<string, KernelFlagValue> = { id };
     if (platform) pinInput.platform = platform;

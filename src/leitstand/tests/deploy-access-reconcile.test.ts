@@ -24,6 +24,9 @@ F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
 F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
   <history>RFC-1284</history>
 </CHANGE_SUMMARY>
 */
@@ -34,6 +37,7 @@ import { join, resolve } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { executeDeployPhases } from "../deploy-execution.ts";
+import { verifyFreshness } from "../leitstand-commands.ts";
 import type { DeployExecutionContext } from "../deploy-execution.ts";
 import type {
   DeploymentAdapter,
@@ -137,7 +141,8 @@ function makeAdapter(): DeploymentAdapter {
 const systemConfig: DeploymentStaticConfig = {
   adapter: "cloudflare-workers",
   channels: {
-    dev: { workerName: "test-dev", url: "https://test-dev.workers.dev" },
+    // RFC-1325: custom-domain dev channel — a workers.dev URL would trigger provisional auto-protect.
+    dev: { workerName: "test-dev", url: "https://dev.example.com" },
     alt: { workerName: "test-alt", url: "https://alt.example.com" },
     main: { workerName: "test-main", url: "https://main.example.com" },
   },
@@ -356,6 +361,14 @@ test("RFC-1284: reconcile failure is non-fatal — result records the diagnostic
   try {
     deploySystemState = { ...deploySystemState, accessPin: "4092" };
     wranglerSecretPutExitCode = 1;
+    // Custom-domain dev channel runs the freshness gate — verify it passes so
+    // the reconcile failure is the only diagnostic on the result.
+    vi.mocked(verifyFreshness).mockResolvedValueOnce({
+      verified: true,
+      cdnDistTreeHash: "hash",
+      localDistTreeHash: "hash",
+      attempts: 1,
+    });
     const result = await executeDeployPhases(makeCtx(makeAdapter(), tmp), "dev");
 
     expect(result.accessReconcile?.ok).toBe(false);

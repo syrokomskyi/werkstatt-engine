@@ -9,6 +9,9 @@
   <item>RFC-0866: initial test for executeDeployPhases with null adapter and dev channel.</item>
   <item>REVIEW-CODE-2026-10-01-01: stub bootSmokeCapable() on the test nullAdapter (required DeploymentAdapter method).</item>
   <item>RFC-1179: smoke-gate wiring tests — site.smoke.run/deploy.smoke.run invoked on every channel after health, non-zero exits map to failingPhase "site-smoke"/"deploy-smoke".</item>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -311,6 +314,66 @@ test("executeDeployPhases marks failingPhase deploy-smoke when deploy.smoke.run 
     });
     const result = await executeDeployPhases(makeCtx("op-smoke-fail2", tmp), "dev");
     expect(result.failingPhase).toBe("deploy-smoke");
+  } finally {
+    const mock = await getKernelMock();
+    mock.mockResolvedValue(mockReport(0, "ok"));
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+// RFC-1325: provisional-host auto-protect — a workers.dev dev/alt deploy with
+// no declared accessPin invokes leitstand.access.protect; custom-domain and
+// already-declared pins never invoke it.
+test("executeDeployPhases auto-protects a provisional dev channel with no declared pin", async () => {
+  const tmp = makeWorkspace();
+  try {
+    const mock = await getKernelMock();
+    mock.mockClear();
+    const result = await executeDeployPhases(makeCtx("op-autoprot", tmp), "dev");
+    expect(result.failingPhase).toBeUndefined();
+    const protectCall = mock.mock.calls.find(
+      (c) => (c[0] as { commandName: string }).commandName === "leitstand.access.protect",
+    );
+    expect(protectCall).toBeDefined();
+    expect((protectCall?.[0] as { argv: string[] }).argv).toContain("--site=test-sys");
+    expect(result.accessReconcile).toEqual({ ok: true });
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+test("executeDeployPhases does not auto-protect a custom-domain alt channel", async () => {
+  const tmp = makeWorkspace();
+  try {
+    const mock = await getKernelMock();
+    mock.mockClear();
+    const result = await executeDeployPhases(makeCtx("op-noautoprot", tmp), "alt");
+    expect(result.failingPhase).toBeUndefined();
+    const names = mock.mock.calls.map((c) => (c[0] as { commandName: string }).commandName);
+    expect(names).not.toContain("leitstand.access.protect");
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+test("executeDeployPhases surfaces a failed auto-protect as accessReconcile.error", async () => {
+  const tmp = makeWorkspace();
+  try {
+    const mock = await getKernelMock();
+    mock.mockClear();
+    mock.mockImplementation(async (input) => {
+      const { commandName } = input as { commandName: string };
+      return commandName === "leitstand.access.protect"
+        ? mockReport(1, "wrangler secret put failed")
+        : mockReport(0, "ok");
+    });
+    const result = await executeDeployPhases(makeCtx("op-autoprot-fail", tmp), "dev");
+    expect(result.failingPhase).toBeUndefined();
+    expect(result.accessReconcile?.ok).toBe(false);
+    expect(result.accessReconcile?.error).toMatch(/access\.protect failed/);
   } finally {
     const mock = await getKernelMock();
     mock.mockResolvedValue(mockReport(0, "ok"));

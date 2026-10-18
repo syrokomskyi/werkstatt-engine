@@ -11,6 +11,9 @@ across the three new command handlers.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-0806: initial extraction of shared service deploy helpers.</item>
   <item>RFC-1188: Web Bot Auth outbound identity: wba-sign primitives, directory emit+sweep, AGS-WBA-01, leitstand signed fetches</item>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -118,7 +121,7 @@ export async function runWranglerRollback(
 }
 
 export function extractWorkersDevUrl(stdout: string): string | undefined {
-  const match = stdout.match(/https?:\/\/[^\s]+\.workers\.dev[^\s]*/);
+  const match = stdout.match(/https?:\/\/[^\s]+\.workers\.dev[^\s]*/); // site-host: wrangler stdout URL extraction, not site-host classification
   return match ? match[0] : undefined;
 }
 

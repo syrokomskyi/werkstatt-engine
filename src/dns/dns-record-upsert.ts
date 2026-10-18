@@ -11,12 +11,14 @@ Supports --dry-run to preview changes without making API calls.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0812: export toApiRecord for unit testing.</item>
   <item>RFC-0817: graceful skip when dns-records.yaml is absent instead of throwing.</item>
   <item>RECOVERY-2026-10-04: upsert matches via pickBestLiveMatch + consumed-live tracking (same as dns.record.validate) — naive find(type+name) compared every declaration against the first same-identity record, misbinding parallel MX / dual apex TXT and producing bogus update/create calls (CF 1046 on Email-Routing MX, 81058 duplicate-TXT). Cloudflare codes 1046/81058 now classify as skipped (goal state externally owned or already satisfied) instead of errors.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
-  <history>RFC-0753</history>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <history>RFC-0753, RFC-0812</history>
 </CHANGE_SUMMARY>
 */
 
@@ -42,6 +44,7 @@ import {
 } from "./dns-helpers.ts";
 import { ensureTxtQuoted } from "./txt-normalize.ts";
 import type { DnsRecordDeclaration } from "@warpgogol/werkstatt-shared/ontology/schemas";
+import { isProvisionalHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
 
 export interface DnsRecordUpsertResult {
   command: "dns.record.upsert";
@@ -96,7 +99,7 @@ export async function runDnsRecordUpsert(
 
   // A provisional Cloudflare *.workers.dev host has no DNS zone the site
   // controls — there is nothing to upsert until the real domain is live.
-  if (/(^|\.)workers\.dev$/i.test(declaration.zone)) {
+  if (isProvisionalHost(declaration.zone)) {
     return {
       data: {
         command: "dns.record.upsert",

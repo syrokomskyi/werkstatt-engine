@@ -8,11 +8,13 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RECOVERY-2026-10-05: stale-channel detection — resolveDevDeploymentRecord captures the releaseId of the latest succeeded dev record; detectMeasuredReleaseMismatch flags when a remote (non---base-url) certify would measure a different artifact than the candidate. Upfront logger.warn, measured-release reason in the gate decision, and a fail-summary hint pointing at the --base-url recovery path (warpgogol r000028 dev gate measured stale r000027).</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1284: crash-safe access protection — suspend-before-measure via durable accessPinSuspended marker, stale-marker entry resume (flag=true), finally-restore, pinManagement {suspended,resumed,staleResumed,restoreError}, isProtectedLiveTarget gating, cache-clone marker store (Q-6), flag=false+suspended proceeds without resume (Q-7)</item>
   <item>RFC-1295</item>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
   <history>RECOVERY-2026, REVIEW-CODE-2026, RFC-0866, RFC-0867, RFC-0929, RFC-0938, RFC-1097, RFC-1126, RFC-1149, RFC-1190</history>
 </CHANGE_SUMMARY>
 */
@@ -61,6 +63,7 @@ import type { ReleaseCandidateV1 } from "../certification/contracts/candidate.ts
 import type { CertificationPolicyBundleV1 } from "../certification/contracts/policy-bundle.ts";
 import { gateDecisionV1Schema } from "../certification/contracts/decisions.ts";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { isDevOrAltHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
 
 const PIN_DELETION_PROPAGATION_DELAY_MS = 5000;
 
@@ -1361,7 +1364,7 @@ export async function isProtectedLiveTarget(
     .filter((h): h is string => h !== null);
 
   if (channelHosts.includes(hostname)) return true;
-  return /^(dev|alt)[.-]/.test(hostname);
+  return isDevOrAltHost(hostname);
 }
 
 // RECOVERY-2026-10-05: stale-channel detection. A remote certify without

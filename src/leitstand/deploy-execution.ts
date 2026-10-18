@@ -8,7 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1190: evidence.sync fail-closed when evidence/axiom + evidence-metadata.json exist (throws EVIDENCE_SYNC_FAILED, failingPhase "evidence-sync") and a clean no-op when absent — replaces the swallowed-error branch that reported deploy success while uploading nothing; axiomStatus/axiomExitCode + missionContext surfaced on DeployExecutionResult.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
@@ -33,7 +32,10 @@ F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
   <item>RFC-1297: buildAuthHeader re-exported from sternsystem/live-drift.ts (canonical home); gate selection uses gateForChannel.</item>
-  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188</history>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188, RFC-1190</history>
 </CHANGE_SUMMARY>
 */
 
@@ -80,6 +82,7 @@ import {
 } from "../integrity/signing.ts";
 import { loadPrivateKey } from "@warpgogol/werkstatt-engine/signing";
 import { createDefaultIO, type WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { isProvisionalHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
 // RFC-1297: canonical home moved to sternsystem/live-drift.ts so
 // sternsystem.validate / ship preflight / rollback share the same PIN header;
 // re-exported here so existing imports and test mocks keep working.
@@ -174,7 +177,7 @@ function getChannelConfig(
 }
 
 function isDevWorkersUrl(url: string): boolean {
-  return url.includes(".workers.dev");
+  return isProvisionalHost(url);
 }
 
 async function runPurgeStep(
@@ -528,10 +531,30 @@ export async function executeDeployPhases(
     // sternsystem.validate is the backstop.
     if (channel !== "main") {
       try {
-        const freshState = await readSystemState(ctx.workspaceRoot, ctx.systemId);
+        let freshState = await readSystemState(ctx.workspaceRoot, ctx.systemId);
+        // RFC-1325: a provisional workers.dev birth has no pre-declared pin —
+        // the first dev/alt deploy creates protection via access.protect
+        // (which writes the secret itself, so the re-assert below is skipped).
+        if ((freshState?.accessPin ?? null) === null && isProvisionalHost(actualDeploymentUrl)) {
+          const { executeKernelCommand } = await import("@warpgogol/werkstatt-engine/kernel");
+          const protectResult = (await executeKernelCommand({
+            workspaceRoot: ctx.workspaceRoot,
+            commandName: "leitstand.access.protect",
+            argv: [`--site=${ctx.systemId}`],
+          })) as { exitCode?: number; summary?: string };
+          if (protectResult.exitCode === 0) {
+            accessReconcile = { ok: true };
+            freshState = await readSystemState(ctx.workspaceRoot, ctx.systemId);
+          } else {
+            accessReconcile = {
+              ok: false,
+              error: `leitstand.access.protect failed: ${protectResult.summary ?? "unknown error"}`,
+            };
+          }
+        }
         const desiredPin = freshState?.accessPin ?? null;
         const suspended = (freshState?.accessPinSuspended ?? null) !== null;
-        if (desiredPin !== null && !suspended) {
+        if (accessReconcile === undefined && desiredPin !== null && !suspended) {
           const secretsEnv = ctx.secretsFilePath ? await sourceDotenv(ctx.secretsFilePath) : {};
           const pinEnv = {
             ...filterEnv(process.env as Record<string, string | undefined>),

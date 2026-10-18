@@ -16,6 +16,7 @@ cloudflare-workers.ts (which wraps wrangler CLI) — this module uses the REST A
   <item>RFC-0752: initial Cloudflare REST API client — listDnsRecords, createDnsRecord, listWorkersRoutes, createWorkersRoute.</item>
   <item>RFC-0753: add pagination, retry, updateDnsRecord, deleteDnsRecord, generalized createDnsRecord for all record types.</item>
   <item>RFC-0896: add getRedirectRuleset, createRedirectRule for Cloudflare Rulesets API (Redirect Rules).</item>
+  <item>RFC-1325: add getWorkersSubdomain, listWorkerNames — account-scoped Workers subdomain + script-name listing for provisional-host birth.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -392,6 +393,87 @@ export async function createRedirectRule(
   }
 
   return body.result;
+}
+
+interface CloudflareWorkersSubdomainResult {
+  subdomain: string;
+}
+
+interface CloudflareWorkerScript {
+  id: string;
+}
+
+/**
+ * RFC-1325: account-scoped Workers subdomain —
+ * `GET /accounts/{accountId}/workers/subdomain`. Used at site birth to verify a
+ * provisional `--domain` host actually lives on this account.
+ */
+export async function getWorkersSubdomain(accountId: string, apiToken: string): Promise<string> {
+  const response = await fetchWithRetry(
+    `${CLOUDFLARE_API_BASE}/accounts/${accountId}/workers/subdomain`,
+    { headers: authHeaders(apiToken) },
+    "getWorkersSubdomain",
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+    throw new Error(
+      `[cloudflare-api] getWorkersSubdomain failed: HTTP ${response.status}: ${errorText}`,
+    );
+  }
+
+  const body =
+    (await response.json()) as CloudflareSingleResultResponse<CloudflareWorkersSubdomainResult>;
+  if (!body.success) {
+    const errorMessages = body.errors.map((e) => `${e.code}: ${e.message}`).join(", ");
+    throw new Error(`[cloudflare-api] getWorkersSubdomain API errors: ${errorMessages}`);
+  }
+
+  return body.result.subdomain;
+}
+
+/**
+ * RFC-1325: all Worker script names on the account — paginated
+ * `GET /accounts/{accountId}/workers/scripts`. Used at site birth to refuse a
+ * `<id>`/`dev-<id>`/`alt-<id>` worker-name collision before any write.
+ */
+export async function listWorkerNames(accountId: string, apiToken: string): Promise<string[]> {
+  const names: string[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const url = new URL(`${CLOUDFLARE_API_BASE}/accounts/${accountId}/workers/scripts`);
+    url.searchParams.set("per_page", String(perPage));
+    url.searchParams.set("page", String(page));
+
+    const response = await fetchWithRetry(
+      url.toString(),
+      { headers: authHeaders(apiToken) },
+      "listWorkerNames",
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(
+        `[cloudflare-api] listWorkerNames failed: HTTP ${response.status}: ${errorText}`,
+      );
+    }
+
+    const body = (await response.json()) as CloudflareListResponse<CloudflareWorkerScript>;
+    if (!body.success) {
+      const errorMessages = body.errors.map((e) => `${e.code}: ${e.message}`).join(", ");
+      throw new Error(`[cloudflare-api] listWorkerNames API errors: ${errorMessages}`);
+    }
+
+    names.push(...body.result.map((s) => s.id));
+
+    const totalPages = body.result_info?.total_pages ?? 1;
+    if (page >= totalPages) break;
+    page++;
+  }
+
+  return names;
 }
 
 export type {

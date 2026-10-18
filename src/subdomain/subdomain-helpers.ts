@@ -10,6 +10,9 @@ account subdomain derivation, and environment variable resolution.
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-0752: initial shared helpers — resolveZoneId, resolveAccountSubdomain, resolveSubdomainEnv.</item>
+  <item>RFC-1325: provisional workers.dev as first-class site host
+
+Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
 </CHANGE_SUMMARY>
 */
 
@@ -19,6 +22,7 @@ import type {
   ServicesRegistry,
 } from "@warpgogol/werkstatt-engine/schemas";
 import { filterEnv, sourceDotenv } from "../leitstand/adapters/cloudflare-workers.ts";
+import { workersDevHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
 
 export function flagString(
   input: { flags: Record<string, unknown> },
@@ -112,7 +116,7 @@ export async function resolveSubdomainEnv(
 }
 
 export function buildCnameContent(workerName: string, account: string): string {
-  return `${workerName}.${account}.workers.dev`;
+  return workersDevHost(workerName, account);
 }
 
 export function buildRoutePattern(domain: string): string {
