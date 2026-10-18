@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: provision ../pipelines sibling into the clone root so optional axiom link deps resolve and gated probes (a11y.axe) actually execute</item>
   <item>RFC-1324: isolate each matrix fixture in its own werkstatt child process (CI parity) — no registry/env state crosses cold births; runStep records errorStack</item>
   <item>RFC-1324: preflight checks tracked modifications only (--untracked-files=no) — the clone copies committed state, untracked files can neither enter it nor execute</item>
   <item>RFC-1324</item>
   <item>RFC-1324: isolated fixture child must report the requested fixture id</item>
+  <item>RFC-1324: cold-run defect: child report parser lost the JSON to post-report stage noise — bounded col-0 block scan; weighted stage budgets (ship 292-300s flat-split edge)</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -149,6 +149,12 @@ export interface ColdStage {
   always?: boolean;
   /** Return a reason to record the stage as `skipped`, or null to run it. */
   skipWhen?: (env: ColdEnv) => string | null;
+  /**
+   * Share of the total run budget relative to other stages (default 1). A
+   * flat split starves heavy stages: register and ship take minutes while
+   * handover-dry-run finishes in milliseconds.
+   */
+  timeoutWeight?: number;
   run: (env: ColdEnv) => Promise<void>;
 }
 
@@ -234,7 +240,12 @@ export async function runStagePlan(stages: ColdStage[], env: ColdEnv): Promise<C
       steps.push(skippedStep(stage.name, reason, env.logger));
       continue;
     }
-    const step = await runStep(stage.name, () => stage.run(env), env.logger, env.perStepTimeout);
+    const step = await runStep(
+      stage.name,
+      () => stage.run(env),
+      env.logger,
+      env.perStepTimeout * (stage.timeoutWeight ?? 1),
+    );
     steps.push(step);
     if (!step.ok) abortedBy = stage.name;
   }
@@ -251,17 +262,28 @@ export async function runStagePlan(stages: ColdStage[], env: ColdEnv): Promise<C
  * the fixture loop's only contract is the child's JSON report on stdout.
  */
 function parseChildMatrix(stdout: string): ColdMatrixReport | null {
-  // The CLI prints JSON.stringify(result, null, 2) as its final stdout line —
-  // the root object is the only `{` at column 0; prologue/log noise precedes it.
-  const idx = stdout.lastIndexOf("\n{");
-  const start = idx === -1 ? (stdout.startsWith("{") ? 0 : -1) : idx + 1;
-  if (start === -1) return null;
-  try {
-    const parsed = JSON.parse(stdout.slice(start)) as { data?: ColdMatrixReport };
-    return parsed?.data && Array.isArray(parsed.data.fixtures) ? parsed.data : null;
-  } catch {
-    return null;
+  // The CLI prints JSON.stringify(result, null, 2) as ONE report — but a
+  // timed-out stage's promise can keep running and interleave trailing log
+  // noise after it. The report root is a `{`...`}` block at column 0: scan
+  // candidate `{` positions from the end, bound each at the next column-0
+  // `}`, and take the last block that parses into a matrix shape.
+  const starts: number[] = [];
+  if (stdout.startsWith("{")) starts.push(0);
+  for (let idx = stdout.indexOf("\n{"); idx !== -1; idx = stdout.indexOf("\n{", idx + 1)) {
+    starts.push(idx + 1);
   }
+  for (let s = starts.length - 1; s >= 0; s--) {
+    const close = stdout.indexOf("\n}", starts[s]);
+    const candidate =
+      close === -1 ? stdout.slice(starts[s]).trimEnd() : stdout.slice(starts[s], close + 2);
+    try {
+      const parsed = JSON.parse(candidate) as { data?: ColdMatrixReport };
+      if (parsed?.data && Array.isArray(parsed.data.fixtures)) return parsed.data;
+    } catch {
+      // not a complete object — try the next earlier candidate
+    }
+  }
+  return null;
 }
 
 async function runFixtureInChildProcess(opts: {
@@ -678,7 +700,11 @@ export async function runColdE2e(
 
     const stages = buildFixtureStages(env, workspaceRoot);
     const plan = stages.filter((s) => withDeploy || !s.deployOnly);
-    env.perStepTimeout = Math.floor(timeoutMs / Math.max(1, plan.length));
+    // Weighted budget split: the run budget is divided into weight units so a
+    // minutes-long stage (register, ship) is not held to the same ceiling as a
+    // milliseconds-long one. perStepTimeout is one weight unit.
+    const totalWeight = plan.reduce((sum, s) => sum + (s.timeoutWeight ?? 1), 0);
+    env.perStepTimeout = Math.floor(timeoutMs / Math.max(1, totalWeight));
 
     let report: ColdRunReport;
     try {
@@ -790,6 +816,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
     },
     {
       name: "install",
+      timeoutWeight: 2,
       run: async () => {
         await execChecked(env.io, "pnpm", ["install", "--frozen-lockfile"], {
           cwd: env.cloneRoot,
@@ -807,6 +834,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
     },
     {
       name: "register-site",
+      timeoutWeight: 2,
       skipWhen: () =>
         env.intake?.domain === null && !cfSecretsPresent(env.secrets)
           ? `${CF_SKIP} — provisional birth domain unverifiable`
@@ -1155,6 +1183,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
     {
       name: "ship-closed",
       requiresMission: true,
+      timeoutWeight: 3,
       run: async () => {
         // Workpiece commits must reach the cache clone before ship (RFC-1217
         // unreconciled-commit gate) — the real lifecycle is commit → validate →

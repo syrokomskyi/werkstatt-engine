@@ -8,11 +8,12 @@ Unit tests for cold e2e covering werkstatt.e2e.cold. It also guards the document
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0965: initial unit tests for cold run handler — interventions, timeout, dirty tree, confinement, success.</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1324: fixture-staging + compose mocks — DirEntry/fs.Stats-shaped io mocks, real INTAKE-01..15 validation on staged bundles, skipped-stage awareness</item>
   <item>RFC-1324</item>
   <item>RFC-1324: Symlink pipelines sibling into cold clone so linked axiom dist resolves</item>
+  <item>RFC-1324: cold-run defect: child report parser lost the JSON to post-report stage noise — bounded col-0 block scan; weighted stage budgets (ship 292-300s flat-split edge)</item>
+  <history>RFC-0965</history>
 </CHANGE_SUMMARY>
 */
 
@@ -531,6 +532,67 @@ describe("werkstatt.e2e.cold", () => {
     for (const argv of childCalls) {
       expect(argv).toContain("--json");
       expect(argv).toContain("--until=closed");
+    }
+  });
+
+  it("parses the child report when trailing noise follows the JSON", async () => {
+    // A timed-out stage's promise keeps running past the report — its logs
+    // land on stdout AFTER the JSON. The parser must bound the report block
+    // instead of choking on the tail.
+    const trailingNoise = `\n[mf:inf] Parsed 38 header rules.\n{"not":"the report"}\nmore noise`;
+    mockExecFileSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "pnpm" && args?.includes("werkstatt.e2e.cold")) {
+        const fixture = args.find((a) => a.startsWith("--fixture="))?.split("=")[1] ?? "?";
+        const report = {
+          exitCode: 0,
+          data: {
+            command: "werkstatt.e2e.cold",
+            platformCommit: "abc",
+            fixtures: [
+              {
+                fixture,
+                systemId: `e2e-${fixture}`,
+                coldRoot: `/tmp/child-${fixture}`,
+                steps: [
+                  {
+                    step: "ship-closed",
+                    attempts: 1,
+                    durationMs: 300000,
+                    ok: false,
+                    status: "fail",
+                    error: 'step "ship-closed" timed out after 300000ms',
+                  },
+                ],
+                interventions: 0,
+                reachedPhase: "closed",
+                timedOut: true,
+                withDeploy: false,
+                ok: false,
+                summary: `[werkstatt.e2e.cold] ${fixture}: failed at ship-closed`,
+              },
+            ],
+            summary: `[werkstatt.e2e.cold] cold run failed: ${fixture} (ship-closed)`,
+          },
+        };
+        return `prologue logs\n${JSON.stringify(report, null, 2)}\n${trailingNoise}`;
+      }
+      return "";
+    });
+    const dir = (name: string) => ({ name, isFile: () => false, isDirectory: () => true });
+    const file = (name: string) => ({ name, isFile: () => true, isDirectory: () => false });
+    mockReaddir = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("intake/fixtures") || s.endsWith("intake\\fixtures"))
+        return [dir("de-domain"), dir("valid-minimal")];
+      return [file("intake.json")];
+    });
+
+    const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
+
+    // The child's real report surfaces — not a synthetic "no JSON" failure.
+    for (const fixture of result.data?.fixtures ?? []) {
+      expect(fixture.steps[0]?.step).toBe("ship-closed");
+      expect(fixture.steps[0]?.error).toContain("timed out");
     }
   });
 
