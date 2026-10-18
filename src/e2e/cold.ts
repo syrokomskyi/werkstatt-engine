@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
   <item>RFC-1324: provision ../pipelines sibling into the clone root so optional axiom link deps resolve and gated probes (a11y.axe) actually execute</item>
   <item>RFC-1324: isolate each matrix fixture in its own werkstatt child process (CI parity) — no registry/env state crosses cold births; runStep records errorStack</item>
   <item>RFC-1324: preflight checks tracked modifications only (--untracked-files=no) — the clone copies committed state, untracked files can neither enter it nor execute</item>
   <item>RFC-1324</item>
+  <item>RFC-1324: isolated fixture child must report the requested fixture id</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -306,7 +306,24 @@ async function runFixtureInChildProcess(opts: {
   const child = await io.exec("pnpm", argv, { cwd: workspaceRoot, timeoutMs: timeoutMs + 120_000 });
   const matrix = parseChildMatrix(child.stdout);
   const fixtureReport = matrix?.fixtures[0];
-  if (fixtureReport) return fixtureReport;
+  if (fixtureReport && fixtureReport.fixture === fixture) return fixtureReport;
+  if (fixtureReport) {
+    const error = `isolated fixture child reported fixture '${fixtureReport.fixture}' — expected '${fixture}'`;
+    return {
+      fixture,
+      systemId,
+      coldRoot: fixtureReport.coldRoot,
+      steps: [
+        { step: "fixture-child", attempts: 1, durationMs: 0, ok: false, status: "fail", error },
+      ],
+      interventions: 0,
+      reachedPhase: until,
+      timedOut: false,
+      withDeploy,
+      ok: false,
+      summary: `[werkstatt.e2e.cold] ${fixture}: ${error}`,
+    };
+  }
 
   // A parsed child with zero fixtures means the child failed before any birth
   // (e.g. its own preflight) — surface its summary instead of "no report".
