@@ -2,3 +2,5 @@
 overrides:
   "@warpgogol/forge": ^6.2.0
   "@warpgogol/werkstatt-shared": ^1.0.0
+minimumReleaseAgeExclude:
+  - "@warpgogol/werkstatt-shared@1.0.0"
