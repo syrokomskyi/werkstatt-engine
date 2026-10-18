@@ -11,6 +11,7 @@
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
   <item>RFC-1219: initial tests — op-interrupted marker, resume at failed step, masking regression.</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
 </CHANGE_SUMMARY>
 */
 
@@ -100,6 +101,8 @@ test("RFC-1219 AC-1/AC-2: failed ship journals op-interrupted and --resume conti
   const journalPath = path.join(operationsDir, "ship-m000001.jsonl");
 
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 1);
@@ -162,6 +165,8 @@ test("RFC-1219 AC-6: a completed later op does not mask an earlier interrupted s
   );
 
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);

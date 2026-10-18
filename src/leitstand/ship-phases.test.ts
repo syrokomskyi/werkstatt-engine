@@ -10,6 +10,7 @@ relaxes only the pre-ship reconcile/close precondition, never ship.</purpose>
 <CHANGE_SUMMARY>
   <item>RFC-1263: initial pin — validate precedes reconcile/close in ship.</item>
   <item>RFC-1263</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
 </CHANGE_SUMMARY>
 */
 
@@ -73,6 +74,8 @@ afterEach(async () => {
 test("AC-5: ship runs mission.validate before reconcile/close — a fast-lane record never substitutes", async () => {
   for (const name of [
     "leitstand.status",
+    "cloudflare.token.check",
+    "agent.search.index.create",
     "agent.search.warm",
     "mission.validate",
     "mission.reconcile",

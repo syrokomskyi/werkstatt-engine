@@ -10,6 +10,7 @@ readLiveChannelStates is injected via a module seam — no network in tests.</pu
 <CHANGE_SUMMARY>
   <item>RFC-1297: initial — AC-5 probe.</item>
   <item>RFC-1297</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
 </CHANGE_SUMMARY>
 */
 
@@ -114,6 +115,8 @@ test("AC-5: ship preflight throws live drift when recorded ≠ live", async () =
 test("matching live state lets preflight continue past the drift check", async () => {
   for (const name of [
     "leitstand.status",
+    "cloudflare.token.check",
+    "agent.search.index.create",
     "agent.search.warm",
     "mission.validate",
     "mission.reconcile",

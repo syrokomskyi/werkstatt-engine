@@ -13,6 +13,7 @@ collision refusal (AC-3), and pre-write fail-fast ordering.</purpose>
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
   <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
 </CHANGE_SUMMARY>
 */
 
@@ -89,6 +90,10 @@ beforeEach(async () => {
     data: { missionId: "dp7-m000001" },
     exitCode: 0,
   } as unknown as Awaited<ReturnType<typeof registerDeps.openMission>>);
+  vi.spyOn(registerDeps, "provisionExternal").mockResolvedValue({
+    ok: true,
+    provisioned: ["cloudflare.token.check", "agent.search.index.create"],
+  });
 });
 
 afterEach(async () => {

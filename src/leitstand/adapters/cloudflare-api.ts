@@ -17,6 +17,7 @@ cloudflare-workers.ts (which wraps wrangler CLI) — this module uses the REST A
   <item>RFC-0753: add pagination, retry, updateDnsRecord, deleteDnsRecord, generalized createDnsRecord for all record types.</item>
   <item>RFC-0896: add getRedirectRuleset, createRedirectRule for Cloudflare Rulesets API (Redirect Rules).</item>
   <item>RFC-1325: add getWorkersSubdomain, listWorkerNames — account-scoped Workers subdomain + script-name listing for provisional-host birth.</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
 </CHANGE_SUMMARY>
 */
 
@@ -474,6 +475,100 @@ export async function listWorkerNames(accountId: string, apiToken: string): Prom
   }
 
   return names;
+}
+
+interface CloudflareTokenVerifyResult {
+  id: string;
+  status: string;
+}
+
+/**
+ * RFC-1326: `GET /user/tokens/verify` — resolves the token's id and status so
+ * cloudflare.token.check can name the exact dashboard token under test.
+ */
+export async function verifyToken(apiToken: string): Promise<{ id: string; status: string }> {
+  const response = await fetchWithRetry(
+    `${CLOUDFLARE_API_BASE}/user/tokens/verify`,
+    { headers: authHeaders(apiToken) },
+    "verifyToken",
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+    throw new Error(`[cloudflare-api] verifyToken failed: HTTP ${response.status}: ${errorText}`);
+  }
+
+  const body =
+    (await response.json()) as CloudflareSingleResultResponse<CloudflareTokenVerifyResult>;
+  if (!body.success) {
+    const errorMessages = body.errors.map((e) => `${e.code}: ${e.message}`).join(", ");
+    throw new Error(`[cloudflare-api] verifyToken API errors: ${errorMessages}`);
+  }
+
+  return { id: body.result.id, status: body.result.status };
+}
+
+export type CloudflareProbeOutcome = "ok" | "missing" | "unknown";
+
+const PERMISSION_DENIED_CODES = new Set([10000, 9109, 10001]);
+
+/**
+ * RFC-1326: one registry probe — a read-only GET proving a permission scope.
+ * `ok` = endpoint answered; `missing` = HTTP 403 or a Cloudflare permission
+ * error code (10000/9109/10001); anything else (network failure, unexpected
+ * status) = `unknown` — a warning, never a `missing` verdict.
+ */
+export async function probePermission(
+  path: string,
+  apiToken: string,
+): Promise<CloudflareProbeOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`${CLOUDFLARE_API_BASE}${path}`, {
+      headers: authHeaders(apiToken),
+    });
+  } catch {
+    return "unknown";
+  }
+
+  if (response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      success?: boolean;
+      errors?: { code: number }[];
+    } | null;
+    if (body && body.success === false) {
+      const codes = (body.errors ?? []).map((e) => e.code);
+      return codes.some((c) => PERMISSION_DENIED_CODES.has(c)) ? "missing" : "unknown";
+    }
+    return "ok";
+  }
+  if (response.status === 403) return "missing";
+  return "unknown";
+}
+
+/**
+ * Resolve a zone id from a domain name — `GET /zones?name=<domain>` — so
+ * `--zone` accepts either an id or a domain (RFC-1326).
+ */
+export async function resolveZoneIdByName(
+  domain: string,
+  apiToken: string,
+): Promise<string | null> {
+  let response: Response;
+  try {
+    const url = new URL(`${CLOUDFLARE_API_BASE}/zones`);
+    url.searchParams.set("name", domain);
+    response = await fetch(url.toString(), { headers: authHeaders(apiToken) });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const body = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    result?: { id: string }[];
+  } | null;
+  if (!body?.success || !Array.isArray(body.result) || body.result.length === 0) return null;
+  return body.result[0]!.id;
 }
 
 export type {

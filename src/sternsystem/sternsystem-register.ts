@@ -13,13 +13,13 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
   <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
   <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -62,6 +62,7 @@ import {
 } from "@warpgogol/werkstatt-shared/middleware/site-host";
 import { deriveProvisionalDeployment, type ProvisionalDeployment } from "./provisional-host.ts";
 import { resolveSubdomainEnv } from "../subdomain/subdomain-helpers.ts";
+import { provisionExternalResources } from "./provision-external-resources.ts";
 
 export interface SternsystemRegisterData {
   command: "sternsystem.register";
@@ -119,7 +120,11 @@ async function checkBiomeViaKernel(workspaceRoot: string, biomeId: string): Prom
 }
 
 /** Seams for tests — production code always uses the kernel-registry check. */
-export const registerDeps = { checkBiome: checkBiomeViaKernel, openMission: runMissionOpen };
+export const registerDeps = {
+  checkBiome: checkBiomeViaKernel,
+  openMission: runMissionOpen,
+  provisionExternal: provisionExternalResources,
+};
 
 /**
  * RFC-1307 preconditions for a new registration — run before any file write.
@@ -1054,6 +1059,21 @@ export async function runSternsystemRegister(
     );
     missionId = missionResult.data!.missionId;
     missionOpened = true;
+
+    // RFC-1326: provision external resources the wrangler bindings need —
+    // cloudflare.token.check names a missing permission, then the Vectorize
+    // index is created while mission m000001 is still open. Failures roll back
+    // the birth (mission abort + file rewind) instead of surfacing at deploy.
+    const provisionResult = await registerDeps.provisionExternal(context, {
+      systemId: id,
+      missionOpen: true,
+    });
+    if (!provisionResult.ok) {
+      throw new Error(`external resource provisioning failed: ${provisionResult.error}`);
+    }
+    logger.info(
+      `  [sternsystem.register] external resources provisioned (${provisionResult.provisioned.join(", ")})`,
+    );
 
     // RFC-0951: mission.open now auto-materializes the workpiece internally.
     // No explicit runMissionMaterialize call needed here.

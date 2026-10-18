@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0962 fo-fix: added --until alt, --until main, invalid --until, releaseId restoration on resume tests; fixed resume test for stepResults including skipped steps.</item>
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1190: step-count updates for the 18-step plan (evidence-sync-* after each certify-*); mission + skip-evidence-sync added to deploy PHASE_FLAGS; evidence.sync flag table entry.</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
@@ -15,6 +14,7 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
 
 2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1207: candidate-preview certify — wrangler dev on releases/<id>/dist/server measures the candidate artifact</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
   <history>RFC-0962</history>
 </CHANGE_SUMMARY>
 */
@@ -63,6 +63,8 @@ const mockExecuteKernelCommand = executeKernelCommand as unknown as ReturnType<t
 
 const PHASE_FLAGS: Record<string, string[]> = {
   "leitstand.status": ["site", "system", "channel"],
+  "cloudflare.token.check": [],
+  "agent.search.index.create": ["site"],
   "agent.search.warm": ["site"],
   "mission.validate": [
     "mission",
@@ -197,6 +199,8 @@ afterEach(async () => {
 
 function setupFullSuccessMocks(releaseId: string = "test-sys-r000001"): void {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -234,6 +238,8 @@ test("full pipeline success — all 18 steps complete, exitCode 0", async () => 
 
 test("--until validated stops after mission-validate (2 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
 
@@ -251,6 +257,8 @@ test("--until validated stops after mission-validate (2 steps)", async () => {
 
 test("--until closed stops after mission-close (4 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -270,6 +278,8 @@ test("--until closed stops after mission-close (4 steps)", async () => {
 
 test("--until dev stops after certify-dev + dev-deploy + evidence-sync + sync (10 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -295,6 +305,8 @@ test("--until dev stops after certify-dev + dev-deploy + evidence-sync + sync (1
 
 test("mission.validate fails — exitCode 1, failedStep set", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 1);
 
@@ -310,6 +322,8 @@ test("mission.validate fails — exitCode 1, failedStep set", async () => {
 
 test("release.prepare fails — exitCode 1, pipeline stops before certify", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -328,6 +342,8 @@ test("release.prepare fails — exitCode 1, pipeline stops before certify", asyn
 
 test("certify-dev fails — exitCode 1, deploy not called", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -349,6 +365,8 @@ test("certify-dev fails — exitCode 1, deploy not called", async () => {
 
 test("self-healing: dirty workpiece after validate triggers auto-commit + re-validate", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   // RFC-1217's gate consumes io.exec calls before mission-validate — dispatch on
@@ -385,6 +403,8 @@ test("RFC-1207 AC-6: certify step-done journal record carries candidatePreview.a
   const artifactHash = `sha256:${"b".repeat(64)}`;
 
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -429,6 +449,8 @@ test("resume after failure skips completed steps", async () => {
   const journalPath = path.join(operationsDir, "ship-m000001.jsonl");
 
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 1);
@@ -556,6 +578,8 @@ test("epilogue sync failure is non-fatal — ship result unaffected", async () =
 
 test("epilogue sync also sweeps after a failed op (journal reaches mirrors for --resume)", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 1);
   mockPhaseResult("sternsystem.sync", 0); // epilogue still runs
@@ -575,6 +599,8 @@ test("epilogue sync also sweeps after a failed op (journal reaches mirrors for -
 
 test("--until alt stops after certify-alt + propagate + evidence-sync + sync (13 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -603,6 +629,8 @@ test("--until alt stops after certify-alt + propagate + evidence-sync + sync (13
 
 test("--until main stops after certify-main + promote + evidence-sync + sync (16 steps)", async () => {
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -644,6 +672,8 @@ test("resume restores releaseId from journal after release-prepare completed", a
 
   // First run: succeeds through release-prepare, fails at release-ready
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
   mockPhaseResult("mission.reconcile", 0);
@@ -697,6 +727,7 @@ test("closed mission + --until alt stops at sync-after-alt — promote never run
   await fs.writeFile(path.join(tmpDir, "missions", "m000001", "mission.yaml"), "state: closed\n");
 
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000050" });
   mockPhaseResult("sternsystem.sync", 0);
@@ -741,6 +772,7 @@ test("archived closed mission — resolves archive path, skips lifecycle, .env f
   await fs.writeFile(path.join(tmpDir, "systems-cache", "test-sys", ".env"), "TEST=1\n");
 
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("release.prepare", 0, { releaseId: "test-sys-r000060" });
   mockPhaseResult("sternsystem.sync", 0);
@@ -810,6 +842,8 @@ function stubGateExec(opts: { count: string; oneline?: string; fetchFails?: bool
 test("RFC-1217 AC-1+AC-4: unreconciled workpiece commits block at preflight before mission.validate", async () => {
   stubGateExec({ count: "2", oneline: "fba300a1 regenerate docs\n641165e8 touch readme" });
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
 
   const result = await runLeitstandShip(
@@ -832,6 +866,8 @@ test("RFC-1217 AC-1+AC-4: unreconciled workpiece commits block at preflight befo
 test("RFC-1217 AC-2: fully merged workpiece — gate passes, ship proceeds to mission-validate", async () => {
   stubGateExec({ count: "0" });
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
 
@@ -851,6 +887,8 @@ test("RFC-1217 AC-2: fully merged workpiece — gate passes, ship proceeds to mi
 test("RFC-1217 AC-3: --allow-unreconciled degrades the gate to a warning", async () => {
   stubGateExec({ count: "3", oneline: "abc1234 x\ndef5678 y\naaa9999 z" });
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
 
@@ -876,6 +914,8 @@ test("RFC-1217 AC-5: closed mission skips the gate entirely — no workpiece fet
   await fs.writeFile(path.join(tmpDir, "missions", "m000001", "mission.yaml"), "state: closed\n");
   stubGateExec({ count: "9" }); // would block if the gate ran
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
 
   const result = await runLeitstandShip(
@@ -894,6 +934,8 @@ test("RFC-1217 AC-5: closed mission skips the gate entirely — no workpiece fet
 test("RFC-1217 degrade: git unreadable (fetch fails) warns but does not block", async () => {
   stubGateExec({ count: "0", fetchFails: true });
   mockPhaseResult("leitstand.status", 0);
+  mockPhaseResult("cloudflare.token.check", 0);
+  mockPhaseResult("agent.search.index.create", 0);
   mockPhaseResult("agent.search.warm", 0);
   mockPhaseResult("mission.validate", 0);
 
@@ -908,4 +950,3 @@ test("RFC-1217 degrade: git unreadable (fetch fails) warns but does not block", 
   );
   expect(invoked).toContain("mission.validate");
 });
-

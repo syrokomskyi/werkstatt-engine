@@ -8,12 +8,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1217: preflight unreconciled-workpiece gate — cache-side `git fetch <workpieceDir> <branch>` + `rev-list HEAD..FETCH_HEAD` blocks ship when the workpiece carries commits the cache clone has not merged (the exact range fetch-and-merge would pull). Open missions only (closed-mission plans skip reconcile, so there is no merge to predict); git-unreadable degrades to a warning; --allow-unreconciled is the manual-merge escape hatch.</item>
   <item>RFC-1219: --resume logs the interrupted failed step (status/failedStep from findIncompleteOperation); formatShipTransition renders op-interrupted as "[ship] interrupted at step — run with --resume" for live followers.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1297: preflight step 2b — readLiveChannelStates + liveDriftDiagnostics; LIVE-01 aborts the ship with a resolve-first hint, LIVE-02 logs only.</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, RFC-1207, warpgogol-m000175</history>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, RFC-1207, RFC-1217, warpgogol-m000175</history>
 </CHANGE_SUMMARY>
 */
 
@@ -32,6 +32,7 @@ import { resolveCacheClonePath } from "../sternsystem/registry-io.ts";
 import { readLiveChannelStates, liveDriftDiagnostics } from "../sternsystem/live-drift.ts";
 import { resolveMissionDir } from "../kernel/mission-resolver.ts";
 import { flagSite } from "./deploy-helpers.ts";
+import { provisionExternalResources } from "../sternsystem/provision-external-resources.ts";
 
 function flagString(input: KernelCommandInput, key: string): string | undefined {
   const v = input.flags[key];
@@ -268,6 +269,18 @@ function buildPreflightStep(): OperationStep<ShipContext> {
         }
         ctx.logger.info("  [ship] preflight: live-drift check ok");
       }
+
+      // 2c. RFC-1326: provision external resources before any deploy step —
+      // cloudflare.token.check names a missing permission; the Vectorize index
+      // is ensured while the mission is still open (mutating command).
+      const provision = await provisionExternalResources(ctx, {
+        systemId: ctx.systemId,
+        missionOpen: !ctx.missionClosed,
+      });
+      if (!provision.ok) {
+        throw new Error(`preflight: external resource provisioning failed — ${provision.error}`);
+      }
+      ctx.logger.info("  [ship] preflight: external resources provisioned");
 
       // 3. Vectorize index ensure (best-effort, non-fatal — same pattern as deploy-execution.ts)
       try {

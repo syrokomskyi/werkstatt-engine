@@ -11,7 +11,6 @@
   <item>CLI execution must route through registered kernel commands and preserve typed flag parsing.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>ADR-0022: add --no-registry-cache flag to disable process-lifetime registry cache.</item>
   <item>RFC-0870: add pipeline hint to Unknown command and not-registered error messages.</item>
   <item>RFC-0972: global --json exit code policy — always exit 0 when outputFormat is json.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
@@ -20,11 +19,11 @@ Mechanical v1 to v2 header migration across the workspace: 942 files rewritten �
   <item>RFC-1097: sweep — werkstatt-engine clean
 
 Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
-  <history>RFC-0686</history>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <history>ADR-0022, RFC-0686</history>
 </CHANGE_SUMMARY>
 */
 
-import "dotenv/config";
 import process from "node:process";
 import {
   buildCommandManifest,
@@ -44,6 +43,7 @@ import {
   printUsage,
 } from "./flags.ts";
 import { assertBatchHasNoPositional, BatchUsageError, runBatch } from "./batch.ts";
+import { loadWorkshopEnvAllowlisted } from "../workshop-env.ts";
 // @ai-invariant: CLI execution must route through registered kernel commands and preserve typed flag parsing.
 
 /** RFC-0266: render one command's manifest entry (description + declared flags) for `--help`. */
@@ -95,6 +95,12 @@ function printTopLevelError(error: unknown): void {
 
 export async function main() {
   const workspaceRoot = await findWorkspaceRoot();
+
+  // RFC-1326: allow-listed workshop .env resolution replaces the blanket
+  // dotenv/config import — only WORKSHOP_ENV_ALLOWLIST keys reach
+  // process.env; site/service keys stay site-level via workpieceEnv.
+  await loadWorkshopEnvAllowlisted(workspaceRoot);
+
   const [subcommand, ...rest] = process.argv.slice(2);
 
   // ADR-0022: --no-registry-cache disables the process-lifetime registry cache.

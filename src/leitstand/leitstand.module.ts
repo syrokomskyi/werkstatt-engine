@@ -7,12 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1248: suppress transient releases/.werkstatt/ validator reads + complete PIPELINE-LOG rules declaration (RFC-1248 review r2)</item>
   <item>RFC-1284: register leitstand.access.suspend/resume; sternsystem.validate gains ACCESS-01/02 rules declaration</item>
   <item>RFC-1297: registered leitstand.state.reconcile (--site/--channel/--from-live/--reason; mutatesState, requiresNetwork).</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
-  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1190, RFC-1203, RFC-1207, RFC-1231</history>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <history>RFC-0627, RFC-0628, RFC-0700, RFC-0842, RFC-0866, RFC-0899, RFC-0927, RFC-0930, RFC-0962, RFC-1097, RFC-1136, RFC-1141, RFC-1168, RFC-1173, RFC-1190, RFC-1203, RFC-1207, RFC-1231, RFC-1248</history>
 </CHANGE_SUMMARY>
 */
 
@@ -61,6 +61,9 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
     runLeitstandAccessStatus,
   } = await import("./access-commands.ts");
   const { runLeitstandStateReconcile } = await import("./state-reconcile.ts");
+  const { cloudflarePermissionsGenerateCommand, cloudflarePermissionsValidateCommand } =
+    await import("./cloudflare-permissions.ts");
+  const { cloudflareTokenCheckCommand } = await import("./cloudflare-token-check.ts");
   return {
     name: "leitstand",
     version: "0.1.0",
@@ -783,7 +786,8 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         acceptsAllFlag: false,
         mutatesState: true,
         idempotency: "resume-only",
-        idempotencyNote: "Resume by journal via --resume; a plain re-run repeats remote deploy/DNS effects rather than converging to a no-op.",
+        idempotencyNote:
+          "Resume by journal via --resume; a plain re-run repeats remote deploy/DNS effects rather than converging to a no-op.",
         flags: {
           site: {
             kind: "string",
@@ -869,6 +873,9 @@ export async function createLeitstandModule(): Promise<ModuleExport> {
         cacheable: true,
         execute: runLeitstandShipStatus,
       },
+      cloudflarePermissionsGenerateCommand,
+      cloudflarePermissionsValidateCommand,
+      cloudflareTokenCheckCommand,
     ],
     pipelines: [],
   };

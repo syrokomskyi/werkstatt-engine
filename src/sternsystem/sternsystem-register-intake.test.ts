@@ -8,11 +8,11 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed intake assets into the pages domain so page credits match</item>
   <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
+  <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
   <history>REVIEW-CODE-2026, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -76,6 +76,10 @@ beforeEach(async () => {
   await writeFile(join(workspaceRoot, "werkstatt.identity.json"), "{}");
   process.env.SIGNING_PRIVATE_KEY = "deadbeef".repeat(8);
   vi.spyOn(registerDeps, "checkBiome").mockResolvedValue(null);
+  vi.spyOn(registerDeps, "provisionExternal").mockResolvedValue({
+    ok: true,
+    provisioned: ["cloudflare.token.check", "agent.search.index.create"],
+  });
 });
 
 afterEach(async () => {
