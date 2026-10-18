@@ -13,12 +13,12 @@ cloudflare-workers.ts (which wraps wrangler CLI) — this module uses the REST A
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0753: add pagination, retry, updateDnsRecord, deleteDnsRecord, generalized createDnsRecord for all record types.</item>
   <item>RFC-0896: add getRedirectRuleset, createRedirectRule for Cloudflare Rulesets API (Redirect Rules).</item>
   <item>RFC-1325: add getWorkersSubdomain, listWorkerNames — account-scoped Workers subdomain + script-name listing for provisional-host birth.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
   <item>RFC-1326: review-fix pass — siteName targeting for app-scoped provisioning, allow-list completion</item>
-  <history>RFC-0752</history>
+  <item>RFC-1324</item>
+  <history>RFC-0752, RFC-0753</history>
 </CHANGE_SUMMARY>
 */
 
@@ -301,6 +301,26 @@ export async function createWorkersRoute(
   return body.result;
 }
 
+export async function deleteWorkersRoute(
+  zoneId: string,
+  apiToken: string,
+  routeId: string,
+): Promise<void> {
+  const response = await fetchWithRetry(
+    `${CLOUDFLARE_API_BASE}/zones/${zoneId}/workers/routes/${routeId}`,
+    { method: "DELETE", headers: authHeaders(apiToken) },
+    "deleteWorkersRoute",
+  );
+
+  if (response.status === 404) return;
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+    throw new Error(
+      `[cloudflare-api] deleteWorkersRoute('${routeId}') failed: HTTP ${response.status}: ${errorText}`,
+    );
+  }
+}
+
 interface CloudflareRedirectRuleActionParameters {
   status_code: number;
   target_url: { expression: string };
@@ -476,6 +496,31 @@ export async function listWorkerNames(accountId: string, apiToken: string): Prom
   }
 
   return names;
+}
+
+/**
+ * RFC-1324: `DELETE /accounts/{accountId}/workers/scripts/{name}` — cold-run
+ * teardown removes every `e2e-*` worker a birth could have created. Throws on
+ * API failure; a 404 is treated as already-gone (idempotent teardown).
+ */
+export async function deleteWorkerScript(
+  accountId: string,
+  apiToken: string,
+  scriptName: string,
+): Promise<void> {
+  const response = await fetchWithRetry(
+    `${CLOUDFLARE_API_BASE}/accounts/${accountId}/workers/scripts/${scriptName}`,
+    { method: "DELETE", headers: authHeaders(apiToken) },
+    "deleteWorkerScript",
+  );
+
+  if (response.status === 404) return;
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+    throw new Error(
+      `[cloudflare-api] deleteWorkerScript('${scriptName}') failed: HTTP ${response.status}: ${errorText}`,
+    );
+  }
 }
 
 interface CloudflareTokenVerifyResult {

@@ -1,0 +1,15 @@
+---
+kind: page
+pageId: about
+cosmicStar: Mirach
+title: "About us | E2E Demowerk GmbH"
+description: "Information about E2E Demowerk GmbH and this website."
+lang: en
+blocks:
+  - id: about-content
+    type: markdown
+    props:
+      hideSectionNumber: true
+      heading: "About us"
+      contentRef: "prose/about-company"
+---

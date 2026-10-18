@@ -1,0 +1,80 @@
+---
+identity:
+  tagline: "Проверяемое качество по честной цене"
+  ctaTarget: contacts
+
+i18n:
+  supported:
+    ru: { name: "Русский" }
+    uz: { name: "Oʻzbekcha" }
+
+clientEditable:
+  - pages
+  - prose
+  - business-profile
+  - navigation
+  - site
+
+sharedContext:
+  requiredPageIds:
+    - home
+
+pages:
+  - pageId: home
+    semanticType: home
+    output:
+      sitemap: { category: content, lastmod: "2026-10-17", includeLastmod: true }
+    routes:
+      ru: ""
+      uz: ""
+    cosmicStar: Polaris
+    planets:
+      - { cosmicPlanet: Hyperion, pin: "latest" }
+
+  - pageId: about
+    semanticType: about
+    output:
+      sitemap: { category: content, lastmod: "2026-10-17", includeLastmod: true }
+    routes:
+      ru: "o-kompanii"
+      uz: "kompaniya-haqida"
+    cosmicStar: Mirach
+    planets:
+      - { cosmicPlanet: Hyperion, pin: "latest" }
+
+  - pageId: contacts
+    semanticType: content
+    output:
+      sitemap: { category: content, lastmod: "2026-10-17", includeLastmod: true }
+    routes:
+      ru: "kontakty"
+      uz: "aloqa"
+    cosmicStar: Alphard
+    planets:
+      - { cosmicPlanet: Hyperion, pin: "latest" }
+
+  - pageId: credits
+    semanticType: content
+    output:
+      sitemap: { category: legal, lastmod: "2026-10-17", includeLastmod: false }
+      llms: exclude
+    routes:
+      ru: "istochniki-materialov"
+      uz: "material-manbalari"
+    cosmicStar: Polaris
+    planets:
+      - { cosmicPlanet: Makemake, pin: "latest" }
+
+growth:
+  vendor:
+    adapter: "null"
+    options: {}
+  funnels: []
+  experiments: []
+
+robots:
+  crawlerBlocklist:
+    - nikto
+    - nmap
+    - sqlmap
+---

@@ -17,6 +17,7 @@ through WorkspaceIO; hashing is node:crypto sha256.</purpose>
   <item>Verbatim substring checks (INTAKE-05) run against text-typed evidence items only (text/*, application/json, message/rfc822); a binary-only source is an error,.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>RFC-1324: INTAKE-01 manifest coverage exempts the fixture-only composition/ tree (compose material, not intake payload).</item>
   <item>RFC-1328/AMD-005: INTAKE-12…15 — anchored internal-marker + assessment-vocabulary scan on published free text (name/statement/summary/description), locale-native statementByLocale coverage, WebP-only rasters, closed palette vocabulary; envelope-only fields stripped before the strict pbp parse (INTAKE-03).</item>
   <item>RFC-1281: created — validateIntakeBundle (INTAKE-01…11) + runIntakeValidate command + resolveIntakeExportSha256.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
@@ -246,8 +247,10 @@ export async function validateIntakeBundle(
         listed.set(rel, m[1]);
       }
 
+      // composition/ is RFC-1324 fixture compose material, not intake payload —
+      // it is exempt from manifest coverage (a real operator bundle never carries it).
       const diskFiles = (await listBundleFiles(bundleDir, io)).filter(
-        (f) => f !== "MANIFEST.sha256",
+        (f) => f !== "MANIFEST.sha256" && !f.startsWith("composition/"),
       );
       const diskSet = new Set(diskFiles);
 

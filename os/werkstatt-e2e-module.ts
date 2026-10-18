@@ -6,8 +6,8 @@
     <item>Do not implement cold run logic — delegate to src/e2e/cold.ts.</item>
   </non-goals>
 </MODULE_CONTRACT>
+  <history>RFC-0965</history>
 <CHANGE_SUMMARY>
-  <item>RFC-0965: initial werkstatt-e2e module registering werkstatt.e2e.cold.</item>
   <item>RFC-1097: step 6 — compass.migrate codemod run
 
 Mechanical v1 to v2 header migration across the workspace: 942 files rewritten — CHANGE_SUMMARY windows collapsed into history, forbidden v1 blocks stripped, KEY_DECISIONS seeded from @ai-invariant comments (5 files) or TODO placeholders (103 files), blocks reordered to canonical order.</item>
@@ -21,6 +21,7 @@ Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
 follows the parsed selector. Guard renamed assertAllSitesAllowed ->
 assertAllFlagAccepted, message updated. 417 declaration sites + type
 surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item>
+  <item>RFC-1324: intake fixture matrix + zero-fabrication cold run — --fixture/--until/--with-deploy flags, not-idempotent declaration, fixtures reads glob</item>
 </CHANGE_SUMMARY>
 */
 
@@ -30,7 +31,7 @@ import type {
   KernelRuntimeContext,
 } from "../src/kernel/types.ts";
 import type { ModuleExport } from "../src/runtime/desired-state.ts";
-import { runColdE2e, type ColdRunReport } from "../src/e2e/cold.ts";
+import { runColdE2e, type ColdMatrixReport } from "../src/e2e/cold.ts";
 
 export const werkstattE2eModule: ModuleExport = {
   name: "werkstatt-e2e",
@@ -43,13 +44,22 @@ export const werkstattE2eModule: ModuleExport = {
       contract: "werkstatt",
       rules: [],
       modulePath: "packages/werkstatt-engine/os/werkstatt-e2e-module.ts",
+      idempotency: "not-idempotent",
+      idempotencyNote:
+        "Provisions real external resources (workers, repos) per fixture; each run needs a fresh temp root + teardown (RFC-1324).",
       description:
-        "Cold end-to-end proving run: clone, install, scaffold, validate, release in a disposable temp directory (RFC-0965). Flags: --keep, --until, --with-deploy, --timeout-minutes, --json.",
+        "Cold end-to-end proving run: clone, install, register from an intake fixture, scripted compose, validate, release — one birth per fixture in a disposable temp directory (RFC-0965/1324). Flags: --fixture, --keep, --until, --with-deploy, --timeout-minutes, --json.",
       scope: "workspace",
       acceptsAllFlag: false,
       longRunning: true,
       cacheable: false,
       flags: {
+        fixture: {
+          kind: "string",
+          description:
+            "Run a single named intake fixture (default: all fixtures, sequentially, each in its own temp root)",
+          required: false,
+        },
         keep: {
           kind: "boolean",
           description: "Keep the temp directory for debugging (default: delete on success)",
@@ -69,11 +79,11 @@ export const werkstattE2eModule: ModuleExport = {
         },
         json: { kind: "boolean", description: "Output report as JSON" },
       },
-      reads: [],
+      reads: ["packages/werkstatt-engine/src/intake/fixtures/**"],
       async execute(
         input: KernelCommandInput,
         context: KernelRuntimeContext,
-      ): Promise<KernelCommandResult<ColdRunReport>> {
+      ): Promise<KernelCommandResult<ColdMatrixReport>> {
         return runColdE2e(input, context);
       },
     },

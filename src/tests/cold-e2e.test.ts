@@ -10,6 +10,7 @@ Unit tests for cold e2e covering werkstatt.e2e.cold. It also guards the document
 <CHANGE_SUMMARY>
   <item>RFC-0965: initial unit tests for cold run handler — interventions, timeout, dirty tree, confinement, success.</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
+  <item>RFC-1324: fixture-staging + compose mocks — DirEntry/fs.Stats-shaped io mocks, real INTAKE-01..15 validation on staged bundles, skipped-stage awareness</item>
 </CHANGE_SUMMARY>
 */
 
@@ -26,6 +27,8 @@ let mockReadFile: any;
 let mockReaddir: any;
 let mockRm: any;
 let mockExistsSync: any;
+let mockStat: any;
+let mockCopyFile: any;
 
 vi.mock("node:child_process", () => ({
   execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
@@ -77,6 +80,8 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     readFile: (...args: unknown[]) => mockReadFile(...args),
     readdir: (...args: unknown[]) => mockReaddir(...args),
     rm: (...args: unknown[]) => mockRm(...args),
+    stat: (...args: unknown[]) => mockStat(...args),
+    copyFile: (...args: unknown[]) => mockCopyFile(...args),
   };
   return {
     ...actual,
@@ -137,10 +142,43 @@ describe("werkstatt.e2e.cold", () => {
     mockWriteFile = vi.fn(async (p: string, c: string | Uint8Array) => {
       await realFsPromises.writeFile(p, c);
     });
-    mockReadFile = vi.fn(async () => "");
-    mockReaddir = vi.fn(async () => [] as never);
+    // Path-aware reads: the staged fixture intake.json (confirmed domain so the
+    // register stage isn't secrets-gated), MANIFEST, the seeded system.md, the
+    // signing key.
+    mockReadFile = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("MANIFEST.sha256")) return "00  intake.json\n";
+      if (s.endsWith("intake.json"))
+        return '{"systemId":"dp7","classification":{"domain":"e2e.test","locales":[{"tag":"de","role":"primary"}]}}';
+      if (s.endsWith("system.md"))
+        return "---\ni18n:\n  default: de\n  supported:\n    de:\n      name: de\n      hreflang: de-DE\nidentity:\n  systemStar: Achernar\n  biome: handwerk-material-warm\nlegalJurisdiction: DE\npublication:\n  gate: enforce\ncontractTerms:\n  gate: enforce\nprovenance:\n  gate: enforce\n---\n";
+      return "PEM";
+    });
+    // DirEntry-shaped listings for fixture discovery, intake staging, mission
+    // lookup and the composition tree.
+    mockReaddir = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      const file = (name: string) => ({ name, isFile: () => true, isDirectory: () => false });
+      const dir = (name: string) => ({ name, isFile: () => false, isDirectory: () => true });
+      if (s.endsWith("intake/fixtures") || s.endsWith("intake\\fixtures"))
+        return [dir("valid-minimal")];
+      if (s.endsWith("valid-minimal")) return [file("intake.json"), file("MANIFEST.sha256")];
+      if (s.endsWith("missions")) return [dir("e2e-valid-minimal-m000001")];
+      if (s.endsWith("composition")) return [dir("pages"), file("system.md")];
+      if (s.endsWith("pages")) return [file("home.md")];
+      return [];
+    });
     mockRm = vi.fn(async () => undefined);
     mockExistsSync = vi.fn(() => true);
+    // Dirs have no extension in the mocked tree (pages, composition), files do.
+    // fs.Stats shape: isFile()/isDirectory() are methods the io adapter calls.
+    mockStat = vi.fn(async (p: unknown) => ({
+      isFile: () => String(p).includes("."),
+      isDirectory: () => !String(p).includes("."),
+      mtimeMs: 0,
+      size: 0,
+    }));
+    mockCopyFile = vi.fn(async () => undefined);
 
     tmpDir = mkdtempSync(join(tmpdir(), "e2e-cold-test-"));
   });
@@ -166,14 +204,16 @@ describe("werkstatt.e2e.cold", () => {
 
   it("returns interventions=0 and exit 0 when all steps succeed", async () => {
     mockExecFileSync.mockReturnValue("");
-    mockReaddir = vi.fn(
-      async () => [{ name: "m000001", isFile: () => false, isDirectory: () => true }] as never,
-    );
-    mockReadFile = vi.fn(async (p: unknown) =>
-      String(p).endsWith("system.md")
-        ? ("---\ni18n:\n  default: de\n  supported:\n    de:\n      name: de\n      hreflang: de-DE\nidentity:\n  systemStar: Achernar\n  biome: handwerk-material-warm\nlegalJurisdiction: DE\npublication:\n  gate: enforce\ncontractTerms:\n  gate: enforce\nprovenance:\n  gate: enforce\n---\n" as never)
-        : ("" as never),
-    );
+    const seededSystemMd =
+      "---\ni18n:\n  default: de\n  supported:\n    de:\n      name: de\n      hreflang: de-DE\nidentity:\n  systemStar: Achernar\n  biome: handwerk-material-warm\nlegalJurisdiction: DE\npublication:\n  gate: enforce\ncontractTerms:\n  gate: enforce\nprovenance:\n  gate: enforce\n---\n";
+    mockReadFile = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("MANIFEST.sha256")) return "00  intake.json\n";
+      if (s.endsWith("intake.json"))
+        return '{"systemId":"dp7","classification":{"domain":"e2e.test","locales":[{"tag":"de","role":"primary"}]}}';
+      if (s.endsWith("system.md")) return seededSystemMd;
+      return "PEM";
+    });
 
     mockedExec.mockImplementation((cmdInput: { commandName?: string }) => {
       const name = cmdInput?.commandName ?? "";
@@ -187,6 +227,17 @@ describe("werkstatt.e2e.cold", () => {
             signedAuthorization: { mock: true },
             authorizationHash: "mock-hash",
           },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        });
+      }
+      if (name === "mission.open") {
+        return Promise.resolve({
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: { missionId: "e2e-valid-minimal-m000002" },
           metadata: {} as never,
           logs: [],
           timing: {} as never,
@@ -221,9 +272,12 @@ describe("werkstatt.e2e.cold", () => {
 
     const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
 
+    if (result.exitCode !== 0) {
+      console.log(JSON.stringify(result.data?.fixtures[0]?.steps, null, 1));
+    }
     expect(result.exitCode).toBe(0);
-    expect(result.data?.interventions).toBe(0);
-    expect(result.data?.steps.every((s: { ok: boolean }) => s.ok)).toBe(true);
+    expect(result.data?.fixtures[0]?.interventions).toBe(0);
+    expect(result.data?.fixtures[0]?.steps.every((s: { ok: boolean }) => s.ok)).toBe(true);
   });
 
   it("returns exit 1 when a sub-command fails", async () => {
@@ -242,7 +296,7 @@ describe("werkstatt.e2e.cold", () => {
     const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
 
     expect(result.exitCode).toBe(1);
-    expect(result.data?.steps.some((s: { ok: boolean }) => !s.ok)).toBe(true);
+    expect(result.data?.fixtures[0]?.steps.some((s: { ok: boolean }) => !s.ok)).toBe(true);
   });
 
   it("tracks timedOut when a step times out", async () => {
@@ -273,7 +327,7 @@ describe("werkstatt.e2e.cold", () => {
     );
 
     expect(result.exitCode).toBe(1);
-    expect(result.data?.timedOut).toBe(true);
+    expect(result.data?.fixtures[0]?.timedOut).toBe(true);
   });
 
   it("does not touch real systems-cache when cold run executes", async () => {

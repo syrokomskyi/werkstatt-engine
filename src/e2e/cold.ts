@@ -1,16 +1,26 @@
 /*
 <MODULE_CONTRACT>
-  <purpose>RFC-0965: werkstatt.e2e.cold — cold end-to-end proving run in a disposable temp directory.
-  Clones the current checkout, installs dependencies, registers a synthetic Sternsystem, opens a mission,
-  applies a scripted content edit, and drives the pipeline through leitstand.ship --until closed plus
-  release.prepare (which includes release.boot-smoke). Asserts zero interventions on first attempt.</purpose>
+  <purpose>RFC-0965 + RFC-1324: werkstatt.e2e.cold — cold end-to-end proving run in a disposable temp directory.
+  Clones the current checkout, installs dependencies, registers a synthetic Sternsystem from a named intake
+  fixture, drives the pipeline through leitstand.ship --until closed plus release.prepare, and asserts zero
+  interventions on first attempt. With --with-deploy it continues to a provisional workers.dev deploy,
+  probes access protection, and tears the workers down. RFC-1324 zero-fabrication rule: the run writes no
+  file a platform command owns — the only writes are intake staging (operator-input bundle) and the compose
+  seam (fixture composition/ files under src/content subtrees a composer would own), both guarded by
+  e2e.cold-fabrication.lint (FAB-01).</purpose>
   <non-goals>
     <item>Does not replace unit or integration tests — it is the L4 workshop-level proving layer (DNA-66).</item>
     <item>Does not touch real systems-cache or real Cloudflare resources without --with-deploy and explicit env secrets.</item>
     <item>Does not use private API shortcuts — all sub-commands are invoked via executeKernelCommand with public commands.</item>
   </non-goals>
+  <key-decisions>
+    <item>Fixture systemId is rewritten at staging time (envelope patched + MANIFEST re-hashed) so runs get collision-safe e2e-&lt;fixture&gt; identities while the committed fixtures keep their canonical ids.</item>
+    <item>Domainless intakes need Cloudflare creds at REGISTER time (RFC-1325 provisional verification) — the register stage reports `skipped`, never a fake pass, when secrets are absent.</item>
+    <item>Stages are an injectable ColdStage[] so cold-stage-failure tests can substitute a failing stage (AC-5) without running the real pipeline.</item>
+  </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1324: zero-fabrication restructure — ColdStage[] runner, fixture matrix, intake staging + compose seams, deploy/probe/teardown/abort legs, skipped-status reporting</item>
   <item>RFC-1189: step 1 — partyKindLabels schema contract
 
 Add required partyKindLabels record (all seven creditPartyKindSchema
@@ -20,14 +30,16 @@ of raw enum tokens. Seed the e2e cold-test labels fixture and cover the
 completeness gate with schema tests.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1249: restore diagnostic detail in failResult violations (no placeholder args)</item>
-  <item>RFC-1307: step 5 — remove 00-brief.md path, onboarding.synthesize and brief.validate; cold run registers from intake</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
-  <history>RFC-0965, RFC-0988</history>
+  <history>RFC-0965, RFC-0988, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import type {
   KernelCommandInput,
@@ -38,29 +50,51 @@ import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { generateKeyPair, toHex } from "@warpgogol/werkstatt-engine/signing";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
-import { buildIntakeBundle } from "../intake/test-bundle.ts";
+import {
+  deleteDnsRecord,
+  deleteWorkerScript,
+  deleteWorkersRoute,
+  getWorkersSubdomain,
+  listDnsRecords,
+  listWorkerNames,
+  listWorkersRoutes,
+  resolveZoneIdByName,
+} from "../leitstand/adapters/cloudflare-api.ts";
+import { isProvisionalHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ColdRunPhase = "closed" | "dev";
+export type ColdStepStatus = "pass" | "fail" | "skipped";
 
 export interface ColdRunStep {
   step: string;
   attempts: number;
   durationMs: number;
   ok: boolean;
+  status: ColdStepStatus;
+  skippedReason?: string;
   error?: string;
 }
 
+/** Per-fixture result — RFC-1324 runs one cold birth per fixture, each in its own temp root. */
 export interface ColdRunReport {
-  command: "werkstatt.e2e.cold";
+  fixture: string;
+  systemId: string;
   coldRoot: string;
-  platformCommit: string;
   steps: ColdRunStep[];
   interventions: number;
   reachedPhase: ColdRunPhase;
   timedOut: boolean;
   withDeploy: boolean;
+  ok: boolean;
+  summary: string;
+}
+
+export interface ColdMatrixReport {
+  command: "werkstatt.e2e.cold";
+  platformCommit: string;
+  fixtures: ColdRunReport[];
   summary: string;
 }
 
@@ -80,14 +114,45 @@ function flagNumber(input: KernelCommandInput, key: string): number | undefined 
   return typeof v === "number" ? v : typeof v === "string" ? Number(v) : undefined;
 }
 
-// ─── Step runner with timeout and attempt tracking ──────────────────────────
+// ─── Stage runner ────────────────────────────────────────────────────────────
 
-interface StepContext {
-  coldRoot: string;
-  workspaceRoot: string;
+export interface ColdSecrets {
+  accountId: string | undefined;
+  apiToken: string | undefined;
+}
+
+export interface ColdEnv {
+  io: WorkspaceIO;
   logger: KernelRuntimeContext["logger"];
+  coldRoot: string;
+  /** The cloned workshop inside coldRoot. */
+  cloneRoot: string;
+  /** coldRoot/systems-cache */
+  cacheRoot: string;
+  /** coldRoot/systems-git */
+  gitRoot: string;
+  fixture: string;
   systemId: string;
   missionId: string | null;
+  platformCommit: string;
+  withDeploy: boolean;
+  secrets: ColdSecrets;
+  /** Populated by the stage-intake step. */
+  intake: { relDir: string; domain: string | null } | null;
+  perStepTimeout: number;
+}
+
+export interface ColdStage {
+  name: string;
+  /** Skipped when register produced no missionId. */
+  requiresMission?: boolean;
+  /** Only enters the plan under --with-deploy. */
+  deployOnly?: boolean;
+  /** Runs even after an earlier stage failed (teardown semantics). */
+  always?: boolean;
+  /** Return a reason to record the stage as `skipped`, or null to run it. */
+  skipWhen?: (env: ColdEnv) => string | null;
+  run: (env: ColdEnv) => Promise<void>;
 }
 
 async function runStep(
@@ -97,11 +162,9 @@ async function runStep(
   timeoutMs: number,
 ): Promise<ColdRunStep> {
   const start = Date.now();
-  let attempts = 0;
   let ok = false;
   let errorMsg: string | undefined;
 
-  attempts = 1;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -123,11 +186,58 @@ async function runStep(
 
   return {
     step: stepName,
-    attempts,
+    attempts: 1,
     durationMs: Date.now() - start,
     ok,
+    status: ok ? "pass" : "fail",
     error: errorMsg,
   };
+}
+
+function skippedStep(
+  name: string,
+  reason: string,
+  logger: KernelRuntimeContext["logger"],
+): ColdRunStep {
+  logger.info(`  [e2e.cold] ${name}: skipped — ${reason}`);
+  return {
+    step: name,
+    attempts: 0,
+    durationMs: 0,
+    ok: true,
+    status: "skipped",
+    skippedReason: reason,
+  };
+}
+
+/**
+ * RFC-1324 AC-5/AC-6: sequential stage runner. A failed stage marks all
+ * subsequent stages `skipped` ("aborted after X") except `always` stages
+ * (teardown). `skipWhen` and `requiresMission` produce `skipped` records —
+ * a skipped stage is never a pass and never a failure.
+ */
+export async function runStagePlan(stages: ColdStage[], env: ColdEnv): Promise<ColdRunStep[]> {
+  const steps: ColdRunStep[] = [];
+  let abortedBy: string | null = null;
+  for (const stage of stages) {
+    if (abortedBy && !stage.always) {
+      steps.push(skippedStep(stage.name, `aborted after '${abortedBy}'`, env.logger));
+      continue;
+    }
+    if (stage.requiresMission && !env.missionId) {
+      steps.push(skippedStep(stage.name, "register produced no mission", env.logger));
+      continue;
+    }
+    const reason = stage.skipWhen?.(env) ?? null;
+    if (reason) {
+      steps.push(skippedStep(stage.name, reason, env.logger));
+      continue;
+    }
+    const step = await runStep(stage.name, () => stage.run(env), env.logger, env.perStepTimeout);
+    steps.push(step);
+    if (!step.ok) abortedBy = stage.name;
+  }
+  return steps;
 }
 
 // ─── Sub-command runner ─────────────────────────────────────────────────────
@@ -137,20 +247,20 @@ async function runSubCommand(
   commandName: string,
   argv: string[],
   logger: KernelRuntimeContext["logger"],
-): Promise<{ exitCode: number; summary?: string }> {
+): Promise<{ exitCode: number; summary?: string; data?: unknown }> {
   logger.info(`  [e2e.cold] ${commandName} ${argv.join(" ")}`);
   const result = (await executeKernelCommand({
     workspaceRoot,
     commandName,
     argv,
-    outputFormat: "pretty",
-  })) as { exitCode?: number; summary?: string };
+    outputFormat: "json",
+  })) as { exitCode?: number; summary?: string; data?: unknown };
 
-  const exitCode = result.exitCode ?? 0;
-  if (exitCode !== 0) {
+  const code = result.exitCode ?? 0;
+  if (code !== 0) {
     throw new Error(`${commandName} failed: ${result.summary ?? "unknown error"}`);
   }
-  return { exitCode: exitCode, summary: result.summary };
+  return { exitCode: code, summary: result.summary, data: result.data };
 }
 
 /**
@@ -172,55 +282,157 @@ async function execChecked(
   return result;
 }
 
-// ─── Main command handler ──────────────────────────────────────────────────
+// ─── Fixture intake staging (operator-input seam, not platform fabrication) ──
+
+export interface FixtureIntakeInfo {
+  relDir: string;
+  domain: string | null;
+  locales: string[];
+}
+
+function fixtureDir(cloneRoot: string, fixture: string): string {
+  return path.join(cloneRoot, "packages", "werkstatt-engine", "src", "intake", "fixtures", fixture);
+}
 
 /**
- * RFC-1307: write a valid single-locale (`de`) intake bundle for the cold
- * run's synthetic site and return its workspace-relative directory. The cold
- * run never writes an `00-brief.md`.
+ * Stage the fixture's intake bundle at onboarding/&lt;systemId&gt;/.input/intake —
+ * the artifact the birth pipeline would have produced for this site. The
+ * envelope's systemId is rewritten to the run's e2e-&lt;fixture&gt; identity and
+ * the MANIFEST intake.json line re-hashed, exactly what a bundle produced for
+ * this id would carry. `composition/` is not part of the intake bundle.
  */
-export async function prepareColdIntake(
-  workspaceRoot: string,
-  systemId: string,
-  io: WorkspaceIO,
-): Promise<string> {
-  const rel = path.join("onboarding", systemId, ".input", "intake");
-  await buildIntakeBundle(path.join(workspaceRoot, rel), io, {
-    mutate: (seed) => {
-      const envelope = seed.envelope as {
-        systemId: string;
-        classification: { locales: unknown[]; domain?: string | null };
-        pbp: Array<{ statementLang?: string }>;
-        voice?: { profile?: { linguisticRules?: Record<string, string[]> } };
-      };
-      envelope.systemId = systemId;
-      envelope.classification.locales = [
-        { tag: "de", role: "primary", sourceLanguageBy: "client", reviewer: "studio" },
-      ];
-      envelope.classification.domain = "e2e-cold.test";
-      for (const entity of envelope.pbp) {
-        if (entity.statementLang !== undefined) entity.statementLang = "de";
+export async function stageFixtureIntake(
+  env: Pick<ColdEnv, "io" | "cloneRoot" | "fixture" | "systemId">,
+): Promise<FixtureIntakeInfo> {
+  const { io, cloneRoot, fixture, systemId } = env;
+  const src = fixtureDir(cloneRoot, fixture);
+  if (!(await io.exists(path.join(src, "intake.json")))) {
+    throw new Error(`stage-intake: no intake.json in fixture '${fixture}' (${src})`);
+  }
+
+  const written: string[] = [];
+  const walk = async (dir: string, rel: string): Promise<void> => {
+    for (const entry of await io.readdir(dir)) {
+      if (rel === "" && entry.name === "composition") continue;
+      const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
+      const entryAbs = path.join(dir, entry.name);
+      const stat = await io.stat(entryAbs).catch(() => null);
+      if (stat?.isDirectory) {
+        await walk(entryAbs, entryRel);
+      } else {
+        written.push(entryRel);
       }
-      if (envelope.voice?.profile) {
-        envelope.voice.profile.linguisticRules = { de: ["keine Anglizismen in Überschriften"] };
-      }
-    },
-  });
-  return rel;
+    }
+  };
+  await walk(src, "");
+
+  // FAB-SEAM-BEGIN: intake-staging
+  const intakeDir = path.join(cloneRoot, "onboarding", systemId, ".input", "intake");
+  for (const rel of written) {
+    const target = path.join(intakeDir, rel);
+    await io.mkdir(path.dirname(target));
+    await io.copyFile(path.join(src, rel), path.join(intakeDir, rel));
+  }
+  // Rebind the envelope to the run's system id + re-hash the MANIFEST line so
+  // INTAKE-01 sees the bundle a producer would have emitted for this site.
+  const intakeRaw = await io.readFile(path.join(intakeDir, "intake.json"));
+  const intakeParsed = JSON.parse(intakeRaw) as {
+    systemId: string;
+    classification?: { domain?: string | null; locales?: Array<{ tag: string }> };
+  };
+  intakeParsed.systemId = systemId;
+  await io.writeFile(
+    path.join(intakeDir, "intake.json"),
+    `${JSON.stringify(intakeParsed, null, 2)}\n`,
+  );
+  const newHash = createHash("sha256")
+    .update(await io.readFile(path.join(intakeDir, "intake.json")))
+    .digest("hex");
+  const manifestRaw = await io.readFile(path.join(intakeDir, "MANIFEST.sha256"));
+  const manifestLines = manifestRaw
+    .split("\n")
+    .map((line) => (line.endsWith("  intake.json") ? `${newHash}  intake.json` : line));
+  await io.writeFile(path.join(intakeDir, "MANIFEST.sha256"), manifestLines.join("\n"));
+  // FAB-SEAM-END: intake-staging
+
+  return {
+    relDir: path.join("onboarding", systemId, ".input", "intake"),
+    domain: intakeParsed.classification?.domain ?? null,
+    locales: (intakeParsed.classification?.locales ?? []).map((l) => l.tag),
+  };
 }
+
+// ─── Stages ──────────────────────────────────────────────────────────────────
+
+/**
+ * Merge a fixture `composition/system.md` overlay onto the seeded manifest.
+ * Frontmatter-only documents (`---\n<yaml>\n---\n`): composer keys replace or
+ * deep-merge per key, seeded platform fields the overlay never mentions
+ * (identity.domain, i18n hreflang/tag, the gate triple) survive untouched.
+ * Arrays replace wholesale — pages[] is a complete composer declaration, not
+ * a diff.
+ */
+export function mergeSystemMdFrontmatter(seededRaw: string, overlayRaw: string): string {
+  const parseFm = (raw: string): { fm: Record<string, unknown>; rest: string } => {
+    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+    if (!match) return { fm: {}, rest: raw };
+    const fm = (YAML.parse(match[1] ?? "") ?? {}) as Record<string, unknown>;
+    return { fm, rest: raw.slice(match[0].length) };
+  };
+  const mergeVal = (base: unknown, over: unknown): unknown => {
+    if (over === undefined) return base;
+    if (
+      base !== null &&
+      over !== null &&
+      typeof base === "object" &&
+      typeof over === "object" &&
+      !Array.isArray(base) &&
+      !Array.isArray(over)
+    ) {
+      const merged: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+      for (const [k, v] of Object.entries(over as Record<string, unknown>)) {
+        merged[k] = mergeVal(merged[k], v);
+      }
+      return merged;
+    }
+    return over;
+  };
+  const seeded = parseFm(seededRaw);
+  const overlay = parseFm(overlayRaw);
+  const merged = mergeVal(seeded.fm, overlay.fm) as Record<string, unknown>;
+  const body = overlay.rest.trim().length > 0 ? overlay.rest : seeded.rest;
+  return `---\n${YAML.stringify(merged)}---${body.endsWith("\n") ? body : `${body}\n`}`;
+}
+
+function cfSecretsPresent(secrets: ColdSecrets): boolean {
+  return Boolean(secrets.accountId) && Boolean(secrets.apiToken);
+}
+
+const CF_SKIP = "CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN absent";
+
+// ─── Main command handler ──────────────────────────────────────────────────
 
 export async function runColdE2e(
   input: KernelCommandInput,
   context: KernelRuntimeContext,
-): Promise<KernelCommandResult<ColdRunReport>> {
+): Promise<KernelCommandResult<ColdMatrixReport>> {
   const keep = flagBool(input, "keep");
   const untilFlag = flagString(input, "until") as ColdRunPhase | undefined;
   const until = untilFlag ?? "closed";
-  const withDeploy = flagBool(input, "with-deploy");
+  // --until dev implies the deploy legs; --with-deploy stays as the explicit alias.
+  const withDeploy = flagBool(input, "with-deploy") || until === "dev";
+  const fixtureFlag = flagString(input, "fixture");
   const timeoutMinutes = flagNumber(input, "timeout-minutes") ?? 90;
   const timeoutMs = timeoutMinutes * 60 * 1000;
 
   const { workspaceRoot, logger } = context;
+
+  const failEarly = (summary: string): KernelCommandResult<ColdMatrixReport> => ({
+    exitCode: 1,
+    summary,
+    nextSteps: [{ action: summary, kind: "required" as const }],
+    data: { command: "werkstatt.e2e.cold", platformCommit: "", fixtures: [], summary },
+  });
 
   // Preflight: check working tree is clean
   try {
@@ -229,54 +441,16 @@ export async function runColdE2e(
       timeoutMs: 10000,
     });
     if (statusOutput.stdout.trim().length > 0) {
-      return {
-        exitCode: 1,
-        summary: "[werkstatt.e2e.cold] preflight failed: dirty working tree",
-        nextSteps: [
-          {
-            action: "[werkstatt.e2e.cold] preflight failed: dirty working tree",
-            kind: "required" as const,
-          },
-        ],
-        data: {
-          command: "werkstatt.e2e.cold",
-          coldRoot: "",
-          platformCommit: "",
-          steps: [],
-          interventions: 0,
-          reachedPhase: until,
-          timedOut: false,
-          withDeploy,
-          summary:
-            "[werkstatt.e2e.cold] preflight failed: working tree is dirty — commit or stash changes before running",
-        },
-      };
+      return failEarly(
+        "[werkstatt.e2e.cold] preflight failed: working tree is dirty — commit or stash changes before running",
+      );
     }
   } catch (err) {
-    return {
-      exitCode: 1,
-      summary: "[werkstatt.e2e.cold] preflight failed: git status error",
-      nextSteps: [
-        {
-          action: "[werkstatt.e2e.cold] preflight failed: git status error",
-          kind: "required" as const,
-        },
-      ],
-      data: {
-        command: "werkstatt.e2e.cold",
-        coldRoot: "",
-        platformCommit: "",
-        steps: [],
-        interventions: 0,
-        reachedPhase: until,
-        timedOut: false,
-        withDeploy,
-        summary: `[werkstatt.e2e.cold] preflight failed: git status check error — ${err instanceof Error ? err.message : String(err)}`,
-      },
-    };
+    return failEarly(
+      `[werkstatt.e2e.cold] preflight failed: git status check error — ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
-  // Get current commit
   const platformCommit = (
     await execChecked(context.io, "git", ["rev-parse", "HEAD"], {
       cwd: workspaceRoot,
@@ -284,650 +458,599 @@ export async function runColdE2e(
     })
   ).stdout.trim();
 
-  // Create cold root
-  const coldRoot = await context.io.mkdtemp(path.join(os.tmpdir(), "werkstatt-e2e-cold-"));
-  logger.info(`[werkstatt.e2e.cold] cold root: ${coldRoot}`);
+  // Resolve the fixture set: --fixture <name> or every fixtures dir carrying an
+  // intake.json (each gets its own cold root, sequentially — RFC-1324 matrix).
+  const parentFixturesRoot = path.join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "intake",
+    "fixtures",
+  );
+  const fixtureEntries = await context.io.readdir(parentFixturesRoot).catch(() => []);
+  const fixtureNames: string[] = [];
+  for (const entry of fixtureEntries) {
+    const name = entry.name;
+    if (await context.io.exists(path.join(parentFixturesRoot, name, "intake.json"))) {
+      fixtureNames.push(name);
+    }
+  }
+  const selected = fixtureFlag ? [fixtureFlag] : fixtureNames;
+  if (fixtureFlag && !fixtureNames.includes(fixtureFlag)) {
+    return failEarly(
+      `[werkstatt.e2e.cold] unknown fixture '${fixtureFlag}' — available: ${fixtureNames.join(", ")}`,
+    );
+  }
 
-  const steps: ColdRunStep[] = [];
-  const systemId = "e2e-cold";
-  let missionId: string | null = null;
-
-  const stepCtx: StepContext = {
-    coldRoot,
-    workspaceRoot: path.join(coldRoot, "werkstatt"),
-    logger,
-    systemId,
-    missionId,
+  const secrets: ColdSecrets = {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+    apiToken: process.env.CLOUDFLARE_API_TOKEN,
   };
 
-  // Per-step timeout: divide total budget across steps (8 base steps + 1 optional)
-  const stepCount = withDeploy ? 9 : 8;
-  const perStepTimeout = Math.floor(timeoutMs / stepCount);
+  const reports: ColdRunReport[] = [];
 
-  try {
-    // Step 1: prepare-cold-root
-    steps.push(
-      await runStep(
-        "prepare-cold-root",
-        async () => {
-          // Clone the current checkout
-          await execChecked(
-            context.io,
-            "git",
-            ["clone", workspaceRoot, path.join(coldRoot, "werkstatt")],
-            { timeoutMs: 60000 },
-          );
-          // Create systems-cache directory (sibling of werkstatt clone)
-          await context.io.mkdir(path.join(coldRoot, "systems-cache"));
-          await context.io.mkdir(path.join(coldRoot, "systems-git"));
-        },
-        logger,
-        perStepTimeout,
-      ),
-    );
+  for (const fixture of selected) {
+    const systemId = `e2e-${fixture}`;
+    const coldRoot = await context.io.mkdtemp(path.join(os.tmpdir(), "werkstatt-e2e-cold-"));
+    logger.info(`[werkstatt.e2e.cold] fixture ${fixture} → ${systemId} @ ${coldRoot}`);
 
-    // Step 2: install
-    steps.push(
-      await runStep(
-        "install",
-        async () => {
-          await execChecked(context.io, "pnpm", ["install", "--frozen-lockfile"], {
-            cwd: stepCtx.workspaceRoot,
-          });
-          await execChecked(context.io, "pnpm", ["exec", "playwright", "install", "chromium"], {
-            cwd: stepCtx.workspaceRoot,
-          });
-        },
-        logger,
-        perStepTimeout,
-      ),
-    );
-
-    // Step 3: register-site
-    steps.push(
-      await runStep(
-        "register-site",
-        async () => {
-          const cachePath = path.join(coldRoot, "systems-cache", systemId);
-          const barePath = path.join(coldRoot, "systems-git", systemId);
-          const mirrorsFlag = `${cachePath}:non-bare,${barePath}:bare`;
-
-          // RFC-0966/0968: Generate a temporary signing key for passport generation.
-          // Must run after install step so deps are available. sternsystem.register
-          // auto-generates a passport if SIGNING_PRIVATE_KEY is set.
-          const keyDir = path.join(coldRoot, "signing-key");
-          await context.io.mkdir(keyDir);
-          await runSubCommand(
-            stepCtx.workspaceRoot,
-            "signing.key.generate",
-            [`--output-dir=${keyDir}`, "--encoding=pem", "--force"],
-            logger,
-          );
-          const privateKeyPem = await context.io.readFile(path.join(keyDir, "signing.key.pem"));
-          process.env.SIGNING_PRIVATE_KEY = privateKeyPem.trim();
-          logger.info(`  [e2e.cold] temporary signing key generated for passport signing`);
-
-          // Initialize bare repo
-          await context.io.mkdir(barePath);
-          await execChecked(context.io, "git", ["init", "--bare", "-b", "main", barePath]);
-
-          // Initialize cache clone as a git repo
-          await context.io.mkdir(cachePath);
-          await execChecked(context.io, "git", ["init", "-b", "main", cachePath]);
-          await execChecked(
-            context.io,
-            "git",
-            ["config", "user.email", "e2e-cold@warpgogol.local"],
-            { cwd: cachePath },
-          );
-          await execChecked(context.io, "git", ["config", "user.name", "e2e-cold"], {
-            cwd: cachePath,
-          });
-          // Add bare repo as origin
-          await execChecked(context.io, "git", ["remote", "add", "origin", barePath], {
-            cwd: cachePath,
-          });
-
-          // Initial commit + push to create main branch in bare repo
-          await context.io.writeFile(path.join(cachePath, "README.md"), "# e2e-cold\n");
-          await execChecked(context.io, "git", ["add", "-A"], { cwd: cachePath });
-          await execChecked(context.io, "git", ["commit", "-m", "initial"], { cwd: cachePath });
-          await execChecked(context.io, "git", ["push", "origin", "main"], { cwd: cachePath });
-
-          // RFC-0840: Write operator config files to cache clone (untracked,
-          // not git-committed) so restoreOperatorConfigFiles finds them during
-          // mission.materialize. A fresh Sternsystem has no previous mission to
-          // persist these from — the cold run must seed them.
-          await context.io.writeFile(
-            path.join(cachePath, ".lighthouse-budget-ignore"),
-            "# e2e-cold: lighthouse budget ignore\n",
-          );
-          await context.io.mkdir(path.join(cachePath, "src"));
-          await context.io.writeFile(
-            path.join(cachePath, "src", "image-delivery.config.yaml"),
-            "# e2e-cold: image delivery config\nprovider: build-portable\n",
-          );
-
-          // RFC-0073: pbp.content.validate requires src/content/business-profile/de/
-          // to exist. pbp.profile.validate requires business.md, web/, contact/, places/.
-          // Commit them to the cache clone git repo so materialization copies them
-          // into the workpiece. The build.prepare.dev pipeline (run during
-          // mission.open inside sternsystem.register) validates before the
-          // content-edit step, so they must be present at materialization time.
-          const pbpDeDir = path.join(cachePath, "src", "content", "business-profile", "de");
-          await context.io.mkdir(pbpDeDir);
-          await context.io.writeFile(
-            path.join(pbpDeDir, "business.md"),
-            "---\nschema: pbp/business@1\nid: https://e2e-cold.test/business\ntype: business\nstatus: published\nname: E2E Cold Test Business\nsummary: Synthetic business profile for cold E2E validation\ndescription: Synthetic business profile for cold E2E validation\n---\n",
-          );
-          for (const sub of ["web", "contact", "places"]) {
-            await context.io.mkdir(path.join(pbpDeDir, sub));
-            await context.io.writeFile(path.join(pbpDeDir, sub, ".gitkeep"), "");
-          }
-          // RFC-0468: pbp.migration.validate requires owner-decision-register.yaml
-          // and migration-coverage-report.yaml in src/content/business-profile/.
-          const pbpRoot = path.join(cachePath, "src", "content", "business-profile");
-          await context.io.writeFile(
-            path.join(pbpRoot, "owner-decision-register.yaml"),
-            "schemaVersion: '1.0.0'\nitems:\n  - id: 1\n    topic: setup\n    question: Initial setup\n    status: open\n    blocks: []\n",
-          );
-          await context.io.writeFile(
-            path.join(pbpRoot, "migration-coverage-report.yaml"),
-            "schemaVersion: '1.0.0'\ncoveragePercentage: 100\nmappedEntities: 1\ntotalLegacyEntities: 1\nverifiedEntities: 1\nunmappedEntities: []\nlegacySourceMappings:\n  - legacyFile: legacy/business.md\n    targetEntities: [business]\n    category: business\nvalidation:\n  errors: []\n",
-          );
-          // RFC-0095: footer.legal.validate requires site/de/labels.md with
-          // footer.legalIds for DE-locale apps.
-          const siteLabelsDir = path.join(cachePath, "src", "content", "site", "de");
-          await context.io.mkdir(siteLabelsDir);
-          await context.io.writeFile(
-            path.join(siteLabelsDir, "labels.md"),
-            "---\nfooter:\n  legalIds:\n    - impressum\n    - datenschutz\ncopyright:\n  symbol: ©\n  yearFirst: 2024\nbrandTagline: E2E Cold Test\nskipLinkLabel: Skip to main content\nbreadcrumbs:\n  homeLabel: Startseite\n  navAriaLabel: Brotkrümelnavigation\nlangSwitcher:\n  switchAriaLabel: Sprache wechseln\nmaterialCredits:\n  summaryLabel: Credits\n  pageTitle: Material Credits\n  pageDescription: Credits for materials used on this site\n  emptyMessage: No credits available\n  detailsLabel: Details\n  createdBy: Created by\n  createdWith: Created with\n  promptBy: Prompt by\n  reviewedBy: Reviewed by\n  license: License\n  copyrightLabel: Copyright\n  rightsHolder: Rights holder\n  sourceType: Source type\n  sourceTypeLabels:\n    human-made: Human-made\n    ai-assisted: AI-assisted\n    ai-generated: AI-generated\n    composite: Composite\n    third-party: Third-party\n    commissioned: Commissioned\n    licensed-third-party: Licensed third-party\n    customer-supplied: Customer-supplied\n    public-domain: Public domain\n    screenshot: Screenshot\n  statusLabels:\n    active: Active\n    orphaned: Orphaned\n    needs-review: Needs review\n    blocked: Blocked\n    expired: Expired\n  usageBasisLabels:\n    internal-commissioned: Internal commissioned\n    express-permission: Express permission\n    license: License\n    customer-supplied: Customer-supplied\n    public-domain: Public domain\n    statutory-exception: Statutory exception\n    quotation-right: Quotation right\n    unverified: Unverified\n  aiUsageLabels:\n    aiGenerated: AI generated\n    aiAssisted: AI assisted\n    humanContribution: Human contribution\n    copyrightClaimed: Copyright claimed\n    copyrightNotClaimed: Copyright not claimed\n  partyKindLabels:\n    Person: Person\n    Organization: Organization\n    AIAgent: AI agent\n    AIModel: AI model\n    AIPlatform: AI platform\n    Workflow: Workflow\n    SourceMaterial: Source material\n  usedOnLabel: Used on\n  verifiedAtLabel: Verified at\n  noPreviewLabel: No preview available\n  copyrightExplanation: Copyright explanation\n---\n",
-          );
-          // RFC-0074: infra.brief.validate checks for wrangler.jsonc existence.
-          // RFC-0908: host.canonical.config.validate requires a www→apex redirect route.
-          await context.io.writeFile(
-            path.join(cachePath, "wrangler.jsonc"),
-            '{\n  "name": "e2e-cold",\n  "compatibility_date": "2024-01-01",\n  "routes": ["www.e2e-cold.test/*"]\n}\n',
-          );
-          await execChecked(context.io, "git", ["add", "-A"], { cwd: cachePath });
-          await execChecked(
-            context.io,
-            "git",
-            ["commit", "-m", "add business-profile/de for pbp.content.validate"],
-            { cwd: cachePath },
-          );
-          await execChecked(context.io, "git", ["push", "origin", "main"], { cwd: cachePath });
-
-          // RFC-1307: register from a synthetic werkstatt:intake/v1 bundle.
-          const intakeDir = await prepareColdIntake(stepCtx.workspaceRoot, systemId, context.io);
-
-          const result = (await executeKernelCommand({
-            workspaceRoot: stepCtx.workspaceRoot,
-            commandName: "sternsystem.register",
-            argv: [
-              `--id=${systemId}`,
-              "--cosmicStar=Polaris",
-              `--mirrors=${mirrorsFlag}`,
-              `--intake=${intakeDir}`,
-              "--biome=handwerk-material-warm",
-            ],
-            outputFormat: "json",
-          })) as { exitCode?: number; summary?: string; data?: { firstMissionId?: string } };
-
-          const exitCode = result.exitCode ?? 0;
-          if (exitCode !== 0) {
-            throw new Error(`sternsystem.register failed: ${result.summary ?? "unknown error"}`);
-          }
-
-          // RFC-1307: the seeded system.md must validate as-born — assert the
-          // i18n/manifest contract instead of repairing it downstream.
-          const seededSystemMd = await context.io.readFile(
-            path.join(cachePath, "src", "content", "system.md"),
-          );
-          const fmStart = seededSystemMd.indexOf("---");
-          const fmEnd = seededSystemMd.lastIndexOf("---");
-          const seededFm = (
-            fmStart === -1 || fmEnd <= fmStart
-              ? null
-              : YAML.parse(seededSystemMd.slice(fmStart + 3, fmEnd))
-          ) as {
-            i18n?: { supported?: Record<string, { name?: string; hreflang?: string }> };
-            legalJurisdiction?: string;
-            publication?: { gate?: string };
-            contractTerms?: { gate?: string };
-            provenance?: { gate?: string };
-            identity?: { biome?: string };
-          } | null;
-          if (!seededFm || Object.keys(seededFm.i18n?.supported ?? {}).length === 0) {
-            throw new Error(
-              "register-site: seeded system.md has no i18n.supported entries — planner must emit valid i18n",
-            );
-          }
-          for (const [segment, entry] of Object.entries(seededFm.i18n?.supported ?? {})) {
-            if (!entry.name || !entry.hreflang) {
-              throw new Error(
-                `register-site: seeded i18n.supported.${segment} lacks name/hreflang — planner must emit valid i18n`,
-              );
-            }
-          }
-          if (seededFm.identity?.biome !== "handwerk-material-warm") {
-            throw new Error(
-              `register-site: seeded identity.biome is '${seededFm.identity?.biome}' — expected 'handwerk-material-warm'`,
-            );
-          }
-
-          missionId = result.data?.firstMissionId ?? null;
-          stepCtx.missionId = missionId;
-        },
-        logger,
-        perStepTimeout,
-      ),
-    );
-
-    if (!missionId) {
-      logger.info(
-        `  [e2e.cold] register-site did not produce missionId — skipping remaining steps`,
-      );
-    }
-
-    // Step 3.5: passport-validate (only if register-site succeeded)
-    // RFC-0966/0967/0968: Verify that passport generation, validation, and ownership
-    // registration work end-to-end on the freshly registered synthetic Sternsystem.
-    if (missionId) {
-      steps.push(
-        await runStep(
-          "passport-validate",
-          async () => {
-            // sternsystem.register already generated a passport (SIGNING_PRIVATE_KEY is set).
-            // Optionally register ownership first (if a registry URL is configured) so that
-            // sternsystem.validate doesn't report OWNERSHIP-01.
-            const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
-            if (registryUrl) {
-              await runSubCommand(
-                stepCtx.workspaceRoot,
-                "fleet.ownership.register",
-                [`--id=${systemId}`],
-                logger,
-              );
-              await runSubCommand(
-                stepCtx.workspaceRoot,
-                "fleet.ownership.verify",
-                [`--id=${systemId}`],
-                logger,
-              );
-              logger.info(`  [e2e.cold] ownership registered and verified`);
-            } else {
-              logger.info(
-                `  [e2e.cold] FLEET_OWNERSHIP_REGISTRY_URL not set — ownership registration skipped`,
-              );
-            }
-
-            // Run sternsystem.validate and check only PASSPORT/HANDOVER/OWNERSHIP rules.
-            // Pre-existing cold E2E setup violations (bundle-contract, mirror-remote-missing,
-            // external-edit-detected) are expected and not related to RFC-0966/0967/0968.
-            const result = (await executeKernelCommand({
-              workspaceRoot: stepCtx.workspaceRoot,
-              commandName: "sternsystem.validate",
-              argv: [`--id=${systemId}`, "--json"],
-              outputFormat: "json",
-            })) as {
-              exitCode?: number;
-              data?: {
-                violations?: Array<{ rule: string; systemId: string; message: string }>;
-                warnings?: Array<{ field: string; systemId: string; message: string }>;
-              };
-            };
-
-            const allViolations = result.data?.violations ?? [];
-            const relevantViolations = allViolations.filter(
-              (v) =>
-                v.rule.startsWith("PASSPORT") ||
-                v.rule.startsWith("HANDOVER") ||
-                v.rule.startsWith("OWNERSHIP"),
-            );
-            const allWarnings = result.data?.warnings ?? [];
-            const relevantWarnings = allWarnings.filter(
-              (w) =>
-                w.field?.startsWith("PASSPORT") ||
-                w.field?.startsWith("HANDOVER") ||
-                w.field?.startsWith("OWNERSHIP"),
-            );
-
-            if (relevantViolations.length > 0) {
-              throw new Error(
-                `passport-validate: ${relevantViolations.length} PASSPORT/HANDOVER/OWNERSHIP violations: ${relevantViolations.map((v) => `${v.rule}: ${v.message}`).join("; ")}`,
-              );
-            }
-            if (relevantWarnings.length > 0) {
-              throw new Error(
-                `passport-validate: ${relevantWarnings.length} PASSPORT/HANDOVER/OWNERSHIP warnings: ${relevantWarnings.map((w) => `${w.field}: ${w.message}`).join("; ")}`,
-              );
-            }
-            logger.info(
-              `  [e2e.cold] PASSPORT/HANDOVER/OWNERSHIP rules clean (${allViolations.length} other violations ignored)`,
-            );
-          },
-          logger,
-          perStepTimeout,
-        ),
-      );
-    }
-
-    // Step 3.6: handover-dry-run (only if register-site succeeded)
-    // RFC-0988: Verify that handover prepare and complete dry-run commands work
-    // end-to-end on the freshly registered Sternsystem without side effects.
-    if (missionId) {
-      steps.push(
-        await runStep(
-          "handover-dry-run",
-          async () => {
-            const recipientPublicKey = toHex((await generateKeyPair()).publicKey);
-
-            const prepareResult = (await executeKernelCommand({
-              workspaceRoot: stepCtx.workspaceRoot,
-              commandName: "sternsystem.handover.prepare",
-              argv: [
-                `--id=${systemId}`,
-                "--recipient-identity=human:e2e-recipient",
-                `--recipient-public-key=${recipientPublicKey}`,
-                "--dry-run",
-                "--json",
-              ],
-              outputFormat: "json",
-            })) as {
-              exitCode?: number;
-              data?: {
-                dryRun?: boolean;
-                signedAuthorization?: unknown;
-                authorizationHash?: string;
-              };
-            };
-
-            if (prepareResult.exitCode !== 0) {
-              throw new Error(
-                `handover-dry-run: sternsystem.handover.prepare --dry-run failed with exit code ${prepareResult.exitCode}`,
-              );
-            }
-            if (!prepareResult.data?.dryRun || !prepareResult.data?.signedAuthorization) {
-              throw new Error(
-                "handover-dry-run: prepare --dry-run did not return signedAuthorization in result",
-              );
-            }
-            logger.info(
-              `  [e2e.cold] handover.prepare --dry-run returned signedAuthorization (hash: ${prepareResult.data.authorizationHash})`,
-            );
-
-            const completeResult = (await executeKernelCommand({
-              workspaceRoot: stepCtx.workspaceRoot,
-              commandName: "sternsystem.handover.complete",
-              argv: [
-                `--id=${systemId}`,
-                "--dry-run",
-                `--authorization-data=${JSON.stringify(prepareResult.data.signedAuthorization)}`,
-                "--json",
-              ],
-              outputFormat: "json",
-            })) as {
-              exitCode?: number;
-              data?: {
-                dryRun?: boolean;
-                newPassportHashPreview?: string;
-                bordbuchEventPreview?: { kind: string };
-                registryTransferPreview?: { previousOwner: string; newOwner: string };
-              };
-            };
-
-            if (completeResult.exitCode !== 0) {
-              throw new Error(
-                `handover-dry-run: sternsystem.handover.complete --dry-run failed with exit code ${completeResult.exitCode}`,
-              );
-            }
-            if (!completeResult.data?.dryRun || !completeResult.data?.newPassportHashPreview) {
-              throw new Error("handover-dry-run: complete --dry-run did not return preview data");
-            }
-            logger.info(
-              `  [e2e.cold] handover.complete --dry-run returned preview data (newPassportHash: ${completeResult.data.newPassportHashPreview})`,
-            );
-          },
-          logger,
-          perStepTimeout,
-        ),
-      );
-    }
-
-    // Step 4: content-edit (only if register-site succeeded)
-    if (missionId) {
-      steps.push(
-        await runStep(
-          "content-edit",
-          async () => {
-            // Apply a deterministic prose change to the workpiece
-            // The workpiece is materialized by sternsystem.register's mission.open
-            // Find the workpiece directory
-            const missionsDir = path.join(stepCtx.workspaceRoot, "missions");
-            const missionDirs = await context.io
-              .readdir(missionsDir)
-              .then((e) => e.map((x) => x.name))
-              .catch(() => []);
-            const missionDir = missionDirs.find((d) => d.includes(missionId!));
-            if (!missionDir) {
-              throw new Error(`content-edit: mission directory not found for ${missionId}`);
-            }
-
-            const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
-
-            const systemMdPath = path.join(workpieceDir, "src", "content", "system.md");
-            if (await context.io.exists(systemMdPath)) {
-              const content = await context.io.readFile(systemMdPath);
-              // Inject verification.google block and pages[] array into
-              // frontmatter for search.verification.validate (SEARCH-VERIFY-01)
-              // and semantic.targets.validate (SEM-TARGET-04).
-              const updatedContent = content.replace(
-                /^---\n([\s\S]*?)\n---/,
-                (match, frontmatter: string) => {
-                  let fm = frontmatter;
-                  if (!fm.includes("verification:")) {
-                    fm +=
-                      "\nverification:\n  google:\n    method: dns-txt\n    token: google-site-verification=e2e-cold-test-token";
-                  }
-                  if (!fm.includes("pages:")) {
-                    fm +=
-                      "\npages:\n  - pageId: home\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: ''\n  - pageId: digitalesFundament\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: digitales-fundament\n  - pageId: contact\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: kontakt\n  - pageId: pricing\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: preise\n  - pageId: services\n    cosmicStar: Polaris\n    planets:\n      - cosmicPlanet: Hyperion\n        pin: latest\n    routes:\n      de: leistungen";
-                  }
-                  return `---\n${fm}\n---`;
-                },
-              );
-              // Append a deterministic cold-run marker
-              const marker = `\n\n<!-- e2e-cold: ${platformCommit} -->\n`;
-              await context.io.writeFile(systemMdPath, updatedContent + marker);
-
-              // Create minimal content page files for the pageIds declared in
-              // system.md pages[] so that generated.stale.validate can resolve
-              // preview images back to content pages. Pages must be frontmatter-only
-              // (no markdown body) with title, description, and lang fields.
-              const pagesDir = path.join(workpieceDir, "src", "content", "pages", "de");
-              await context.io.mkdir(pagesDir);
-              const pageStubs: Record<string, { title: string; description: string }> = {
-                home: {
-                  title: "Startseite",
-                  description:
-                    "Willkommen bei E2E Cold Test — digitale Souveränität und Stabilität.",
-                },
-                "digitales-fundament": {
-                  title: "Digitales Fundament",
-                  description:
-                    "Stabile digitale Basis für nachhaltiges Wachstum und Klarheit im Betrieb.",
-                },
-                contact: {
-                  title: "Kontakt",
-                  description:
-                    "Erreichen Sie uns für Fragen, Beratung und Partnerschaften jeder Art.",
-                },
-                pricing: {
-                  title: "Preise",
-                  description:
-                    "Transparente Preisgestaltung für verschiedene Betriebsgrößen und Bedarfe.",
-                },
-                services: {
-                  title: "Leistungen",
-                  description:
-                    "Umfassende Dienstleistungen für digitale Souveränität und Stabilität.",
-                },
-              };
-              for (const [slug, meta] of Object.entries(pageStubs)) {
-                const pageId = slug === "digitales-fundament" ? "digitalesFundament" : slug;
-                const pageFile = path.join(pagesDir, `${slug}.md`);
-                if (!(await context.io.exists(pageFile))) {
-                  await context.io.writeFile(
-                    pageFile,
-                    `---\ncosmicStar: Polaris\npageId: ${pageId}\ntitle: ${meta.title}\ndescription: ${meta.description}\nlang: de\nblocks:\n  - id: ${slug}-main\n    type: markdown\n    props:\n      hideSectionNumber: true\n---\n`,
-                  );
-                }
-              }
-            }
-
-            // RFC-0908: host.canonical.config.validate scans middleware source
-            // for host redirect patterns. Add a stub that satisfies the scan.
-            const middlewareDir = path.join(workpieceDir, "src", "middleware");
-            await context.io.mkdir(middlewareDir);
-            await context.io.writeFile(
-              path.join(middlewareDir, "host-canonical-redirect.ts"),
-              '// RFC-0908: www → apex canonical redirect stub\n/*\n<MODULE_CONTRACT>\n<purpose>Stub file for host canonical redirect validation pattern detection in cold E2E pipeline.</purpose>\n<non-goals>\n  <item>Does not perform actual redirects — exists for validator scan satisfaction only.</item>\n</non-goals>\n</MODULE_CONTRACT>\n<CHANGE_SUMMARY>\n  <item>RFC-0965: cold E2E host canonical redirect stub.</item>\n</CHANGE_SUMMARY>\n*/\n// @ai-invariant: Stub file for validator pattern detection only.\nexport function redirectWwwToApex(host: string): Response | null {\n  if (host === "www.e2e-cold.test") {\n    return Response.redirect("https://e2e-cold.test", 301);\n  }\n  return null;\n}\n',
-            );
-
-            // RFC-0721: behavior.snapshot.validate requires a committed
-            // behavior.snapshot.generated.yaml with the GENERATED_MARKER.
-            // The validator auto-recovers (regenerates) on SNAP-01 drift,
-            // so a minimal placeholder is sufficient.
-            await context.io.writeFile(
-              path.join(workpieceDir, "behavior.snapshot.generated.yaml"),
-              "# GENERATED. Do not change this line unless the file contains project specific changes.\n# DO NOT EDIT THIS FILE. Changes are overwritten on the next build.\n# Owner command: behavior.snapshot.generate\n# Edit instead: the behavior.snapshot.generate generator source (not this file).\n# Regenerate:   pnpm exec werkstatt run behavior.snapshot.generate\nmeta:\n  schemaVersion: 1\n  deterministic: true\n  generatedAt: null\n  contentHash: ''\nsite: e2e-cold\nroutes: []\nheaders: []\nredirects: []\n",
-            );
-
-            // Commit the edit
-            await runSubCommand(
-              stepCtx.workspaceRoot,
-              "mission.git.commit",
-              [`--mission=${missionId}`, "--message=cold-run: deterministic content edit"],
-              logger,
-            );
-          },
-          logger,
-          perStepTimeout,
-        ),
-      );
-
-      // Step 5: validate-and-release
-      steps.push(
-        await runStep(
-          "validate-and-release",
-          async () => {
-            // Run leitstand.ship --until closed
-            await runSubCommand(
-              stepCtx.workspaceRoot,
-              "leitstand.ship",
-              [`--site=${systemId}`, `--mission=${missionId}`, "--until=closed"],
-              logger,
-            );
-
-            // Then run release.prepare (which includes release.boot-smoke internally)
-            await runSubCommand(
-              stepCtx.workspaceRoot,
-              "release.prepare",
-              [`--mission=${missionId}`],
-              logger,
-            );
-          },
-          logger,
-          perStepTimeout,
-        ),
-      );
-
-      // Step 6: report (always runs — builds the report object)
-      // This step is implicit — the report is built after all steps complete.
-
-      // Step 7 (only with --with-deploy): dev-deploy
-      if (withDeploy) {
-        steps.push(
-          await runStep(
-            "dev-deploy",
-            async () => {
-              await runSubCommand(
-                stepCtx.workspaceRoot,
-                "leitstand.ship",
-                [`--site=${systemId}`, `--mission=${missionId}`, "--until=dev", "--resume"],
-                logger,
-              );
-            },
-            logger,
-            perStepTimeout,
-          ),
-        );
-      }
-    } // end if (missionId)
-
-    // Calculate interventions
-    const interventions = steps.reduce((sum, s) => sum + (s.attempts > 1 ? s.attempts - 1 : 0), 0);
-    const allOk = steps.every((s) => s.ok);
-    const timedOut = steps.some((s) => s.error?.includes("timed out"));
-
-    const report: ColdRunReport = {
-      command: "werkstatt.e2e.cold",
+    const cloneRoot = path.join(coldRoot, "werkstatt");
+    const env: ColdEnv = {
+      io: context.io,
+      logger,
       coldRoot,
+      cloneRoot,
+      cacheRoot: path.join(coldRoot, "systems-cache"),
+      gitRoot: path.join(coldRoot, "systems-git"),
+      fixture,
+      systemId,
+      missionId: null,
       platformCommit,
-      steps,
-      interventions,
-      reachedPhase: until,
-      timedOut,
       withDeploy,
-      summary:
-        allOk && interventions === 0
-          ? `[werkstatt.e2e.cold] cold run green: scaffold→validate→release with 0 interventions (${Math.round(steps.reduce((s, st) => s + st.durationMs, 0) / 60000)}m)`
-          : `[werkstatt.e2e.cold] cold run failed: ${steps
-              .filter((s) => !s.ok)
-              .map((s) => s.step)
-              .join(", ")} (${interventions} interventions)`,
+      secrets,
+      intake: null,
+      perStepTimeout: 0,
     };
 
-    if (!allOk || interventions > 0) {
-      // Keep temp dir on failure for debugging
-      return {
-        ...failResult("cold", [report.summary]),
-        data: report,
+    const stages = buildFixtureStages(env, workspaceRoot);
+    const plan = stages.filter((s) => withDeploy || !s.deployOnly);
+    env.perStepTimeout = Math.floor(timeoutMs / Math.max(1, plan.length));
+
+    let report: ColdRunReport;
+    try {
+      const steps = await runStagePlan(plan, env);
+      const interventions = steps.reduce((sum, s) => sum + Math.max(0, s.attempts - 1), 0);
+      const failed = steps.filter((s) => s.status === "fail");
+      const timedOut = steps.some((s) => s.error?.includes("timed out"));
+      const ok = failed.length === 0 && interventions === 0;
+      const skipped = steps.filter((s) => s.status === "skipped").map((s) => s.step);
+      report = {
+        fixture,
+        systemId,
+        coldRoot,
+        steps,
+        interventions,
+        reachedPhase: until,
+        timedOut,
+        withDeploy,
+        ok,
+        summary: ok
+          ? `[werkstatt.e2e.cold] ${fixture}: green with 0 interventions${skipped.length ? ` (skipped: ${skipped.join(", ")})` : ""}`
+          : `[werkstatt.e2e.cold] ${fixture}: failed at ${failed.map((s) => s.step).join(", ")} (${interventions} interventions)`,
+      };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      report = {
+        fixture,
+        systemId,
+        coldRoot,
+        steps: [
+          {
+            step: "fatal",
+            attempts: 1,
+            durationMs: 0,
+            ok: false,
+            status: "fail",
+            error: errorMsg,
+          },
+        ],
+        interventions: 0,
+        reachedPhase: until,
+        timedOut: false,
+        withDeploy,
+        ok: false,
+        summary: `[werkstatt.e2e.cold] ${fixture}: fatal error — ${errorMsg}`,
       };
     }
+    reports.push(report);
 
-    // Clean up temp dir on success unless --keep
-    if (!keep) {
+    if (!keep && report.ok) {
       await context.io.rm(coldRoot, { recursive: true }).catch(() => {
         logger.info(`[werkstatt.e2e.cold] warning: could not remove cold root ${coldRoot}`);
       });
     }
-
-    return {
-      exitCode: 0,
-      data: report,
-      summary: report.summary,
-    };
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.info(`[werkstatt.e2e.cold] fatal error: ${errorMsg}`);
-
-    const report: ColdRunReport = {
-      command: "werkstatt.e2e.cold",
-      coldRoot,
-      platformCommit,
-      steps,
-      interventions: steps.reduce((sum, s) => sum + (s.attempts > 1 ? s.attempts - 1 : 0), 0),
-      reachedPhase: until,
-      timedOut: false,
-      withDeploy,
-      summary: `[werkstatt.e2e.cold] fatal error: ${errorMsg}`,
-    };
-
-    return {
-      ...failResult("cold", [errorMsg]),
-      data: report,
-    };
   }
+
+  const allOk = reports.every((r) => r.ok);
+  const matrix: ColdMatrixReport = {
+    command: "werkstatt.e2e.cold",
+    platformCommit,
+    fixtures: reports,
+    summary: allOk
+      ? `[werkstatt.e2e.cold] cold run green: ${reports.length} fixture(s), 0 interventions`
+      : `[werkstatt.e2e.cold] cold run failed: ${reports
+          .filter((r) => !r.ok)
+          .map((r) => `${r.fixture} (${r.steps.find((s) => s.status === "fail")?.step ?? "?"})`)
+          .join(", ")}`,
+  };
+
+  if (!allOk) {
+    return { ...failResult("cold", [matrix.summary]), data: matrix };
+  }
+  return { exitCode: 0, data: matrix, summary: matrix.summary };
+}
+
+// ─── Fixture stage plan ──────────────────────────────────────────────────────
+
+/**
+ * The birth pipeline as a stage array — injectable so tests substitute stages.
+ * Deploy legs only enter the plan under --with-deploy; teardown is `always` so
+ * it runs even when an earlier deploy stage failed.
+ */
+export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): ColdStage[] {
+  const cachePath = path.join(env.cacheRoot, env.systemId);
+  const barePath = path.join(env.gitRoot, env.systemId);
+
+  return [
+    {
+      name: "prepare-cold-root",
+      run: async () => {
+        await execChecked(env.io, "git", ["clone", parentWorkspaceRoot, env.cloneRoot], {
+          timeoutMs: 60000,
+        });
+        await env.io.mkdir(env.cacheRoot);
+        await env.io.mkdir(env.gitRoot);
+      },
+    },
+    {
+      name: "install",
+      run: async () => {
+        await execChecked(env.io, "pnpm", ["install", "--frozen-lockfile"], {
+          cwd: env.cloneRoot,
+        });
+        await execChecked(env.io, "pnpm", ["exec", "playwright", "install", "chromium"], {
+          cwd: env.cloneRoot,
+        });
+      },
+    },
+    {
+      name: "stage-intake",
+      run: async () => {
+        env.intake = await stageFixtureIntake(env);
+      },
+    },
+    {
+      name: "register-site",
+      skipWhen: () =>
+        env.intake?.domain === null && !cfSecretsPresent(env.secrets)
+          ? `${CF_SKIP} — provisional birth domain unverifiable`
+          : null,
+      run: async () => {
+        const keyDir = path.join(env.coldRoot, "signing-key");
+        await env.io.mkdir(keyDir);
+        await runSubCommand(
+          env.cloneRoot,
+          "signing.key.generate",
+          [`--output-dir=${keyDir}`, "--encoding=pem", "--force"],
+          env.logger,
+        );
+        const privateKeyPem = await env.io.readFile(path.join(keyDir, "signing.key.pem"));
+        process.env.SIGNING_PRIVATE_KEY = privateKeyPem.trim();
+
+        await env.io.mkdir(barePath);
+        await execChecked(env.io, "git", ["init", "--bare", "-b", "main", barePath]);
+        await env.io.mkdir(cachePath);
+
+        const argv = [
+          `--id=${env.systemId}`,
+          "--cosmicStar=Polaris",
+          `--mirrors=${cachePath}:non-bare,${barePath}:bare`,
+          `--intake=${env.intake!.relDir}`,
+          "--biome=handwerk-material-warm",
+        ];
+        if (env.intake!.domain === null) {
+          const subdomain = await getWorkersSubdomain(
+            env.secrets.accountId!,
+            env.secrets.apiToken!,
+          );
+          argv.push(`--domain=${env.systemId}.${subdomain}.workers.dev`);
+        }
+        const result = (await executeKernelCommand({
+          workspaceRoot: env.cloneRoot,
+          commandName: "sternsystem.register",
+          argv,
+          outputFormat: "json",
+        })) as { exitCode?: number; summary?: string; data?: { firstMissionId?: string } };
+        if ((result.exitCode ?? 0) !== 0) {
+          throw new Error(`sternsystem.register failed: ${result.summary ?? "unknown error"}`);
+        }
+
+        // RFC-1307: the seeded system.md must validate as-born — assert the
+        // i18n/manifest contract instead of repairing it downstream.
+        const seededSystemMd = await env.io.readFile(
+          path.join(cachePath, "src", "content", "system.md"),
+        );
+        const fmStart = seededSystemMd.indexOf("---");
+        const fmEnd = seededSystemMd.lastIndexOf("---");
+        const seededFm = (
+          fmStart === -1 || fmEnd <= fmStart
+            ? null
+            : YAML.parse(seededSystemMd.slice(fmStart + 3, fmEnd))
+        ) as {
+          i18n?: { supported?: Record<string, { name?: string; hreflang?: string }> };
+          identity?: { biome?: string };
+        } | null;
+        if (!seededFm || Object.keys(seededFm.i18n?.supported ?? {}).length === 0) {
+          throw new Error(
+            "register-site: seeded system.md has no i18n.supported entries — planner must emit valid i18n",
+          );
+        }
+        for (const [segment, entry] of Object.entries(seededFm.i18n?.supported ?? {})) {
+          if (!entry.name || !entry.hreflang) {
+            throw new Error(
+              `register-site: seeded i18n.supported.${segment} lacks name/hreflang — planner must emit valid i18n`,
+            );
+          }
+        }
+        if (seededFm.identity?.biome !== "handwerk-material-warm") {
+          throw new Error(
+            `register-site: seeded identity.biome is '${seededFm.identity?.biome}' — expected 'handwerk-material-warm'`,
+          );
+        }
+
+        env.missionId = result.data?.firstMissionId ?? null;
+      },
+    },
+    {
+      name: "passport-validate",
+      requiresMission: true,
+      run: async () => {
+        const registryUrl = process.env.FLEET_OWNERSHIP_REGISTRY_URL;
+        if (registryUrl) {
+          await runSubCommand(
+            env.cloneRoot,
+            "fleet.ownership.register",
+            [`--id=${env.systemId}`],
+            env.logger,
+          );
+          await runSubCommand(
+            env.cloneRoot,
+            "fleet.ownership.verify",
+            [`--id=${env.systemId}`],
+            env.logger,
+          );
+        }
+        const result = (await executeKernelCommand({
+          workspaceRoot: env.cloneRoot,
+          commandName: "sternsystem.validate",
+          argv: [`--id=${env.systemId}`, "--json"],
+          outputFormat: "json",
+        })) as {
+          exitCode?: number;
+          data?: {
+            violations?: Array<{ rule: string; systemId: string; message: string }>;
+            warnings?: Array<{ field: string; systemId: string; message: string }>;
+          };
+        };
+        const relevantViolations = (result.data?.violations ?? []).filter(
+          (v) =>
+            v.rule.startsWith("PASSPORT") ||
+            v.rule.startsWith("HANDOVER") ||
+            v.rule.startsWith("OWNERSHIP"),
+        );
+        const relevantWarnings = (result.data?.warnings ?? []).filter(
+          (w) =>
+            w.field?.startsWith("PASSPORT") ||
+            w.field?.startsWith("HANDOVER") ||
+            w.field?.startsWith("OWNERSHIP"),
+        );
+        if (relevantViolations.length > 0) {
+          throw new Error(
+            `passport-validate: ${relevantViolations.length} PASSPORT/HANDOVER/OWNERSHIP violations: ${relevantViolations.map((v) => `${v.rule}: ${v.message}`).join("; ")}`,
+          );
+        }
+        if (relevantWarnings.length > 0) {
+          throw new Error(
+            `passport-validate: ${relevantWarnings.length} PASSPORT/HANDOVER/OWNERSHIP warnings: ${relevantWarnings.map((w) => `${w.field}: ${w.message}`).join("; ")}`,
+          );
+        }
+      },
+    },
+    {
+      name: "handover-dry-run",
+      requiresMission: true,
+      run: async () => {
+        const recipientPublicKey = toHex((await generateKeyPair()).publicKey);
+        const prepareResult = (await executeKernelCommand({
+          workspaceRoot: env.cloneRoot,
+          commandName: "sternsystem.handover.prepare",
+          argv: [
+            `--id=${env.systemId}`,
+            "--recipient-identity=human:e2e-recipient",
+            `--recipient-public-key=${recipientPublicKey}`,
+            "--dry-run",
+            "--json",
+          ],
+          outputFormat: "json",
+        })) as {
+          exitCode?: number;
+          data?: { dryRun?: boolean; signedAuthorization?: unknown; authorizationHash?: string };
+        };
+        if (prepareResult.exitCode !== 0) {
+          throw new Error(
+            `handover-dry-run: prepare --dry-run failed with exit code ${prepareResult.exitCode}`,
+          );
+        }
+        if (!prepareResult.data?.dryRun || !prepareResult.data?.signedAuthorization) {
+          throw new Error("handover-dry-run: prepare --dry-run did not return signedAuthorization");
+        }
+        const completeResult = (await executeKernelCommand({
+          workspaceRoot: env.cloneRoot,
+          commandName: "sternsystem.handover.complete",
+          argv: [
+            `--id=${env.systemId}`,
+            "--dry-run",
+            `--authorization-data=${JSON.stringify(prepareResult.data.signedAuthorization)}`,
+            "--json",
+          ],
+          outputFormat: "json",
+        })) as {
+          exitCode?: number;
+          data?: { dryRun?: boolean; newPassportHashPreview?: string };
+        };
+        if (completeResult.exitCode !== 0) {
+          throw new Error(
+            `handover-dry-run: complete --dry-run failed with exit code ${completeResult.exitCode}`,
+          );
+        }
+        if (!completeResult.data?.dryRun || !completeResult.data?.newPassportHashPreview) {
+          throw new Error("handover-dry-run: complete --dry-run did not return preview data");
+        }
+      },
+    },
+    {
+      name: "compose",
+      requiresMission: true,
+      run: async () => {
+        const missionsDir = path.join(env.cloneRoot, "missions");
+        const missionDirs = await env.io
+          .readdir(missionsDir)
+          .then((e) => e.map((x) => x.name))
+          .catch(() => []);
+        const missionDir = missionDirs.find((d) => d.includes(env.missionId!));
+        if (!missionDir) {
+          throw new Error(`compose: mission directory not found for ${env.missionId}`);
+        }
+        const workpieceDir = path.join(missionsDir, missionDir, "workpiece");
+        const compositionSrc = path.join(fixtureDir(env.cloneRoot, env.fixture), "composition");
+        if (!(await env.io.exists(compositionSrc))) {
+          throw new Error(
+            `compose: fixture '${env.fixture}' carries no composition/ directory — the scripted compose step stands in for the composer and needs authored content`,
+          );
+        }
+
+        // FAB-SEAM-BEGIN: compose
+        const COMPOSE_SUBDIRS = ["pages", "prose", "navigation", "site"];
+        const COMPOSE_FILES = ["system.md"];
+        const composeContentDir = path.join(workpieceDir, "src", "content");
+        const applyDir = async (src: string, rel: string): Promise<void> => {
+          for (const entry of await env.io.readdir(src)) {
+            const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
+            const stat = await env.io.stat(path.join(src, entry.name)).catch(() => null);
+            if (stat?.isDirectory) {
+              if (rel === "" && !COMPOSE_SUBDIRS.includes(entry.name)) {
+                throw new Error(
+                  `compose: fixture composition carries '${entry.name}/' — only ${COMPOSE_SUBDIRS.join("/")} subtrees are composer territory`,
+                );
+              }
+              await applyDir(path.join(src, entry.name), entryRel);
+            } else {
+              if (rel === "" && !COMPOSE_FILES.includes(entry.name)) {
+                throw new Error(
+                  `compose: fixture composition carries '${entry.name}' at root — only ${COMPOSE_FILES.join("/")} overlays are composer territory`,
+                );
+              }
+              const target = path.join(composeContentDir, entryRel);
+              await env.io.mkdir(path.dirname(target));
+              if (rel === "" && entry.name === "system.md") {
+                // The composer edits the seeded manifest — a frontmatter
+                // overlay merge, not a replace: platform-seeded fields
+                // (identity.domain, i18n hreflang, gates) survive, composer
+                // keys (pages[], clientEditable, growth) merge on top.
+                const seededRaw = await env.io.readFile(target);
+                const overlayRaw = await env.io.readFile(path.join(src, entry.name));
+                const merged = mergeSystemMdFrontmatter(seededRaw, overlayRaw);
+                await env.io.writeFile(target, merged);
+              } else {
+                await env.io.copyFile(
+                  path.join(src, entry.name),
+                  path.join(composeContentDir, entryRel),
+                );
+              }
+            }
+          }
+        };
+        await applyDir(compositionSrc, "");
+        // FAB-SEAM-END: compose
+
+        await runSubCommand(
+          env.cloneRoot,
+          "mission.git.commit",
+          [`--mission=${env.missionId}`, "--message=cold-run: scripted composition applied"],
+          env.logger,
+        );
+      },
+    },
+    {
+      name: "ship-closed",
+      requiresMission: true,
+      run: async () => {
+        await runSubCommand(
+          env.cloneRoot,
+          "leitstand.ship",
+          [`--site=${env.systemId}`, `--mission=${env.missionId}`, "--until=closed"],
+          env.logger,
+        );
+        await runSubCommand(
+          env.cloneRoot,
+          "release.prepare",
+          [`--mission=${env.missionId}`],
+          env.logger,
+        );
+      },
+    },
+    {
+      name: "dev-deploy",
+      requiresMission: true,
+      deployOnly: true,
+      skipWhen: () => (!cfSecretsPresent(env.secrets) ? `${CF_SKIP} — deploy legs` : null),
+      run: async () => {
+        await runSubCommand(
+          env.cloneRoot,
+          "leitstand.ship",
+          [`--site=${env.systemId}`, `--mission=${env.missionId}`, "--until=dev", "--resume"],
+          env.logger,
+        );
+      },
+    },
+    {
+      name: "access-probe",
+      requiresMission: true,
+      deployOnly: true,
+      skipWhen: () => (!cfSecretsPresent(env.secrets) ? `${CF_SKIP} — access probe` : null),
+      run: async () => {
+        // RFC-1325: first dev deploy auto-protects provisional hosts — a
+        // provisional dev channel must answer 401 to an unauthenticated
+        // request. A custom-domain dev channel carries no auto-PIN — there
+        // the probe asserts reachability instead (2xx/3xx, never 5xx).
+        const cfg = YAML.parse(
+          await env.io.readFile(path.join(cachePath, "system-config.yaml")),
+        ) as { deployment?: { channels?: { dev?: { url?: string } } } };
+        const devUrl = cfg.deployment?.channels?.dev?.url;
+        if (!devUrl) {
+          throw new Error(
+            "access-probe: system-config.yaml declares no deployment.channels.dev.url — the deployment block is incomplete",
+          );
+        }
+        const res = await fetch(devUrl, { redirect: "manual" });
+        if (isProvisionalHost(new URL(devUrl).hostname)) {
+          if (res.status !== 401) {
+            throw new Error(
+              `access-probe: ${devUrl} answered ${res.status}, expected 401 (RFC-1325 auto-PIN)`,
+            );
+          }
+        } else if (res.status >= 400) {
+          throw new Error(
+            `access-probe: custom-domain dev channel ${devUrl} answered ${res.status} — deploy did not come up`,
+          );
+        }
+      },
+    },
+    {
+      name: "teardown",
+      deployOnly: true,
+      always: true,
+      skipWhen: () => (!cfSecretsPresent(env.secrets) ? `${CF_SKIP} — nothing deployed` : null),
+      run: async () => {
+        // Always runs after deploy legs (even on stage failure): delete every
+        // worker this birth could have created.
+        const existing = new Set(
+          await listWorkerNames(env.secrets.accountId!, env.secrets.apiToken!),
+        );
+        for (const name of [env.systemId, `dev-${env.systemId}`, `alt-${env.systemId}`]) {
+          if (!existing.has(name)) continue;
+          try {
+            await deleteWorkerScript(env.secrets.accountId!, env.secrets.apiToken!, name);
+            env.logger.info(`  [e2e.cold] teardown: deleted worker ${name}`);
+          } catch (err) {
+            env.logger.warn(
+              `  [e2e.cold] teardown: could not delete worker ${name} — ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+
+        // Custom-domain fixtures: the deploy also created Workers Routes and
+        // DNS records on the real zone (dev.<domain> etc.) — sweep every
+        // record whose name carries the e2e systemId. Zone = the confirmed
+        // domain's registrable root (last two labels).
+        const domain = env.intake?.domain;
+        if (domain && !isProvisionalHost(domain)) {
+          const labels = domain.split(".");
+          const zoneName = labels.slice(-2).join(".");
+          const zoneId = await resolveZoneIdByName(zoneName, env.secrets.apiToken!);
+          if (!zoneId) {
+            env.logger.warn(
+              `  [e2e.cold] teardown: zone '${zoneName}' not found — cannot sweep routes/DNS for ${env.systemId}`,
+            );
+            return;
+          }
+          for (const route of await listWorkersRoutes(zoneId, env.secrets.apiToken!)) {
+            if (!route.pattern.includes(env.systemId)) continue;
+            try {
+              await deleteWorkersRoute(zoneId, env.secrets.apiToken!, route.id);
+              env.logger.info(`  [e2e.cold] teardown: deleted route ${route.pattern}`);
+            } catch (err) {
+              env.logger.warn(
+                `  [e2e.cold] teardown: could not delete route ${route.pattern} — ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }
+          for (const record of await listDnsRecords(zoneId, env.secrets.apiToken!)) {
+            if (!record.name.includes(env.systemId)) continue;
+            try {
+              await deleteDnsRecord(zoneId, env.secrets.apiToken!, record.id);
+              env.logger.info(`  [e2e.cold] teardown: deleted DNS ${record.name}`);
+            } catch (err) {
+              env.logger.warn(
+                `  [e2e.cold] teardown: could not delete DNS ${record.name} — ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }
+        }
+      },
+    },
+    {
+      name: "abort-second-mission",
+      requiresMission: true,
+      run: async () => {
+        // RFC-1324: prove abort on a cloned workpiece — open a second, empty
+        // mission on the closed system and abort it.
+        const opened = (await executeKernelCommand({
+          workspaceRoot: env.cloneRoot,
+          commandName: "mission.open",
+          argv: [
+            `--system=${env.systemId}`,
+            "--brief=e2e-cold: abort proving run",
+            "--actor=agent:e2e-cold",
+            "--json",
+          ],
+          outputFormat: "json",
+        })) as { exitCode?: number; summary?: string; data?: { missionId?: string } };
+        if ((opened.exitCode ?? 0) !== 0 || !opened.data?.missionId) {
+          throw new Error(
+            `abort-second-mission: mission.open failed — ${opened.summary ?? "no missionId"}`,
+          );
+        }
+        await runSubCommand(
+          env.cloneRoot,
+          "mission.abort",
+          [
+            `--mission=${opened.data.missionId}`,
+            "--reason=e2e-cold: abort proving run complete",
+            "--actor=agent:e2e-cold",
+          ],
+          env.logger,
+        );
+      },
+    },
+  ];
 }

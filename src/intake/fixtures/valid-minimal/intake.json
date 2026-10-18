@@ -27,6 +27,18 @@
         "evidenceRefs": [
           "evidence-source/src-01"
         ]
+      },
+      {
+        "intent": "about",
+        "evidenceRefs": [
+          "evidence-source/src-01"
+        ]
+      },
+      {
+        "intent": "contacts",
+        "evidenceRefs": [
+          "evidence-source/src-01"
+        ]
       }
     ]
   },
