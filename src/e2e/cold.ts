@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: cold-run defect: ship-closed skipped mission.reconcile — RFC-1217 gate correctly blocked unreconciled workpiece</item>
   <item>RFC-1324: cold-run defect: ship-closed needs mission.validate before reconcile</item>
   <item>RFC-1324: cold-run defect: compose stage missed passport.key.ensure/emit — sole-owned .well-known artifacts</item>
   <item>RFC-1324: cold-run defect: system.md merge emitted YAML-1.1-ambiguous scalars unquoted (lastmod date)</item>
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
+  <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -862,7 +862,15 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
         }
 
         // FAB-SEAM-BEGIN: compose
-        const COMPOSE_SUBDIRS = ["pages", "prose", "navigation", "site", "business-profile"];
+        const COMPOSE_SUBDIRS = [
+          "pages",
+          "prose",
+          "navigation",
+          "site",
+          "business-profile",
+          "business",
+          "faq",
+        ];
         const COMPOSE_FILES = ["system.md"];
         const composeContentDir = path.join(workpieceDir, "src", "content");
         const applyDir = async (src: string, rel: string): Promise<void> => {

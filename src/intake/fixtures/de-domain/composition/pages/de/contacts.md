@@ -11,5 +11,6 @@ blocks:
     props:
       hideSectionNumber: true
       heading: "Kontakt"
+      level: 1
       contentRef: "prose/contacts"
 ---

@@ -2,6 +2,10 @@
 identity:
   tagline: "Проверяемое качество по честной цене"
   ctaTarget: contacts
+  legal:
+    responsibleName: "DP7 Digitalprojekt GmbH"
+    address: "Chausseestraße 86, 10115 Berlin, DE"
+    email: "e2e-valid@example.com"
 
 i18n:
   supported:

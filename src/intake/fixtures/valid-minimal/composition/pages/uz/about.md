@@ -11,5 +11,6 @@ blocks:
     props:
       hideSectionNumber: true
       heading: "Kompaniya haqida"
+      level: 1
       contentRef: "prose/about-company"
 ---

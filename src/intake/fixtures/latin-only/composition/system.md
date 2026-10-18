@@ -2,6 +2,10 @@
 identity:
   tagline: "Verifiable quality at a fair price"
   ctaTarget: contacts
+  legal:
+    responsibleName: "E2E Latinworks LLC"
+    address: "SW Morrison Street 1500, 97205 Portland, US"
+    email: "e2e-latinworks@example.com"
 
 i18n:
   supported:

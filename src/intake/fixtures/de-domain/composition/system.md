@@ -2,6 +2,10 @@
 identity:
   tagline: "Nachweisbare Qualität zum fairen Preis"
   ctaTarget: contacts
+  legal:
+    responsibleName: "E2E Demowerk GmbH"
+    address: "Friedrichstraße 12, 10117 Berlin, DE"
+    email: "e2e-demowerk@example.com"
 
 i18n:
   supported:

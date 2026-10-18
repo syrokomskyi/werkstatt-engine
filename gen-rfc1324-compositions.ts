@@ -7,11 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: initial — per-fixture composition emission from declarative specs.</item>
   <item>RFC-1324</item>
   <item>RFC-1324: cold-run defect: fixture page descriptions under semantic.drift 50-char SEO floor</item>
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <item>RFC-1324: declare legal pageIds in system.md overlay — scaffold emits files, composer owns the route registry (B-04)</item>
+  <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
+  <history>RFC-1324</history>
 </CHANGE_SUMMARY>
 */
 // Run: pnpm exec tsx gen-rfc1324-compositions.ts (from packages/werkstatt-engine)
@@ -64,6 +65,13 @@ interface FixtureSpec {
   segments: string[];
   /** legalJurisdiction regimes legal.scaffold emits — manifest-only page entries, files are scaffold-owned */
   legalPages?: string[];
+  /** home faq-list block + faq/{seg}/ entries (FAQPage JSON-LD baseline) */
+  faq?: {
+    heading: Record<string, string>;
+    items: Record<string, Array<{ q: string; a: string }>>;
+  };
+  /** business/{seg}/services/ record (Service JSON-LD baseline) */
+  service?: { name: Record<string, string>; description: Record<string, string> };
   pages: PageSpec[];
   proseTexts: Record<string, Record<string, string>>; // proseId -> seg -> body
   navLabels: Record<string, Record<string, string>>; // pageId -> seg -> label
@@ -117,10 +125,15 @@ ${routes}
   const i18n = spec.segments
     .map((s) => `    ${s}: { name: "${spec.nativeNames[s] ?? s}" }`)
     .join("\n");
+  const legal = `  legal:
+    responsibleName: "${spec.legalName}"
+    address: "${spec.place.street} ${spec.place.streetNumber}, ${spec.place.postalCode} ${spec.place.locality}, ${spec.place.countryCode}"
+    email: "${spec.email}"`;
   return `---
 identity:
   tagline: "${spec.tagline[spec.segments[0]!]}"
   ctaTarget: contacts
+${legal}
 
 i18n:
   supported:
@@ -172,6 +185,20 @@ blocks:
       lead: "${p.lead![seg]}"
 `);
   }
+  // `level: 1` renders the block heading as the page's single <h1>
+  // (HTML-STRUCT-03); faq-list on home feeds the FAQPage JSON-LD the
+  // family agent-readiness baseline requires.
+  const faqBlock =
+    p.pageId === "home" && spec.faq
+      ? `
+  - id: home-faq
+    type: faq-list
+    props:
+      header:
+        heading: "${spec.faq.heading[seg] ?? spec.faq.heading[spec.segments[0]!]}"
+      background:
+        kind: transparent`
+      : "";
   return fm(`kind: page
 pageId: ${p.pageId}
 cosmicStar: ${p.star}
@@ -184,7 +211,8 @@ blocks:
     props:
       hideSectionNumber: true
       heading: "${p.heading![seg]}"
-      contentRef: "prose/${p.prose}"
+      level: 1
+      contentRef: "prose/${p.prose}"${faqBlock}
 `);
 }
 
@@ -778,6 +806,41 @@ const fixtures: FixtureSpec[] = [
     segments: ["ru", "uz"],
     legalPages: ["impressum", "datenschutz"],
     nativeNames: { ru: "Русский", uz: "Oʻzbekcha" },
+    faq: {
+      heading: { ru: "Частые вопросы", uz: "Kop soʻraladigan savollar" },
+      items: {
+        ru: [
+          {
+            q: "Чем занимается компания?",
+            a: "Информационный сайт о компании и её деятельности; продажа через сайт не ведётся.",
+          },
+          {
+            q: "Как связаться с компанией?",
+            a: "Через страницу контактов — там указаны электронная почта и адрес офиса.",
+          },
+        ],
+        uz: [
+          {
+            q: "Kompaniya nima bilan shugʻullanadi?",
+            a: "Kompaniya va uning faoliyati haqida axborot sayti; sayt orqali sotuv olib borilmaydi.",
+          },
+          {
+            q: "Kompaniya bilan qanday bogʻlanish mumkin?",
+            a: "Aloqa sahifasi orqali — u yerda elektron pochta va ofis manzili koʻrsatilgan.",
+          },
+        ],
+      },
+    },
+    service: {
+      name: {
+        ru: "Информационные материалы о компании",
+        uz: "Kompaniya haqida axborot materiallari",
+      },
+      description: {
+        ru: "Описание компании, её профиля и способов связи для деловых партнёров.",
+        uz: "Kompaniya, uning profili va biznes hamkorlari uchun aloqa usullari tavsifi.",
+      },
+    },
     tagline: { ru: "Проверяемое качество по честной цене" },
     defaultDescription: {
       ru: "Информационный сайт E2E Valid GmbH: компания, страницы и способы связи.",
@@ -896,6 +959,41 @@ const fixtures: FixtureSpec[] = [
     },
     segments: ["de", "en"],
     legalPages: ["impressum", "datenschutz"],
+    faq: {
+      heading: { de: "Häufige Fragen", en: "Frequently asked questions" },
+      items: {
+        de: [
+          {
+            q: "Was macht das Unternehmen?",
+            a: "Informationswebsite über das Unternehmen und seine Tätigkeit; ein Verkauf über die Website erfolgt nicht.",
+          },
+          {
+            q: "Wie erreicht man das Unternehmen?",
+            a: "Über die Kontaktseite — dort stehen E-Mail-Adresse und Postanschrift.",
+          },
+        ],
+        en: [
+          {
+            q: "What does the company do?",
+            a: "An informational site about the company and its work; nothing is sold through the website.",
+          },
+          {
+            q: "How can the company be reached?",
+            a: "Via the contact page — it lists the email address and the postal address.",
+          },
+        ],
+      },
+    },
+    service: {
+      name: {
+        de: "Informationsmaterialien zum Unternehmen",
+        en: "Informational materials about the company",
+      },
+      description: {
+        de: "Beschreibung des Unternehmens, seines Profils und der Kontaktmöglichkeiten für Geschäftspartner.",
+        en: "A description of the company, its profile, and the contact channels for business partners.",
+      },
+    },
     nativeNames: { de: "Deutsch", en: "English" },
     tagline: { de: "Nachweisbare Qualität zum fairen Preis" },
     defaultDescription: {
@@ -1014,6 +1112,27 @@ const fixtures: FixtureSpec[] = [
       countryCode: "US",
     },
     segments: ["en"],
+    faq: {
+      heading: { en: "Frequently asked questions" },
+      items: {
+        en: [
+          {
+            q: "What does the company do?",
+            a: "An informational site about the company; nothing is sold through the website.",
+          },
+          {
+            q: "How can the company be reached?",
+            a: "Via the contact page, which lists email and postal addresses.",
+          },
+        ],
+      },
+    },
+    service: {
+      name: { en: "Company information materials" },
+      description: {
+        en: "A description of the company, its profile, and the contact channels for business partners.",
+      },
+    },
     nativeNames: { en: "English" },
     tagline: { en: "Verifiable quality at a fair price" },
     defaultDescription: {
@@ -1111,6 +1230,28 @@ for (const spec of fixtures) {
     files[`navigation/${seg}/navigation.md`] = navFile(spec, seg);
     files[`site/${seg}/labels.md`] = fm(spec.labels(seg));
     files[`site/${seg}/layout.md`] = layoutFile(spec, seg);
+    // faq/{seg}/ entries — the home faq-list block aggregates them into the
+    // FAQPage JSON-LD the family baseline requires.
+    for (const [i, item] of (spec.faq?.items[seg] ?? []).entries()) {
+      files[`faq/${seg}/q${i + 1}.md`] = `---
+slug: "q${i + 1}"
+question: "${item.q}"
+answer: "${item.a}"
+order: ${i + 1}
+---
+`;
+    }
+    // business/{seg}/services/ — projected into organization.services for the
+    // Service JSON-LD node (RFC-0373 catalog).
+    if (spec.service) {
+      files[`business/${seg}/services/main.md`] = `---
+slug: "main-service"
+name: "${spec.service.name[seg] ?? spec.service.name[spec.segments[0]!]}"
+description: "${spec.service.description[seg] ?? spec.service.description[spec.segments[0]!]}"
+order: 1
+---
+`;
+    }
   }
   emit(dir, files);
   console.log(`${spec.name}: ${Object.keys(files).length} files`);

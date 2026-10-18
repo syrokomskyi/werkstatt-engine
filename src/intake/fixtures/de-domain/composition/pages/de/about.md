@@ -11,5 +11,6 @@ blocks:
     props:
       hideSectionNumber: true
       heading: "Über uns"
+      level: 1
       contentRef: "prose/about-company"
 ---

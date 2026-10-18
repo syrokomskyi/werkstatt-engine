@@ -11,5 +11,13 @@ blocks:
     props:
       hideSectionNumber: true
       heading: "What we do"
+      level: 1
       contentRef: "prose/home-intro"
+  - id: home-faq
+    type: faq-list
+    props:
+      header:
+        heading: "Frequently asked questions"
+      background:
+        kind: transparent
 ---
