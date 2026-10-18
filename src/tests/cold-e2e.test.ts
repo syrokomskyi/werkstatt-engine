@@ -405,6 +405,86 @@ describe("werkstatt.e2e.cold", () => {
     expect(result.data?.fixtures[0]?.timedOut).toBe(true);
   });
 
+  it("isolates each matrix fixture in a child process and merges reports", async () => {
+    mockedExec.mockClear();
+    const childCalls: string[][] = [];
+    mockExecFileSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "pnpm" && args?.includes("werkstatt.e2e.cold")) {
+        childCalls.push(args);
+        const fixture = args.find((a) => a.startsWith("--fixture="))?.split("=")[1] ?? "?";
+        return JSON.stringify({
+          exitCode: 0,
+          data: {
+            command: "werkstatt.e2e.cold",
+            platformCommit: "abc",
+            fixtures: [
+              {
+                fixture,
+                systemId: `e2e-${fixture}`,
+                coldRoot: `/tmp/child-${fixture}`,
+                steps: [
+                  { step: "register-site", attempts: 1, durationMs: 1, ok: true, status: "pass" },
+                ],
+                interventions: 0,
+                reachedPhase: "closed",
+                timedOut: false,
+                withDeploy: false,
+                ok: true,
+                summary: "green",
+              },
+            ],
+            summary: "green",
+          },
+        });
+      }
+      return "";
+    });
+    const dir = (name: string) => ({ name, isFile: () => false, isDirectory: () => true });
+    const file = (name: string) => ({ name, isFile: () => true, isDirectory: () => false });
+    mockReaddir = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("intake/fixtures") || s.endsWith("intake\\fixtures"))
+        return [dir("de-domain"), dir("valid-minimal")];
+      return [file("intake.json")];
+    });
+
+    const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.data?.fixtures.map((f) => f.fixture)).toEqual(["de-domain", "valid-minimal"]);
+    // No in-process stages ran — every fixture executed in its own child.
+    expect(mockedExec).not.toHaveBeenCalled();
+    expect(childCalls).toHaveLength(2);
+    for (const argv of childCalls) {
+      expect(argv).toContain("--json");
+      expect(argv).toContain("--until=closed");
+    }
+  });
+
+  it("reports a failed fixture when the isolated child emits no JSON report", async () => {
+    mockExecFileSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "pnpm" && args?.includes("werkstatt.e2e.cold")) return "install noise, then boom";
+      return "";
+    });
+    const dir = (name: string) => ({ name, isFile: () => false, isDirectory: () => true });
+    const file = (name: string) => ({ name, isFile: () => true, isDirectory: () => false });
+    mockReaddir = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("intake/fixtures") || s.endsWith("intake\\fixtures"))
+        return [dir("de-domain"), dir("valid-minimal")];
+      return [file("intake.json")];
+    });
+
+    const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
+
+    expect(result.exitCode).toBe(1);
+    for (const fixture of result.data?.fixtures ?? []) {
+      expect(fixture.ok).toBe(false);
+      expect(fixture.steps[0]?.step).toBe("fixture-child");
+      expect(fixture.steps[0]?.error).toContain("no JSON report");
+    }
+  });
+
   it("does not touch real systems-cache when cold run executes", async () => {
     const realCachePath = join(tmpDir, "systems-cache");
     mkdirSync(realCachePath, { recursive: true });

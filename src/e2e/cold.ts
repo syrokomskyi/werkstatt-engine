@@ -20,11 +20,10 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
   <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
   <item>RFC-1324: provision ../pipelines sibling into the clone root so optional axiom link deps resolve and gated probes (a11y.axe) actually execute</item>
-  <item>RFC-1324: Symlink pipelines sibling into cold clone so linked axiom dist resolves</item>
+  <item>RFC-1324: isolate each matrix fixture in its own werkstatt child process (CI parity) — no registry/env state crosses cold births; runStep records errorStack</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -69,6 +68,9 @@ export interface ColdRunStep {
   status: ColdStepStatus;
   skippedReason?: string;
   error?: string;
+  /** First stack frames of a thrown error — bare messages like
+   * "Maximum call stack size exceeded" are otherwise undiagnosable. */
+  errorStack?: string;
 }
 
 /** Per-fixture result — RFC-1324 runs one cold birth per fixture, each in its own temp root. */
@@ -158,6 +160,7 @@ async function runStep(
   const start = Date.now();
   let ok = false;
   let errorMsg: string | undefined;
+  let errorStack: string | undefined;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -173,7 +176,9 @@ async function runStep(
     logger.info(`  [e2e.cold] ${stepName}: ok (${Date.now() - start}ms)`);
   } catch (err) {
     errorMsg = err instanceof Error ? err.message : String(err);
+    errorStack = err instanceof Error ? err.stack?.split("\n").slice(0, 12).join("\n") : undefined;
     logger.info(`  [e2e.cold] ${stepName}: FAILED — ${errorMsg}`);
+    if (errorStack) logger.info(`    ${errorStack.split("\n").join("\n    ")}`);
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -185,6 +190,7 @@ async function runStep(
     ok,
     status: ok ? "pass" : "fail",
     error: errorMsg,
+    errorStack,
   };
 }
 
@@ -232,6 +238,90 @@ export async function runStagePlan(stages: ColdStage[], env: ColdEnv): Promise<C
     if (!step.ok) abortedBy = stage.name;
   }
   return steps;
+}
+
+// ─── Per-fixture process isolation ──────────────────────────────────────────
+
+/**
+ * Multi-fixture matrix runs spawn each fixture in its own `werkstatt` child
+ * process — identical to CI's one-job-per-fixture model. A shared parent
+ * process accumulates module registries, env state (SIGNING_PRIVATE_KEY
+ * leaks between fixtures), and whatever else a full site birth retains;
+ * the fixture loop's only contract is the child's JSON report on stdout.
+ */
+function parseChildMatrix(stdout: string): ColdMatrixReport | null {
+  // The CLI prints JSON.stringify(result, null, 2) as its final stdout line —
+  // the root object is the only `{` at column 0; prologue/log noise precedes it.
+  const idx = stdout.lastIndexOf("\n{");
+  const start = idx === -1 ? (stdout.startsWith("{") ? 0 : -1) : idx + 1;
+  if (start === -1) return null;
+  try {
+    const parsed = JSON.parse(stdout.slice(start)) as { data?: ColdMatrixReport };
+    return parsed?.data && Array.isArray(parsed.data.fixtures) ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function runFixtureInChildProcess(opts: {
+  io: WorkspaceIO;
+  logger: KernelRuntimeContext["logger"];
+  workspaceRoot: string;
+  fixture: string;
+  systemId: string;
+  until: ColdRunPhase;
+  timeoutMinutes: number;
+  timeoutMs: number;
+  withDeploy: boolean;
+  keep: boolean;
+}): Promise<ColdRunReport> {
+  const {
+    io,
+    logger,
+    workspaceRoot,
+    fixture,
+    systemId,
+    until,
+    timeoutMinutes,
+    timeoutMs,
+    withDeploy,
+    keep,
+  } = opts;
+  logger.info(`[werkstatt.e2e.cold] fixture ${fixture} → ${systemId} in isolated child process`);
+  const argv = [
+    "exec",
+    "werkstatt",
+    "run",
+    "werkstatt.e2e.cold",
+    `--fixture=${fixture}`,
+    `--until=${until}`,
+    `--timeout-minutes=${timeoutMinutes}`,
+  ];
+  if (withDeploy) argv.push("--with-deploy");
+  if (keep) argv.push("--keep");
+  argv.push("--json");
+
+  // Child boot + clone install margin beyond the stage budget itself.
+  const child = await io.exec("pnpm", argv, { cwd: workspaceRoot, timeoutMs: timeoutMs + 120_000 });
+  const fixtureReport = parseChildMatrix(child.stdout)?.fixtures[0];
+  if (fixtureReport) return fixtureReport;
+
+  const stderrTail = child.stderr.slice(-1500).trim();
+  const error = `isolated fixture child produced no JSON report (exit ${child.exitCode})${stderrTail ? ` — ${stderrTail}` : ""}`;
+  return {
+    fixture,
+    systemId,
+    coldRoot: "",
+    steps: [
+      { step: "fixture-child", attempts: 1, durationMs: 0, ok: false, status: "fail", error },
+    ],
+    interventions: 0,
+    reachedPhase: until,
+    timedOut: false,
+    withDeploy,
+    ok: false,
+    summary: `[werkstatt.e2e.cold] ${fixture}: ${error}`,
+  };
 }
 
 // ─── Sub-command runner ─────────────────────────────────────────────────────
@@ -495,9 +585,30 @@ export async function runColdE2e(
   };
 
   const reports: ColdRunReport[] = [];
+  // A multi-fixture invocation is a local matrix run — CI always isolates one
+  // fixture per job. Spawn each fixture in a child process so no registry,
+  // env, or module state crosses cold births.
+  const isolateFixtures = selected.length > 1;
 
   for (const fixture of selected) {
     const systemId = `e2e-${fixture}`;
+    if (isolateFixtures) {
+      reports.push(
+        await runFixtureInChildProcess({
+          io: context.io,
+          logger,
+          workspaceRoot,
+          fixture,
+          systemId,
+          until,
+          timeoutMinutes,
+          timeoutMs,
+          withDeploy,
+          keep,
+        }),
+      );
+      continue;
+    }
     const coldRoot = await context.io.mkdtemp(path.join(os.tmpdir(), "werkstatt-e2e-cold-"));
     logger.info(`[werkstatt.e2e.cold] fixture ${fixture} → ${systemId} @ ${coldRoot}`);
 
@@ -875,11 +986,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
 
         // FAB-SEAM-BEGIN: compose
         const COMPOSE_SUBDIRS = [
-          "pages",
-          "prose",
-          "navigation",
-          "site",
-          "business-profile",
+          "pages", "prose", "navigation", "site", "business-profile",
           "business",
           "faq",
         ];
@@ -927,12 +1034,12 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
                 // target resolves to composeContentDir for content subtrees or
                 // the src/ root for COMPOSE_SRC_FILES — both inside the seam.
                 await env.io.copyFile(path.join(src, entry.name), target);
+                // composeContentDir-derived — declared in the branch above.
               }
             }
           }
         };
         await applyDir(compositionSrc, "");
-        // FAB-SEAM-END: compose
 
         // business-profile entities are authored against the resolved site
         // host — the fixture carries a {{SITE_ORIGIN}} token (the canonical
@@ -953,7 +1060,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
                 const raw = await env.io.readFile(full);
                 if (raw.includes("{{SITE_ORIGIN}}")) {
                   await env.io.writeFile(
-                    full,
+                    full, // files the seam copied under composeContentDir
                     raw.replaceAll("{{SITE_ORIGIN}}", `https://${identityDomain}`),
                   );
                 }
@@ -962,6 +1069,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
           };
           await substitute(businessProfileDir).catch(() => {});
         }
+        // FAB-SEAM-END: compose
 
         // Jurisdiction-keyed legal pages (RFC-1329): DE/AT/CH requires
         // impressum+datenschutz per supported locale — the command emits the
