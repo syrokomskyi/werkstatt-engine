@@ -7,14 +7,14 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: steps 3-4 — deterministic intake seed planner and sternsystem.register --intake --biome</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
   <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
-  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097, RFC-1141, RFC-1173, RFC-1231, RFC-1248, RFC-1284, RFC-1297</history>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
+  <history>RFC-0477, RFC-0966, RFC-0968, RFC-1097, RFC-1141, RFC-1173, RFC-1231, RFC-1248, RFC-1284, RFC-1297, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
 
@@ -105,6 +105,7 @@ export async function createSternsystemModule(): Promise<ModuleExport> {
           "../systems-cache/{id}/system.pin.json",
           "../systems-cache/{id}/src/content/system.md",
           "../systems-cache/{id}/src/content/business-profile/**",
+          "werkstatt.cloudflare.json",
         ],
         reads: [
           "../systems-cache/*/system-config.yaml",

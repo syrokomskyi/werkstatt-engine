@@ -11,14 +11,14 @@ Supports --dry-run to preview changes without making API calls.
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0817: graceful skip when dns-records.yaml is absent instead of throwing.</item>
   <item>RECOVERY-2026-10-04: upsert matches via pickBestLiveMatch + consumed-live tracking (same as dns.record.validate) — naive find(type+name) compared every declaration against the first same-identity record, misbinding parallel MX / dual apex TXT and producing bogus update/create calls (CF 1046 on Email-Routing MX, 81058 duplicate-TXT). Cloudflare codes 1046/81058 now classify as skipped (goal state externally owned or already satisfied) instead of errors.</item>
   <item>RFC-1237: resolve dry-run via context.dryRun fallback — consumeCommonFlags strips --dry-run into context.dryRun before dispatch, so a flags-only read was permanently false under werkstatt run (enforced by KERNEL-FLAG-10).</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
-  <history>RFC-0753, RFC-0812</history>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
+  <history>RFC-0753, RFC-0812, RFC-0817</history>
 </CHANGE_SUMMARY>
 */
 
@@ -110,7 +110,7 @@ export async function runDnsRecordUpsert(
         summary: { created: 0, updated: 0, skipped: 0, total: 0, errors: 0 },
       },
       exitCode: 0,
-      summary: `[dns.record.upsert] ${systemId}: not applicable — '${declaration.zone}' is a provisional workers.dev host without a DNS zone`,
+      summary: `[dns.record.upsert] ${systemId}: not applicable — '${declaration.zone}' is a provisional workers.dev host without a DNS zone`, // site-host: operator-facing summary text, not host classification
     };
   }
 

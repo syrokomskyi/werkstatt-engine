@@ -12,6 +12,7 @@ collision refusal (AC-3), and pre-write fail-fast ordering.</purpose>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
 </CHANGE_SUMMARY>
 */
 
@@ -123,6 +124,7 @@ describe("sternsystem.register provisional host (RFC-1325)", () => {
       runSternsystemRegister(input(baseFlags()), context(workspaceRoot)),
     ).rejects.toThrow(/worker-name collision.*dev-dp7/);
     expect(existsSync(join(cacheDir(), "system-config.yaml"))).toBe(false);
+    expect(existsSync(cacheFile()), "the account cache must not be written on refusal").toBe(false);
   });
 
   it("fails fast naming the missing env before any write", async () => {
@@ -151,6 +153,7 @@ describe("sternsystem.register provisional host (RFC-1325)", () => {
       ),
     ).rejects.toThrow(/account subdomain 'foreign'.*resolves to 'syrokomskyi'/);
     expect(existsSync(join(cacheDir(), "system-config.yaml"))).toBe(false);
+    expect(existsSync(cacheFile()), "the account cache must not be written on refusal").toBe(false);
   });
 
   it("reuses the cached account subdomain without re-probing the API", async () => {

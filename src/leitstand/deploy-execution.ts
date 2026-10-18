@@ -8,11 +8,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
-
-RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
-
-2026-10-04 handoff fixes: shared 25min mission.check timeout (inner 5min race + 300s orchestrator raced cold ~7-11min captures), sweep excludeOpIds so mission.close no longer self-abandons the live ship journal (broke --resume), name-keyed journal resume state so closed-mission plan shifts can't skip unexecuted steps, wrangler dev documented as the required --base-url preview server.</item>
   <item>RFC-1284: post-propagate access-pin reconcile — after a successful dev/alt
 propagation, re-assert ACCESS_PIN from the freshly re-read system state when
 protection is desired and no suspension marker is open. Non-fatal diagnostic on
@@ -35,6 +30,7 @@ the re-assert.</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
   <history>RFC-0866, RFC-0925, RFC-0931, RFC-0948, RFC-1092, RFC-1097, RFC-1138, RFC-1179, RFC-1188, RFC-1190</history>
 </CHANGE_SUMMARY>
 */
@@ -157,7 +153,7 @@ export interface DeployExecutionResult {
   axiomStatus: "pass" | "fail" | "not-run";
   axiomExitCode: number;
   /** RFC-1284: post-propagate ACCESS_PIN reconcile outcome — present only when the channel was eligible for reconciliation (dev/alt, pin declared, no suspension). */
-  accessReconcile?: { ok: boolean; error?: string };
+  accessReconcile?: { ok: boolean; error?: string; pinIssued?: string };
   /** RFC-1190: mission identity resolution record propagated to the deploy result. */
   missionContext?: MissionContext;
   failingPhase?: string;
@@ -315,7 +311,7 @@ export async function executeDeployPhases(
   const now = new Date().toISOString();
 
   const systemState = await readSystemStateSmart(ctx.workspaceRoot, ctx.systemId);
-  const authHeaders = buildAuthHeader(systemState.accessPin);
+  let authHeaders = buildAuthHeader(systemState.accessPin);
 
   let buildSkipped = false;
   let buildIdentityPath = "";
@@ -541,10 +537,15 @@ export async function executeDeployPhases(
             workspaceRoot: ctx.workspaceRoot,
             commandName: "leitstand.access.protect",
             argv: [`--site=${ctx.systemId}`],
-          })) as { exitCode?: number; summary?: string };
-          if (protectResult.exitCode === 0) {
-            accessReconcile = { ok: true };
+          })) as { exitCode?: number; summary?: string; data?: { pin?: string } };
+          // undefined exitCode is the already-protected no-op — still success.
+          if ((protectResult.exitCode ?? 0) === 0) {
             freshState = await readSystemState(ctx.workspaceRoot, ctx.systemId);
+            // The pin the protect call just issued now gates the dev/alt
+            // workers — the pre-deploy headers are stale and would 401 the
+            // health/freshness probes below.
+            authHeaders = buildAuthHeader(freshState?.accessPin);
+            accessReconcile = { ok: true, pinIssued: protectResult.data?.pin };
           } else {
             accessReconcile = {
               ok: false,

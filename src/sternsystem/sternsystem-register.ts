@@ -13,13 +13,13 @@ With --amend: update pin and open amend mission without creating a new registry 
 <!-- risk: fs-write -->
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1307: initialise missing cache clone repo during register</item>
   <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
   <history>REVIEW-CODE-2026, RFC-0354, RFC-0532, RFC-0561, RFC-0902, RFC-1149, RFC-1249, RFC-1293, RFC-1294, RFC-1307</history>
 </CHANGE_SUMMARY>
 */
@@ -56,7 +56,10 @@ import { runMissionAbort } from "../mission/mission-abort.ts";
 import { hasTldSuffix } from "@warpgogol/werkstatt-shared/ontology/operations";
 import type { WorkspaceIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
 import { failResult } from "@warpgogol/werkstatt-shared/checks/result-helpers";
-import { isProvisionalHost } from "@warpgogol/werkstatt-shared/middleware/site-host";
+import {
+  isBareHostname,
+  isProvisionalHost,
+} from "@warpgogol/werkstatt-shared/middleware/site-host";
 import { deriveProvisionalDeployment, type ProvisionalDeployment } from "./provisional-host.ts";
 import { resolveSubdomainEnv } from "../subdomain/subdomain-helpers.ts";
 
@@ -184,7 +187,7 @@ export async function prepareIntakeSeed(
       "[sternsystem.register] the intake carries no confirmed domain — pass --domain <host> (e.g. the provisional <worker>.<account>.workers.dev host) until the real domain is decided", // site-host: operator-facing guidance text, not host classification
     );
   }
-  if (input.domain !== undefined && !/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(input.domain)) {
+  if (input.domain !== undefined && !isBareHostname(input.domain)) {
     throw new Error(
       `[sternsystem.register] --domain '${input.domain}' is not a bare lowercase host name (no scheme, no path)`,
     );

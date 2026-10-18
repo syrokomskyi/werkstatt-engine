@@ -12,6 +12,7 @@
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
 </CHANGE_SUMMARY>
 */
 
@@ -354,6 +355,66 @@ test("executeDeployPhases does not auto-protect a custom-domain alt channel", as
     const names = mock.mock.calls.map((c) => (c[0] as { commandName: string }).commandName);
     expect(names).not.toContain("leitstand.access.protect");
   } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
+  }
+});
+
+// RFC-1325 review r1 F-1: after auto-protect issues a pin, the SAME deploy's
+// health/freshness probes must carry it — the pre-deploy empty headers would
+// 401 the now-gated worker and falsely report failingPhase "health-check".
+test("executeDeployPhases re-derives auth headers after auto-protect issues a pin", async () => {
+  const tmp = makeWorkspace();
+  try {
+    const cacheClone = join(tmp, "..", "systems-cache", "test-sys");
+    mkdirSync(cacheClone, { recursive: true });
+    const healthHeaders: Array<Record<string, string>> = [];
+    const adapter: DeploymentAdapter = {
+      ...nullAdapter,
+      async health(input: HealthInput) {
+        healthHeaders.push(input.authHeaders ?? {});
+        return { state: "healthy", checks: [] };
+      },
+    };
+    const mock = await getKernelMock();
+    mock.mockClear();
+    mock.mockImplementation(async (input) => {
+      const { commandName } = input as { commandName: string };
+      if (commandName === "leitstand.access.protect") {
+        // Simulate the real command: secrets put, then system-state.yaml write.
+        writeFileSync(
+          join(cacheClone, "system-state.yaml"),
+          [
+            'schemaVersion: "1.0.0"',
+            "systemId: test-sys",
+            "currentMission: null",
+            "lastRelease: null",
+            "lastPropagated: {}",
+            'accessPin: "7777"',
+            "accessPinSuspended: null",
+            "passportRequired: false",
+            "ownershipRequired: false",
+            "",
+          ].join("\n"),
+        );
+        return { ...mockReport(0, "protected"), data: { pin: "7777", channels: [] } };
+      }
+      return mockReport(0, "ok");
+    });
+    const ctx = { ...makeCtx("op-autoprot-headers", tmp), adapter };
+    const result = await executeDeployPhases(ctx, "dev");
+    expect(result.failingPhase).toBeUndefined();
+    expect(result.accessReconcile?.ok).toBe(true);
+    expect(result.accessReconcile?.pinIssued).toBe("7777");
+    const expected = `Basic ${Buffer.from("warp:7777").toString("base64")}`;
+    expect(
+      healthHeaders.every((h) => h.Authorization === expected),
+      `health probes must carry the issued pin: ${JSON.stringify(healthHeaders)}`,
+    ).toBe(true);
+    expect(healthHeaders.length).toBeGreaterThan(0);
+  } finally {
+    const mock = await getKernelMock();
+    mock.mockResolvedValue(mockReport(0, "ok"));
     rmSync(tmp, { recursive: true, force: true });
     rmSync(resolve(tmp, "..", "systems-cache"), { recursive: true, force: true });
   }

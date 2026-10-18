@@ -22,6 +22,7 @@ re-probe.
   <item>RFC-1325: provisional workers.dev as first-class site host
 
 Single host predicate module in werkstatt-shared; provisional registration derives dev/alt/main workers.dev channels from the account subdomain; first dev deploy auto-protects provisional hosts; provisional main responses carry noindex; dns-aid skips provisional sites; site.domain.adopt cuts over to a custom domain.</item>
+  <item>RFC-1325: review r1 — pin-carrying probes, AC-3 write ordering, dns-aid validate parity, hardened host lint</item>
 </CHANGE_SUMMARY>
 */
 
@@ -75,11 +76,12 @@ async function writeCloudflareAccountCache(
 
 /**
  * Resolve and verify a provisional birth domain, then derive the deployment
- * block. Throws before any caller write:
+ * block. Throws before ANY file write (AC-3 — including the account cache):
  * - env missing: `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` (named);
  * - the domain's account slug disagrees with the live API subdomain;
  * - `<id>`, `dev-<id>`, or `alt-<id>` already exists as a Worker script.
- * On success the account record is (re)cached at workspaceRoot.
+ * On success the account record is (re)cached at workspaceRoot — the cache
+ * write happens only after every refusal check has passed.
  */
 export async function deriveProvisionalDeployment(
   systemId: string,
@@ -91,13 +93,13 @@ export async function deriveProvisionalDeployment(
   const parts = domain.split(".");
   if (parts.length !== 4 || parts[2] !== "workers" || parts[3] !== "dev") {
     throw new Error(
-      `[sternsystem.register] provisional --domain '${domain}' must have the <worker>.<account>.workers.dev shape`,
+      `[sternsystem.register] provisional --domain '${domain}' must have the <worker>.<account>.workers.dev shape`, // site-host: operator-facing error text, not host classification
     );
   }
   const [workerLabel, domainSubdomain] = parts;
   if (workerLabel !== systemId) {
     throw new Error(
-      `[sternsystem.register] provisional --domain '${domain}' names worker '${workerLabel}' but --id is '${systemId}' — on workers.dev the worker name IS the host label; pass --domain ${systemId}.${domainSubdomain}.workers.dev`,
+      `[sternsystem.register] provisional --domain '${domain}' names worker '${workerLabel}' but --id is '${systemId}' — on workers.dev the worker name IS the host label; pass --domain ${systemId}.${domainSubdomain}.workers.dev`, // site-host: operator-facing error text, not host classification
     );
   }
 
@@ -116,12 +118,11 @@ export async function deriveProvisionalDeployment(
   const cached = await readCloudflareAccountCache(io, workspaceRoot);
   let workersSubdomain =
     cached !== null && cached.accountId === accountId ? cached.workersSubdomain : null;
-  if (workersSubdomain === null) {
+  // The API resolution is cached only after every refusal check below passes —
+  // a mismatch/collision failure must leave zero files touched (AC-3).
+  const resolvedFromApi = workersSubdomain === null;
+  if (resolvedFromApi) {
     workersSubdomain = await getWorkersSubdomain(accountId!, apiToken!);
-    await writeCloudflareAccountCache(io, workspaceRoot, {
-      accountId: accountId!,
-      workersSubdomain,
-    });
   }
 
   if (workersSubdomain !== domainSubdomain) {
@@ -142,6 +143,13 @@ export async function deriveProvisionalDeployment(
     throw new Error(
       `[sternsystem.register] worker-name collision on account '${workersSubdomain}' — ${listed} already exist; choose another --domain/--id or delete the stale Workers`,
     );
+  }
+
+  if (resolvedFromApi) {
+    await writeCloudflareAccountCache(io, workspaceRoot, {
+      accountId: accountId!,
+      workersSubdomain: workersSubdomain!,
+    });
   }
 
   const host = (channel: "dev" | "alt" | "main") =>
