@@ -211,6 +211,79 @@ describe("werkstatt.e2e.cold", () => {
     expect(result.data?.summary).toContain("dirty");
   });
 
+  it("preflight ignores untracked files — the clone copies committed state only", async () => {
+    const statusArgs: string[][] = [];
+    mockExecFileSync.mockImplementation((...args: unknown[]) => {
+      const cmd = args[0] as string;
+      const subArgs = args[1] as string[];
+      if (cmd === "git" && subArgs?.[0] === "status") {
+        statusArgs.push(subArgs);
+        // Real git suppresses untracked lines under --untracked-files=no.
+        return subArgs.includes("--untracked-files=no") ? "" : "?? docs/other-session.md\n";
+      }
+      return "";
+    });
+    mockedExec.mockImplementation((cmdInput: { commandName?: string }) => {
+      const name = cmdInput?.commandName ?? "";
+      if (name === "sternsystem.handover.prepare") {
+        return Promise.resolve({
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: {
+            dryRun: true,
+            signedAuthorization: { mock: true },
+            authorizationHash: "mock-hash",
+          },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        });
+      }
+      if (name === "mission.open") {
+        return Promise.resolve({
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: { missionId: "e2e-valid-minimal-m000002" },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        });
+      }
+      if (name === "sternsystem.handover.complete") {
+        return Promise.resolve({
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: {
+            dryRun: true,
+            newPassportHashPreview: "mock-hash-preview",
+            bordbuchEventPreview: { kind: "handover" },
+            registryTransferPreview: { previousOwner: "a", newOwner: "b" },
+          },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        });
+      }
+      return Promise.resolve({
+        commandName: name || "sternsystem.register",
+        exitCode: 0,
+        ok: true,
+        data: { firstMissionId: "m000001" },
+        metadata: {} as never,
+        logs: [],
+        timing: {} as never,
+      });
+    });
+
+    const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
+
+    expect(statusArgs[0]).toContain("--untracked-files=no");
+    expect(result.exitCode).toBe(0);
+  });
+
   it("returns interventions=0 and exit 0 when all steps succeed", async () => {
     mockExecFileSync.mockReturnValue("");
     const seededSystemMd =

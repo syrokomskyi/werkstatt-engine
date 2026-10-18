@@ -24,6 +24,7 @@
   <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
   <item>RFC-1324: provision ../pipelines sibling into the clone root so optional axiom link deps resolve and gated probes (a11y.axe) actually execute</item>
   <item>RFC-1324: isolate each matrix fixture in its own werkstatt child process (CI parity) — no registry/env state crosses cold births; runStep records errorStack</item>
+  <item>RFC-1324: preflight checks tracked modifications only (--untracked-files=no) — the clone copies committed state, untracked files can neither enter it nor execute</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -532,12 +533,19 @@ export async function runColdE2e(
     data: { command: "werkstatt.e2e.cold", platformCommit: "", fixtures: [], summary },
   });
 
-  // Preflight: check working tree is clean
+  // Preflight: the run must execute exactly HEAD's code. The clone copies
+  // committed state only, so untracked files can neither enter it nor execute
+  // (nothing tracked imports them) — only tracked modifications matter.
   try {
-    const statusOutput = await execChecked(context.io, "git", ["status", "--porcelain"], {
-      cwd: workspaceRoot,
-      timeoutMs: 10000,
-    });
+    const statusOutput = await execChecked(
+      context.io,
+      "git",
+      ["status", "--porcelain", "--untracked-files=no"],
+      {
+        cwd: workspaceRoot,
+        timeoutMs: 10000,
+      },
+    );
     if (statusOutput.stdout.trim().length > 0) {
       return failEarly(
         "[werkstatt.e2e.cold] preflight failed: working tree is dirty — commit or stash changes before running",
@@ -986,7 +994,11 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
 
         // FAB-SEAM-BEGIN: compose
         const COMPOSE_SUBDIRS = [
-          "pages", "prose", "navigation", "site", "business-profile",
+          "pages",
+          "prose",
+          "navigation",
+          "site",
+          "business-profile",
           "business",
           "faq",
         ];
