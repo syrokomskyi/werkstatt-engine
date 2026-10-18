@@ -16,6 +16,7 @@ sternsystem.register (after mission.open) and leitstand.ship (preflight).
 <CHANGE_SUMMARY>
   <item>RFC-1326: initial — token preflight + Vectorize index ensure.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <item>RFC-1326: review-fix pass — siteName targeting for app-scoped provisioning, allow-list completion</item>
 </CHANGE_SUMMARY>
 */
 
@@ -33,15 +34,23 @@ export interface ProvisionResult {
 async function invoke(
   workspaceRoot: string,
   commandName: string,
-  argv: string[],
+  opts: { siteName?: string },
 ): Promise<{ exitCode: number; summary?: string; data?: Record<string, unknown> }> {
-  const result = (await executeKernelCommand({
-    workspaceRoot,
-    commandName,
-    argv,
-    outputFormat: "json",
-  })) as { exitCode?: number; summary?: string; data?: Record<string, unknown> };
-  return { exitCode: result.exitCode ?? 0, summary: result.summary, data: result.data };
+  try {
+    const result = (await executeKernelCommand({
+      workspaceRoot,
+      commandName,
+      argv: [],
+      outputFormat: "json",
+      ...(opts.siteName ? { siteName: opts.siteName, siteExplicit: true } : {}),
+    })) as { exitCode?: number; summary?: string; data?: Record<string, unknown> };
+    return { exitCode: result.exitCode ?? 0, summary: result.summary, data: result.data };
+  } catch (error) {
+    return {
+      exitCode: 1,
+      summary: `${commandName} threw before producing a result: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 /**
@@ -57,7 +66,7 @@ export async function provisionExternalResources(
   const provisioned: string[] = [];
 
   // 1. Token preflight — names the missing permission before any write.
-  const tokenCheck = await invoke(workspaceRoot, "cloudflare.token.check", []);
+  const tokenCheck = await invoke(workspaceRoot, "cloudflare.token.check", {});
   if (tokenCheck.exitCode !== 0) {
     return {
       ok: false,
@@ -71,9 +80,9 @@ export async function provisionExternalResources(
 
   // 2. Vectorize index ensure — every site's wrangler binds <id>-search.
   if (opts.missionOpen) {
-    const indexCreate = await invoke(workspaceRoot, "agent.search.index.create", [
-      `--site=${opts.systemId}`,
-    ]);
+    const indexCreate = await invoke(workspaceRoot, "agent.search.index.create", {
+      siteName: opts.systemId,
+    });
     if (indexCreate.exitCode !== 0) {
       return {
         ok: false,

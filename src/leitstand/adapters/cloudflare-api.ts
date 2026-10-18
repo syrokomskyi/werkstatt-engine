@@ -13,11 +13,12 @@ cloudflare-workers.ts (which wraps wrangler CLI) — this module uses the REST A
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-0752: initial Cloudflare REST API client — listDnsRecords, createDnsRecord, listWorkersRoutes, createWorkersRoute.</item>
   <item>RFC-0753: add pagination, retry, updateDnsRecord, deleteDnsRecord, generalized createDnsRecord for all record types.</item>
   <item>RFC-0896: add getRedirectRuleset, createRedirectRule for Cloudflare Rulesets API (Redirect Rules).</item>
   <item>RFC-1325: add getWorkersSubdomain, listWorkerNames — account-scoped Workers subdomain + script-name listing for provisional-host birth.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <item>RFC-1326: review-fix pass — siteName targeting for app-scoped provisioning, allow-list completion</item>
+  <history>RFC-0752</history>
 </CHANGE_SUMMARY>
 */
 
@@ -531,18 +532,24 @@ export async function probePermission(
     return "unknown";
   }
 
+  const body = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    errors?: { code: number }[];
+  } | null;
+  const codes = (body?.errors ?? []).map((e) => e.code);
+
   if (response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      success?: boolean;
-      errors?: { code: number }[];
-    } | null;
     if (body && body.success === false) {
-      const codes = (body.errors ?? []).map((e) => e.code);
       return codes.some((c) => PERMISSION_DENIED_CODES.has(c)) ? "missing" : "unknown";
     }
     return "ok";
   }
-  if (response.status === 403) return "missing";
+  // RFC-1326 review: a 403 is `missing` only when Cloudflare names a
+  // permission-denied code — an out-of-scope zone id or a revoked-token 403
+  // reports `unknown` so the fix hint stays honest.
+  if (response.status === 403) {
+    return codes.some((c) => PERMISSION_DENIED_CODES.has(c)) ? "missing" : "unknown";
+  }
   return "unknown";
 }
 

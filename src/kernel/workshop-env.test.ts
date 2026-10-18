@@ -12,6 +12,7 @@ never mutated.
 <CHANGE_SUMMARY>
   <item>RFC-1326: initial — AC-6/AC-7 cases + precedence/tolerance invariants.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <item>RFC-1326: review-fix pass — siteName targeting for app-scoped provisioning, allow-list completion</item>
 </CHANGE_SUMMARY>
 */
 
@@ -71,15 +72,16 @@ describe("loadWorkshopEnvAllowlisted (RFC-1326)", () => {
 
     expect(target.CLOUDFLARE_API_TOKEN).toBe("cf-token-123");
     expect(target.R2_AXIOM_ACCOUNT_ID).toBe("r2-acc");
-    // RFC-1326: workspace commands read FLEET_OWNERSHIP_REGISTRY_* — it is
-    // allow-listed, unlike site/service secrets.
+    // RFC-1326: workspace commands read FLEET_OWNERSHIP_REGISTRY_* and
+    // UPSTASH_REDIS_REST_* (agent.registration.* ops) — both are allow-listed,
+    // unlike site/service secrets.
     expect(target.FLEET_OWNERSHIP_REGISTRY_URL).toBe("https://registry.example");
+    expect(target.UPSTASH_REDIS_REST_URL).toBe("https://upstash.example");
     for (const denied of [
       "LANGUAGETOOL_URL",
       "LAGEBILD_API_KEY",
       "GH_TOKEN",
       "OPENAI_API_KEY",
-      "UPSTASH_REDIS_REST_URL",
       "SEARCH_REINDEX_TOKEN",
       "STRIPE_SECRET_KEY",
     ]) {
@@ -89,6 +91,7 @@ describe("loadWorkshopEnvAllowlisted (RFC-1326)", () => {
       "CLOUDFLARE_API_TOKEN",
       "FLEET_OWNERSHIP_REGISTRY_URL",
       "R2_AXIOM_ACCOUNT_ID",
+      "UPSTASH_REDIS_REST_URL",
     ]);
   });
 

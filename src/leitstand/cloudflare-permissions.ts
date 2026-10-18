@@ -18,6 +18,7 @@ registry and re-run generate.
 <CHANGE_SUMMARY>
   <item>RFC-1326: initial — generate + validate pair over the two marked permission surfaces.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <item>RFC-1326: review-fix pass — siteName targeting for app-scoped provisioning, allow-list completion</item>
 </CHANGE_SUMMARY>
 */
 
@@ -108,6 +109,17 @@ function extractMarkedSection(
   return inner === "" ? [] : inner.replace(/\n$/, "").split("\n");
 }
 
+/**
+ * True when a second BEGIN marker follows the first marker pair — a
+ * hand-added duplicate would silently evade both generate and validate
+ * (first-match `indexOf` never reaches it).
+ */
+function hasDuplicateMarkers(content: string, beginMarker: string, endMarker: string): boolean {
+  const endIdx = content.indexOf(endMarker);
+  if (endIdx === -1) return false;
+  return content.indexOf(beginMarker, endIdx + endMarker.length) !== -1;
+}
+
 async function runGenerate(
   _input: KernelCommandInput,
   context: KernelRuntimeContext,
@@ -135,6 +147,11 @@ async function runGenerate(
     if (next === null) {
       return failResult("cloudflare.permissions.generate", [
         `${target.relativePath} carries no '${target.beginMarker}' marked section — seed the markers once, then re-run`,
+      ]);
+    }
+    if (hasDuplicateMarkers(next, target.beginMarker, target.endMarker)) {
+      return failResult("cloudflare.permissions.generate", [
+        `${target.relativePath} carries a duplicate '${target.beginMarker}' marked section — remove it before regenerating`,
       ]);
     }
     if (next === content) {
@@ -189,6 +206,15 @@ async function runValidate(
       });
       continue;
     }
+    if (hasDuplicateMarkers(content, target.beginMarker, target.endMarker)) {
+      violations.push({
+        ruleId: "CFPERM-01",
+        severity: "error",
+        message: `${target.relativePath} carries a duplicate '${target.beginMarker}' marked section`,
+        file: target.relativePath,
+      });
+      continue;
+    }
     const expected = target.render();
     if (actual.join("\n") !== expected.join("\n")) {
       violations.push({
@@ -216,7 +242,7 @@ export const cloudflarePermissionsGenerateCommand: KernelCommandDefinition = {
   mutatesState: true,
   idempotency: "rerun-safe",
   writes: [".env.example", "docs/engineering/workshop-setup.md"],
-  reads: ["package.json"],
+  reads: [".env.example", "docs/engineering/workshop-setup.md"],
   modulePaths: ["cloudflare-permissions.ts"],
   execute: runGenerate,
 };

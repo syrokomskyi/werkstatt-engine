@@ -8,12 +8,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1219: --resume logs the interrupted failed step (status/failedStep from findIncompleteOperation); formatShipTransition renders op-interrupted as "[ship] interrupted at step — run with --resume" for live followers.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1297: preflight step 2b — readLiveChannelStates + liveDriftDiagnostics; LIVE-01 aborts the ship with a resolve-first hint, LIVE-02 logs only.</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
-  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, RFC-1207, RFC-1217, warpgogol-m000175</history>
+  <item>RFC-1326: review-fix pass — siteName targeting for app-scoped provisioning, allow-list completion</item>
+  <history>RFC-0962, RFC-0986, RFC-1097, RFC-1149, RFC-1168, RFC-1190, RFC-1207, RFC-1217, RFC-1219, warpgogol-m000175</history>
 </CHANGE_SUMMARY>
 */
 
@@ -149,6 +149,7 @@ async function runShipPhase(
   ctx: ShipContext,
   commandName: string,
   argv: string[],
+  opts?: { siteName?: string },
 ): Promise<{ exitCode: number; data?: Record<string, unknown>; summary?: string }> {
   const registry = await getOrBuildWorkspaceRegistry(ctx.workspaceRoot);
   const command = registry?.commands.get(commandName);
@@ -178,6 +179,7 @@ async function runShipPhase(
     commandName,
     argv,
     outputFormat: "pretty",
+    ...(opts?.siteName ? { siteName: opts.siteName, siteExplicit: true } : {}),
   })) as { exitCode?: number; data?: Record<string, unknown>; summary?: string };
   return {
     exitCode: result.exitCode ?? 0,
@@ -284,7 +286,7 @@ function buildPreflightStep(): OperationStep<ShipContext> {
 
       // 3. Vectorize index ensure (best-effort, non-fatal — same pattern as deploy-execution.ts)
       try {
-        await runShipPhase(ctx, "agent.search.warm", [`--site=${ctx.systemId}`]);
+        await runShipPhase(ctx, "agent.search.warm", [], { siteName: ctx.systemId });
         ctx.logger.info("  [ship] preflight: Vectorize index warm ok");
       } catch {
         ctx.logger.info(
