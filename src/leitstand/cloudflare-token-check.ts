@@ -16,8 +16,20 @@ discovered by a failing deploy.
   <item>--zone accepts a zone id or a domain (resolved via GET /zones?name=); no zone context downgrades every zone-scope entry to unknown, never missing.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
+  <item>RFC-1326 review-unblock: token-inactive return gains [command] summary prefix + nextSteps (CMD-OUTPUT-02/03).</item>
   <item>RFC-1326: initial — verifyToken + registry probes, ok/missing/unknown verdicts, exit 1 on missing always-permission.</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
+  <item>RFC-1329: legal pages by jurisdiction — legal.scaffold keys on manifest.legalJurisdiction, LEGAL-JUR-01
+
+legal.scaffold resolves target locales from system.md legalJurisdiction: a
+DE/AT/CH jurisdiction scaffolds impressum + datenschutz on every i18n.supported
+locale with canonical German slugs — binding locales carry the German document
+natively, others carry the same German text + RFC-0174 unofficial-translation
+block + NEED_THIS_TRANSLATION unofficial prose slot. Absent jurisdiction keeps
+the legacy DE_LOCALES filter byte-identical. legal.translation.validate gains
+LEGAL-JUR-01 and relaxes missing-binding-lang for the jurisdiction binding
+language (binding text is inline). Drive-by: cloudflare.token.check
+token-inactive path gains summary prefix + nextSteps (CMD-OUTPUT-02/03).</item>
 </CHANGE_SUMMARY>
 */
 
@@ -91,7 +103,13 @@ export async function runCloudflareTokenCheck(
         tokenStatus: token.status,
       },
       exitCode: 1,
-      summary: `cloudflare.token.check: token-inactive — Cloudflare reports status "${token.status}" for token ${token.id}; roll it in the dashboard`,
+      summary: `[cloudflare.token.check] token-inactive — Cloudflare reports status "${token.status}" for token ${token.id}; roll it in the dashboard`,
+      nextSteps: [
+        {
+          action: `Roll token ${token.id} in Cloudflare Dashboard → My Profile → API Tokens, update CLOUDFLARE_API_TOKEN, then re-run cloudflare.token.check`,
+          kind: "required" as const,
+        },
+      ],
     };
   }
 
