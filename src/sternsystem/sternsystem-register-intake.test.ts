@@ -8,13 +8,20 @@ AC-10), and the system-state onboarding provenance block (AC-7).</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1328: uz variant/localeNeutral seed coverage; pbpDocuments 5→8.</item>
-  <item>RFC-1307: add register --domain for intakes without a confirmed domain</item>
   <item>RFC-1307: seed default operator config files at registration</item>
   <item>RFC-1307: seed intake assets into the pages domain so page credits match</item>
   <item>RFC-1307: seed the platform CSP sink allowlist disposition at registration</item>
   <item>RFC-1326: single Cloudflare permission registry, token preflight, birth provisioning</item>
-  <history>REVIEW-CODE-2026, RFC-1307</history>
+  <item>RFC-1328: review fix pass: envelope fields in vendored schema defs, locale merge prose guard, manifest defaultLocale threading
+
+F-1 blocking: inject statementByLocale/localeNeutral into every exported pbp
+def so producers can self-validate AMD-005 bundles. F-2/F-3: LOCALE_SCOPED_FIELDS
+never merge onto existing locale docs; defaultLocale param replaces the
+hardcoded de across semantic profile, currency, referral capacity. F-4..F-10:
+statementLang rewrite, prose drops on clones/variants, INTAKE-12 name+literals,
+currency-policy gate, predicate signature, doc drift. Unblocks dna-trace
+WS-WRITE-02 false positive (_io naming).</item>
+  <history>REVIEW-CODE-2026, RFC-1307, RFC-1328</history>
 </CHANGE_SUMMARY>
 */
 
@@ -303,9 +310,12 @@ describe("planSeedFromIntake (RFC-1307)", () => {
     expect(uzClaim).toContain("Yevropa sifati");
     expect(uzClaim).not.toContain("Европейское качество");
     expect(uzClaim).toContain("status: published");
+    // F-4: the variant declares its own locale, not the primary's.
+    expect(uzClaim).toContain("statementLang: uz-Latn");
+    expect(uzClaim).not.toContain("statementLang: ru");
     // Envelope-only fields never reach the seeded document.
     expect(uzClaim).not.toContain("statementByLocale");
-    // localeNeutral path — verbatim clone.
+    // localeNeutral path — verbatim clone minus prose (description drops).
     const uzBusiness = fileText(plan, "src/content/business-profile/uz/business.md");
     expect(uzBusiness).toContain("name: DP7");
     expect(uzBusiness).not.toContain("localeNeutral");
@@ -318,6 +328,36 @@ describe("planSeedFromIntake (RFC-1307)", () => {
         (f) => f.path === "src/content/business-profile/uz/trust/claims/installation-warranty.md",
       ),
     ).toBe(false);
+  });
+
+  it("RFC-1328 review: prose never crosses locales — summary+description drop from variants and localeNeutral clones", () => {
+    const json = fixtureJson();
+    const pbp = json.pbp as Record<string, unknown>[];
+    const claim = pbp.find((e) => e["id"] === "claim/european-quality")!;
+    claim["summary"] = "Russian summary";
+    const business = pbp.find((e) => e["id"] === "business/dp7")!;
+    business["description"] = "Russian business description";
+
+    const plan = planSeedFromIntake(seedInput(json));
+
+    const uzClaim = fileText(
+      plan,
+      "src/content/business-profile/uz/trust/claims/european-quality.md",
+    );
+    expect(uzClaim).toContain("Yevropa sifati");
+    expect(uzClaim).not.toContain("Russian summary");
+
+    const uzBusiness = fileText(plan, "src/content/business-profile/uz/business.md");
+    expect(uzBusiness).not.toContain("Russian business description");
+
+    // Primary-locale docs keep every prose field untouched.
+    const ruClaim = fileText(
+      plan,
+      "src/content/business-profile/ru/trust/claims/european-quality.md",
+    );
+    expect(ruClaim).toContain("Russian summary");
+    const ruBusiness = fileText(plan, "src/content/business-profile/ru/business.md");
+    expect(ruBusiness).toContain("Russian business description");
   });
 
   it("singleton types keep type-named files: brand + legal-identity on the same slug do not collide", () => {

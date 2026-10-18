@@ -21,7 +21,7 @@ sidecars, and the system-state onboarding provenance block.</purpose>
   <item>Seeded assets and credit sidecars live in the pages domain (pages/&lt;lang&gt;/assets) so page image references match their credits</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1328/AMD-005: per-locale document variants (statementByLocale values, localeNeutral verbatim clones); envelope-only fields stripped before the strict pbp parse.</item>
+  <item>RFC-1328/AMD-005: per-locale document variants (statementByLocale values + statementLang rewrite, localeNeutral clones); prose never crosses locales — description dropped everywhere, summary dropped on statement-bearing variants; envelope-only fields stripped before the strict pbp parse.</item>
   <item>RFC-1307: record review-fix decisions in compass headers</item>
   <item>REVIEW-CODE-2026-10-16-08 N3/N4: reject duplicate locale primary segments and non-2-letter primary subtags at plan time instead of seeding born-invalid i18n; credit target.domain names business-profile — the tree the seeded asset actually lands in.</item>
   <item>RFC-1307: review-08 N1-N7 — ref-scoped rollback, pre-existing content preservation, svg resolution, explicit io</item>
@@ -83,8 +83,9 @@ export function localeSegment(tag: string): string {
 
 /**
  * AMD-005/RFC-1328: the entity field a locale variant replaces — `statement`
- * wins over `summary`; `description` has no locale channel and is dropped
- * from clones (the primary-language text never ships under another locale).
+ * wins over `summary`. Free prose never ships under another locale:
+ * `description` has no locale channel and is dropped from every non-primary
+ * document, and `summary` is dropped when `statement` carried the variant.
  */
 const STATEMENT_FIELDS = ["statement", "summary"] as const;
 
@@ -93,7 +94,7 @@ const STATEMENT_FIELDS = ["statement", "summary"] as const;
  * facts for that locale (it surfaces in the primary tree until the producer
  * emits the locale — Q-4). A document is seeded when the entity carries a
  * `statementByLocale` value for the tag or is marked `localeNeutral`
- * (names, identifiers, addresses — verbatim clone).
+ * (names, identifiers, addresses — verbatim clone minus prose).
  */
 function localeVariantDocument(
   entity: IntakeEnvelope["pbp"][number],
@@ -105,9 +106,17 @@ function localeVariantDocument(
   if (typeof variant === "string" && variant.length > 0 && statementField) {
     const clone = { ...canonicalEntity, [statementField]: variant };
     delete clone["description"];
+    if (statementField === "statement") delete clone["summary"];
+    // The variant statement is authored in the variant locale — a declared
+    // statementLang follows the doc's locale, not the primary one.
+    if (typeof clone["statementLang"] === "string") clone["statementLang"] = tag;
     return clone;
   }
-  if (entity.localeNeutral === true) return { ...canonicalEntity };
+  if (entity.localeNeutral === true) {
+    const clone = { ...canonicalEntity };
+    delete clone["description"];
+    return clone;
+  }
   return undefined;
 }
 

@@ -17,7 +17,7 @@ through WorkspaceIO; hashing is node:crypto sha256.</purpose>
   <item>Verbatim substring checks (INTAKE-05) run against text-typed evidence items only (text/*, application/json, message/rfc822); a binary-only source is an error,.</item>
 </KEY_DECISIONS>
 <CHANGE_SUMMARY>
-  <item>RFC-1328/AMD-005: INTAKE-12…15 — anchored internal-marker scan on published free text, locale-native statementByLocale coverage, WebP-only rasters, closed palette vocabulary; envelope-only fields stripped before the strict pbp parse (INTAKE-03).</item>
+  <item>RFC-1328/AMD-005: INTAKE-12…15 — anchored internal-marker + assessment-vocabulary scan on published free text (name/statement/summary/description), locale-native statementByLocale coverage, WebP-only rasters, closed palette vocabulary; envelope-only fields stripped before the strict pbp parse (INTAKE-03).</item>
   <item>RFC-1281: created — validateIntakeBundle (INTAKE-01…11) + runIntakeValidate command + resolveIntakeExportSha256.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
 </CHANGE_SUMMARY>
@@ -62,13 +62,15 @@ export const INTAKE_RULE_IDS = [
 export type IntakeRuleId = (typeof INTAKE_RULE_IDS)[number];
 
 /**
- * AMD-005/RFC-1328: evidence-ledger id shape in free text. Anchored — bare
- * words ("source", "gap") never match; only `PREFIX-digits` forms do.
+ * AMD-005/RFC-1328: evidence-ledger id shape plus the internal-assessment
+ * vocabulary (evidence-source kinds, publishability gates) in free text.
+ * Anchored — bare words ("source", "gap") never match.
  */
-const INTERNAL_MARKER_RE = /\b(SRC|CLM|GAP|OPD|DEF|CHK|AST)-\d+/;
+const INTERNAL_MARKER_RE =
+  /\b(?:SRC|CLM|GAP|OPD|DEF|CHK|AST)-\d+|\b(?:internal_only|client-statement|after_proof)\b/;
 
 /** Free-text fields INTAKE-12 scans on published entities (AMD-005). */
-const PBP_FREE_TEXT_FIELDS = ["statement", "summary", "description"] as const;
+const PBP_FREE_TEXT_FIELDS = ["name", "statement", "summary", "description"] as const;
 
 /**
  * AMD-005/RFC-1328: `visual.palette` keys must come from the canonical biome

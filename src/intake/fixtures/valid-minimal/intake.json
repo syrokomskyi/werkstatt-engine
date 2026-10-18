@@ -269,7 +269,7 @@
     "producer": "site-werkstatt",
     "producerVersion": "0.1.0",
     "runId": "run-2026-10-15-01",
-    "contractSnapshot": "sha256:0afea4405268826b0fc7cd053849b81ec3ec1d97ee7fb4a51e3aa4e10b6d5d9c",
+    "contractSnapshot": "sha256:1666efc62b52b21457b19c33126f38a1a4e870ddfdbc2837cca0c9cea0877cdd",
     "inputs": [
       {
         "path": ".input/client-knowledge-base.json",

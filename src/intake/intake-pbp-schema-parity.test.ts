@@ -9,6 +9,7 @@ producers can validate pbp[] entities without the werkstatt checkout.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1328 review (F-1): envelope-level Ajv coverage — $defs accept statementByLocale/localeNeutral, canonical strict schemas still reject them.</item>
   <item>RFC-1311: Compass header sweep — declares the intake suite's contract for test-file scaffold coverage.</item>
 </CHANGE_SUMMARY>
 */
@@ -140,5 +141,39 @@ describe("RFC-1301 intake pbp entity JSON Schema parity", () => {
       expect(pbpSchemaById[e["schema"] as string]!.safeParse(e).success, JSON.stringify(e)).toBe(
         false,
       );
+  });
+});
+
+describe("RFC-1328/AMD-005: envelope-only fields on the exported $defs", () => {
+  const exported = exportedValidators();
+
+  it("every allow-listed $def accepts statementByLocale + localeNeutral", () => {
+    // The $defs describe pbp[] items *as they appear in the envelope* — a
+    // producer validating an AMD-005-conformant entity must not be rejected
+    // by additionalProperties: false inside the $ref'd canonical fragment.
+    for (const entity of VALID) {
+      const withEnvelopeFields = {
+        ...entity,
+        statementByLocale: { "uz-Latn": "Lokalisierte Angabe" },
+        localeNeutral: false,
+      };
+      expect(
+        exported(entity["schema"] as string)(withEnvelopeFields),
+        String(entity["schema"]),
+      ).toBe(true);
+    }
+  });
+
+  it("the canonical strict Zod schemas still reject the envelope fields", () => {
+    // Envelope-only by contract — pbp/*@1 schemas stay frozen; the intake
+    // layer strips the fields before the canonical parse (INTAKE-03, seed).
+    const withEnvelopeFields = {
+      ...VALID[3],
+      statementByLocale: { "uz-Latn": "x" },
+      localeNeutral: true,
+    };
+    expect(
+      pbpSchemaById[VALID[3]!["schema"] as string]!.safeParse(withEnvelopeFields).success,
+    ).toBe(false);
   });
 });

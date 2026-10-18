@@ -14,6 +14,7 @@ value INTAKE-10 compares against.</purpose>
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
+  <item>RFC-1328 review (F-1): inject statementByLocale/localeNeutral into every $def — the export validates envelope items, not bare canonical entities.</item>
   <item>RFC-1281: created — onboarding.intake.schema.export command.</item>
   <item>RFC-1281: intake contract and onboarding.intake.validate</item>
   <item>RFC-1301: export PBP entity JSON Schemas in werkstatt:intake/v1 (RFC-1301)</item>
@@ -27,6 +28,7 @@ import { z } from "zod";
 import { pbpSchemaById } from "@warpgogol/pbp/entities";
 import {
   INTAKE_PBP_SCHEMA_ALLOWLIST,
+  intakePbpEntitySchema,
   renderIntakeSchemaExport,
   type IntakePbpEntityJsonSchemas,
 } from "@warpgogol/werkstatt-shared/onboarding/intake";
@@ -50,6 +52,15 @@ export const INTAKE_SCHEMA_EXPORT_PATH =
  * authoritative.
  */
 export function renderIntakePbpEntityJsonSchemas(): IntakePbpEntityJsonSchemas {
+  // AMD-005/RFC-1328: the $defs describe pbp[] items *as they appear in the
+  // envelope* — producers validate the whole intake.json against this export.
+  // The canonical strict fragment alone would reject the envelope-only fields
+  // (additionalProperties: false), so each $def gains the envelope field
+  // declarations, rendered from the same Zod source (DNA-103).
+  const envelopeFields = z.toJSONSchema(
+    intakePbpEntitySchema.pick({ statementByLocale: true, localeNeutral: true }),
+    { target: "draft-2020-12", unrepresentable: "any", io: "input" },
+  ) as { properties?: Record<string, unknown> };
   const out: IntakePbpEntityJsonSchemas = {};
   for (const id of INTAKE_PBP_SCHEMA_ALLOWLIST) {
     const canonical = pbpSchemaById[id];
@@ -61,6 +72,10 @@ export function renderIntakePbpEntityJsonSchemas(): IntakePbpEntityJsonSchemas {
       unrepresentable: "any",
       io: "input",
     }) as Record<string, unknown>;
+    fragment.properties = {
+      ...(fragment.properties as Record<string, unknown> | undefined),
+      ...envelopeFields.properties,
+    };
     out[id] = fragment;
   }
   return out;
