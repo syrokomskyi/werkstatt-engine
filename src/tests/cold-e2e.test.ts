@@ -12,6 +12,7 @@ Unit tests for cold e2e covering werkstatt.e2e.cold. It also guards the document
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1324: fixture-staging + compose mocks — DirEntry/fs.Stats-shaped io mocks, real INTAKE-01..15 validation on staged bundles, skipped-stage awareness</item>
   <item>RFC-1324</item>
+  <item>RFC-1324: Symlink pipelines sibling into cold clone so linked axiom dist resolves</item>
 </CHANGE_SUMMARY>
 */
 
@@ -137,7 +138,13 @@ describe("werkstatt.e2e.cold", () => {
 
   beforeEach(() => {
     mockExecFileSync = vi.fn();
-    mockMkdtemp = vi.fn(async () => join(tmpDir, "cold-root"));
+    // Real fs.mkdtemp creates the dir — the mock must too, or fs ops that
+    // provision siblings into the cold root (pipelines symlink) hit ENOENT.
+    mockMkdtemp = vi.fn(async () => {
+      const dir = join(tmpDir, "cold-root");
+      await realFsPromises.mkdir(dir, { recursive: true });
+      return dir;
+    });
     mockMkdir = vi.fn(async (p: string) => {
       await realFsPromises.mkdir(p, { recursive: true });
     });
