@@ -7,11 +7,11 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: cold-run defect: fixture page descriptions under semantic.drift 50-char SEO floor</item>
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <item>RFC-1324: declare legal pageIds in system.md overlay — scaffold emits files, composer owns the route registry (B-04)</item>
   <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
   <item>RFC-1324: pin Atlas in home planets[] — B-02 requires every used block component declared (faq-list -> Atlas)</item>
+  <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
   <history>RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -70,7 +70,7 @@ interface FixtureSpec {
     heading: Record<string, string>;
     items: Record<string, Array<{ q: string; a: string }>>;
   };
-  /** business/{seg}/services/ record (Service JSON-LD baseline) */
+  /** business-profile/{seg}/products/ record — kind:service projects into Service JSON-LD */
   service?: { name: Record<string, string>; description: Record<string, string> };
   pages: PageSpec[];
   proseTexts: Record<string, Record<string, string>>; // proseId -> seg -> body
@@ -244,6 +244,26 @@ function layoutFile(spec: FixtureSpec, seg: string): string {
   return fm(`defaultDescription: "${spec.defaultDescription[seg]}"
 skipLinkLabel: "${spec.skipLinkLabel[seg]}"
 `);
+}
+
+// RFC-0830 escape hatch — the credits gallery renders only below-the-fold
+// thumbnails, so no image is the LCP element. The composer owns
+// src/image-delivery.config.yaml (seeded empty at registration); this mirrors
+// the override real sites carry for the same routes.
+function imageDeliveryConfig(spec: FixtureSpec): string {
+  const slugs = spec.segments
+    .map((s) => spec.pages.find((p) => p.credits)?.routes[s])
+    .filter((s): s is string => Boolean(s));
+  const pattern = slugs.length === 1 ? slugs[0] : `{${slugs.join(",")}}`;
+  return `# RFC-0830 IMG-DELIVERY escape-hatch overrides.
+# Each entry needs: srcPattern, rules[], reason.
+overrides:
+  - srcPattern: "**"
+    pagePattern: "**/${pattern}/**"
+    rules:
+      - IMG-DELIVERY-04
+    reason: "Material credits list page — text/list layout without a hero; every image is a below-the-fold thumbnail, the LCP element is textual."
+`;
 }
 
 // pbp.profile.validate requires web/, contact/, places/ under the default
@@ -1222,6 +1242,7 @@ for (const spec of fixtures) {
   const dir = join(root, spec.name, "composition");
   const files: Record<string, string> = {
     "system.md": systemMdOverlay(spec),
+    "image-delivery.config.yaml": imageDeliveryConfig(spec),
     ...businessProfileFiles(spec),
   };
   for (const seg of spec.segments) {
@@ -1247,14 +1268,20 @@ order: ${i + 1}
 ---
 `;
     }
-    // business/{seg}/services/ — projected into organization.services for the
-    // Service JSON-LD node (RFC-0373 catalog).
+    // PBP product (kind: service) — projected by buildPbpSemanticProfile into
+    // organization.services, the render-path source of the Service JSON-LD
+    // node the family baseline requires.
     if (spec.service) {
-      files[`business/${seg}/services/main.md`] = `---
-slug: "main-service"
+      files[`business-profile/${seg}/products/information-materials.md`] = `---
+schema: pbp/product@1
+id: product/information-materials
+type: product
+status: published
+kind: service
 name: "${spec.service.name[seg] ?? spec.service.name[spec.segments[0]!]}"
-description: "${spec.service.description[seg] ?? spec.service.description[spec.segments[0]!]}"
-order: 1
+summary: "${spec.service.description[seg] ?? spec.service.description[spec.segments[0]!]}"
+governance:
+  authorityRef: pbp/business@1:business/${spec.businessId}
 ---
 `;
     }

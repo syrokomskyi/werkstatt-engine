@@ -1,0 +1,8 @@
+# RFC-0830 IMG-DELIVERY escape-hatch overrides.
+# Each entry needs: srcPattern, rules[], reason.
+overrides:
+  - srcPattern: "**"
+    pagePattern: "**/{materialquellen,credits}/**"
+    rules:
+      - IMG-DELIVERY-04
+    reason: "Material credits list page — text/list layout without a hero; every image is a below-the-fold thumbnail, the LCP element is textual."

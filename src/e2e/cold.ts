@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: cold-run defect: ship-closed needs mission.validate before reconcile</item>
   <item>RFC-1324: cold-run defect: compose stage missed passport.key.ensure/emit — sole-owned .well-known artifacts</item>
   <item>RFC-1324: cold-run defect: system.md merge emitted YAML-1.1-ambiguous scalars unquoted (lastmod date)</item>
   <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
+  <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -872,6 +872,9 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
           "faq",
         ];
         const COMPOSE_FILES = ["system.md"];
+        // Composer-owned files that live at src/ root rather than under
+        // src/content/ — per-site validator escape hatches (RFC-0830).
+        const COMPOSE_SRC_FILES = ["image-delivery.config.yaml"];
         const composeContentDir = path.join(workpieceDir, "src", "content");
         const applyDir = async (src: string, rel: string): Promise<void> => {
           for (const entry of await env.io.readdir(src)) {
@@ -885,12 +888,19 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
               }
               await applyDir(path.join(src, entry.name), entryRel);
             } else {
-              if (rel === "" && !COMPOSE_FILES.includes(entry.name)) {
+              if (
+                rel === "" &&
+                !COMPOSE_FILES.includes(entry.name) &&
+                !COMPOSE_SRC_FILES.includes(entry.name)
+              ) {
                 throw new Error(
-                  `compose: fixture composition carries '${entry.name}' at root — only ${COMPOSE_FILES.join("/")} overlays are composer territory`,
+                  `compose: fixture composition carries '${entry.name}' at root — only ${[...COMPOSE_FILES, ...COMPOSE_SRC_FILES].join("/")} overlays are composer territory`,
                 );
               }
-              const target = path.join(composeContentDir, entryRel);
+              const target =
+                rel === "" && COMPOSE_SRC_FILES.includes(entry.name)
+                  ? path.join(workpieceDir, "src", entry.name)
+                  : path.join(composeContentDir, entryRel);
               await env.io.mkdir(path.dirname(target));
               if (rel === "" && entry.name === "system.md") {
                 // The composer edits the seeded manifest — a frontmatter
@@ -902,10 +912,9 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
                 const merged = mergeSystemMdFrontmatter(seededRaw, overlayRaw);
                 await env.io.writeFile(target, merged);
               } else {
-                await env.io.copyFile(
-                  path.join(src, entry.name),
-                  path.join(composeContentDir, entryRel),
-                );
+                // target resolves to composeContentDir for content subtrees or
+                // the src/ root for COMPOSE_SRC_FILES — both inside the seam.
+                await env.io.copyFile(path.join(src, entry.name), target);
               }
             }
           }
