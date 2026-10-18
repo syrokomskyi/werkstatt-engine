@@ -11,6 +11,7 @@ Unit tests for cold e2e covering werkstatt.e2e.cold. It also guards the document
   <item>RFC-0965: initial unit tests for cold run handler — interventions, timeout, dirty tree, confinement, success.</item>
   <item>RFC-1307: canonical org-singleton PBP paths, seeded hreflang+publication.gate, full rollback</item>
   <item>RFC-1324: fixture-staging + compose mocks — DirEntry/fs.Stats-shaped io mocks, real INTAKE-01..15 validation on staged bundles, skipped-stage awareness</item>
+  <item>RFC-1324</item>
 </CHANGE_SUMMARY>
 */
 
@@ -111,6 +112,7 @@ const realFsPromises = await vi.importActual<typeof import("node:fs/promises")>(
 import { runColdE2e } from "../e2e/cold.ts";
 import { executeKernelCommand } from "@warpgogol/werkstatt-engine/kernel";
 import { createDefaultIO } from "@warpgogol/werkstatt-shared/kernel/workspace-io";
+import { getPublicKey, loadPrivateKey, toHex } from "@warpgogol/werkstatt-engine/signing";
 
 const mockedExec = vi.mocked(executeKernelCommand);
 
@@ -278,6 +280,72 @@ describe("werkstatt.e2e.cold", () => {
     expect(result.exitCode).toBe(0);
     expect(result.data?.fixtures[0]?.interventions).toBe(0);
     expect(result.data?.fixtures[0]?.steps.every((s: { ok: boolean }) => s.ok)).toBe(true);
+  });
+
+  it("hands the recipient key to handover.complete and restores the sender key (HANDOVER-04)", async () => {
+    mockExecFileSync.mockReturnValue("");
+    const seededSystemMd =
+      "---\ni18n:\n  default: de\n  supported:\n    de:\n      name: de\n      hreflang: de-DE\nidentity:\n  systemStar: Achernar\n  biome: handwerk-material-warm\nlegalJurisdiction: DE\npublication:\n  gate: enforce\ncontractTerms:\n  gate: enforce\nprovenance:\n  gate: enforce\n---\n";
+    mockReadFile = vi.fn(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("MANIFEST.sha256")) return "00  intake.json\n";
+      if (s.endsWith("intake.json"))
+        return '{"systemId":"dp7","classification":{"domain":"e2e.test","locales":[{"tag":"de","role":"primary"}]}}';
+      if (s.endsWith("system.md")) return seededSystemMd;
+      return "PEM";
+    });
+
+    let recipientPublicKey = "";
+    let completeSawRecipientKey = false;
+    mockedExec.mockImplementation(async (cmdInput: { commandName?: string; argv?: string[] }) => {
+      const name = cmdInput?.commandName ?? "";
+      if (name === "sternsystem.handover.prepare") {
+        const keyArg = (cmdInput.argv ?? []).find((a) => a.startsWith("--recipient-public-key="));
+        recipientPublicKey = keyArg?.split("=")[1] ?? "";
+        return {
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: { dryRun: true, signedAuthorization: { mock: true }, authorizationHash: "h" },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        };
+      }
+      if (name === "sternsystem.handover.complete") {
+        // HANDOVER-04 semantics: complete runs as the recipient — the env key
+        // must derive the public key the sender authorized, not the sender's.
+        const pem = process.env.SIGNING_PRIVATE_KEY ?? "";
+        const derived = toHex(await getPublicKey(await loadPrivateKey({ pem })));
+        completeSawRecipientKey = derived === recipientPublicKey && pem !== "PEM";
+        return {
+          commandName: name,
+          exitCode: 0,
+          ok: true,
+          data: { dryRun: true, newPassportHashPreview: "h" },
+          metadata: {} as never,
+          logs: [],
+          timing: {} as never,
+        };
+      }
+      return {
+        commandName: name || "sternsystem.register",
+        exitCode: 0,
+        ok: true,
+        data: { firstMissionId: "m000001", missionId: "m000002" },
+        metadata: {} as never,
+        logs: [],
+        timing: {} as never,
+      };
+    });
+
+    const result = await runColdE2e(makeInput({}), makeContext(tmpDir) as never);
+
+    expect(result.exitCode).toBe(0);
+    expect(recipientPublicKey).not.toBe("");
+    expect(completeSawRecipientKey).toBe(true);
+    // Sender key restored for later stages.
+    expect(process.env.SIGNING_PRIVATE_KEY).toBe("PEM");
   });
 
   it("returns exit 1 when a sub-command fails", async () => {
