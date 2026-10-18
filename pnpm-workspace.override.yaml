@@ -1,6 +1,9 @@
 # RFC-1254: floors track the published versions the standalone package must work against.
 overrides:
-  "@warpgogol/forge": ^6.2.0
+  "@warpgogol/forge": ^8.0.2
   "@warpgogol/werkstatt-shared": ^1.0.0
+  "@warpgogol/pbp": ^1.0.0
 minimumReleaseAgeExclude:
   - "@warpgogol/werkstatt-shared@1.0.0"
+  - "@warpgogol/forge@8.0.2"
+  - "@warpgogol/pbp@1.0.0"
