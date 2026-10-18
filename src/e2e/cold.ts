@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: isolate each matrix fixture in its own werkstatt child process (CI parity) — no registry/env state crosses cold births; runStep records errorStack</item>
   <item>RFC-1324: preflight checks tracked modifications only (--untracked-files=no) — the clone copies committed state, untracked files can neither enter it nor execute</item>
   <item>RFC-1324</item>
   <item>RFC-1324: isolated fixture child must report the requested fixture id</item>
   <item>RFC-1324: cold-run defect: child report parser lost the JSON to post-report stage noise — bounded col-0 block scan; weighted stage budgets (ship 292-300s flat-split edge)</item>
+  <item>RFC-1324: cold-run defect: dev-deploy --resume false-passed on the closed ship journal (177ms, nothing deployed, probe 404) — fresh leitstand.ship reuses build inputs</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -1220,10 +1220,14 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
       deployOnly: true,
       skipWhen: () => (!cfSecretsPresent(env.secrets) ? `${CF_SKIP} — deploy legs` : null),
       run: async () => {
+        // A fresh ship, not --resume: the ship-closed journal already closed,
+        // so --resume reports "nothing to resume" and exits in ~200ms without
+        // deploying — a false pass the access-probe then exposes as 404.
+        // Distribution-reuse by build-input hash makes the fresh run cheap.
         await runSubCommand(
           env.cloneRoot,
           "leitstand.ship",
-          [`--site=${env.systemId}`, `--mission=${env.missionId}`, "--until=dev", "--resume"],
+          [`--site=${env.systemId}`, `--mission=${env.missionId}`, "--until=dev"],
           env.logger,
         );
       },
