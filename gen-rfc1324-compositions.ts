@@ -10,6 +10,7 @@
   <item>RFC-1324: initial — per-fixture composition emission from declarative specs.</item>
   <item>RFC-1324</item>
   <item>RFC-1324: cold-run defect: fixture page descriptions under semantic.drift 50-char SEO floor</item>
+  <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
 </CHANGE_SUMMARY>
 */
 // Run: pnpm exec tsx gen-rfc1324-compositions.ts (from packages/werkstatt-engine)
@@ -43,6 +44,18 @@ interface FixtureSpec {
   name: string;
   app: string; // canonical systemId (staging rewrites to e2e-<name>)
   legalName: string;
+  /** PBP business entity id (business/<id>) the intake seeds */
+  businessId: string;
+  /** composer-authored contact email */
+  email: string;
+  /** composer-authored place entity */
+  place: {
+    street: string;
+    streetNumber: string;
+    postalCode: string;
+    locality: string;
+    countryCode: string;
+  };
   tagline: Record<string, string>;
   defaultDescription: Record<string, string>;
   skipLinkLabel: Record<string, string>;
@@ -176,6 +189,57 @@ function layoutFile(spec: FixtureSpec, seg: string): string {
   return fm(`defaultDescription: "${spec.defaultDescription[seg]}"
 skipLinkLabel: "${spec.skipLinkLabel[seg]}"
 `);
+}
+
+// pbp.profile.validate requires web/, contact/, places/ under the default
+// locale — composed from the resolved host and the published legal address
+// (wg-onboard qa-log). canonicalUrl is templated: the stage substitutes the
+// domain the register step actually resolved.
+function businessProfileFiles(spec: FixtureSpec): Record<string, string> {
+  const seg = spec.segments[0]!;
+  const pl = spec.place;
+  return {
+    [`business-profile/${seg}/web/primary.md`]: fm(`schema: pbp/web-presence@1
+id: web-presence/primary
+type: web-presence
+status: published
+name: ${spec.legalName} website
+kind: primary-website
+canonicalUrl: "{{SITE_ORIGIN}}/"
+businessRef:
+  ref: pbp/business@1:business/${spec.businessId}
+  expectedType: business
+control: business-controlled
+locales:
+  ${seg}: ${seg}
+`),
+    [`business-profile/${seg}/contact/email.md`]: fm(`schema: pbp/contact-point@1
+id: contact-point/email
+type: contact-point
+status: published
+name: Corporate email
+channel: email
+governance:
+  authorityRef: pbp/evidence-source@1:evidence-source/src-01
+preferred: true
+value: ${spec.email}
+`),
+    [`business-profile/${seg}/places/main.md`]: fm(`schema: pbp/place@1
+id: place/main
+type: place
+status: published
+name: ${pl.locality}
+kind: locality
+address:
+  street: ${pl.street}
+  streetNumber: "${pl.streetNumber}"
+  postalCode: "${pl.postalCode}"
+  locality: ${pl.locality}
+  countryCode: ${pl.countryCode}
+governance:
+  authorityRef: pbp/evidence-source@1:evidence-source/src-01
+`),
+  };
 }
 
 // ── per-fixture specs ────────────────────────────────────────────────────
@@ -681,6 +745,15 @@ const fixtures: FixtureSpec[] = [
     name: "valid-minimal",
     app: "dp7",
     legalName: "DP7 Digitalprojekt GmbH",
+    businessId: "dp7",
+    email: "e2e-valid@example.com",
+    place: {
+      street: "Chausseestraße",
+      streetNumber: "86",
+      postalCode: "10115",
+      locality: "Berlin",
+      countryCode: "DE",
+    },
     segments: ["ru", "uz"],
     nativeNames: { ru: "Русский", uz: "Oʻzbekcha" },
     tagline: { ru: "Проверяемое качество по честной цене" },
@@ -790,6 +863,15 @@ const fixtures: FixtureSpec[] = [
     name: "de-domain",
     app: "de-domain",
     legalName: "E2E Demowerk GmbH",
+    businessId: "demowerk",
+    email: "e2e-demowerk@example.com",
+    place: {
+      street: "Friedrichstraße",
+      streetNumber: "12",
+      postalCode: "10117",
+      locality: "Berlin",
+      countryCode: "DE",
+    },
     segments: ["de", "en"],
     nativeNames: { de: "Deutsch", en: "English" },
     tagline: { de: "Nachweisbare Qualität zum fairen Preis" },
@@ -899,10 +981,21 @@ const fixtures: FixtureSpec[] = [
     name: "latin-only",
     app: "latin-only",
     legalName: "E2E Latinworks LLC",
+    businessId: "latinworks",
+    email: "e2e-latinworks@example.com",
+    place: {
+      street: "SW Morrison Street",
+      streetNumber: "1500",
+      postalCode: "97205",
+      locality: "Portland",
+      countryCode: "US",
+    },
     segments: ["en"],
     nativeNames: { en: "English" },
     tagline: { en: "Verifiable quality at a fair price" },
-    defaultDescription: { en: "Informational site of E2E Latinworks LLC: company, pages, and contact." },
+    defaultDescription: {
+      en: "Informational site of E2E Latinworks LLC: company, pages, and contact.",
+    },
     skipLinkLabel: { en: "Skip to content" },
     pages: [
       {
@@ -925,7 +1018,9 @@ const fixtures: FixtureSpec[] = [
         planet: "Hyperion",
         routes: { en: "about" },
         title: { en: "About us | E2E Latinworks LLC" },
-        description: { en: "Information about E2E Latinworks LLC and the purpose of this website." },
+        description: {
+          en: "Information about E2E Latinworks LLC and the purpose of this website.",
+        },
         heading: { en: "About us" },
         prose: "about-company",
       },
@@ -977,7 +1072,10 @@ const fixtures: FixtureSpec[] = [
 
 for (const spec of fixtures) {
   const dir = join(root, spec.name, "composition");
-  const files: Record<string, string> = { "system.md": systemMdOverlay(spec) };
+  const files: Record<string, string> = {
+    "system.md": systemMdOverlay(spec),
+    ...businessProfileFiles(spec),
+  };
   for (const seg of spec.segments) {
     for (const p of spec.pages) {
       files[`pages/${seg}/${p.pageId.replace(/([A-Z])/g, (c) => `-${c.toLowerCase()}`)}.md`] =

@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: cold-run defect: handover-dry-run ran complete as sender — recipient key swap for HANDOVER-04</item>
   <item>RFC-1324: cold-run defect: ship-closed skipped mission.reconcile — RFC-1217 gate correctly blocked unreconciled workpiece</item>
   <item>RFC-1324: cold-run defect: ship-closed needs mission.validate before reconcile</item>
   <item>RFC-1324: cold-run defect: compose stage missed passport.key.ensure/emit — sole-owned .well-known artifacts</item>
   <item>RFC-1324: cold-run defect: system.md merge emitted YAML-1.1-ambiguous scalars unquoted (lastmod date)</item>
+  <item>RFC-1324: cold-run defect: compose missed business-profile seam, legal.scaffold, and domain-templated canonicalUrl</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -862,7 +862,7 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
         }
 
         // FAB-SEAM-BEGIN: compose
-        const COMPOSE_SUBDIRS = ["pages", "prose", "navigation", "site"];
+        const COMPOSE_SUBDIRS = ["pages", "prose", "navigation", "site", "business-profile"];
         const COMPOSE_FILES = ["system.md"];
         const composeContentDir = path.join(workpieceDir, "src", "content");
         const applyDir = async (src: string, rel: string): Promise<void> => {
@@ -904,6 +904,45 @@ export function buildFixtureStages(env: ColdEnv, parentWorkspaceRoot: string): C
         };
         await applyDir(compositionSrc, "");
         // FAB-SEAM-END: compose
+
+        // business-profile entities are authored against the resolved site
+        // host — the fixture carries a {{SITE_ORIGIN}} token (the canonical
+        // domain is only known after register resolves it, never hardcoded).
+        const mergedManifest = await env.io.readFile(path.join(composeContentDir, "system.md"));
+        const fmBlock = mergedManifest.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        const identityDomain = (fmBlock ? YAML.parse(fmBlock[1]) : {})?.identity?.domain as
+          string | undefined;
+        const businessProfileDir = path.join(composeContentDir, "business-profile");
+        if (identityDomain) {
+          const substitute = async (dir: string): Promise<void> => {
+            for (const entry of await env.io.readdir(dir)) {
+              const full = path.join(dir, entry.name);
+              const st = await env.io.stat(full).catch(() => null);
+              if (st?.isDirectory) {
+                await substitute(full);
+              } else if (entry.name.endsWith(".md")) {
+                const raw = await env.io.readFile(full);
+                if (raw.includes("{{SITE_ORIGIN}}")) {
+                  await env.io.writeFile(
+                    full,
+                    raw.replaceAll("{{SITE_ORIGIN}}", `https://${identityDomain}`),
+                  );
+                }
+              }
+            }
+          };
+          await substitute(businessProfileDir).catch(() => {});
+        }
+
+        // Jurisdiction-keyed legal pages (RFC-1329): DE/AT/CH requires
+        // impressum+datenschutz per supported locale — the command emits the
+        // binding-locale documents and unofficial slots from the manifest.
+        await runSubCommand(
+          env.cloneRoot,
+          "legal.scaffold",
+          [`--site=${env.systemId}`],
+          env.logger,
+        );
 
         // First-mission composer duties beyond authored content (wg-onboard
         // qa-log): the passport key pair and .well-known artifacts are
