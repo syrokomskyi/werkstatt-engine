@@ -28,6 +28,7 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", ...quarantinedExcludes],
+    setupFiles: ["./vitest.setup.git-identity.ts"],
     testTimeout: 30_000,
     maxWorkers: "50%",
     coverage: {
