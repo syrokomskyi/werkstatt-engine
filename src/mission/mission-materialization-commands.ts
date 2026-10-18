@@ -6,12 +6,12 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>ADR-0110: post-reconcile divergence check classifies origin-side commits by PIPELINE_SUBJECT_PREFIXES (git log origin/main --not HEAD) — transient when all are pipeline-authored or none exist, real divergence otherwise; warning names sternsystem.sync as the remedy and never advises git reset --hard.</item>
   <item>ADR-0096 follow-up: runMissionBuild now calls bootstrapCommittedSnapshot before build.post — the ADR-0096 baseline commit existed only on the mission.validate path, so mission.build deadlocked on SNAP-02 for first-time missions with no committed behavior snapshot.</item>
   <item>RFC-1263</item>
   <item>RFC-1296</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
-  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159, RFC-1218, RFC-1219, RFC-1221, RFC-1249, warpgogol-m000196</history>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
+  <history>ADR-0008, ADR-0060, ADR-0093, ADR-0096, ADR-0110, RFC-0356, RFC-0480, RFC-0522, RFC-0560, RFC-0568, RFC-0578, RFC-0579, RFC-0580, RFC-0635, RFC-0644, RFC-0689, RFC-0697, RFC-0702, RFC-0705, RFC-0749, RFC-0763, RFC-0796, RFC-0797, RFC-0820, RFC-0913, RFC-0918, RFC-0958, RFC-0973, RFC-1020, RFC-1028, RFC-1074, RFC-1086, RFC-1097, RFC-1149, RFC-1159, RFC-1218, RFC-1219, RFC-1221, RFC-1249, warpgogol-m000196</history>
 </CHANGE_SUMMARY>
 */
 
@@ -65,6 +65,7 @@ import { appendAndCommitBordbuch } from "../bordbuch/bordbuch-commit-helper.ts";
 import type { WorkpieceConfigPresenceResult } from "./workpiece-config-presence-check.ts";
 import {
   restoreCacheCloneGitignore,
+  sweepUntrackedGeneratedResidue,
   untrackForbiddenGeneratedFiles,
   CACHE_CLONE_GENERATED_PATTERNS,
 } from "./cache-clone-gitignore.ts";
@@ -1896,45 +1897,51 @@ export async function runMissionReconcile(
   );
   const systemDir = await resolveCacheClonePath(workspaceRoot, manifest.systemId);
 
-  // RFC-1327: a re-run on an already-reconciled workpiece head is a no-op.
-  // The merge machinery rewinds the clone to preReconcileSha, which strips the
-  // .gitignore restoration commit and leaves untracked generated files looking
-  // dirty — skip the whole pipeline when the report already folded this head.
-  const prevReportPath = path.join(evidenceDir, "reconciliation-report.json");
-  if (await context.io.exists(prevReportPath)) {
-    try {
-      const prevReport = JSON.parse(await context.io.readFile(prevReportPath)) as {
-        workpieceHeadAtReconcile?: string | null;
-      };
-      const currentHead = (await shExec("git rev-parse HEAD", workpieceDir, context.io)).trim();
-      if (
-        prevReport.workpieceHeadAtReconcile &&
-        prevReport.workpieceHeadAtReconcile === currentHead
-      ) {
-        return {
-          data: {
-            missionId,
-            systemId: manifest.systemId,
-            commitSha: null,
-            workpieceHeadAtReconcile: currentHead,
-            alreadyReconciled: true,
-          } as unknown as MissionReconcileData,
-          exitCode: 0,
-          summary: `[mission.reconcile] ${missionId} already reconciled at ${currentHead.slice(0, 8)} — no-op`,
-          nextSteps: [
-            {
-              action: `Close the mission: pnpm exec werkstatt run mission.close --mission ${missionId}`,
-              kind: "optional",
-            },
-          ],
-        };
-      }
-    } catch {
-      // Missing/unreadable report or non-git workpiece — fall through to the merge path.
-    }
-  }
-
   try {
+    // RFC-1327: a re-run on an already-reconciled workpiece head is a no-op.
+    // The merge machinery rewinds the clone to preReconcileSha, which strips
+    // the .gitignore restoration commit and leaves untracked generated files
+    // looking dirty — skip the pipeline when the report already folded this
+    // head. Gates: manifest.reconciledAt set (a crash between report write and
+    // manifest update must resume the journaled tail, not no-op) and a clean
+    // worktree (uncommitted edits on the same head still need the auto-commit
+    // sweep). Inside try so the acquired locks release via finally.
+    const prevReportPath = path.join(evidenceDir, "reconciliation-report.json");
+    if (manifest.reconciledAt && (await context.io.exists(prevReportPath))) {
+      try {
+        const prevReport = JSON.parse(await context.io.readFile(prevReportPath)) as {
+          workpieceHeadAtReconcile?: string | null;
+        };
+        const currentHead = (await shExec("git rev-parse HEAD", workpieceDir, context.io)).trim();
+        const dirty = await isWorkpieceDirty(workpieceDir, context.io);
+        if (
+          prevReport.workpieceHeadAtReconcile &&
+          prevReport.workpieceHeadAtReconcile === currentHead &&
+          !dirty.dirty
+        ) {
+          return {
+            data: {
+              missionId,
+              systemId: manifest.systemId,
+              commitSha: null,
+              workpieceHeadAtReconcile: currentHead,
+              alreadyReconciled: true,
+            } as unknown as MissionReconcileData,
+            exitCode: 0,
+            summary: `[mission.reconcile] ${missionId} already reconciled at ${currentHead.slice(0, 8)} — no-op`,
+            nextSteps: [
+              {
+                action: `Close the mission: pnpm exec werkstatt run mission.close --mission ${missionId}`,
+                kind: "optional",
+              },
+            ],
+          };
+        }
+      } catch {
+        // Missing/unreadable report or non-git workpiece — fall through to the merge path.
+      }
+    }
+
     const now = new Date().toISOString();
     const missionDir = await resolveMissionDir(workspaceRoot, missionId, context.io);
 
@@ -2271,6 +2278,15 @@ export async function buildReconcileSteps(
         const workpieceBranch = (
           await shExec("git rev-parse --abbrev-ref HEAD", cc.workpieceDir, cc.context.io)
         ).trim();
+        // RFC-1327: pre-merge residue sweep — untracked on-disk generated files
+        // (pre-fix residue or post-rewind un-ignore) would crash the merge with
+        // "untracked working tree files would be overwritten".
+        const swept = await sweepUntrackedGeneratedResidue(cc.systemDir, cc.context.io);
+        if (swept.length > 0) {
+          cc.context.logger.info(
+            `  Swept ${swept.length} untracked generated file(s) before merge`,
+          );
+        }
         await shExec(
           `git fetch ${JSON.stringify(cc.workpieceDir)} ${JSON.stringify(workpieceBranch)}`,
           cc.systemDir,

@@ -6,7 +6,6 @@
 </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1159: step 4 — exec.exitcode.lint command, sweep remainder, packages-check wiring</item>
   <item>RFC-1190: restore mission context + evidence archival in release-mode deploys
 
 RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-identity → currentMission), MISSION_CONTEXT_UNRESOLVED/MISMATCH blocking, fail-closed EVIDENCE_SYNC_FAILED with --skip-evidence-sync as sole escape hatch, journaled evidence-sync-* ship steps after each certify-*, evidence.sync --site/--system flag.
@@ -15,7 +14,8 @@ RFC-1190: precedence-ordered resolveMissionContext (--mission → release build-
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1263</item>
   <item>RFC-1264</item>
-  <history>ADR-0010, ADR-0084, RECOVERY-2026, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097, RFC-1149</history>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
+  <history>ADR-0010, ADR-0084, RECOVERY-2026, RFC-0355, RFC-0477, RFC-0480, RFC-0522, RFC-0560, RFC-0580, RFC-0593, RFC-0597, RFC-0652, RFC-0655, RFC-0658, RFC-0703, RFC-0705, RFC-0734, RFC-0762, RFC-0797, RFC-0801, RFC-0820, RFC-0822, RFC-0878, RFC-0913, RFC-0958, RFC-0991, RFC-0992, RFC-1097, RFC-1149, RFC-1159</history>
 </CHANGE_SUMMARY>
 */
 
@@ -217,6 +217,19 @@ export async function runMissionClose(
   // RFC-0522: releaseId precedence — flag overrides manifest (written by release.prepare)
   const releaseId = releaseIdFlag ?? manifest.releaseId ?? null;
 
+  // RFC-1327: re-running close on an already-closed mission is a no-op exit-0;
+  // aborted or mid-operation states keep throwing.
+  if (manifest.state === "closed") {
+    return {
+      data: {
+        missionId,
+        systemId: manifest.systemId,
+        alreadyClosed: true,
+      } as unknown as MissionCloseData,
+      exitCode: 0,
+      summary: `[mission.close] ${missionId} already closed — no-op`,
+    };
+  }
   if (manifest.state !== "open") {
     throw new Error(
       `[mission.close] mission '${missionId}' is not open (state: ${manifest.state})`,

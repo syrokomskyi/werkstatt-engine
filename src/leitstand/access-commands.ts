@@ -16,9 +16,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1097: sweep — werkstatt-engine clean
-
-Sweep batch 4: 73 Compass headers on headerless engine files (certification, component-runtime, isolation, evolution, testing), real KEY_DECISIONS on 75 files (kernel, cache, dht, swim, gitmesh, runtime), ~80 purpose expansions (CONTRACT-02/PURPOSE-02), non-goals on 13 CONTRACT-03 files, CS-07 history literal fix repo-wide (253 files). Policy: .template.ts/.template.astro excludedPaths. werkstatt-engine now 0 diagnostics.</item>
   <item>RFC-1249: wire werkstatt.commands.validate into packages.check + retire CMD-OUTPUT debt</item>
   <item>RFC-1254: drop unused io-migration leftovers</item>
   <item>RFC-1284: suspend/resume commands, crash-safe marker, status tri-state
@@ -42,6 +39,7 @@ F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
 F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
   <history>RFC-0899, RFC-1065, RFC-1097</history>
 </CHANGE_SUMMARY>
 */
@@ -189,10 +187,24 @@ export async function runLeitstandAccessProtect(
   const systemId = requireSite(input, "leitstand.access.protect");
 
   const pinArg = flagString(input, "pin");
+  const workspaceRoot = context.workspaceRoot;
+
+  // RFC-1327: re-running without an explicit --pin while a PIN is already
+  // recorded must not silently rotate the secret — converge to a no-op.
+  if (!pinArg) {
+    const existing = await readSystemState(workspaceRoot, systemId);
+    if (existing.accessPin) {
+      return {
+        data: { pin: existing.accessPin, channels: [] },
+        summary: `[leitstand.access.protect] ${systemId} already protected — no-op (pass --pin to rotate)`,
+        exitCode: undefined,
+      };
+    }
+  }
+
   const pin = pinArg ?? generateRandomPin();
   validatePin(pin);
 
-  const workspaceRoot = context.workspaceRoot;
   const systemConfig = await readSystemConfigSmart(workspaceRoot, systemId);
   const channels = accessChannels(systemConfig, "leitstand.access.protect", systemId);
   const env = await buildSecretsEnv(workspaceRoot, systemId, context.io);

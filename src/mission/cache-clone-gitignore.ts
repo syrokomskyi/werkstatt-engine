@@ -11,6 +11,7 @@
   <item>RFC-1149: migrate ambient filesystem and process IO to the WorkspaceIO port across engine and shared</item>
   <item>RFC-1179: add releases/ to CACHE_CLONE_ONLY_PATTERNS so merge-restore keeps release evidence gitignored (ADR-0085 closed-workpiece exemption for deploy.smoke.run writes)</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
 </CHANGE_SUMMARY>
 */
 
@@ -107,4 +108,29 @@ export async function untrackForbiddenGeneratedFiles(
     }
   }
   return untracked;
+}
+
+/**
+ * RFC-1327: delete on-disk copies of generated artifacts that git does not
+ * track — residue left by pre-RFC-1327 untrack passes (or a .gitignore-stripping
+ * rewind) would otherwise crash `git merge` with "untracked working tree files
+ * would be overwritten". Regenerable files only; tracked files are never
+ * touched. Call before fetch-and-merge, after any rewind.
+ */
+export async function sweepUntrackedGeneratedResidue(
+  systemDir: string,
+  io: WorkspaceIO = createDefaultIO().io,
+): Promise<string[]> {
+  const swept: string[] = [];
+  for (const pattern of CACHE_CLONE_GENERATED_PATTERNS) {
+    const abs = path.join(systemDir, pattern);
+    if (!(await io.exists(abs))) continue;
+    const tracked = await io.exec("git", ["ls-files", "--error-unmatch", "--", pattern], {
+      cwd: systemDir,
+    });
+    if (tracked.exitCode === 0) continue; // tracked — merge owns it
+    await io.rm(abs, { recursive: true }).catch(() => {});
+    swept.push(pattern);
+  }
+  return swept;
 }

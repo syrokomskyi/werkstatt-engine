@@ -13,6 +13,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1327: initial rerun coverage for the ship reconcile-skip gate.</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
 </CHANGE_SUMMARY>
 */
 

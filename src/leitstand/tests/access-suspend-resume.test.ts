@@ -23,6 +23,7 @@ F5: sternsystem.validate declares ACCESS-01/02 + system-state.yaml reads.
 F6: isProtectedLiveTarget exported and covered (AC-12 probe repointed).
 F7: fresh-read ordering proven — suspension opened mid-deploy suppresses
 the re-assert.</item>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
   <history>RFC-1284</history>
 </CHANGE_SUMMARY>
 */
@@ -266,5 +267,38 @@ describe("RFC-1284: marker normalization", () => {
       written.accessPinSuspended,
       "unprotect must dissolve the marker — permanent unprotection leaves no suspension",
     ).toBeNull();
+  });
+});
+
+describe("RFC-1327: protect rerun convergence", () => {
+  it("protect without --pin on an already-pinned site is a no-op, not a rotation", async () => {
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: "1111" }));
+
+    const result = await runLeitstandAccessProtect(
+      makeInput({ site: "test-bundle" }),
+      makeContext("/tmp/test"),
+    );
+
+    expect(result.data!.pin).toBe("1111");
+    expect(result.summary).toContain("already protected");
+    expect(
+      runWranglerSecretPut,
+      "no --pin + recorded accessPin must not rotate the deployed secret",
+    ).not.toHaveBeenCalled();
+    expect(writeSystemState).not.toHaveBeenCalled();
+  });
+
+  it("explicit --pin still rotates even when a PIN is recorded", async () => {
+    vi.mocked(readSystemConfigSmart).mockResolvedValueOnce(makeConfig());
+    vi.mocked(readSystemState).mockResolvedValueOnce(makeState({ accessPin: "1111" }));
+    vi.mocked(runWranglerSecretPut).mockResolvedValue(wranglerOk);
+
+    const result = await runLeitstandAccessProtect(
+      makeInput({ site: "test-bundle", pin: "9999" }),
+      makeContext("/tmp/test"),
+    );
+
+    expect(result.data!.pin).toBe("9999");
+    expect(runWranglerSecretPut).toHaveBeenCalled();
   });
 });

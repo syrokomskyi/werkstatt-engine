@@ -362,6 +362,10 @@
       "types": "./src/testing/boot/index.ts",
       "default": "./src/testing/boot/index.ts"
     },
+    "./testing/run-twice": {
+      "types": "./src/testing/run-twice.ts",
+      "default": "./src/testing/run-twice.ts"
+    },
     "./e2e": {
       "types": "./src/e2e/index.ts",
       "default": "./src/e2e/index.ts"

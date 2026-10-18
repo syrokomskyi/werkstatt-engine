@@ -36,22 +36,24 @@ export interface RunResult {
   status?: string;
 }
 
-export interface RerunCase<TSnapshot> {
+export interface RerunCase<TSnapshot, TRun extends RunResult = RunResult> {
   /** Execute the command under test once (run 1 and run 2 share the fixture). */
-  run: () => Promise<RunResult>;
+  run: () => Promise<TRun>;
   /** Fingerprint the state the command owns — must be deterministic. */
   snapshot: () => Promise<TSnapshot> | TSnapshot;
   /** Optional second-run expectation override; defaults to equal status + equal snapshot. */
-  expectSecondRun?: (first: RunResult, second: RunResult) => void;
+  expectSecondRun?: (first: TRun, second: TRun) => void;
 }
 
 /**
  * Run `probe.run()` twice and assert the second run converges:
  * identical `status`/`exitCode` and an unchanged snapshot.
  */
-export async function expectRerunSafe<TSnapshot>(probe: RerunCase<TSnapshot>): Promise<{
-  first: RunResult;
-  second: RunResult;
+export async function expectRerunSafe<TSnapshot, TRun extends RunResult = RunResult>(
+  probe: RerunCase<TSnapshot, TRun>,
+): Promise<{
+  first: TRun;
+  second: TRun;
   snapshot: TSnapshot;
 }> {
   const first = await probe.run();
@@ -65,10 +67,7 @@ export async function expectRerunSafe<TSnapshot>(probe: RerunCase<TSnapshot>): P
     expect(second.status).toBe(first.status);
     expect(second.exitCode).toBe(first.exitCode);
   }
-  expect(
-    after,
-    "second run changed owned state — command is not rerun-safe",
-  ).toEqual(before);
+  expect(after, "second run changed owned state — command is not rerun-safe").toEqual(before);
 
   return { first, second, snapshot: after };
 }
@@ -79,6 +78,10 @@ export async function expectRerunSafe<TSnapshot>(probe: RerunCase<TSnapshot>): P
  */
 export function snapshotGitTree(dir: string): string {
   const git = (args: string) =>
-    execSync(`git ${args}`, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    execSync(`git ${args}`, {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
   return `${git("rev-parse HEAD")}\n${git("status --porcelain")}`;
 }

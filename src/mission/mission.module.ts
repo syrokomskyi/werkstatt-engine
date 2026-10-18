@@ -7,12 +7,12 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1256: a11y.contrast.lint + mission.deploy-preflight — early deploy-blocker detection</item>
   <item>RFC-1256: review fixes — manifest-derived systemId, at-statement boundary, alpha/NaN guards, resolveSiteWorkspace, execOnReadOnly drift</item>
   <item>RFC-1263</item>
   <item>RFC-1264</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
-  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176, RFC-1199, RFC-1231, RFC-1248</history>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
+  <history>ADR-0041, ADR-0096, RFC-0560, RFC-1028, RFC-1095, RFC-1097, RFC-1146, RFC-1173, RFC-1176, RFC-1199, RFC-1231, RFC-1248, RFC-1256</history>
 </CHANGE_SUMMARY>
 */
 
@@ -56,7 +56,8 @@ export async function createMissionModule(): Promise<ModuleExport> {
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
-        idempotency: "rerun-safe",
+        idempotency: "not-idempotent",
+        idempotencyNote: "Each run opens a NEW mission (mNNNNNN+1) — a re-run is never a no-op.",
         flags: {
           system: { kind: "string", required: true, description: "Sternsystem id." },
           brief: { kind: "string", required: true, description: "Mission brief." },

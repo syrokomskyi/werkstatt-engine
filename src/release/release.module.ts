@@ -7,7 +7,6 @@
   </non-goals>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1173: fixup: flip mutatesState to true on 19 commands that declare writes/generates — the codemod's name-suffix rules misclassified leitstand.dev-deploy, leitstand.certify, coverage.report and peers as read-only; declared writes imply mutation</item>
   <item>RFC-1231: step 1 — rename supportsAllSites to acceptsAllFlag
 
 Mechanical sweep: the field only ever gated --all argv acceptance; fan-out
@@ -17,6 +16,7 @@ surfaces (KernelCommandMetadata, ForgeCommandMetadata) in one atomic pass.</item
   <item>RFC-1248: VITE-CLIENT-DEP-02 lazy-import gate + SCAN-02 validator reads-root existence check (RFC-1248)</item>
   <item>RFC-1248: suppress transient releases/.werkstatt/ validator reads + complete PIPELINE-LOG rules declaration (RFC-1248 review r2)</item>
   <item>RFC-1327: run-twice idempotency — declarations, command.idempotency.validate, rerun tests, reconcile/ship/abort convergence fixes</item>
+  <item>RFC-1327: review r1 — lock-safe reconcile gate, residue sweep, honest idempotency classes</item>
   <history>RFC-0655, RFC-0656, RFC-0931, RFC-1097, RFC-1173</history>
 </CHANGE_SUMMARY>
 */
@@ -48,7 +48,9 @@ export async function createReleaseModule(): Promise<ModuleExport> {
         scope: "workspace",
         acceptsAllFlag: false,
         mutatesState: true,
-        idempotency: "rerun-safe",
+        idempotency: "not-idempotent",
+        idempotencyNote:
+          "Each run mints a new release id — re-running creates a new release, not a no-op.",
         flags: {
           mission: { kind: "string", required: true, description: "Mission id to release." },
           semver: { kind: "string", default: "0.1.0", description: "Release semantic version." },
