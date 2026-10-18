@@ -20,11 +20,11 @@
   </key-decisions>
 </MODULE_CONTRACT>
 <CHANGE_SUMMARY>
-  <item>RFC-1324: satisfy family agent-readiness baseline + h1 contract — level:1 heading, faq-list+faq entries, services record, identity.legal for scaffold placeholders</item>
   <item>RFC-1324: project service-kind PBP products into organization.services (Service JSON-LD satisfiable on PBP-native sites); compose seam gains src-root files for the image-delivery escape hatch</item>
   <item>RFC-1324: provision ../pipelines sibling into the clone root so optional axiom link deps resolve and gated probes (a11y.axe) actually execute</item>
   <item>RFC-1324: isolate each matrix fixture in its own werkstatt child process (CI parity) — no registry/env state crosses cold births; runStep records errorStack</item>
   <item>RFC-1324: preflight checks tracked modifications only (--untracked-files=no) — the clone copies committed state, untracked files can neither enter it nor execute</item>
+  <item>RFC-1324</item>
   <history>RFC-0965, RFC-0988, RFC-1189, RFC-1249, RFC-1307, RFC-1324</history>
 </CHANGE_SUMMARY>
 */
@@ -304,8 +304,29 @@ async function runFixtureInChildProcess(opts: {
 
   // Child boot + clone install margin beyond the stage budget itself.
   const child = await io.exec("pnpm", argv, { cwd: workspaceRoot, timeoutMs: timeoutMs + 120_000 });
-  const fixtureReport = parseChildMatrix(child.stdout)?.fixtures[0];
+  const matrix = parseChildMatrix(child.stdout);
+  const fixtureReport = matrix?.fixtures[0];
   if (fixtureReport) return fixtureReport;
+
+  // A parsed child with zero fixtures means the child failed before any birth
+  // (e.g. its own preflight) — surface its summary instead of "no report".
+  if (matrix) {
+    const error = `isolated fixture child reported no fixture result: ${matrix.summary}`;
+    return {
+      fixture,
+      systemId,
+      coldRoot: "",
+      steps: [
+        { step: "fixture-child", attempts: 1, durationMs: 0, ok: false, status: "fail", error },
+      ],
+      interventions: 0,
+      reachedPhase: until,
+      timedOut: false,
+      withDeploy,
+      ok: false,
+      summary: `[werkstatt.e2e.cold] ${fixture}: ${error}`,
+    };
+  }
 
   const stderrTail = child.stderr.slice(-1500).trim();
   const error = `isolated fixture child produced no JSON report (exit ${child.exitCode})${stderrTail ? ` — ${stderrTail}` : ""}`;
