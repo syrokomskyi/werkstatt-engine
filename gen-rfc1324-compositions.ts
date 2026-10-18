@@ -9,6 +9,7 @@
 <CHANGE_SUMMARY>
   <item>RFC-1324: initial — per-fixture composition emission from declarative specs.</item>
   <item>RFC-1324</item>
+  <item>RFC-1324: cold-run defect: fixture page descriptions under semantic.drift 50-char SEO floor</item>
 </CHANGE_SUMMARY>
 */
 // Run: pnpm exec tsx gen-rfc1324-compositions.ts (from packages/werkstatt-engine)
@@ -684,8 +685,8 @@ const fixtures: FixtureSpec[] = [
     nativeNames: { ru: "Русский", uz: "Oʻzbekcha" },
     tagline: { ru: "Проверяемое качество по честной цене" },
     defaultDescription: {
-      ru: "Информационный сайт E2E Valid GmbH.",
-      uz: "E2E Valid GmbH axborot sayti.",
+      ru: "Информационный сайт E2E Valid GmbH: компания, страницы и способы связи.",
+      uz: "E2E Valid GmbH axborot sayti: kompaniya, sahifalar va aloqa usullari.",
     },
     skipLinkLabel: { ru: "Перейти к содержимому", uz: "Asosiy mazmunga oʻtish" },
     pages: [
@@ -718,7 +719,7 @@ const fixtures: FixtureSpec[] = [
         },
         description: {
           ru: "Сведения о компании E2E Valid GmbH и об этом сайте.",
-          uz: "E2E Valid GmbH va bu sayt haqida maʼlumot.",
+          uz: "E2E Valid GmbH va bu sayt haqida maʼlumot: kompaniya va sahifalar.",
         },
         heading: { ru: "О компании", uz: "Kompaniya haqida" },
         prose: "about-company",
@@ -734,8 +735,8 @@ const fixtures: FixtureSpec[] = [
           uz: "Aloqa | E2E Valid GmbH",
         },
         description: {
-          ru: "Как связаться с E2E Valid GmbH.",
-          uz: "E2E Valid GmbH bilan qanday bogʻlanish mumkin.",
+          ru: "Как связаться с E2E Valid GmbH: электронная почта, адрес и время ответа.",
+          uz: "E2E Valid GmbH bilan qanday bogʻlanish mumkin: elektron pochta va manzil.",
         },
         heading: { ru: "Контакты", uz: "Aloqa" },
         prose: "contacts",
@@ -793,8 +794,8 @@ const fixtures: FixtureSpec[] = [
     nativeNames: { de: "Deutsch", en: "English" },
     tagline: { de: "Nachweisbare Qualität zum fairen Preis" },
     defaultDescription: {
-      de: "Informationsseite der E2E Demowerk GmbH.",
-      en: "Informational site of E2E Demowerk GmbH.",
+      de: "Informationsseite der E2E Demowerk GmbH: Unternehmen, Seiten und Kontakt.",
+      en: "Informational site of E2E Demowerk GmbH: company, pages, and contact.",
     },
     skipLinkLabel: { de: "Zum Inhalt springen", en: "Skip to content" },
     pages: [
@@ -843,8 +844,8 @@ const fixtures: FixtureSpec[] = [
           en: "Contact | E2E Demowerk GmbH",
         },
         description: {
-          de: "So erreichen Sie die E2E Demowerk GmbH.",
-          en: "How to reach E2E Demowerk GmbH.",
+          de: "So erreichen Sie die E2E Demowerk GmbH: E-Mail, Anschrift und Antwortzeiten.",
+          en: "How to reach E2E Demowerk GmbH: email address, postal address, and hours.",
         },
         heading: { de: "Kontakt", en: "Contact" },
         prose: "contacts",
@@ -901,7 +902,7 @@ const fixtures: FixtureSpec[] = [
     segments: ["en"],
     nativeNames: { en: "English" },
     tagline: { en: "Verifiable quality at a fair price" },
-    defaultDescription: { en: "Informational site of E2E Latinworks LLC." },
+    defaultDescription: { en: "Informational site of E2E Latinworks LLC: company, pages, and contact." },
     skipLinkLabel: { en: "Skip to content" },
     pages: [
       {
@@ -924,7 +925,7 @@ const fixtures: FixtureSpec[] = [
         planet: "Hyperion",
         routes: { en: "about" },
         title: { en: "About us | E2E Latinworks LLC" },
-        description: { en: "Information about E2E Latinworks LLC and this website." },
+        description: { en: "Information about E2E Latinworks LLC and the purpose of this website." },
         heading: { en: "About us" },
         prose: "about-company",
       },
@@ -935,7 +936,7 @@ const fixtures: FixtureSpec[] = [
         planet: "Hyperion",
         routes: { en: "contact" },
         title: { en: "Contact | E2E Latinworks LLC" },
-        description: { en: "How to reach E2E Latinworks LLC." },
+        description: { en: "How to reach E2E Latinworks LLC: email address and postal address." },
         heading: { en: "Contact" },
         prose: "contacts",
       },

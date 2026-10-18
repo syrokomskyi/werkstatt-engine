@@ -3,7 +3,7 @@ kind: page
 pageId: about
 cosmicStar: Mirach
 title: "Kompaniya haqida | E2E Valid GmbH"
-description: "E2E Valid GmbH va bu sayt haqida maʼlumot."
+description: "E2E Valid GmbH va bu sayt haqida maʼlumot: kompaniya va sahifalar."
 lang: uz
 blocks:
   - id: about-content
